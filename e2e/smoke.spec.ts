@@ -1,6 +1,13 @@
 import { expect, test } from '@playwright/test';
 
 test('smoke-canvas-and-ui-layer', async ({ page }) => {
+  // Fail on any uncaught page error or console error (e.g. a scene that throws on boot).
+  const errors: string[] = [];
+  page.on('pageerror', (err) => errors.push(err.message));
+  page.on('console', (msg) => {
+    if (msg.type() === 'error') errors.push(msg.text());
+  });
+
   await page.goto('/');
 
   const canvas = page.locator('#game canvas');
@@ -34,6 +41,8 @@ test('smoke-canvas-and-ui-layer', async ({ page }) => {
     [canvasBox!.x + canvasBox!.width / 2, canvasBox!.y + canvasBox!.height / 2],
   );
   expect(hit).toBe('CANVAS');
+
+  expect(errors).toEqual([]);
 
   await page.screenshot({ path: 'test-results/smoke-canvas-and-ui-layer/screenshot.png' });
 });
