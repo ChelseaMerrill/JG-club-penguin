@@ -16,20 +16,40 @@ Players create and customize their own penguin, just like in the original Club P
 
 ## Tech Stack
 
-To be decided during wireframing. Open decisions:
+Locked in issue #7:
 
-- Game engine / framework
-- Language
-- Multiplayer / real-time backend
-- Hosting and deployment
+- **Game:** Phaser 3 with Vite and TypeScript (no React wrapper)
+- **Realtime and auth:** Supabase Realtime and Supabase Auth (Google OAuth)
+- **Hosting:** Vercel static hosting
+- **Tooling:** ESLint, Prettier, Vitest, Playwright, GitHub Actions CI
 
 ## Project Status
 
-🚧 **Planning and wireframing.** No code yet.
+🚧 **Initial codebase.** A blank Phaser scene with a DOM overlay layer (`#ui`) for UI such as the login button.
 
 ## Getting Started
 
-Setup and run instructions will be added once the tech stack is chosen.
+Requires Node 22.12 or newer (see `.nvmrc`).
+
+```sh
+nvm use
+npm ci
+cp .env.example .env   # fill in VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY
+npm run dev            # http://localhost:5173
+```
+
+| Script | What it does |
+|---|---|
+| `npm run dev` | Start the Vite dev server |
+| `npm run build` | Typecheck and build the production bundle to `dist/` |
+| `npm run preview` | Serve the production build locally |
+| `npm run typecheck` | Run `tsc --noEmit` |
+| `npm run lint` | Run ESLint |
+| `npm run format` / `format:check` | Format with Prettier / check formatting |
+| `npm test` | Run Vitest unit tests |
+| `npm run test:e2e` | Run Playwright browser tests (first run: `npx playwright install chromium`) |
+
+CI runs typecheck, lint, format check, unit tests, and build on every pull request.
 
 ## Team
 

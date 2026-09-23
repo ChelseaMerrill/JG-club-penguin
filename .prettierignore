@@ -1,0 +1,13 @@
+dist
+node_modules
+playwright-report
+playwright-output
+test-results
+package-lock.json
+.claude
+.atlas
+# Existing hand-written docs are not reformatted by `npm run format`.
+docs
+CLAUDE.md
+CONTEXT.md
+README.md

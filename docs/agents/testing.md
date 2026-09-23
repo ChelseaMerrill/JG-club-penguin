@@ -16,13 +16,13 @@ rereading this guide.
 
 | Check | Command | Coverage | When | Status |
 |---|---|---|---|---|
-| typecheck | `unavailable (no package.json yet; expected tsc --noEmit)` | TypeScript type correctness | Every change | unavailable |
-| unit | `unavailable (no package.json yet; expected vitest)` | Unit behavior | Every change | unavailable |
-| lint | `unavailable (no linter configured; expected eslint)` | Static code issues | Every change | unavailable |
-| format | `unavailable (no formatter configured; expected prettier)` | Code layout | Before lint | unavailable |
-| build | `unavailable (no package.json yet; expected vite build)` | Production SPA build for Vercel | Before PR | unavailable |
-| e2e | `unavailable (no Playwright config yet)` | Browser flows incl. two-client multiplayer | Before PR | unavailable |
-| run | `unavailable (no package.json yet; expected vite dev server)` | Local game in the browser | Manual verification | unavailable |
+| typecheck | `npm run typecheck` | TypeScript type correctness (`tsc --noEmit`) | Every change | verified |
+| unit | `npm test` | Unit behavior (Vitest, `src/**/*.test.ts`) | Every change | verified |
+| lint | `npm run lint` | Static code issues (ESLint + typescript-eslint) | Every change | verified |
+| format | `npm run format:check` (fix with `npm run format`) | Code layout (Prettier) | Before lint | verified |
+| build | `npm run build` | Production SPA build for Vercel (`tsc --noEmit && vite build` to `dist/`) | Before PR | verified |
+| e2e | `npm run test:e2e` | Browser flows (Playwright, chromium); currently the canvas + `#ui` layer smoke only | Before PR | verified |
+| run | `npm run dev` | Local game in the browser at http://localhost:5173 | Manual verification | verified |
 
 `verified` means the command ran successfully here. `inferred` means configuration names it but setup did not execute it. `unavailable` is an explicit gap.
 
