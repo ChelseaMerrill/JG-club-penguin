@@ -1,5 +1,10 @@
 {
   "enabledPlugins": {
     "atlas@atlas-plugins": true
+  },
+  "hooks": {},
+  "permissions": {
+    "ask": [],
+    "deny": []
   }
 }

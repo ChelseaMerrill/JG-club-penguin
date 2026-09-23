@@ -1,0 +1,60 @@
+{
+  "atlas_version": "0.1.0",
+  "cloud_tools": [
+    "vercel",
+    "supabase"
+  ],
+  "customized_files": {},
+  "guardrails_mode": "off",
+  "guardrails_off_authorization": null,
+  "hook_activation": {
+    "decision": "standard",
+    "hook_managers": [],
+    "preexisting_hooks_path": ""
+  },
+  "human_only_state_ids": [],
+  "human_only_states": [
+    "closed"
+  ],
+  "managed_files": {},
+  "managed_sections": {
+    ".gitattributes": "gitattributes",
+    ".gitignore": "gitignore",
+    "CLAUDE.md": "guidance",
+    "README.md": "readme",
+    "docs/agents/issue-tracker.md": "tracker",
+    "docs/agents/planning.md": "planning",
+    "docs/agents/testing.md": "testing",
+    "docs/agents/tooling.md": "tooling",
+    "docs/atlas-operators-guide.md": "operators-guide"
+  },
+  "mattpocock_skills_marketplace": "claude-plugins-official",
+  "mattpocock_skills_tested": "1.2.0",
+  "repositories": [
+    {
+      "id": "JG-club-penguin",
+      "path": ".",
+      "protected_branches": [
+        "main"
+      ]
+    }
+  ],
+  "section_provenance": {
+    ".gitattributes": "ee2483103e4535a08218c30d2d183f93e748055fe4e49383b9b1696c0ab92c41",
+    ".gitignore": "51662d61f56fc55514c50fbc54f5990fb61140503f2ea54d143c848559e2e6f8",
+    "CLAUDE.md": "3d74da0830fec09bdd4bfde4b34a0930966cf2ed8eddd956b689ef5e535763eb",
+    "README.md": "825f176fb86a5ec73077dbedfffa8a91cd728dc7cdf3f7d7c51055e981da0f48",
+    "docs/agents/issue-tracker.md": "2f2d61d5c826001d5c32f5d185a2979b3f82d36a2ada995fd30dbba9a440381d",
+    "docs/agents/planning.md": "e80962d7f46695c5aa1809101fa57a6428dbe3c69c9d1a335ce258d147a52d97",
+    "docs/agents/testing.md": "8156e2ea06b683fd2d26d76464c0d8fe9db50dfbdf5912aed9cc0d5ac5a87201",
+    "docs/agents/tooling.md": "054a8d76e65dca82c5e318b2d8db677ae28d11b4274c9bc603a9e2a69be1fe43",
+    "docs/atlas-operators-guide.md": "fb8ab770ea8c6f2f41cb71955b4333d3be215076827c5ad16bfc86493c8e851c"
+  },
+  "settings_provenance": {
+    "hooks": {},
+    "permissions": {
+      "ask": [],
+      "deny": []
+    }
+  }
+}

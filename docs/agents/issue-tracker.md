@@ -43,3 +43,95 @@ Used by `/wayfinder`. The **map** is a single issue with **child** issues as tic
 - **Frontier query**: list the map's open children (`gh issue list --state open`, scoped to the map's sub-issues / task list), drop any with an open blocker (`issue_dependencies_summary.blocked_by > 0`, or an open issue in the `Blocked by` line) or an assignee; first in map order wins.
 - **Claim**: `gh issue edit <n> --add-assignee @me`, the session's first write.
 - **Resolve**: `gh issue comment <n> --body "<answer>"`, then `gh issue close <n>`, then append a context pointer (gist + link) to the map's Decisions-so-far.
+
+## Atlas delivery lifecycle
+
+<!-- atlas-v3:tracker:start -->
+# Issue tracker
+
+Tracker type: **github**.
+
+This document is the authoritative repository policy for tracker reads, writes,
+readiness, availability, claims, ownership, transitions, human-only actions,
+and planning-artifact publication.
+
+## States
+
+| State | Meaning |
+|---|---|
+| `needs-triage` | New issue awaiting a maintainer's evaluation; a human decides ready-for-agent, ready-for-human, needs-info, or wontfix. |
+| `atlas:planning` | Atlas is producing the technical plan for this issue. |
+| `atlas:plan-review` | Plan posted as an issue comment; red-team review runs here when the plan is risky. |
+| `atlas:in-progress` | Implementation underway in a worktree under .claude/worktrees. |
+| `atlas:ai-review` | Aggregate AI review and verification of the change. |
+| `atlas:human-review` | Pull request open against main, awaiting human review and merge. |
+| `closed` | Merged and done; only a human closes the issue. |
+
+Human-only states: `closed`.
+
+Recommended lifecycle: `needs-triage` → `atlas:planning` → `atlas:plan-review` → `atlas:in-progress` → `atlas:ai-review` → `atlas:human-review` → `closed`.
+
+## Read and write rules
+
+- Read the complete ticket and comments before planning or implementation.
+- Check for available work before claiming. Available work is ready to
+  implement, unclaimed, in an eligible state, has no active impediment or
+  blocking decision, and every `blocked by` ticket is in
+  `closed`. A dependency that is not a `blocked by` edge does
+  not make work unavailable.
+- Claim before starting work and use one active owner. Enter
+  `needs-triage` only when starting any work.
+- Enter `atlas:planning` only when planning starts and
+  `atlas:plan-review` only when the plan is ready for review.
+- Enter `atlas:in-progress` only when implementation starts.
+- Enter `atlas:ai-review` only when aggregate AI code review starts.
+- Record blocks, approved scope changes, proof of work, and the PR URL.
+- Enter `atlas:human-review` only after verification and PR creation.
+- Compare the next Atlas phase with the last-known tracker state from the
+  initial ticket read or most recent successful transition. Do not fetch the
+  ticket solely for this comparison. When both map to the same state, record
+  the phase in its configured phase record or comment without requesting a
+  same-status transition.
+- Never enter `closed`; a human does that after reviewing the PR.
+- When blocked, preserve work, record the exact reason and resume instructions,
+  and follow the configured blocked-state behavior. On resume, reread the ticket
+  and avoid duplicating claims, transitions, workers, commits, or comments.
+- Planning artifact storage: **tracker**.
+- Drafts before approval: **false**.
+- Preview exact plan writes and transitions before publishing them. If drafts
+  are not permitted, return the draft without presenting it as tracker state.
+- Preserve stable ticket/spec requirements. Record evolving execution in
+  `[EXECUTION PLAN]`, `[PROGRESS]`, `[SCOPE CHANGE]`, `[BLOCKED]`,
+  `[AI CODE REVIEW]`, and `[CLOSEOUT]` records rather than silently rewriting
+  the contract. Write the complete AI Code Review output to the ticket before
+  entering `atlas:human-review`.
+
+Before creating, classifying, prioritizing, or decomposing tickets, also read
+and follow `docs/agents/triage-labels.md`. Do not infer labels or priority from
+this document.
+
+## Readiness
+
+Ready to plan: Open issue labelled ready-for-agent, not the wayfinder:map issue, with a clear problem and outcome; otherwise return to /grill-with-docs or Wayfinder.
+
+Ready to implement: Plan comment posted on the issue, no open blockers (GitHub native issue dependencies or a 'Blocked by:' line), and no needs-info label or open wayfinder:grilling decision it depends on.
+
+Available to claim: Open, no assignee, no open blocked_by dependency. Claim by assigning; an assigned issue belongs to that person or agent.
+
+## Sources and pull requests
+
+| Repository | Path | Source host | Base branch | PR creation command |
+|---|---|---|---|---|
+| `JG-club-penguin` | `.` | github | `main` | `gh pr create --base main --head <feature-branch>` |
+
+Open one PR per affected repository.
+
+The tracker and source host may differ. Never infer tracker operations from the
+source host.
+
+## Atlas closeout record
+
+Record every repository delivery, deliverable and worker/model, each DoD
+outcome and evidence, deviations, verified run command, deployed smoke when
+applicable, every PR URL, and the AI Code Review output.
+<!-- atlas-v3:tracker:end -->
