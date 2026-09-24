@@ -16,6 +16,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import opentype from 'opentype.js';
+import * as prettier from 'prettier';
 
 const REPO_ROOT = process.cwd();
 const BUMBASTIKA_PATH = path.join(REPO_ROOT, 'design', 'assets', 'bumbastika.ttf');
@@ -153,7 +154,14 @@ async function main(): Promise<void> {
     '\n' +
     '};\n';
 
-  await writeFile(OUTPUT_PATH, contents, 'utf8');
+  // Formatted with this repo's own Prettier config (the same as `npm run
+  // format` would apply) so the committed output is always already
+  // repo-formatted and a second run -- or `npm run format` -- never touches
+  // it again.
+  const prettierConfig = (await prettier.resolveConfig(OUTPUT_PATH)) ?? {};
+  const formatted = await prettier.format(contents, { ...prettierConfig, filepath: OUTPUT_PATH });
+
+  await writeFile(OUTPUT_PATH, formatted, 'utf8');
   console.log(`Wrote ${path.relative(REPO_ROOT, OUTPUT_PATH)}`);
 }
 
