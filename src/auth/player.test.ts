@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { DEFAULT_LOOK } from '../contracts/penguin';
+import { DEFAULT_LOOK } from '../contracts';
 import {
   bindPlayer,
   ensurePlayer,
@@ -85,7 +85,7 @@ describe('loadPlayer', () => {
 });
 
 describe('ensurePlayer', () => {
-  it('upserts with ignoreDuplicates and never sends a penguin_color, then loads the default color', async () => {
+  it('upserts with ignoreDuplicates and never sends a penguin_color, then loads the database default colour #00bdff into look.body', async () => {
     const { client, upsert } = createFakeClient({
       row: { id: 'user-1', penguin_color: '#00bdff' },
     });

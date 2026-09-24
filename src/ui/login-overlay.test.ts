@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { DEFAULT_LOOK } from '../contracts/penguin';
+import { DEFAULT_LOOK } from '../contracts';
 import { createLoginOverlay } from './login-overlay';
 
 function setup() {

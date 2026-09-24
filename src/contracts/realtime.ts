@@ -3,7 +3,7 @@ import type { RoomId, Tile } from './rooms';
 
 /**
  * `room:<roomId>`, except the Igloo: `room:igloo:<playerId>`, since a Player
- * alone in their own igloo still has a Presence channel of one.
+ * alone in their own Igloo still has a Room channel of one.
  */
 export function roomChannelKey(roomId: RoomId, playerId: string): string {
   return roomId === 'igloo' ? `room:igloo:${playerId}` : `room:${roomId}`;
@@ -20,6 +20,9 @@ export interface PresencePayload {
   facing: Facing;
 }
 
+/**
+ * Producer/consumer: #28 bus; #43, #44.
+ */
 export interface RoomBroadcastMap {
   /** Producer/consumer: #43. */
   move: { playerId: string; target: Tile };
@@ -27,6 +30,9 @@ export interface RoomBroadcastMap {
   chat: { playerId: string; text: string; sentAt: number };
 }
 
+/**
+ * Producer/consumer: #28 bus; #43, #44.
+ */
 export type RoomBroadcastEvent = keyof RoomBroadcastMap;
 
 /**

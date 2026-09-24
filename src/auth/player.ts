@@ -1,4 +1,4 @@
-import { DEFAULT_LOOK, isHexColor, type PenguinLook } from '../contracts/penguin';
+import { DEFAULT_LOOK, isHexColor, type PenguinLook } from '../contracts';
 
 /**
  * The Player: identity plus Penguin look, read from `public.players` and

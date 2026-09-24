@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  DEFAULT_FACING,
   DEFAULT_LOOK,
   IDLE_EMOTES,
   PENGUIN_NAME_MAX,
@@ -20,6 +21,7 @@ describe('src/contracts barrel', () => {
     expect(IDLE_EMOTES).toHaveLength(5);
     expect(PENGUIN_NAME_MAX).toBe(16);
     expect(UNNAMED_PENGUIN).toBe('Unnamed Penguin');
+    expect(DEFAULT_FACING).toBe('right');
     expect(typeof createEmitter).toBe('function');
     expect(typeof gameEvents.on).toBe('function');
     expect(typeof roomChannelKey).toBe('function');

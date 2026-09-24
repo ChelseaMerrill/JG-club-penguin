@@ -1,3 +1,7 @@
+/**
+ * Used by every track: Phaser scenes and DOM overlays share the one
+ * `gameEvents` instance built from this shape.
+ */
 export interface TypedEmitter<M extends object> {
   on<K extends keyof M>(type: K, handler: (payload: M[K]) => void): () => void;
   off<K extends keyof M>(type: K, handler: (payload: M[K]) => void): void;
@@ -15,6 +19,18 @@ export interface TypedEmitter<M extends object> {
  * remaining handler for that same emit, and a nested `emit` (called from
  * inside a handler) delivers depth-first before the outer emit's remaining
  * handlers run.
+ *
+ * Handlers are stored in a `Set`: subscribing the same function twice for
+ * the same event type registers it once, not twice. `once` returns its own
+ * unsubscribe function; calling `off(type, originalHandler)` does not remove
+ * a still-pending `once` subscription, because `once` wraps the original
+ * handler in a new function that `off` never sees. A handler removed with
+ * `off` during an emit still receives that emit: the handler set is
+ * snapshotted before delivery starts.
+ *
+ * A handler that throws is isolated: `emit` reports the error via
+ * `console.error` and continues delivering to the remaining handlers, so one
+ * throwing listener can never abort a producer's own work (e.g. sign-out).
  */
 export function createEmitter<M extends object>(): TypedEmitter<M> {
   type Handler<K extends keyof M> = (payload: M[K]) => void;
@@ -47,7 +63,11 @@ export function createEmitter<M extends object>(): TypedEmitter<M> {
     if (!set) return;
     const payload = args[0] as M[K];
     for (const handler of Array.from(set)) {
-      handler(payload);
+      try {
+        handler(payload);
+      } catch (err) {
+        console.error(`[gameEvents] handler for "${String(type)}" threw`, err);
+      }
     }
   }
 

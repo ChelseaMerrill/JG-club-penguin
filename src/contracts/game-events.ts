@@ -1,14 +1,21 @@
 import { createEmitter, type TypedEmitter } from './emitter';
 import type { RoomEventMap } from './rooms';
 
+/**
+ * Producers: #37 (played), #27 `record_round`. Consumers: #27, #34, #42.
+ */
 export type MinigameId = 'bug-squash' | 'pancake-flip' | 'coffee-rush' | 'snow-cone-stand';
 
+/**
+ * Producers: #37 (played), #27 `record_round`. Consumers: #27, #34, #42.
+ */
 export type BadgeId = 'exterminator' | 'breakfast-club' | 'barista' | 'brain-freeze';
 
 /**
- * Per-minigame stats keys. #27's SQL and #37's games must both use exactly
- * these keys under `stats`; the two stretch games stay open (`Record<string,
- * number>`) until they're built.
+ * Per-minigame stats keys. Producer: #37. Consumers: #27 (SQL keys), #32,
+ * stretch #46. #27's SQL and #37's games must both use exactly these keys
+ * under `stats`; the two stretch games stay open (`Record<string, number>`)
+ * until they're built.
  */
 export interface MinigameStatsMap {
   'bug-squash': { squashed: number };
@@ -23,6 +30,9 @@ export interface MinigameStatsMap {
   'snow-cone-stand': Record<string, number>;
 }
 
+/**
+ * Producer: #37. Consumers: #27 (SQL keys), #32, stretch #46.
+ */
 export type MinigameCompleted = {
   [K in MinigameId]: { minigameId: K; score: number; stats: MinigameStatsMap[K] };
 }[MinigameId];

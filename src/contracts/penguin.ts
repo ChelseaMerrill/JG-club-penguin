@@ -1,13 +1,17 @@
 import type { RoomId, Tile } from './rooms';
 
-/** A 6-digit hex color, e.g. `#00BDFF`. */
+/**
+ * A 6-digit hex color, e.g. `#00BDFF`. Backs every `PenguinLook` colour
+ * field. Producers: #35 Creator, #27 stored defaults. Consumers: #31
+ * renderer, #28 Room channel payload.
+ */
 export type HexColor = `#${string}`;
 
 const HEX_COLOR_PATTERN = /^#[0-9a-fA-F]{6}$/;
 
 /**
  * Matches a 6-digit hex color such as `#00BDFF` or the design's lowercase
- * `#3a4046`. Case is accepted but never normalised here: #31 must hash a
+ * `#3a4046`. Case is accepted but never normalized here: #31 must hash a
  * lowercased look before comparing, and #27's check constraints must stay
  * case-insensitive.
  */
@@ -15,8 +19,10 @@ export function isHexColor(value: string): value is HexColor {
   return HEX_COLOR_PATTERN.test(value);
 }
 
-// Verbatim from design/Penguin Creator.dc.html (the `JG`, cap/beak/feet `sw`
-// arrays), including the lowercase `#3a4046` swatch as authored.
+/**
+ * Verbatim from design/Penguin Creator.dc.html (the `JG`, cap/beak/feet `sw`
+ * arrays), including the lowercase `#3a4046` swatch as authored.
+ */
 export const BODY_COLORS: readonly HexColor[] = [
   '#161719',
   '#0C4B5F',
@@ -44,9 +50,10 @@ export type Pattern = (typeof PATTERNS)[number];
 export const EYES = ['ROUND', 'SLEEPY', 'STAR', 'WINK'] as const;
 export type Eyes = (typeof EYES)[number];
 
-// The design's own `emotes` list also has SNOWBALL (a stretch throw) and
-// FACEPALM (a stretch reaction); the idle set here keeps only the five
-// loopable idle animations.
+/**
+ * The five idle animations. The design's list also has SNOWBALL and
+ * FACEPALM, which are excluded by #26.
+ */
 export const IDLE_EMOTES = ['WADDLE', 'WAVE', 'DANCE', 'LAUGH', 'SIT'] as const;
 export type IdleEmote = (typeof IDLE_EMOTES)[number];
 
@@ -75,6 +82,9 @@ export interface PenguinLook {
   emote: IdleEmote;
 }
 
+/**
+ * Consumers: #35 Creator, #34 first sign-in, #31.
+ */
 export const DEFAULT_LOOK: PenguinLook = {
   name: '',
   body: '#161719',
@@ -91,10 +101,18 @@ export const DEFAULT_LOOK: PenguinLook = {
 /**
  * Sprite mirroring direction. The design mirrors the Penguin figure with
  * `scaleX(-1)`; there is no 4-way sprite.
+ *
+ * Producer: #14. Consumers: #28, #31 (mirrors the sprite).
  */
 export type Facing = 'left' | 'right';
 
-/** Producer: #14. Consumers: #28/#43, #31. Tile coordinates, never pixels. */
+/** Producer: #14. Consumers: #28, #31 (mirrors the sprite). */
+export const DEFAULT_FACING: Facing = 'right';
+
+/**
+ * Producer: #14. Consumers: #28/#43, #31. Isometric tile coordinates, never
+ * pixels.
+ */
 export interface PenguinState {
   playerId: string;
   roomId: RoomId;

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { DEFAULT_LOOK } from '../contracts/penguin';
+import { DEFAULT_LOOK } from '../contracts';
 import {
   startAuth,
   type AuthClient,

@@ -1,6 +1,5 @@
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import design from '../../design/Penguin Creator.dc.html?raw';
 import {
   BEAK_COLORS,
   BODY_COLORS,
@@ -17,8 +16,6 @@ import {
 // Reads the mirrored design file directly rather than comparing against
 // literals copied into this test, so the test fails if the contract ever
 // drifts from the design instead of drifting alongside a hand-copied fixture.
-const designPath = fileURLToPath(new URL('../../design/Penguin Creator.dc.html', import.meta.url));
-const design = readFileSync(designPath, 'utf-8');
 
 function extractArray(source: string, pattern: RegExp): string[] {
   const match = source.match(pattern);

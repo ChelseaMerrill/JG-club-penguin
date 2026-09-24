@@ -77,4 +77,34 @@ describe('createEmitter', () => {
     expect(handler).toHaveBeenCalledTimes(1);
     expect(handler).toHaveBeenCalledWith(undefined);
   });
+
+  it('a throwing handler does not stop later handlers for the same emit', () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const emitter = createEmitter<TestEvents>();
+    const calls: string[] = [];
+    emitter.on('ping', () => {
+      calls.push('first');
+      throw new Error('boom');
+    });
+    emitter.on('ping', () => calls.push('second'));
+
+    emitter.emit('ping', { value: 'x' });
+
+    expect(calls).toEqual(['first', 'second']);
+    consoleError.mockRestore();
+  });
+
+  it('reports a throwing handler via console.error', () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const emitter = createEmitter<TestEvents>();
+    const error = new Error('boom');
+    emitter.on('ping', () => {
+      throw error;
+    });
+
+    emitter.emit('ping', { value: 'x' });
+
+    expect(consoleError).toHaveBeenCalledWith('[gameEvents] handler for "ping" threw', error);
+    consoleError.mockRestore();
+  });
 });
