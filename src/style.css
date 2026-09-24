@@ -612,3 +612,305 @@ body {
   box-shadow: inset 0 -5px 0 #06303d;
   color: var(--fg-primary);
 }
+
+/* Minigame shell (#37): a full-Stage overlay above the HUD, reproducing
+   `design/Minigame Bug Squash.dc.html` and `design/Minigame Pancake
+   Flip.dc.html`'s shared how-to-play/play/done chrome. Unlike `.hud`, the
+   whole overlay is `pointer-events: auto` so a click here never reaches the
+   canvas underneath (the Penguin can't move while a Minigame is open). */
+.minigame {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: auto;
+  background: rgba(10, 12, 15, 0.78);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.minigame__hex-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 48px;
+  padding: 0 24px;
+  border: none;
+  background: var(--jg-secondary);
+  clip-path: polygon(
+    14px 0,
+    calc(100% - 14px) 0,
+    100% 50%,
+    calc(100% - 14px) 100%,
+    14px 100%,
+    0 50%
+  );
+  box-shadow: inset 0 -5px 0 #06303d;
+  font-family: var(--font-game-display);
+  font-size: 18px;
+  letter-spacing: 0.06em;
+  color: var(--fg-primary);
+  cursor: pointer;
+}
+
+.minigame__howto-start {
+  background: var(--jg-primary);
+  box-shadow: inset 0 -5px 0 var(--jg-secondary);
+  color: var(--jg-dark);
+}
+
+.minigame__howto {
+  position: absolute;
+  left: 160px;
+  right: 160px;
+  top: 110px;
+  bottom: 110px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 30px 34px;
+  background: rgba(22, 23, 25, 0.96);
+  border: 3px solid var(--jg-secondary);
+  box-shadow: 0 10px 0 var(--jg-secondary);
+}
+
+.minigame__howto[hidden],
+.minigame__play[hidden],
+.minigame__done[hidden] {
+  display: none;
+}
+
+.minigame__howto-title {
+  font-family: var(--font-game-display);
+  font-size: 40px;
+  line-height: 1;
+  color: var(--jg-primary);
+  -webkit-text-stroke: 5px var(--jg-secondary);
+  paint-order: stroke fill;
+  text-shadow: 0 4px 0 var(--jg-secondary);
+}
+
+.minigame__howto-subtitle {
+  font: 400 12px var(--font-display);
+  letter-spacing: 0.22em;
+  color: var(--fg-primary);
+}
+
+.minigame__howto-list {
+  flex: 1;
+  margin: 0;
+  padding-left: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font: 700 15px/1.4 var(--font-body);
+  color: var(--fg-primary);
+}
+
+.minigame__howto-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  border-top: 2px solid var(--jg-secondary);
+  padding-top: 16px;
+}
+
+.minigame__play {
+  position: absolute;
+  left: 120px;
+  right: 120px;
+  top: 60px;
+  bottom: 60px;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 18px;
+  padding: 26px 30px;
+  background: rgba(22, 23, 25, 0.96);
+  border: 3px solid var(--jg-secondary);
+  box-shadow: 0 10px 0 var(--jg-secondary);
+}
+
+.minigame__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+.minigame__title {
+  font-family: var(--font-game-display);
+  font-size: 36px;
+  line-height: 1;
+  color: var(--jg-primary);
+  -webkit-text-stroke: 4px var(--jg-secondary);
+  paint-order: stroke fill;
+  text-shadow: 0 4px 0 var(--jg-secondary);
+}
+
+.minigame__counters {
+  display: flex;
+  gap: 28px;
+}
+
+.minigame__counter {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.minigame__counter-label {
+  font: 400 11px var(--font-display);
+  letter-spacing: 0.2em;
+  color: var(--fg-muted);
+}
+
+.minigame__counter-value {
+  font-family: var(--font-game-display);
+  font-size: 28px;
+  line-height: 1;
+  color: var(--fg-primary);
+}
+
+.minigame__stage {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.minigame__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  border-top: 2px solid var(--jg-secondary);
+  padding-top: 14px;
+}
+
+.minigame__done {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 22px;
+  width: 720px;
+  padding: 34px 38px;
+  background: rgba(22, 23, 25, 0.97);
+  border: 3px solid var(--jg-primary);
+  box-shadow:
+    0 0 0 3px var(--jg-secondary),
+    0 12px 0 var(--jg-secondary);
+  text-align: center;
+}
+
+.minigame__done-kicker {
+  font: 400 12px var(--font-display);
+  letter-spacing: 0.24em;
+  color: var(--fg-muted);
+}
+
+.minigame__done-title {
+  font-family: var(--font-game-display);
+  font-size: 48px;
+  line-height: 1;
+  color: var(--jg-primary);
+  -webkit-text-stroke: 6px var(--jg-secondary);
+  paint-order: stroke fill;
+  text-shadow: 0 5px 0 var(--jg-secondary);
+}
+
+.minigame__done-stats {
+  display: flex;
+  gap: 36px;
+}
+
+.minigame__done-stat {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.minigame__done-stat-label {
+  font: 400 11px var(--font-display);
+  letter-spacing: 0.2em;
+  color: var(--fg-muted);
+}
+
+.minigame__done-stat-value {
+  font-family: var(--font-game-display);
+  font-size: 30px;
+  line-height: 1;
+  color: var(--fg-primary);
+}
+
+.minigame__done-newbest {
+  position: absolute;
+  top: -14px;
+  right: 0;
+  padding: 2px 8px;
+  background: var(--jg-primary);
+  font: 400 10px var(--font-display);
+  letter-spacing: 0.1em;
+  color: var(--jg-dark);
+}
+
+.minigame__done-newbest[hidden] {
+  display: none;
+}
+
+.minigame__done-badge {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 18px;
+  background: rgba(12, 75, 95, 0.4);
+  border: 2px solid var(--jg-primary);
+  text-align: left;
+}
+
+.minigame__done-badge[hidden] {
+  display: none;
+}
+
+.minigame__done-badge-name {
+  font: 700 14px var(--font-body);
+  color: var(--fg-primary);
+}
+
+.minigame__done-badge-caption {
+  font: 400 11px var(--font-display);
+  letter-spacing: 0.16em;
+  color: var(--fg-muted);
+}
+
+.minigame__done-error {
+  font: 700 14px var(--font-body);
+  color: var(--fg-primary);
+}
+
+.minigame__done-error[hidden] {
+  display: none;
+}
+
+.minigame__done-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.stub-minigame__squash-button {
+  height: 72px;
+  padding: 0 40px;
+  border: none;
+  background: var(--jg-primary);
+  box-shadow: inset 0 -6px 0 var(--jg-secondary);
+  font-family: var(--font-game-display);
+  font-size: 26px;
+  letter-spacing: 0.06em;
+  color: var(--jg-dark);
+  cursor: pointer;
+}
+
+.stub-minigame__squash-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
