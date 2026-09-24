@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { DEFAULT_LOOK } from '../contracts';
 import { LANDING_CROWD } from './landing-art';
 import { createLoginOverlay } from './login-overlay';
 
@@ -18,13 +17,12 @@ beforeEach(() => {
 });
 
 describe('createLoginOverlay', () => {
-  it('hides both the Landing page and the badge until auth resolves', () => {
+  it('hides the Landing page until auth resolves', () => {
     const { root } = setup();
 
     expect(root.querySelector('.landing__play')?.textContent).toBe('PLAY NOW');
     expect(root.querySelector('.landing__login')?.textContent).toBe('LOG IN');
     expect((root.querySelector('.landing') as HTMLElement).hidden).toBe(true);
-    expect((root.querySelector('.player-badge') as HTMLElement).hidden).toBe(true);
   });
 
   it('showSignedOut reveals the Landing page', () => {
@@ -33,7 +31,6 @@ describe('createLoginOverlay', () => {
     overlay.showSignedOut();
 
     expect((root.querySelector('.landing') as HTMLElement).hidden).toBe(false);
-    expect((root.querySelector('.player-badge') as HTMLElement).hidden).toBe(true);
   });
 
   it.each(['.landing__play', '.landing__login'])('clicking %s calls onSignIn', (selector) => {
@@ -55,49 +52,23 @@ describe('createLoginOverlay', () => {
     );
   });
 
-  it('showSignedIn shows the badge with name, swatch color and hides the Landing page', () => {
+  it('showSignedIn hides the Landing page and renders no Player badge (the HUD is the signed-in chrome)', () => {
     const { root, overlay } = setup();
+    overlay.showSignedOut();
 
-    overlay.showSignedIn({
-      id: 'user-1',
-      displayName: 'Ada Lovelace',
-      look: { ...DEFAULT_LOOK, body: '#00bdff' },
-    });
+    overlay.showSignedIn();
 
-    const badge = root.querySelector('.player-badge') as HTMLElement;
-    const card = root.querySelector('.landing') as HTMLElement;
-    const swatch = root.querySelector('.player-badge__swatch') as HTMLElement;
-
-    expect(badge.hidden).toBe(false);
-    expect(card.hidden).toBe(true);
-    expect(badge.querySelector('.player-badge__name')?.textContent).toBe('Ada Lovelace');
-    expect(swatch.dataset.penguinColor).toBe('#00bdff');
+    expect((root.querySelector('.landing') as HTMLElement).hidden).toBe(true);
+    expect(root.querySelector('.player-badge')).toBeNull();
   });
 
-  it('the badge has no Sign out button (signing out lives in the HUD MENU)', () => {
+  it('showSignedOut shows the Landing page again after sign-in', () => {
     const { root, overlay } = setup();
-    overlay.showSignedIn({
-      id: 'user-1',
-      displayName: 'Ada Lovelace',
-      look: { ...DEFAULT_LOOK, body: '#00bdff' },
-    });
-
-    const badge = root.querySelector('.player-badge') as HTMLElement;
-    expect(badge.querySelector('button')).toBeNull();
-  });
-
-  it('showSignedOut shows the Landing page again and hides the badge', () => {
-    const { root, overlay } = setup();
-    overlay.showSignedIn({
-      id: 'user-1',
-      displayName: 'Ada Lovelace',
-      look: { ...DEFAULT_LOOK, body: '#00bdff' },
-    });
+    overlay.showSignedIn();
 
     overlay.showSignedOut();
 
     expect((root.querySelector('.landing') as HTMLElement).hidden).toBe(false);
-    expect((root.querySelector('.player-badge') as HTMLElement).hidden).toBe(true);
   });
 
   it('showError renders the message in the Landing page', () => {
@@ -144,11 +115,7 @@ describe('createLoginOverlay', () => {
     const { root, overlay } = setup();
     overlay.showError('Unable to load player');
 
-    overlay.showSignedIn({
-      id: 'user-1',
-      displayName: 'Ada Lovelace',
-      look: { ...DEFAULT_LOOK, body: '#00bdff' },
-    });
+    overlay.showSignedIn();
 
     expect(root.querySelector('.landing__error')?.textContent).toBe('');
     expect((root.querySelector('.landing__error-signout') as HTMLElement).hidden).toBe(true);
