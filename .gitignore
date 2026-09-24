@@ -1,3 +1,12 @@
+node_modules/
+dist/
+.env
+.env*.local
+!.env.example
+.DS_Store
+.vite/
+playwright-report/
+playwright-output/
 # atlas-v3:gitignore:start
 .claude/worktrees/
 .claude/atlas-state/
