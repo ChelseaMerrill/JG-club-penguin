@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { DEFAULT_LOOK } from '../contracts';
 import {
   bindPlayer,
   ensurePlayer,
@@ -41,7 +42,11 @@ describe('loadPlayer', () => {
     });
 
     expect(result).toEqual({
-      player: { id: 'user-1', displayName: 'Ada Lovelace', penguinColor: '#00bdff', penguin: null },
+      player: {
+        id: 'user-1',
+        displayName: 'Ada Lovelace',
+        look: { ...DEFAULT_LOOK, body: '#00bdff' },
+      },
       error: null,
     });
   });
@@ -58,9 +63,16 @@ describe('loadPlayer', () => {
     expect(result.player).toEqual({
       id: 'user-1',
       displayName: 'ada@example.com',
-      penguinColor: '#123456',
-      penguin: null,
+      look: { ...DEFAULT_LOOK, body: '#123456' },
     });
+  });
+
+  it('falls back to the default body color when the stored penguin_color is not a valid hex value', async () => {
+    const { client } = createFakeClient({ row: { id: 'user-1', penguin_color: 'not-a-color' } });
+
+    const result = await loadPlayer(client, { id: 'user-1', email: 'ada@example.com' });
+
+    expect(result.player?.look).toEqual(DEFAULT_LOOK);
   });
 
   it('reports an error when the row is missing', async () => {
@@ -73,7 +85,7 @@ describe('loadPlayer', () => {
 });
 
 describe('ensurePlayer', () => {
-  it('upserts with ignoreDuplicates and never sends a penguin_color, then loads the default color', async () => {
+  it('upserts with ignoreDuplicates and never sends a penguin_color, then loads the database default colour #00bdff into look.body', async () => {
     const { client, upsert } = createFakeClient({
       row: { id: 'user-1', penguin_color: '#00bdff' },
     });
@@ -85,7 +97,11 @@ describe('ensurePlayer', () => {
       { onConflict: 'id', ignoreDuplicates: true },
     );
     expect(result).toEqual({
-      player: { id: 'user-1', displayName: 'ada@example.com', penguinColor: '#00bdff', penguin: null },
+      player: {
+        id: 'user-1',
+        displayName: 'ada@example.com',
+        look: { ...DEFAULT_LOOK, body: '#00bdff' },
+      },
       error: null,
     });
   });
@@ -103,7 +119,7 @@ describe('ensurePlayer', () => {
 describe('bindPlayer', () => {
   it('sets the player on the registry under the player key', () => {
     const registry: PlayerRegistry = { set: vi.fn(), remove: vi.fn() };
-    const player = { id: 'user-1', displayName: 'Ada Lovelace', penguinColor: '#00bdff', penguin: null };
+    const player = { id: 'user-1', displayName: 'Ada Lovelace', look: DEFAULT_LOOK };
 
     bindPlayer(registry, player);
 

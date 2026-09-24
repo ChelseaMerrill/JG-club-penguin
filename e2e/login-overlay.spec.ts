@@ -16,10 +16,10 @@ test('login-overlay-signed-out', async ({ page, context }) => {
   await page.goto('/');
   const pageOrigin = new URL(page.url()).origin;
 
-  const signInButton = page.locator('#ui .login-card__button');
+  const signInButton = page.locator('#ui .landing__play');
   await expect(signInButton).toBeVisible();
-  await expect(signInButton).toHaveText('Sign in with Google');
-  await expect(page.locator('#ui .player-badge')).toBeHidden();
+  await expect(signInButton).toHaveText('PLAY NOW');
+  await expect(page.locator('#ui .landing__login')).toBeVisible();
 
   // The aborted authorize request surfaces as a page-level net::ERR_FAILED;
   // that's expected here and isn't a real app error.

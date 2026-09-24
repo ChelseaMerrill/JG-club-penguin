@@ -1,9 +1,11 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { DEFAULT_APPEARANCE, type PenguinAppearance } from '../penguin/appearance';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { DEFAULT_LOOK, IDLE_EMOTES, type PenguinLook } from '../contracts';
+import { PENGUIN_FRAME_MS } from '../game/penguin/poses';
+import { renderPenguinSvg } from '../game/penguin/render-svg';
 import { createPenguinCreator } from './penguin-creator';
 
-const initial: PenguinAppearance = { ...DEFAULT_APPEARANCE, name: 'Ada Lovelace' };
+const initial: PenguinLook = { ...DEFAULT_LOOK, name: 'Waddles' };
 
 function setup() {
   const root = document.createElement('div');
@@ -18,8 +20,14 @@ function setup() {
   return { root, creator, onSubmit, onCancel, q, chip, submit };
 }
 
+const preview = (idPrefix = 'penguin-creator') => ({ idPrefix });
+
 beforeEach(() => {
   document.body.innerHTML = '';
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe('createPenguinCreator', () => {
@@ -38,13 +46,22 @@ describe('createPenguinCreator', () => {
     const dialog = q('.penguin-creator');
     expect(dialog.hidden).toBe(false);
     expect(dialog.getAttribute('role')).toBe('dialog');
-    expect(q<HTMLInputElement>('#penguin-creator-name').value).toBe('Ada Lovelace');
-    expect(q('.penguin-creator__nameplate').textContent).toBe('Ada Lovelace');
-    expect(q('.penguin-creator__figure svg')).not.toBeNull();
+    expect(q<HTMLInputElement>('#penguin-creator-name').value).toBe('Waddles');
+    expect(q('.penguin-creator__nameplate').textContent).toBe('Waddles');
     expect(q('.penguin-creator__summary').textContent).toBe('JG CAP · PLAIN · ROUND');
   });
 
-  it('WADDLE IN submits the default look when nothing changed', () => {
+  it('previews with the same renderer as the Penguin in the Room', () => {
+    const { q, creator } = setup();
+
+    creator.open(initial, { dismissible: false });
+
+    expect(q('.penguin-creator__figure').innerHTML).toBe(
+      renderPenguinSvg(initial, { anim: 'WADDLE', frame: 0 }, preview()),
+    );
+  });
+
+  it('WADDLE IN submits the initial look when nothing changed', () => {
     const { creator, onSubmit, submit } = setup();
     creator.open(initial, { dismissible: false });
 
@@ -53,12 +70,12 @@ describe('createPenguinCreator', () => {
     expect(onSubmit).toHaveBeenCalledWith(initial);
   });
 
-  it('submits every pick the Player made', () => {
+  it('submits every pick the Player made, including the Idle animation', () => {
     const { q, creator, onSubmit, chip, submit } = setup();
     creator.open(initial, { dismissible: false });
 
     const name = q<HTMLInputElement>('#penguin-creator-name');
-    name.value = '  Waddles  ';
+    name.value = '  Ada   Lovelace  ';
     name.dispatchEvent(new Event('input'));
     q<HTMLButtonElement>('[aria-label="BODY"] [data-color="#3a4046"]').click();
     const customBeak = q<HTMLInputElement>('[aria-label="Custom beak color"]');
@@ -67,29 +84,59 @@ describe('createPenguinCreator', () => {
     chip('HAT', 'HEADPHONES').click();
     chip('BELLY PATTERN', 'SNOWFLAKE').click();
     chip('EYES', 'WINK').click();
+    chip('Idle animation', 'SIT').click();
 
-    expect(q('.penguin-creator__nameplate').textContent).toBe('Waddles');
+    expect(q('.penguin-creator__nameplate').textContent).toBe('Ada Lovelace');
     expect(chip('HAT', 'HEADPHONES').getAttribute('aria-pressed')).toBe('true');
     expect(chip('HAT', 'JG CAP').getAttribute('aria-pressed')).toBe('false');
+    expect(chip('Idle animation', 'SIT').getAttribute('aria-pressed')).toBe('true');
 
     submit();
 
     expect(onSubmit).toHaveBeenCalledWith({
-      name: 'Waddles',
+      ...DEFAULT_LOOK,
+      name: 'Ada Lovelace',
       body: '#3a4046',
-      cap: '#00bdff',
       beak: '#ff00aa',
-      feet: '#00bdff',
       hat: 'HEADPHONES',
       pattern: 'SNOWFLAKE',
       eyes: 'WINK',
+      emote: 'SIT',
     });
+  });
+
+  it('offers exactly the five Idle animations', () => {
+    const { root } = setup();
+
+    const values = [
+      ...root.querySelectorAll<HTMLElement>('[aria-label="Idle animation"] button'),
+    ].map((b) => b.dataset.value);
+
+    expect(values).toEqual([...IDLE_EMOTES]);
+  });
+
+  it('marks contract swatches pressed regardless of case', () => {
+    const { q, creator } = setup();
+
+    creator.open({ ...initial, cap: '#00bdff' }, { dismissible: false });
+
+    expect(q('[aria-label="HAT COLOR"] [data-color="#00BDFF"]').getAttribute('aria-pressed')).toBe(
+      'true',
+    );
+    expect(q<HTMLInputElement>('[aria-label="Custom hat color color"]').value).toBe('#00bdff');
+  });
+
+  it('caps the name input at 16 characters', () => {
+    const { q } = setup();
+
+    expect(q<HTMLInputElement>('#penguin-creator-name').maxLength).toBe(16);
   });
 
   it('refuses to submit without a name', () => {
     const { q, creator, onSubmit, submit } = setup();
-    creator.open({ ...initial, name: '' }, { dismissible: false });
+    creator.open(DEFAULT_LOOK, { dismissible: false });
 
+    expect(q<HTMLInputElement>('#penguin-creator-name').value).toBe('');
     expect(q('.penguin-creator__nameplate').textContent).toBe('Unnamed Penguin');
     submit();
 
@@ -97,61 +144,53 @@ describe('createPenguinCreator', () => {
     expect(q('.penguin-creator__error').textContent).toBe('Your Penguin needs a name.');
   });
 
-  it('SHUFFLE changes the look but keeps the name', () => {
-    const { q, creator, onSubmit, submit } = setup();
+  it('SHUFFLE changes the look but keeps the name and Idle animation', () => {
+    const { q, creator, onSubmit, chip, submit } = setup();
     creator.open(initial, { dismissible: false });
+    chip('Idle animation', 'WAVE').click();
     const random = vi.spyOn(Math, 'random').mockReturnValue(0.99);
 
     q<HTMLButtonElement>('.penguin-creator__shuffle').click();
     submit();
     random.mockRestore();
 
-    const submitted = onSubmit.mock.calls[0][0] as PenguinAppearance;
-    expect(submitted.name).toBe('Ada Lovelace');
-    expect(submitted).not.toEqual(initial);
+    const submitted = onSubmit.mock.calls[0][0] as PenguinLook;
+    expect(submitted.name).toBe('Waddles');
+    expect(submitted.emote).toBe('WAVE');
+    expect(submitted).not.toEqual({ ...initial, emote: 'WAVE' });
   });
 
-  it('emotes change the preview only, never the submitted look', () => {
-    const { q, creator, onSubmit, chip, submit } = setup();
+  it('cycles the chosen Idle animation frames and stops when closed', () => {
+    vi.useFakeTimers();
+    const { q, creator, chip } = setup();
     creator.open(initial, { dismissible: false });
+    chip('Idle animation', 'DANCE').click();
+    const figure = q('.penguin-creator__figure');
+    const look: PenguinLook = { ...initial, emote: 'DANCE' };
 
-    chip('Try an emote', 'SIT').click();
+    expect(figure.innerHTML).toBe(renderPenguinSvg(look, { anim: 'DANCE', frame: 0 }, preview()));
+    vi.advanceTimersByTime(PENGUIN_FRAME_MS.DANCE);
+    expect(figure.innerHTML).toBe(renderPenguinSvg(look, { anim: 'DANCE', frame: 1 }, preview()));
 
-    expect(q('.penguin-creator__figure').dataset.emote).toBe('SIT');
-    expect(q('.penguin-creator__seat').hidden).toBe(false);
-    submit();
-    expect(onSubmit).toHaveBeenCalledWith(initial);
+    creator.close();
+    expect(vi.getTimerCount()).toBe(0);
   });
 
-  it('hides Cancel and ignores Escape when not dismissible', () => {
-    const { q, creator, onCancel } = setup();
+  it('hides Cancel when not dismissible', () => {
+    const { q, creator } = setup();
     creator.open(initial, { dismissible: false });
 
     expect(q('.penguin-creator__cancel').hidden).toBe(true);
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
-
-    expect(onCancel).not.toHaveBeenCalled();
   });
 
-  it('offers Cancel and Escape when dismissible', () => {
+  it('offers Cancel when dismissible and leaves Escape to the OverlayManager', () => {
     const { q, creator, onCancel } = setup();
     creator.open(initial, { dismissible: true });
 
     q<HTMLButtonElement>('.penguin-creator__cancel').click();
     window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
 
-    expect(onCancel).toHaveBeenCalledTimes(2);
-  });
-
-  it('stops listening for Escape once closed', () => {
-    const { creator, onCancel } = setup();
-    creator.open(initial, { dismissible: true });
-
-    creator.close();
-    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
-
-    expect(onCancel).not.toHaveBeenCalled();
-    expect(creator.isOpen()).toBe(false);
+    expect(onCancel).toHaveBeenCalledTimes(1);
   });
 
   it('setSaving disables the buttons and blocks a double submit', () => {

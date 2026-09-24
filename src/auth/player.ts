@@ -1,17 +1,13 @@
-import { parseAppearance, type PenguinAppearance } from '../penguin/appearance';
+import { DEFAULT_LOOK, isHexColor, type PenguinLook } from '../contracts';
 
 /**
- * The Player: identity plus their Penguin, read from `public.players` and
+ * The Player: identity plus Penguin look, read from `public.players` and
  * `auth.users`. See CONTEXT.md for the Player/Penguin distinction.
  */
 export interface Player {
   id: string;
-  /** The Google account name; the Penguin's own name lives on `penguin`. */
   displayName: string;
-  /** Always equal to `penguin.body` once a Penguin is saved. */
-  penguinColor: string;
-  /** Null until the Player first saves a Penguin in the creator. */
-  penguin: PenguinAppearance | null;
+  look: PenguinLook;
 }
 
 /** The subset of a Supabase auth user that a Player is derived from. */
@@ -26,7 +22,6 @@ export interface AuthUserLike {
 interface PlayerRow {
   id: string;
   penguin_color: string;
-  penguin: unknown;
 }
 
 /** The narrow error shape returned by every supabase-js call this app uses. */
@@ -34,7 +29,7 @@ export interface DbError {
   message: string;
 }
 
-interface PlayersWriteResult {
+interface PlayersUpsertResult {
   error: DbError | null;
 }
 
@@ -51,11 +46,8 @@ interface PlayersTable {
   upsert(
     values: { id: string },
     options: { onConflict: 'id'; ignoreDuplicates: true },
-  ): PromiseLike<PlayersWriteResult>;
-  select(columns: 'id, penguin_color, penguin'): PlayersSelectBuilder;
-  update(values: { penguin: PenguinAppearance; penguin_color: string }): {
-    eq(column: 'id', value: string): PromiseLike<PlayersWriteResult>;
-  };
+  ): PromiseLike<PlayersUpsertResult>;
+  select(columns: 'id, penguin_color'): PlayersSelectBuilder;
 }
 
 /** The narrow slice of a Supabase client that Player loading needs. */
@@ -72,11 +64,24 @@ function toDisplayName(user: AuthUserLike): string {
   return user.user_metadata?.full_name ?? user.email ?? '';
 }
 
+/**
+ * Until #27 adds the other look columns, only `penguin_color` exists in
+ * `public.players`; every other `PenguinLook` field falls back to
+ * `DEFAULT_LOOK`, including `name` (never seeded from the Google display
+ * name: `players` must not duplicate Google identity).
+ */
+function toLook(row: PlayerRow): PenguinLook {
+  return {
+    ...DEFAULT_LOOK,
+    body: isHexColor(row.penguin_color) ? row.penguin_color : DEFAULT_LOOK.body,
+  };
+}
+
 /** Reads the caller's own `players` row. Does not create it. */
 export async function loadPlayer(client: PlayersClient, user: AuthUserLike): Promise<PlayerResult> {
   const { data, error } = await client
     .from('players')
-    .select('id, penguin_color, penguin')
+    .select('id, penguin_color')
     .eq('id', user.id)
     .single();
 
@@ -85,12 +90,7 @@ export async function loadPlayer(client: PlayersClient, user: AuthUserLike): Pro
   }
 
   return {
-    player: {
-      id: data.id,
-      displayName: toDisplayName(user),
-      penguinColor: data.penguin_color,
-      penguin: parseAppearance(data.penguin),
-    },
+    player: { id: data.id, displayName: toDisplayName(user), look: toLook(data) },
     error: null,
   };
 }
@@ -112,23 +112,6 @@ export async function ensurePlayer(
   }
 
   return loadPlayer(client, user);
-}
-
-/**
- * Saves the caller's Penguin. `penguin_color` is written alongside so it
- * always mirrors the body color (a DB check enforces this): in-world tinting
- * and Presence keep reading `penguin_color`.
- */
-export async function savePenguin(
-  client: PlayersClient,
-  playerId: string,
-  penguin: PenguinAppearance,
-): Promise<{ error: string | null }> {
-  const { error } = await client
-    .from('players')
-    .update({ penguin, penguin_color: penguin.body })
-    .eq('id', playerId);
-  return { error: error?.message ?? null };
 }
 
 /** A registry narrow enough for `game.registry` (Phaser's `DataManager`). */

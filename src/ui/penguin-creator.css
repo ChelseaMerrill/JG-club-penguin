@@ -1,26 +1,21 @@
-/* Penguin Creator: design/Penguin Creator.dc.html, on its fixed 1600×900
-   stage, scaled to the window by --penguin-creator-scale (set from JS). */
-
-@font-face {
-  font-family: 'Bumbastika';
-  src: url('../assets/fonts/bumbastika.ttf') format('truetype');
-  font-display: swap;
-}
+/* Penguin Creator: design/Penguin Creator.dc.html. It fills the 1600x900
+   #ui layer, which mountStage already scales to the window, so every size
+   here is Stage pixels. */
 
 .penguin-creator {
-  --pc-cyan: #00bdff;
-  --pc-teal: #0c4b5f;
-  --pc-light: #f4f4f4;
-  --pc-dark: #161719;
-  --pc-muted: #b3b6c9;
+  --pc-cyan: var(--jg-primary);
+  --pc-teal: var(--jg-secondary);
+  --pc-light: var(--jg-light);
+  --pc-dark: var(--jg-dark);
+  --pc-muted: var(--jg-inactive);
   --pc-field: #0a0c0f;
 
   position: absolute;
   inset: 0;
   z-index: 20;
-  background: #0e1013;
+  background: var(--stage-bg);
   color: var(--pc-light);
-  font-family: 'Libre Franklin', sans-serif;
+  font-family: var(--font-body);
   overflow: hidden;
 }
 
@@ -30,18 +25,11 @@
 
 .penguin-creator__stage {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 1600px;
-  height: 900px;
-  transform: translate(-50%, -50%) scale(var(--penguin-creator-scale, 1));
+  inset: 0;
   display: grid;
   grid-template-columns: 1fr 620px;
   overflow: hidden;
   background: linear-gradient(180deg, #0a0c0f 0%, #161719 45%, #0f3441 100%);
-  box-shadow:
-    0 0 0 6px var(--pc-teal),
-    0 0 0 9px var(--pc-cyan);
 }
 
 .penguin-creator button {
@@ -84,7 +72,7 @@
 
 .penguin-creator__title {
   margin: 0;
-  font-family: 'Bumbastika', 'Anton', sans-serif;
+  font-family: var(--font-game-display);
   font-size: 48px;
   font-weight: 400;
   line-height: 1;
@@ -101,7 +89,7 @@
 .penguin-creator__chip,
 .penguin-creator__cancel {
   margin: 0;
-  font-family: 'Anton', sans-serif;
+  font-family: var(--font-display);
   font-weight: 400;
 }
 
@@ -140,32 +128,19 @@
   opacity: 0.35;
 }
 
+/* The A-3 renderer's padded 180x190 frame at the design's figure scale
+   (340px per 120 design units). Its padding lets the SIT seat and raised arms
+   spill past the podium, as in the design. */
 .penguin-creator__figure {
   position: relative;
   z-index: 1;
-  transform-origin: 50% 100%;
-  animation: pc-idle 2.4s ease-in-out infinite;
 }
 
 .penguin-creator__figure svg {
   display: block;
+  width: 510px;
+  height: auto;
   overflow: visible;
-}
-
-.penguin-creator__seat {
-  position: absolute;
-  left: 50%;
-  bottom: 40px;
-  width: 200px;
-  height: 40px;
-  margin-left: -100px;
-  background: #3a4046;
-  border: 3px solid var(--pc-teal);
-  border-radius: 6px;
-}
-
-.penguin-creator__seat[hidden] {
-  display: none;
 }
 
 .penguin-creator__nameplate {
@@ -181,121 +156,6 @@
   font-size: 11px;
   letter-spacing: 0.2em;
   color: var(--pc-muted);
-}
-
-/* ---- Emote animations (keyframes copied from the design) ---- */
-
-.penguin-creator__figure[data-emote='WADDLE'] {
-  animation: pc-waddle 2.4s ease-in-out infinite;
-}
-.penguin-creator__figure[data-emote='DANCE'] {
-  animation: pc-dance 0.7s ease-in-out infinite;
-}
-.penguin-creator__figure[data-emote='LAUGH'] {
-  animation: pc-laugh 0.5s ease-in-out infinite;
-}
-.penguin-creator__figure[data-emote='SIT'] {
-  animation: none;
-}
-.penguin-creator__figure[data-emote='FACEPALM'] .penguin-svg__arm--left {
-  animation: pc-facepalm 1.6s ease-in-out infinite;
-}
-.penguin-creator__figure[data-emote='DANCE'] .penguin-svg__arm--left {
-  animation: pc-wave 0.7s ease-in-out infinite;
-}
-.penguin-creator__figure[data-emote='WAVE'] .penguin-svg__arm--right {
-  animation: pc-wave 0.8s ease-in-out infinite;
-}
-.penguin-creator__figure[data-emote='DANCE'] .penguin-svg__arm--right {
-  animation: pc-wave 0.7s ease-in-out 0.35s infinite;
-}
-.penguin-creator__figure .penguin-svg__snowball {
-  animation: pc-throw 1.4s ease-out infinite;
-}
-.penguin-creator__figure .penguin-svg__haha {
-  animation: pc-idle 0.6s ease-in-out infinite;
-}
-
-@keyframes pc-waddle {
-  0%,
-  100% {
-    transform: translateX(-26px) rotate(-5deg);
-  }
-  25% {
-    transform: translateX(-12px) rotate(4deg) translateY(-6px);
-  }
-  50% {
-    transform: translateX(26px) rotate(5deg);
-  }
-  75% {
-    transform: translateX(12px) rotate(-4deg) translateY(-6px);
-  }
-}
-@keyframes pc-wave {
-  0%,
-  100% {
-    transform: rotate(0);
-  }
-  50% {
-    transform: rotate(-40deg);
-  }
-}
-@keyframes pc-dance {
-  0%,
-  100% {
-    transform: rotate(-8deg) translateY(0);
-  }
-  50% {
-    transform: rotate(8deg) translateY(-14px);
-  }
-}
-@keyframes pc-throw {
-  0%,
-  40% {
-    transform: translate(0, 0) scale(1);
-    opacity: 1;
-  }
-  100% {
-    transform: translate(140px, -90px) scale(0.6);
-    opacity: 0;
-  }
-}
-@keyframes pc-laugh {
-  0%,
-  100% {
-    transform: rotate(0) translateY(0);
-  }
-  30% {
-    transform: rotate(-3deg) translateY(-4px);
-  }
-  60% {
-    transform: rotate(3deg) translateY(-4px);
-  }
-}
-@keyframes pc-facepalm {
-  0%,
-  100% {
-    transform: rotate(0);
-  }
-  50% {
-    transform: rotate(-110deg);
-  }
-}
-@keyframes pc-idle {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-6px);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .penguin-creator__figure,
-  .penguin-creator__figure * {
-    animation: none !important;
-  }
 }
 
 /* ---- Right column: controls ---- */
@@ -339,7 +199,7 @@
   border: 2px solid var(--pc-teal);
   border-radius: 0;
   color: var(--pc-light);
-  font: 700 15px 'Libre Franklin', sans-serif;
+  font: 700 15px var(--font-body);
   outline: none;
 }
 
@@ -348,14 +208,21 @@
   display: flex;
   align-items: center;
   border: none;
-  font-family: 'Bumbastika', 'Anton', sans-serif;
+  font-family: var(--font-game-display);
 }
 
 .penguin-creator__shuffle {
   height: 44px;
   padding: 0 18px;
   background: var(--pc-teal);
-  clip-path: polygon(12px 0, calc(100% - 12px) 0, 100% 50%, calc(100% - 12px) 100%, 12px 100%, 0 50%);
+  clip-path: polygon(
+    12px 0,
+    calc(100% - 12px) 0,
+    100% 50%,
+    calc(100% - 12px) 100%,
+    12px 100%,
+    0 50%
+  );
   box-shadow: inset 0 -4px 0 #06303d;
   font-size: 16px;
 }
@@ -483,7 +350,14 @@
   height: 52px;
   padding: 0 30px;
   background: var(--pc-cyan);
-  clip-path: polygon(14px 0, calc(100% - 14px) 0, 100% 50%, calc(100% - 14px) 100%, 14px 100%, 0 50%);
+  clip-path: polygon(
+    14px 0,
+    calc(100% - 14px) 0,
+    100% 50%,
+    calc(100% - 14px) 100%,
+    14px 100%,
+    0 50%
+  );
   box-shadow: inset 0 -5px 0 var(--pc-teal);
   font-size: 22px;
   color: var(--pc-dark);

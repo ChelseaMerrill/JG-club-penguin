@@ -1,153 +1,213 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { Player } from '../auth/player';
-import { DEFAULT_APPEARANCE, type PenguinAppearance } from './appearance';
-import { createPenguinEditor } from './penguin-editor';
+import { DEFAULT_LOOK, type PenguinLook } from '../contracts';
+import { createInMemoryProgressStore } from '../persistence/in-memory-progress-store';
+import { ProgressStoreError, type ProgressStore } from '../persistence/progress-store';
+import { createPenguinEditor, PENGUIN_CREATOR_OVERLAY_ID } from './penguin-editor';
 
-const saved: PenguinAppearance = {
-  ...DEFAULT_APPEARANCE,
+const saved: PenguinLook = {
+  ...DEFAULT_LOOK,
   name: 'Waddles',
   body: '#3a4046',
+  emote: 'DANCE',
 };
 
-const newPlayer: Player = {
-  id: 'user-1',
-  displayName: 'Ada Lovelace',
-  penguinColor: '#00bdff',
-  penguin: null,
-};
-const returningPlayer: Player = { ...newPlayer, penguinColor: '#3a4046', penguin: saved };
-
-function setup(saveResult: { error: string | null } = { error: null }) {
+function setup(store: Pick<ProgressStore, 'loadAll' | 'saveLook'> = createInMemoryProgressStore()) {
   const creator = {
     open: vi.fn(),
     close: vi.fn(),
     setSaving: vi.fn(),
     showError: vi.fn(),
   };
-  let resolveSave: (result: { error: string | null }) => void = () => {};
-  const save = vi.fn(
-    () =>
-      new Promise<{ error: string | null }>((resolve) => {
-        resolveSave = resolve;
-      }),
-  );
-  const onPlayerChanged = vi.fn();
-  const editor = createPenguinEditor({ creator, save, onPlayerChanged });
-  return {
+  const overlays = { open: vi.fn(), close: vi.fn() };
+  const onLookChanged = vi.fn();
+  const onReady = vi.fn();
+  const onError = vi.fn();
+  const editor = createPenguinEditor({
     creator,
-    save,
-    onPlayerChanged,
-    editor,
-    finishSave: () => resolveSave(saveResult),
-  };
+    store,
+    overlays,
+    onLookChanged,
+    onReady,
+    onError,
+  });
+  return { creator, overlays, store, onLookChanged, onReady, onError, editor };
+}
+
+/** A store whose first save has already completed the Creator. */
+async function returningStore(): Promise<ProgressStore> {
+  const store = createInMemoryProgressStore();
+  await store.saveLook(saved);
+  return store;
 }
 
 describe('createPenguinEditor', () => {
-  it('opens the creator, not dismissible, for a Player with no Penguin', () => {
-    const { editor, creator } = setup();
+  it('opens the Creator, not dismissible, when the Creator was never completed', async () => {
+    const { editor, creator, onReady, onLookChanged } = setup();
 
-    editor.playerSignedIn(newPlayer);
+    await editor.playerSignedIn();
 
-    expect(creator.open).toHaveBeenCalledWith(
-      { ...DEFAULT_APPEARANCE, name: 'Ada Lovelace' },
-      { dismissible: false },
-    );
+    // The default look, with an empty name: never seeded from Google.
+    expect(creator.open).toHaveBeenCalledWith(DEFAULT_LOOK, { dismissible: false });
+    expect(onReady).not.toHaveBeenCalled();
+    expect(onLookChanged).not.toHaveBeenCalled();
   });
 
-  it('does not open the creator for a returning Player', () => {
-    const { editor, creator } = setup();
+  it('sends a returning Player straight in with their saved look', async () => {
+    const { editor, creator, onReady, onLookChanged } = setup(await returningStore());
 
-    editor.playerSignedIn(returningPlayer);
+    await editor.playerSignedIn();
 
     expect(creator.open).not.toHaveBeenCalled();
+    expect(onLookChanged).toHaveBeenCalledWith(saved);
+    expect(onReady).toHaveBeenCalledTimes(1);
   });
 
-  it('edit() reopens the creator with the saved Penguin, dismissible', () => {
-    const { editor, creator } = setup();
-    editor.playerSignedIn(returningPlayer);
+  it('the first save completes the Creator, then lets the Player in', async () => {
+    const { editor, creator, store, overlays, onReady, onLookChanged } = setup();
+    await editor.playerSignedIn();
+
+    await editor.submit(saved);
+
+    expect(creator.setSaving).toHaveBeenNthCalledWith(1, true);
+    expect(creator.setSaving).toHaveBeenLastCalledWith(false);
+    expect(onLookChanged).toHaveBeenCalledWith(saved);
+    expect(creator.close).toHaveBeenCalled();
+    expect(overlays.close).toHaveBeenCalledWith(PENGUIN_CREATOR_OVERLAY_ID);
+    expect(onReady).toHaveBeenCalledTimes(1);
+    const snapshot = await store.loadAll();
+    expect(snapshot.look).toEqual(saved);
+    expect(snapshot.profileCreatedAt).not.toBeNull();
+  });
+
+  it('edit() reopens the saved look as a dismissible HUD overlay', async () => {
+    const { editor, creator, overlays } = setup(await returningStore());
+    await editor.playerSignedIn();
 
     editor.edit();
 
     expect(creator.open).toHaveBeenCalledWith(saved, { dismissible: true });
-  });
-
-  it('edit() does nothing while signed out', () => {
-    const { editor, creator } = setup();
-
-    editor.edit();
-
-    expect(creator.open).not.toHaveBeenCalled();
-  });
-
-  it('cancel() closes only when the Player already has a Penguin', () => {
-    const { editor, creator } = setup();
-    editor.playerSignedIn(newPlayer);
-    creator.close.mockClear();
-
-    editor.cancel();
-    expect(creator.close).not.toHaveBeenCalled();
-
-    editor.playerSignedIn(returningPlayer);
-    creator.close.mockClear();
-    editor.cancel();
-    expect(creator.close).toHaveBeenCalledTimes(1);
-  });
-
-  it('submit() saves, then reports the updated Player and closes', async () => {
-    const { editor, creator, save, onPlayerChanged, finishSave } = setup();
-    editor.playerSignedIn(newPlayer);
-
-    const done = editor.submit(saved);
-    expect(creator.setSaving).toHaveBeenCalledWith(true);
-    expect(save).toHaveBeenCalledWith('user-1', saved);
-    finishSave();
-    await done;
-
-    expect(creator.setSaving).toHaveBeenLastCalledWith(false);
-    expect(onPlayerChanged).toHaveBeenCalledWith({
-      ...newPlayer,
-      penguin: saved,
-      penguinColor: '#3a4046',
-    });
+    expect(overlays.open).toHaveBeenCalledWith(PENGUIN_CREATOR_OVERLAY_ID, expect.any(Function));
+    // The OverlayManager's close (Escape, or another overlay opening) closes
+    // the Creator.
+    overlays.open.mock.calls[0][1]();
     expect(creator.close).toHaveBeenCalled();
   });
 
-  it('after a save, edit() reopens with the new Penguin', async () => {
-    const { editor, creator, finishSave } = setup();
-    editor.playerSignedIn(newPlayer);
-    const done = editor.submit(saved);
-    finishSave();
-    await done;
+  it('edit() does nothing while signed out or before the Creator is completed', async () => {
+    const { editor, creator, overlays } = setup();
 
     editor.edit();
+    await editor.playerSignedIn();
+    creator.open.mockClear();
+    editor.edit();
 
-    expect(creator.open).toHaveBeenLastCalledWith(saved, { dismissible: true });
+    expect(creator.open).not.toHaveBeenCalled();
+    expect(overlays.open).not.toHaveBeenCalled();
   });
 
-  it('submit() shows the error and stays open when the save fails', async () => {
-    const { editor, creator, onPlayerChanged, finishSave } = setup({ error: 'permission denied' });
-    editor.playerSignedIn(newPlayer);
-    creator.close.mockClear();
+  it('cancel() closes only once the Player has a Penguin', async () => {
+    const first = setup();
+    await first.editor.playerSignedIn();
+    first.editor.cancel();
+    expect(first.creator.close).not.toHaveBeenCalled();
 
-    const done = editor.submit(saved);
-    finishSave();
-    await done;
+    const returning = setup(await returningStore());
+    await returning.editor.playerSignedIn();
+    returning.editor.edit();
+    returning.editor.cancel();
+    expect(returning.creator.close).toHaveBeenCalled();
+    expect(returning.overlays.close).toHaveBeenCalledWith(PENGUIN_CREATOR_OVERLAY_ID);
+  });
 
-    expect(creator.showError).toHaveBeenCalledWith("Couldn't save your Penguin: permission denied");
+  it('a later save updates the look without calling onReady again', async () => {
+    const { editor, onReady, onLookChanged } = setup(await returningStore());
+    await editor.playerSignedIn();
+    editor.edit();
+
+    const next: PenguinLook = { ...saved, hat: 'NONE', emote: 'SIT' };
+    await editor.submit(next);
+
+    expect(onLookChanged).toHaveBeenLastCalledWith(next);
+    expect(onReady).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows the error and stays open when the save is rejected', async () => {
+    const { editor, creator, onLookChanged, onReady } = setup();
+    await editor.playerSignedIn();
+
+    await editor.submit({ ...saved, name: '' });
+
+    expect(creator.showError).toHaveBeenCalledWith("Couldn't save your Penguin: invalid_look");
     expect(creator.setSaving).toHaveBeenLastCalledWith(false);
-    expect(onPlayerChanged).not.toHaveBeenCalled();
+    expect(onLookChanged).not.toHaveBeenCalled();
+    expect(onReady).not.toHaveBeenCalled();
     expect(creator.close).not.toHaveBeenCalled();
   });
 
+  it('reports a load failure and still lets the Player in', async () => {
+    const store = {
+      loadAll: vi.fn().mockRejectedValue(new ProgressStoreError('not_authenticated')),
+      saveLook: vi.fn(),
+    };
+    const { editor, onError, onReady, creator } = setup(store);
+
+    await editor.playerSignedIn();
+
+    expect(onError).toHaveBeenCalledWith("Couldn't load your Penguin: not_authenticated");
+    expect(onReady).toHaveBeenCalledTimes(1);
+    expect(creator.open).not.toHaveBeenCalled();
+  });
+
+  it('drops a load that finishes after the Player signed out', async () => {
+    let finishLoad: () => void = () => {};
+    const inner = await returningStore();
+    const store = {
+      loadAll: () =>
+        new Promise<Awaited<ReturnType<ProgressStore['loadAll']>>>((resolve) => {
+          finishLoad = () => void inner.loadAll().then(resolve);
+        }),
+      saveLook: inner.saveLook.bind(inner),
+    };
+    const { editor, onReady, onLookChanged } = setup(store);
+
+    const done = editor.playerSignedIn();
+    editor.playerSignedOut();
+    finishLoad();
+    await done;
+
+    expect(onReady).not.toHaveBeenCalled();
+    expect(onLookChanged).not.toHaveBeenCalled();
+  });
+
   it('drops a save that finishes after the Player signed out', async () => {
-    const { editor, onPlayerChanged, finishSave } = setup();
-    editor.playerSignedIn(newPlayer);
+    let finishSave: () => void = () => {};
+    const inner = createInMemoryProgressStore();
+    const store = {
+      loadAll: inner.loadAll.bind(inner),
+      saveLook: (look: PenguinLook) =>
+        new Promise<void>((resolve) => {
+          finishSave = () => void inner.saveLook(look).then(resolve);
+        }),
+    };
+    const { editor, onLookChanged, onReady } = setup(store);
+    await editor.playerSignedIn();
 
     const done = editor.submit(saved);
     editor.playerSignedOut();
     finishSave();
     await done;
 
-    expect(onPlayerChanged).not.toHaveBeenCalled();
+    expect(onLookChanged).not.toHaveBeenCalled();
+    expect(onReady).not.toHaveBeenCalled();
+  });
+
+  it('signing out closes the Creator', async () => {
+    const { editor, creator, overlays } = setup();
+    await editor.playerSignedIn();
+
+    editor.playerSignedOut();
+
+    expect(creator.close).toHaveBeenCalled();
+    expect(overlays.close).toHaveBeenCalledWith(PENGUIN_CREATOR_OVERLAY_ID);
   });
 });

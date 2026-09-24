@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { LANDING_CROWD } from './landing-art';
 import { createLoginOverlay } from './login-overlay';
 
 function setup() {
@@ -7,9 +8,8 @@ function setup() {
   document.body.append(root);
   const onSignIn = vi.fn();
   const onSignOut = vi.fn();
-  const onEditPenguin = vi.fn();
-  const overlay = createLoginOverlay(root, { onSignIn, onSignOut, onEditPenguin });
-  return { root, overlay, onSignIn, onSignOut, onEditPenguin };
+  const overlay = createLoginOverlay(root, { onSignIn, onSignOut });
+  return { root, overlay, onSignIn, onSignOut };
 }
 
 beforeEach(() => {
@@ -17,117 +17,79 @@ beforeEach(() => {
 });
 
 describe('createLoginOverlay', () => {
-  it('hides both the login card and the badge until auth resolves', () => {
+  it('hides the Landing page until auth resolves', () => {
     const { root } = setup();
 
-    const button = root.querySelector('.login-card__button');
-    expect(button?.textContent).toBe('Sign in with Google');
-    expect((root.querySelector('.login-card') as HTMLElement).hidden).toBe(true);
-    expect((root.querySelector('.player-badge') as HTMLElement).hidden).toBe(true);
+    expect(root.querySelector('.landing__play')?.textContent).toBe('PLAY NOW');
+    expect(root.querySelector('.landing__login')?.textContent).toBe('LOG IN');
+    expect((root.querySelector('.landing') as HTMLElement).hidden).toBe(true);
   });
 
-  it('showSignedOut reveals the login card', () => {
+  it('showSignedOut reveals the Landing page', () => {
     const { root, overlay } = setup();
 
     overlay.showSignedOut();
 
-    expect((root.querySelector('.login-card') as HTMLElement).hidden).toBe(false);
-    expect((root.querySelector('.player-badge') as HTMLElement).hidden).toBe(true);
+    expect((root.querySelector('.landing') as HTMLElement).hidden).toBe(false);
   });
 
-  it('clicking the sign-in button calls onSignIn', () => {
+  it.each(['.landing__play', '.landing__login'])('clicking %s calls onSignIn', (selector) => {
     const { root, overlay, onSignIn } = setup();
     overlay.showSignedOut();
 
-    (root.querySelector('.login-card__button') as HTMLButtonElement).click();
+    (root.querySelector(selector) as HTMLButtonElement).click();
 
     expect(onSignIn).toHaveBeenCalledTimes(1);
   });
 
-  it('showSignedIn shows the badge with name, swatch color and hides the card', () => {
+  it('draws the logo, the hero and the full crowd', () => {
+    const { root } = setup();
+
+    expect(root.querySelector('.landing__logo')?.getAttribute('aria-label')).toBe('Club JenGuin');
+    expect(root.querySelector('.landing__hero svg')).not.toBeNull();
+    expect(root.querySelectorAll('.landing__crowd .landing__bob svg')).toHaveLength(
+      LANDING_CROWD.length,
+    );
+  });
+
+  it('showSignedIn hides the Landing page and renders no Player badge (the HUD is the signed-in chrome)', () => {
     const { root, overlay } = setup();
+    overlay.showSignedOut();
 
-    overlay.showSignedIn({ id: 'user-1', displayName: 'Ada Lovelace', penguinColor: '#00bdff', penguin: null });
+    overlay.showSignedIn();
 
-    const badge = root.querySelector('.player-badge') as HTMLElement;
-    const card = root.querySelector('.login-card') as HTMLElement;
-    const swatch = root.querySelector('.player-badge__swatch') as HTMLElement;
-
-    expect(badge.hidden).toBe(false);
-    expect(card.hidden).toBe(true);
-    expect(badge.querySelector('.player-badge__name')?.textContent).toBe('Ada Lovelace');
-    expect(swatch.dataset.penguinColor).toBe('#00bdff');
+    expect((root.querySelector('.landing') as HTMLElement).hidden).toBe(true);
+    expect(root.querySelector('.player-badge')).toBeNull();
   });
 
-  it('clicking sign out calls onSignOut', () => {
-    const { root, overlay, onSignOut } = setup();
-    overlay.showSignedIn({ id: 'user-1', displayName: 'Ada Lovelace', penguinColor: '#00bdff', penguin: null });
-
-    (root.querySelector('.player-badge__signout') as HTMLButtonElement).click();
-
-    expect(onSignOut).toHaveBeenCalledTimes(1);
-  });
-
-  it('shows the Penguin name instead of the Google name once a Penguin is saved', () => {
+  it('showSignedOut shows the Landing page again after sign-in', () => {
     const { root, overlay } = setup();
-
-    overlay.showSignedIn({
-      id: 'user-1',
-      displayName: 'Ada Lovelace',
-      penguinColor: '#3a4046',
-      penguin: {
-        name: 'Waddles',
-        body: '#3a4046',
-        cap: '#00bdff',
-        beak: '#00bdff',
-        feet: '#00bdff',
-        hat: 'NONE',
-        pattern: 'PLAIN',
-        eyes: 'ROUND',
-      },
-    });
-
-    expect(root.querySelector('.player-badge__name')?.textContent).toBe('Waddles');
-  });
-
-  it('clicking Edit Penguin calls onEditPenguin', () => {
-    const { root, overlay, onEditPenguin } = setup();
-    overlay.showSignedIn({ id: 'user-1', displayName: 'Ada Lovelace', penguinColor: '#00bdff', penguin: null });
-
-    (root.querySelector('.player-badge__edit') as HTMLButtonElement).click();
-
-    expect(onEditPenguin).toHaveBeenCalledTimes(1);
-  });
-
-  it('showSignedOut shows the card again and hides the badge', () => {
-    const { root, overlay } = setup();
-    overlay.showSignedIn({ id: 'user-1', displayName: 'Ada Lovelace', penguinColor: '#00bdff', penguin: null });
+    overlay.showSignedIn();
 
     overlay.showSignedOut();
 
-    expect((root.querySelector('.login-card') as HTMLElement).hidden).toBe(false);
-    expect((root.querySelector('.player-badge') as HTMLElement).hidden).toBe(true);
+    expect((root.querySelector('.landing') as HTMLElement).hidden).toBe(false);
   });
 
-  it('showError renders the message in the card', () => {
+  it('showError renders the message in the Landing page', () => {
     const { root, overlay } = setup();
 
     overlay.showError('Sign-in failed');
 
-    expect(root.querySelector('.login-card__error')?.textContent).toBe('Sign-in failed');
+    expect(root.querySelector('.landing__error')?.textContent).toBe('Sign-in failed');
   });
 
-  it('showError reveals the card when it is still hidden (load error on a fresh page)', () => {
+  it('showError reveals the Landing page when it is still hidden (load error on a fresh page)', () => {
     const { root, overlay } = setup();
 
     overlay.showError('Unable to load player');
 
-    expect((root.querySelector('.login-card') as HTMLElement).hidden).toBe(false);
+    expect((root.querySelector('.landing') as HTMLElement).hidden).toBe(false);
   });
 
   it('showError reveals a Sign out escape hatch, hidden again once the error clears', () => {
     const { root, overlay } = setup();
-    const signOutButton = () => root.querySelector('.login-card__error-signout') as HTMLElement;
+    const signOutButton = () => root.querySelector('.landing__error-signout') as HTMLElement;
 
     expect(signOutButton().hidden).toBe(true);
 
@@ -144,7 +106,7 @@ describe('createLoginOverlay', () => {
     const { root, overlay, onSignOut } = setup();
     overlay.showError('Unable to load player');
 
-    (root.querySelector('.login-card__error-signout') as HTMLButtonElement).click();
+    (root.querySelector('.landing__error-signout') as HTMLButtonElement).click();
 
     expect(onSignOut).toHaveBeenCalledTimes(1);
   });
@@ -153,15 +115,15 @@ describe('createLoginOverlay', () => {
     const { root, overlay } = setup();
     overlay.showError('Unable to load player');
 
-    overlay.showSignedIn({ id: 'user-1', displayName: 'Ada Lovelace', penguinColor: '#00bdff', penguin: null });
+    overlay.showSignedIn();
 
-    expect(root.querySelector('.login-card__error')?.textContent).toBe('');
-    expect((root.querySelector('.login-card__error-signout') as HTMLElement).hidden).toBe(true);
+    expect(root.querySelector('.landing__error')?.textContent).toBe('');
+    expect((root.querySelector('.landing__error-signout') as HTMLElement).hidden).toBe(true);
 
     overlay.showError('Unable to load player');
     overlay.showSignedOut();
 
-    expect(root.querySelector('.login-card__error')?.textContent).toBe('');
-    expect((root.querySelector('.login-card__error-signout') as HTMLElement).hidden).toBe(true);
+    expect(root.querySelector('.landing__error')?.textContent).toBe('');
+    expect((root.querySelector('.landing__error-signout') as HTMLElement).hidden).toBe(true);
   });
 });

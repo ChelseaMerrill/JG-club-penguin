@@ -1,24 +1,28 @@
 import {
-  EMOTES,
   EYES,
   HATS,
-  MAX_NAME_LENGTH,
+  IDLE_EMOTES,
   PATTERNS,
+  PENGUIN_NAME_MAX,
+  UNNAMED_PENGUIN,
+  type PenguinLook,
+} from '../contracts';
+import { PENGUIN_FRAMES, PENGUIN_FRAME_MS } from '../game/penguin/poses';
+import { renderPenguinSvg } from '../game/penguin/render-svg';
+import {
   SWATCHES,
-  normalizeColor,
   normalizeName,
-  shuffleAppearance,
+  sameColor,
+  shuffleLook,
+  toHexColor,
   type ColorPart,
-  type Emote,
-  type PenguinAppearance,
-} from '../penguin/appearance';
-import { renderPenguinSvg } from '../penguin/penguin-svg';
+} from '../penguin/look';
 import './penguin-creator.css';
 
 export interface PenguinCreatorCallbacks {
-  /** WADDLE IN with a valid, named appearance. The caller saves it. */
-  onSubmit: (appearance: PenguinAppearance) => void;
-  /** Cancel (button or Escape); only offered when opened `dismissible`. */
+  /** WADDLE IN with a valid, named look. The caller saves it. */
+  onSubmit: (look: PenguinLook) => void;
+  /** The CANCEL button; only shown when opened `dismissible`. */
   onCancel: () => void;
 }
 
@@ -28,18 +32,13 @@ export interface PenguinCreatorOpenOptions {
 }
 
 export interface PenguinCreator {
-  open(initial: PenguinAppearance, options: PenguinCreatorOpenOptions): void;
+  open(initial: PenguinLook, options: PenguinCreatorOpenOptions): void;
   close(): void;
   isOpen(): boolean;
   setSaving(saving: boolean): void;
   showError(message: string): void;
   destroy(): void;
 }
-
-/** The design's fixed stage; scaled down to fit smaller windows. */
-const STAGE_WIDTH = 1600;
-const STAGE_HEIGHT = 900;
-const STAGE_MARGIN = 24;
 
 const COLOR_LABELS: Record<ColorPart, string> = {
   body: 'BODY',
@@ -75,19 +74,28 @@ function label(text: string, input?: HTMLInputElement): HTMLElement {
   return node;
 }
 
+function prefersReducedMotion(): boolean {
+  return typeof window.matchMedia === 'function'
+    ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
+    : false;
+}
+
 /**
  * Mounts the Penguin Creator (design: `design/Penguin Creator.dc.html`) into
- * `root` as a full-screen DOM overlay above the canvas. Hidden until `open()`.
- * It only edits a local draft; saving is the caller's job via `onSubmit`.
+ * `root` (the `#ui` layer) as a full-Stage DOM overlay. Hidden until
+ * `open()`. It only edits a local draft; saving is the caller's job via
+ * `onSubmit`. The preview uses the same renderer as the Penguin in the
+ * Room, cycling the chosen Idle animation's frames. Escape is left to the
+ * HUD's `OverlayManager`, which the caller registers a dismissible open with.
  */
 export function createPenguinCreator(
   root: HTMLElement,
   callbacks: PenguinCreatorCallbacks,
 ): PenguinCreator {
-  let draft: PenguinAppearance | null = null;
-  let emote: Emote = 'WADDLE';
-  let dismissible = false;
+  let draft: PenguinLook | null = null;
   let saving = false;
+  let frame = 0;
+  let frameTimer: ReturnType<typeof setTimeout> | null = null;
 
   const overlay = el('div', 'penguin-creator');
   overlay.hidden = true;
@@ -98,32 +106,34 @@ export function createPenguinCreator(
   const stage = el('div', 'penguin-creator__stage');
   overlay.append(stage);
 
-  // ---- Left: heading + live preview + emotes ----
+  // ---- Left: heading + live preview + Idle animation ----
   const previewCol = el('section', 'penguin-creator__preview');
   const heading = el('header', 'penguin-creator__heading');
   const title = el('h1', 'penguin-creator__title', 'MAKE YOUR PENGUIN');
   title.id = 'penguin-creator-title';
-  heading.append(title, el('p', 'penguin-creator__subtitle', 'EVERYTHING IS FREE · CHANGE IT ANYTIME'));
+  heading.append(
+    title,
+    el('p', 'penguin-creator__subtitle', 'EVERYTHING IS FREE · CHANGE IT ANYTIME'),
+  );
 
   const podium = el('div', 'penguin-creator__podium');
   const figure = el('div', 'penguin-creator__figure');
-  const seat = el('div', 'penguin-creator__seat');
   podium.append(
     el('div', 'penguin-creator__shadow'),
     el('div', 'penguin-creator__hexagon'),
     figure,
-    seat,
   );
 
   const nameplate = el('div', 'penguin-creator__nameplate');
   const emoteRow = el('div', 'penguin-creator__chips penguin-creator__chips--center');
   emoteRow.setAttribute('role', 'group');
-  emoteRow.setAttribute('aria-label', 'Try an emote');
-  const emoteButtons = EMOTES.map((value) => {
+  emoteRow.setAttribute('aria-label', 'Idle animation');
+  const emoteButtons = IDLE_EMOTES.map((value) => {
     const b = button('penguin-creator__chip', value);
     b.dataset.value = value;
     b.addEventListener('click', () => {
-      emote = value;
+      if (!draft) return;
+      draft = { ...draft, emote: value };
       render();
     });
     emoteRow.append(b);
@@ -134,7 +144,7 @@ export function createPenguinCreator(
     podium,
     nameplate,
     emoteRow,
-    el('p', 'penguin-creator__hint', 'TRY AN EMOTE · WADDLE IS THE DEFAULT'),
+    el('p', 'penguin-creator__hint', 'PICK AN IDLE ANIMATION · WADDLE IS THE DEFAULT'),
   );
 
   // ---- Right: the controls panel ----
@@ -145,7 +155,7 @@ export function createPenguinCreator(
   const nameInput = el('input', 'penguin-creator__name-input');
   nameInput.id = 'penguin-creator-name';
   nameInput.placeholder = 'Your name';
-  nameInput.maxLength = MAX_NAME_LENGTH;
+  nameInput.maxLength = PENGUIN_NAME_MAX;
   nameInput.autocomplete = 'off';
   nameInput.spellcheck = false;
   nameInput.addEventListener('input', () => {
@@ -157,7 +167,7 @@ export function createPenguinCreator(
   const shuffleButton = button('penguin-creator__shuffle', 'SHUFFLE');
   shuffleButton.addEventListener('click', () => {
     if (!draft) return;
-    draft = shuffleAppearance(draft);
+    draft = shuffleLook(draft);
     render();
   });
   nameRow.append(nameField, shuffleButton);
@@ -241,7 +251,7 @@ export function createPenguinCreator(
   root.append(overlay);
 
   function setColor(part: ColorPart, value: string): void {
-    const color = normalizeColor(value);
+    const color = toHexColor(value);
     if (!draft || !color) return;
     draft = { ...draft, [part]: color };
     render();
@@ -263,37 +273,61 @@ export function createPenguinCreator(
     for (const b of buttons) b.setAttribute('aria-pressed', String(b.dataset.value === selected));
   }
 
+  function renderFigure(): void {
+    if (!draft) return;
+    figure.innerHTML = renderPenguinSvg(
+      draft,
+      { anim: draft.emote, frame },
+      { idPrefix: 'penguin-creator' },
+    );
+  }
+
+  function stopAnimation(): void {
+    if (frameTimer !== null) clearTimeout(frameTimer);
+    frameTimer = null;
+  }
+
+  /** Restarts the chosen Idle animation from its first frame. */
+  function restartAnimation(): void {
+    stopAnimation();
+    frame = 0;
+    if (!draft || overlay.hidden || prefersReducedMotion()) return;
+    const anim = draft.emote;
+    if (PENGUIN_FRAMES[anim] < 2) return;
+    const tick = (): void => {
+      frame = (frame + 1) % PENGUIN_FRAMES[anim];
+      renderFigure();
+      frameTimer = setTimeout(tick, PENGUIN_FRAME_MS[anim]);
+    };
+    frameTimer = setTimeout(tick, PENGUIN_FRAME_MS[anim]);
+  }
+
+  let animatedEmote: PenguinLook['emote'] | null = null;
+
   function render(): void {
     if (!draft) return;
-    figure.dataset.emote = emote;
-    seat.hidden = emote !== 'SIT';
-    figure.innerHTML = renderPenguinSvg(draft, { emote, idPrefix: 'penguin-creator' });
-    nameplate.textContent = normalizeName(draft.name) || 'Unnamed Penguin';
+    if (draft.emote !== animatedEmote) {
+      animatedEmote = draft.emote;
+      restartAnimation();
+    }
+    figure.dataset.emote = draft.emote;
+    renderFigure();
+    nameplate.textContent = normalizeName(draft.name) || UNNAMED_PENGUIN;
     if (nameInput.value !== draft.name) nameInput.value = draft.name;
 
     for (const { part, swatches, custom } of colorControls) {
       const current = draft[part];
-      for (const b of swatches) b.setAttribute('aria-pressed', String(b.dataset.color === current));
-      custom.value = current;
+      for (const b of swatches) {
+        b.setAttribute('aria-pressed', String(sameColor(b.dataset.color ?? '', current)));
+      }
+      // <input type="color"> only accepts lowercase #rrggbb.
+      custom.value = current.toLowerCase();
     }
     markPressed(hatGroup.buttons, draft.hat);
     markPressed(patternGroup.buttons, draft.pattern);
     markPressed(eyesGroup.buttons, draft.eyes);
-    markPressed(emoteButtons, emote);
+    markPressed(emoteButtons, draft.emote);
     summary.textContent = `${draft.hat} · ${draft.pattern} · ${draft.eyes}`;
-  }
-
-  function fitToWindow(): void {
-    const scale = Math.min(
-      1,
-      (window.innerWidth - STAGE_MARGIN) / STAGE_WIDTH,
-      (window.innerHeight - STAGE_MARGIN) / STAGE_HEIGHT,
-    );
-    stage.style.setProperty('--penguin-creator-scale', String(Math.max(scale, 0.1)));
-  }
-
-  function onKeyDown(event: KeyboardEvent): void {
-    if (event.key === 'Escape' && dismissible && !saving) callbacks.onCancel();
   }
 
   function showError(message: string): void {
@@ -310,25 +344,18 @@ export function createPenguinCreator(
   function close(): void {
     if (overlay.hidden) return;
     overlay.hidden = true;
-    window.removeEventListener('resize', fitToWindow);
-    window.removeEventListener('keydown', onKeyDown);
+    stopAnimation();
   }
 
   return {
     open(initial, options) {
       draft = { ...initial };
-      emote = 'WADDLE';
-      dismissible = options.dismissible;
-      cancelButton.hidden = !dismissible;
+      cancelButton.hidden = !options.dismissible;
       setSaving(false);
       showError('');
+      overlay.hidden = false;
+      animatedEmote = null;
       render();
-      fitToWindow();
-      if (overlay.hidden) {
-        overlay.hidden = false;
-        window.addEventListener('resize', fitToWindow);
-        window.addEventListener('keydown', onKeyDown);
-      }
       nameInput.focus();
     },
     close,

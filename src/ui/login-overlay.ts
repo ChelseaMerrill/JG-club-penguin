@@ -1,106 +1,50 @@
-import type { Player } from '../auth/player';
+import { createLandingPage } from './landing-page';
 
 export interface LoginOverlayCallbacks {
   onSignIn: () => void;
   onSignOut: () => void;
-  onEditPenguin: () => void;
 }
 
 export interface LoginOverlay {
   showSignedOut(): void;
-  showSignedIn(player: Player): void;
+  showSignedIn(): void;
   showError(message: string): void;
   destroy(): void;
 }
 
 /**
- * Mounts the DOM login card (signed-out) and Player badge (signed-in) into
- * `root` (the `#ui` overlay layer). No full-screen backdrop: only the card
- * and badge themselves receive pointer events, via the `#ui > *` rule in
- * `style.css`.
+ * Mounts the signed-out Landing page into `root` (the `#ui` overlay layer).
+ * It covers the whole Stage while signed out and is hidden once signed in;
+ * the signed-in chrome (including Sign out) is the HUD (#32).
  */
 export function createLoginOverlay(
   root: HTMLElement,
   callbacks: LoginOverlayCallbacks,
 ): LoginOverlay {
-  const card = document.createElement('div');
-  card.className = 'login-card';
+  const landing = createLandingPage(callbacks);
   // Hidden until auth resolves (`showSignedOut()` reveals it), so a
-  // returning Player never sees a flash of a clickable login card.
-  card.hidden = true;
+  // returning Player never sees a flash of the Landing page.
+  landing.el.hidden = true;
 
-  const signInButton = document.createElement('button');
-  signInButton.type = 'button';
-  signInButton.className = 'login-card__button';
-  signInButton.textContent = 'Sign in with Google';
-  signInButton.addEventListener('click', () => callbacks.onSignIn());
-
-  const errorEl = document.createElement('p');
-  errorEl.className = 'login-card__error';
-  errorEl.setAttribute('role', 'alert');
-
-  // A way out when a load error strands the Player with a live Supabase auth
-  // session but no loaded Player row: shown only while an error is set.
-  const errorSignOutButton = document.createElement('button');
-  errorSignOutButton.type = 'button';
-  errorSignOutButton.className = 'login-card__error-signout';
-  errorSignOutButton.textContent = 'Sign out';
-  errorSignOutButton.hidden = true;
-  errorSignOutButton.addEventListener('click', () => callbacks.onSignOut());
-
-  card.append(signInButton, errorEl, errorSignOutButton);
-
-  const badge = document.createElement('div');
-  badge.className = 'player-badge';
-  badge.hidden = true;
-
-  const nameEl = document.createElement('span');
-  nameEl.className = 'player-badge__name';
-
-  const swatchEl = document.createElement('span');
-  swatchEl.className = 'player-badge__swatch';
-
-  const signOutButton = document.createElement('button');
-  signOutButton.type = 'button';
-  signOutButton.className = 'player-badge__signout';
-  signOutButton.textContent = 'Sign out';
-  signOutButton.addEventListener('click', () => callbacks.onSignOut());
-
-  const editButton = document.createElement('button');
-  editButton.type = 'button';
-  editButton.className = 'player-badge__edit';
-  editButton.textContent = 'Edit Penguin';
-  editButton.addEventListener('click', () => callbacks.onEditPenguin());
-
-  badge.append(nameEl, swatchEl, editButton, signOutButton);
-
-  root.append(card, badge);
+  root.append(landing.el);
 
   return {
     showSignedOut() {
-      errorEl.textContent = '';
-      errorSignOutButton.hidden = true;
-      card.hidden = false;
-      badge.hidden = true;
+      landing.setError('');
+      landing.el.hidden = false;
     },
-    showSignedIn(player: Player) {
-      nameEl.textContent = player.penguin?.name ?? player.displayName;
-      swatchEl.style.backgroundColor = player.penguinColor;
-      swatchEl.dataset.penguinColor = player.penguinColor;
-      errorEl.textContent = '';
-      errorSignOutButton.hidden = true;
-      card.hidden = true;
-      badge.hidden = false;
+    showSignedIn() {
+      landing.setError('');
+      landing.el.hidden = true;
     },
     showError(message: string) {
-      errorEl.textContent = message;
-      errorSignOutButton.hidden = !message;
-      // The card starts hidden, so a load error on a fresh page must reveal it.
-      if (message) card.hidden = false;
+      landing.setError(message);
+      // The Landing page starts hidden, so a load error on a fresh page must
+      // reveal it.
+      if (message) landing.el.hidden = false;
     },
     destroy() {
-      card.remove();
-      badge.remove();
+      landing.el.remove();
     },
   };
 }
