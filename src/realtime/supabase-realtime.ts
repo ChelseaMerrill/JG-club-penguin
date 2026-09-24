@@ -36,6 +36,9 @@ function toPresenceChannel(ch: RealtimeChannel): PresenceChannelLike {
     send(payload: RoomBroadcastEvent) {
       return ch.send({ type: 'broadcast', event: 'room', payload });
     },
+    teardown() {
+      ch.teardown();
+    },
   };
 }
 
@@ -60,7 +63,7 @@ export function toRealtimeClient(client: SupabaseClient): RealtimeClientLike {
     },
     removeChannel(ch) {
       const real = raw.get(ch);
-      if (!real) return Promise.resolve();
+      if (!real) return Promise.resolve('ok');
       return client.removeChannel(real);
     },
   };
