@@ -11,6 +11,14 @@ function isWalkable(walkable: WalkableGrid, tile: Tile): boolean {
   return walkable[tile.row]?.[tile.col] === true;
 }
 
+/**
+ * Shared by `targets.ts` and `RoomScene.ts` (#14 review fix 7), rather than
+ * each defining its own copy.
+ */
+export function tilesEqual(a: Tile, b: Tile): boolean {
+  return a.col === b.col && a.row === b.row;
+}
+
 function tileKey(tile: Tile): string {
   return `${tile.col},${tile.row}`;
 }
@@ -139,4 +147,59 @@ export function nearestWalkable(walkable: WalkableGrid, tile: Tile): Tile {
   }
 
   return tile;
+}
+
+/**
+ * The reachable tile nearest to `target` by Manhattan distance, found by a
+ * breadth-first search outward from `from` over `walkable`'s own connected
+ * component (#14 review fix 2). Unlike `nearestWalkable`, which finds the
+ * nearest walkable tile to `target` regardless of whether anything actually
+ * connects it to `from`, this only ever returns a tile a path from `from`
+ * can reach, so a click on a target cut off by a wall lands the Penguin as
+ * close as connectivity allows instead of leaving it stuck mid-walk with
+ * nowhere to go.
+ *
+ * Ties break the same way as `nearestWalkable`: lowest row, then lowest
+ * column. Returns `from` itself, unchanged, when nothing reachable is any
+ * closer to `target` than `from` already is — including when `from` isn't
+ * itself walkable — and returns `target` itself when it's directly
+ * reachable (nothing can beat its own zero distance).
+ */
+export function nearestReachable(walkable: WalkableGrid, from: Tile, target: Tile): Tile {
+  let best = from;
+  let bestDistance = manhattan(from, target);
+
+  function consider(candidate: Tile): void {
+    const distance = manhattan(candidate, target);
+    const better =
+      distance < bestDistance ||
+      (distance === bestDistance &&
+        (candidate.row < best.row || (candidate.row === best.row && candidate.col < best.col)));
+    if (better) {
+      best = candidate;
+      bestDistance = distance;
+    }
+  }
+
+  if (!isWalkable(walkable, from)) return best;
+
+  const visited = new Set<string>([tileKey(from)]);
+  let frontier: Tile[] = [from];
+
+  while (frontier.length > 0) {
+    const next: Tile[] = [];
+    for (const current of frontier) {
+      for (const neighbor of neighborsOf(current)) {
+        if (!isWalkable(walkable, neighbor)) continue;
+        const key = tileKey(neighbor);
+        if (visited.has(key)) continue;
+        visited.add(key);
+        next.push(neighbor);
+        consider(neighbor);
+      }
+    }
+    frontier = next;
+  }
+
+  return best;
 }

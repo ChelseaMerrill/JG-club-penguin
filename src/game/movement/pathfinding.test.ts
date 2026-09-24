@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findPath, nearestWalkable } from './pathfinding';
+import { findPath, nearestReachable, nearestWalkable } from './pathfinding';
 
 function fullyWalkable(columns: number, rows: number): boolean[][] {
   return Array.from({ length: rows }, () => Array.from({ length: columns }, () => true));
@@ -50,6 +50,25 @@ describe('findPath', () => {
 
     expect(findPath(walkable, { col: 0, row: 0 }, { col: 1, row: 1 })).toBeNull();
   });
+
+  it('routes around an obstacle to find the shortest available path (#14 review fix 8)', () => {
+    const walkable = fullyWalkable(5, 5);
+    // A wall across row 2, except a single gap at col 4.
+    for (let col = 0; col < 4; col += 1) walkable[2][col] = false;
+
+    const from = { col: 0, row: 0 };
+    const to = { col: 0, row: 4 };
+    const path = findPath(walkable, from, to);
+
+    expect(path).not.toBeNull();
+    expect(path![0]).toEqual(from);
+    expect(path![path!.length - 1]).toEqual(to);
+    // Must detour through the only gap in the wall.
+    expect(path!.some((tile) => tile.col === 4 && tile.row === 2)).toBe(true);
+    // Shortest possible: Manhattan distance to the gap (4+2=6) plus from the
+    // gap to the goal (4+2=6) = 12 steps, 13 tiles including both ends.
+    expect(path).toHaveLength(13);
+  });
 });
 
 describe('nearestWalkable', () => {
@@ -87,5 +106,39 @@ describe('nearestWalkable', () => {
 
     expect(result.col).toBeGreaterThanOrEqual(0);
     expect(result.row).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe('nearestReachable', () => {
+  it('returns the target itself when it is reachable from `from`', () => {
+    const walkable = fullyWalkable(5, 5);
+
+    expect(nearestReachable(walkable, { col: 0, row: 0 }, { col: 3, row: 3 })).toEqual({
+      col: 3,
+      row: 3,
+    });
+  });
+
+  it('returns `from` unchanged when `from` equals `target`', () => {
+    const walkable = fullyWalkable(5, 5);
+    const tile = { col: 2, row: 2 };
+
+    expect(nearestReachable(walkable, tile, tile)).toEqual(tile);
+  });
+
+  it('returns the nearest reachable tile when a wall fully separates `from` from `target` (#14 review fix 2)', () => {
+    const walkable = fullyWalkable(6, 6);
+    // A wall across row 3 splits the grid top from bottom, same split as
+    // `findPath`'s "wall fully separates start and goal" test above, so
+    // `moveTo` this target would otherwise return `null` and leave the
+    // Penguin stuck walking in place toward nowhere.
+    walkable[3] = walkable[3].map(() => false);
+
+    const from = { col: 2, row: 0 };
+    const target = { col: 2, row: 5 };
+
+    // Every tile in rows 0-2 is reachable from `from`; row 2, col 2 is the
+    // closest of those to (2, 5) (Manhattan distance 3).
+    expect(nearestReachable(walkable, from, target)).toEqual({ col: 2, row: 2 });
   });
 });

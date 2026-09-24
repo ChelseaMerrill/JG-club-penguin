@@ -62,6 +62,20 @@ describe('createLocalPenguinController', () => {
     expect(controller.nextTile()).toEqual({ col: 1, row: 0 });
   });
 
+  it('moveTo to the current tile is a no-op: it leaves no target set (#14 review fix 6)', () => {
+    const controller = createLocalPenguinController(walkable, {
+      playerId: 'p1',
+      roomId: 'town-center',
+      tile: { col: 2, row: 2 },
+    });
+
+    const path = controller.moveTo({ col: 2, row: 2 });
+
+    expect(path).toEqual([{ col: 2, row: 2 }]);
+    expect(controller.state.target).toBeUndefined();
+    expect(controller.isMoving()).toBe(false);
+  });
+
   it('moveTo returns null and leaves state untouched when the target is unreachable', () => {
     const blocked = fullyWalkable(4, 4);
     blocked[0][0] = true; // start tile

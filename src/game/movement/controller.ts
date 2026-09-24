@@ -40,9 +40,13 @@ export interface LocalPenguinController {
 
   /**
    * Finds a path from `state.tile` to `target` and adopts it as the active
-   * path, setting `state.target`. Returns the path (start tile first), or
-   * `null` when `target` is unreachable, in which case `state` and any
-   * previous active path are left untouched (the click is ignored).
+   * path, setting `state.target` to `target` — unless `target` is the tile
+   * already stood on (a single-tile path), in which case `state.target`
+   * stays `undefined` (#14 review fix 6: an own-tile "move" is a no-op, not
+   * a walk, so it must never leave a stale target behind). Returns the path
+   * (start tile first), or `null` when `target` is unreachable, in which
+   * case `state` and any previous active path are left untouched (the click
+   * is ignored).
    */
   moveTo(target: Tile): Tile[] | null;
 
@@ -85,7 +89,7 @@ export function createLocalPenguinController(
     const found = findPath(walkable, state.tile, target);
     if (!found) return null;
     activePath = found;
-    state.target = target;
+    state.target = found.length > 1 ? target : undefined;
     return found;
   }
 

@@ -2,11 +2,7 @@ import type { Tile } from '../../contracts';
 import type { GridOrigin } from '../rooms/iso';
 import { screenToTile } from '../rooms/iso';
 import type { RoomDoor, RoomNpcSlot } from '../rooms/room-definition';
-import { nearestWalkable, type WalkableGrid } from './pathfinding';
-
-function tilesEqual(a: Tile, b: Tile): boolean {
-  return a.col === b.col && a.row === b.row;
-}
+import { nearestWalkable, tilesEqual, type WalkableGrid } from './pathfinding';
 
 /** `walkable` with `blocked` forced unwalkable, regardless of its own mask value. */
 function withTileBlocked(walkable: WalkableGrid, blocked: Tile): WalkableGrid {

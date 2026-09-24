@@ -1,6 +1,5 @@
-import { GameObjects, Scene, Scenes, Textures, type Input, type Tweens } from 'phaser';
+import { Data, GameObjects, Scene, Scenes, type Input, type Tweens } from 'phaser';
 import {
-  DEFAULT_LOOK,
   gameEvents,
   SPAWN_ROOM_ID,
   type PenguinLook,
@@ -12,12 +11,22 @@ import {
   facingForStep,
   type LocalPenguinController,
 } from '../movement/controller';
-import { nearestWalkable } from '../movement/pathfinding';
+import { nearestReachable, nearestWalkable, tilesEqual } from '../movement/pathfinding';
+import {
+  resolveRegisteredLook,
+  resolveRegisteredPlayerId,
+  type RegisteredPlayer,
+} from '../movement/registered-player';
 import { doorApproachTile, npcInteractionTile } from '../movement/targets';
 import { createPenguin, type Penguin, type PenguinAnim } from '../penguin';
 import { GAME_HEIGHT, GAME_WIDTH } from '../stage-size';
 import { planBackgroundDraw } from './background';
-import { exposeRoomDebug, HOOKS_ENABLED, resolveRoomIdFromLocation } from './dev-room-hook';
+import {
+  countActiveTextureListeners,
+  exposeRoomDebug,
+  HOOKS_ENABLED,
+  resolveRoomIdFromLocation,
+} from './dev-room-hook';
 import {
   depthForTile,
   screenToTile,
@@ -95,21 +104,8 @@ const PROP_COLOR = 0x3a3d42;
 const TILE_SPEED = 4;
 const TILE_STEP_MS = 1000 / TILE_SPEED;
 
-/**
- * Placeholder `PenguinState.playerId` for the local Penguin. #28/#43
- * substitute the real signed-in Player id once Presence/broadcast land;
- * #14 only needs a stable local identity.
- */
-const LOCAL_PLAYER_ID = 'local';
-
-/**
- * The minimal shape #14 needs from `game.registry.get('player')` (see
- * `src/auth/player.ts`'s `Player`), declared locally so `RoomScene` doesn't
- * import the auth module.
- */
-interface RegisteredPlayer {
-  look: PenguinLook;
-}
+/** The registry key #14/`src/auth/player.ts`'s `bindPlayer` sets/removes. */
+const PLAYER_REGISTRY_KEY = 'player';
 
 /** One entry in an interactive hit-area lookup table (`onPointerDown`). */
 interface HitArea<T> {
@@ -117,16 +113,19 @@ interface HitArea<T> {
   data: T;
 }
 
-function countActiveTextureListeners(scene: Scene): number {
-  const prefix = Textures.Events.ADD_KEY;
-  return scene.textures
-    .eventNames()
-    .filter((name): name is string => typeof name === 'string' && name.startsWith(prefix))
-    .reduce((total, name) => total + scene.textures.listenerCount(name), 0);
+/** A click's target, queued mid-walk rather than applied immediately (#14 review fix 3). */
+interface QueuedMove {
+  target: Tile;
+  onArrive?: () => void;
 }
 
 export interface RoomSceneData {
   roomId?: RoomId;
+  /**
+   * The tile to spawn the local Penguin on (#15's door handoff); falls back
+   * to `room.spawnTile` when absent, as at the initial boot spawn.
+   */
+  entryTile?: Tile;
 }
 
 /**
@@ -141,26 +140,43 @@ export interface RoomSceneData {
  * Room-switching, #15), and otherwise from the `?room=` dev/e2e hook, which
  * itself falls back to `SPAWN_ROOM_ID`.
  *
- * #14 also spawns the local Penguin at the Room's `spawnTile` and drives
- * click-to-move: a pointer click resolves to a walkable tile (`iso.ts`'s
- * `screenToTile`, snapped to the nearest walkable tile when the click lands
- * off the mask), an NPC's interaction tile, or a door's approach tile, and
- * `LocalPenguinController` walks it there tile by tile.
+ * #14 also spawns the local Penguin at the Room's `spawnTile` (or `data`'s
+ * `entryTile`, #15) and drives click-to-move: a pointer click resolves to a
+ * walkable, connectivity-checked tile (`iso.ts`'s `screenToTile`, snapped to
+ * the nearest walkable tile when the click lands off the mask, then to the
+ * nearest tile actually reachable from the Penguin's own tile), an NPC's
+ * interaction tile, or a door's approach tile, and `LocalPenguinController`
+ * walks it there tile by tile.
+ *
+ * A future consumer that calls `scene.start(ROOM_SCENE_KEY, data)` or
+ * `scene.restart(data)` (#15) should treat Phaser's `Scenes.Events.CREATE`
+ * (fired once `create()` finishes) as the "Room is ready" signal, not the
+ * synchronous return of `start`/`restart` itself. Listeners for
+ * `LOCAL_PENGUIN_MOVE_EVENT`/`DOOR_REACHED_EVENT` should be attached to
+ * `scene.events` exactly once, right after the Scene is first created: the
+ * same `RoomScene` instance (and its `events` emitter) is reused across a
+ * `scene.restart()`, so a listener attached once keeps receiving events
+ * after every later restart without needing to be re-attached.
  */
 export class RoomScene extends Scene {
   private roomId: RoomId = SPAWN_ROOM_ID;
+  private entryTile: Tile | undefined;
   private room: RoomDefinition | null = null;
   private controller: LocalPenguinController | null = null;
   private penguin: Penguin | null = null;
-  private currentLook: PenguinLook = DEFAULT_LOOK;
-  private currentAnim: PenguinAnim = DEFAULT_LOOK.emote;
+  private currentLook: PenguinLook = resolveRegisteredLook(undefined);
+  private currentAnim: PenguinAnim = this.currentLook.emote;
   private activeTween: Tweens.Tween | null = null;
   private pendingArrival: (() => void) | null = null;
+  private queuedMove: QueuedMove | null = null;
   private npcHitAreas: HitArea<RoomNpcSlot>[] = [];
   private doorHitAreas: HitArea<RoomDoor>[] = [];
   private npcArrivedLog: string[] = [];
   private doorReachedLog: string[] = [];
   private localPenguinMoveLog: Tile[] = [];
+  private debugPenguins: Penguin[] = [];
+  /** Persists across restarts (never reset in `init()`); see `restartCount` on `RoomDebugInfo`. */
+  private restartCount = 0;
 
   /** A stable reference so `cleanup` can `off` exactly what `create` `on`'d. */
   private readonly handlePointerDown = (
@@ -170,9 +186,31 @@ export class RoomScene extends Scene {
     this.onPointerDown(pointer, currentlyOver);
   };
 
+  /**
+   * Fired the very first time the registry's `player` key is ever set.
+   * Phaser's `DataManager` only emits a generic `setdata` (no per-key
+   * variant) on a key's first `set`; filtered to `player` here. Sign-in
+   * normally arrives this way, since `bindPlayer` (`main.ts`) calls
+   * `registry.remove('player')` on sign-out, which makes the *next*
+   * sign-in "first" again (#14 review fix 1).
+   */
+  private readonly handleRegistrySetData = (_parent: unknown, key: string): void => {
+    if (key === PLAYER_REGISTRY_KEY) this.applyRegisteredPlayer();
+  };
+
+  /** Fired on every later `player` update, once the key already exists (review fix 1). */
+  private readonly handleRegistryPlayerChanged = (): void => {
+    this.applyRegisteredPlayer();
+  };
+
   /** A stable reference so a scene restart's fresh `create()` re-registers cleanly. */
   private readonly cleanup = (): void => {
     this.input.off('pointerdown', this.handlePointerDown);
+    this.registry.events.off(Data.Events.SET_DATA, this.handleRegistrySetData);
+    this.registry.events.off(
+      Data.Events.CHANGE_DATA_KEY + PLAYER_REGISTRY_KEY,
+      this.handleRegistryPlayerChanged,
+    );
     if (this.activeTween) {
       this.activeTween.stop();
       this.activeTween = null;
@@ -181,6 +219,9 @@ export class RoomScene extends Scene {
     this.penguin = null;
     this.controller = null;
     this.pendingArrival = null;
+    this.queuedMove = null;
+    this.debugPenguins.forEach((debugPenguin) => debugPenguin.destroy());
+    this.debugPenguins = [];
   };
 
   constructor() {
@@ -189,16 +230,19 @@ export class RoomScene extends Scene {
 
   init(data: RoomSceneData = {}): void {
     this.roomId = data.roomId ?? resolveRoomIdFromLocation(window.location);
+    this.entryTile = data.entryTile;
     this.room = null;
     this.controller = null;
     this.penguin = null;
     this.activeTween = null;
     this.pendingArrival = null;
+    this.queuedMove = null;
     this.npcHitAreas = [];
     this.doorHitAreas = [];
     this.npcArrivedLog = [];
     this.doorReachedLog = [];
     this.localPenguinMoveLog = [];
+    this.debugPenguins = [];
   }
 
   preload(): void {
@@ -209,6 +253,8 @@ export class RoomScene extends Scene {
   }
 
   create(): void {
+    this.restartCount += 1;
+
     const room = getRoomDefinition(this.roomId);
     this.room = room;
     this.cameras.main.setBackgroundColor(STAGE_BACKGROUND_COLOR);
@@ -223,6 +269,11 @@ export class RoomScene extends Scene {
     this.spawnLocalPenguin(room);
 
     this.input.on('pointerdown', this.handlePointerDown);
+    this.registry.events.on(Data.Events.SET_DATA, this.handleRegistrySetData);
+    this.registry.events.on(
+      Data.Events.CHANGE_DATA_KEY + PLAYER_REGISTRY_KEY,
+      this.handleRegistryPlayerChanged,
+    );
     this.events.once(Scenes.Events.SHUTDOWN, this.cleanup);
 
     if (HOOKS_ENABLED) this.publishRoomDebug();
@@ -233,17 +284,22 @@ export class RoomScene extends Scene {
   }
 
   private publishRoomDebug(): void {
+    const controller = this.controller;
     exposeRoomDebug({
       roomId: this.roomId,
       scrollX: this.cameras.main.scrollX,
       scrollY: this.cameras.main.scrollY,
-      localPenguin: this.controller
+      localPenguin: controller
         ? {
-            tile: this.controller.state.tile,
-            target: this.controller.state.target,
+            tile: controller.state.tile,
+            target: controller.state.target,
             anim: this.currentAnim,
-            facing: this.controller.state.facing,
-            moving: this.controller.isMoving(),
+            facing: controller.state.facing,
+            moving: controller.isMoving(),
+            flipX: this.penguinSprite()?.flipX ?? false,
+            lookName: this.currentLook.name,
+            lookBody: this.currentLook.body,
+            playerId: controller.state.playerId,
           }
         : undefined,
       textureListenerCount: countActiveTextureListeners(this),
@@ -251,25 +307,57 @@ export class RoomScene extends Scene {
       doorReachedLog: this.doorReachedLog,
       localPenguinMoveLog: this.localPenguinMoveLog,
       restartRoom: () => this.scene.restart(),
+      restartCount: this.restartCount,
+      penguinCount: this.countPenguinContainers(),
+      setRegisteredPlayer: (player) => this.registry.set(PLAYER_REGISTRY_KEY, player),
+      spawnDebugPenguin: (tile, look) => this.spawnDebugPenguin(tile, look),
     });
+  }
+
+  /** The Penguin's rendered `Sprite`, reached through its `container` (#14 review fix 8's `flipX` check). */
+  private penguinSprite(): GameObjects.Sprite | undefined {
+    return this.penguin?.container.list.find(
+      (child): child is GameObjects.Sprite => child instanceof GameObjects.Sprite,
+    );
+  }
+
+  /** Every Penguin `Container` in the Scene's display list (#14 review fix 8's restart-leak check). */
+  private countPenguinContainers(): number {
+    return this.children.list.filter((child) => child instanceof GameObjects.Container).length;
   }
 
   // --- Local Penguin & click-to-move --------------------------------------
 
   private spawnLocalPenguin(room: RoomDefinition): void {
-    const registered = this.registry.get('player') as RegisteredPlayer | undefined;
-    const look = registered?.look ?? DEFAULT_LOOK;
-    const spawnPoint = tileToScreen(room.spawnTile, room.grid.origin);
+    const registered = this.registry.get(PLAYER_REGISTRY_KEY) as RegisteredPlayer | undefined;
+    const look = resolveRegisteredLook(registered);
+    const playerId = resolveRegisteredPlayerId(registered);
+    const spawnTile = this.entryTile ?? room.spawnTile;
+    const spawnPoint = tileToScreen(spawnTile, room.grid.origin);
 
     this.controller = createLocalPenguinController(room.walkable, {
-      playerId: LOCAL_PLAYER_ID,
+      playerId,
       roomId: room.id,
-      tile: room.spawnTile,
+      tile: spawnTile,
     });
     this.currentLook = look;
     this.currentAnim = look.emote;
     this.penguin = createPenguin(this, spawnPoint.x, spawnPoint.y, look);
-    this.penguin.container.setDepth(depthForTile(room.spawnTile));
+    this.penguin.container.setDepth(depthForTile(spawnTile));
+  }
+
+  /** Re-applies the registered Player's look/id to the already-spawned Penguin (#14 review fixes 1 and 4). */
+  private applyRegisteredPlayer(): void {
+    const controller = this.controller;
+    const registered = this.registry.get(PLAYER_REGISTRY_KEY) as RegisteredPlayer | undefined;
+    const look = resolveRegisteredLook(registered);
+
+    this.currentLook = look;
+    if (controller) {
+      controller.state.playerId = resolveRegisteredPlayerId(registered);
+      if (!controller.isMoving()) this.currentAnim = look.emote;
+    }
+    this.penguin?.setLook(look);
   }
 
   private onPointerDown(pointer: Input.Pointer, currentlyOver: GameObjects.GameObject[]): void {
@@ -313,43 +401,75 @@ export class RoomScene extends Scene {
     });
   }
 
+  /**
+   * Starts walking toward `target` immediately, or — mid-walk — queues it
+   * rather than snapping the Penguin forward (#14 review fix 3): the queued
+   * move is applied from `advanceStep`'s tween `onComplete`, once the
+   * current step actually reaches its tile, so walking speed stays a steady
+   * 4 tiles/s instead of jumping ahead on every re-route click.
+   */
   private startMoveTo(target: Tile, onArrive?: () => void): void {
     const controller = this.controller;
     if (!controller) return;
 
     if (controller.isMoving()) {
-      this.snapToNextTileBoundary();
+      this.queuedMove = { target, onArrive };
+      return;
     }
 
-    const path = controller.moveTo(target);
-    if (!path) return; // unreachable target (shouldn't happen post-nearestWalkable); ignore the click
+    this.applyMoveTo(target, onArrive);
+  }
+
+  /**
+   * Resolves `target` against the Penguin's current tile via
+   * `nearestReachable` (#14 review fix 2) and either starts walking there,
+   * or stops cleanly with no path logged/emitted: either because the
+   * resolved target already *is* the tile the Penguin stands on (review fix
+   * 6's own-tile click, and fix 2's case where nothing reachable is any
+   * closer to an unreachable target than staying put), or — defensively,
+   * since `nearestReachable` only ever returns a tile connected to the
+   * Penguin's own tile — because `moveTo` still failed.
+   */
+  private applyMoveTo(target: Tile, onArrive?: () => void): void {
+    const controller = this.controller;
+    const room = this.room;
+    if (!controller || !room) return;
+
+    const reachableTarget = nearestReachable(room.walkable, controller.state.tile, target);
+
+    if (tilesEqual(reachableTarget, controller.state.tile)) {
+      this.stopCleanly(controller);
+      return;
+    }
+
+    const path = controller.moveTo(reachableTarget);
+    if (!path) {
+      this.stopCleanly(controller);
+      return;
+    }
 
     this.pendingArrival = onArrive ?? null;
-    this.localPenguinMoveLog.push(target);
-    const event: LocalPenguinMoveEvent = { target };
+    this.localPenguinMoveLog.push(reachableTarget);
+    const event: LocalPenguinMoveEvent = { target: reachableTarget };
     this.events.emit(LOCAL_PENGUIN_MOVE_EVENT, event);
     this.advanceStep();
   }
 
-  /**
-   * Cancels the in-flight tween and snaps the controller/Penguin to the tile
-   * it was walking toward, so a new click mid-walk re-routes from that tile
-   * boundary rather than the tile the walk started from (#14 D3).
-   */
-  private snapToNextTileBoundary(): void {
-    const controller = this.controller;
-    const penguin = this.penguin;
-    const room = this.room;
-    if (!controller || !penguin || !room) return;
+  /** Cancels any active path/target and returns the Penguin to idle in place. */
+  private stopCleanly(controller: LocalPenguinController): void {
+    controller.stop();
+    this.penguin?.idle();
+    this.currentAnim = this.currentLook.emote;
+    this.pendingArrival = null;
+  }
 
-    if (this.activeTween) {
-      this.activeTween.stop();
-      this.activeTween = null;
-    }
-    const arrived = controller.arriveAtNextTile();
-    const point = tileToScreen(arrived, room.grid.origin);
-    penguin.container.setPosition(point.x, point.y);
-    penguin.container.setDepth(depthForTile(arrived));
+  private spawnDebugPenguin(tile: Tile, look: PenguinLook): void {
+    const room = this.room;
+    if (!room) return;
+    const point = tileToScreen(tile, room.grid.origin);
+    const debugPenguin = createPenguin(this, point.x, point.y, look);
+    debugPenguin.container.setDepth(depthForTile(tile));
+    this.debugPenguins.push(debugPenguin);
   }
 
   private advanceStep(): void {
@@ -393,6 +513,14 @@ export class RoomScene extends Scene {
       onComplete: () => {
         this.activeTween = null;
         controller.arriveAtNextTile();
+
+        const queued = this.queuedMove;
+        if (queued) {
+          this.queuedMove = null;
+          this.applyMoveTo(queued.target, queued.onArrive);
+          return;
+        }
+
         this.advanceStep();
       },
     });
