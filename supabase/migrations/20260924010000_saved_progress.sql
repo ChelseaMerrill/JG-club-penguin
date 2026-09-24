@@ -266,8 +266,9 @@ revoke all on sequence public.minigame_rounds_id_seq from anon, authenticated;
 --
 -- Computes the round's payout on the server from the stats, floors it at 0,
 -- caps it at the Minigame's per-round maximum, rejects a round that arrives
--- sooner than the Minigame's duration after the Player's previous round of it,
--- updates the personal best, and awards the Minigame's Badge (+50 Tokens the
+-- less than 10 s after the Player's previous round of that Minigame, clamps
+-- the payout by the time since that previous round (below), updates the
+-- personal best, and awards the Minigame's Badge (+50 Tokens the
 -- first time only).
 --
 -- Returns { tokensAwarded, balance, newBest, badgeEarned }. tokensAwarded is
@@ -284,7 +285,7 @@ revoke all on sequence public.minigame_rounds_id_seq from anon, authenticated;
 -- Pancake Flip stats keys match src/contracts/game-events.ts (#26). Stats
 -- values are non-negative integers; a missing key counts as 0.
 --
---   Minigame      Payout per round                       Best            Badge (threshold)       Cap  Interval
+--   Minigame      Payout per round                       Best            Badge (threshold)       Cap  Duration
 --   bug-squash    floor(score / 10)                      score           exterminator (500)      250  60 s
 --   pancake-flip  10 golden + 5 flipNow - 5 burnt        stacked         breakfast-club (20)     400  90 s
 --   coffee-rush   5 small + 10 medium + 15 large         cups served     barista (15 cups)       400  90 s
@@ -295,7 +296,14 @@ revoke all on sequence public.minigame_rounds_id_seq from anon, authenticated;
 --                 (rushCone5 ... rushCone25) doubled
 --
 -- Caps confirmed in the #27 red-team review (2026-09-24).
--- Intervals are each Minigame's round duration.
+--
+-- Interval rule (option A, #27 red-team RT3, decided 2026-09-24): a round
+-- less than 10 s after the previous round of the same Minigame is rejected
+-- with round_too_soon. Otherwise the payout is at most
+-- floor(cap * min(1, seconds since the previous round / duration)), so a
+-- Player can never earn more than one cap per duration, while an honest
+-- round that ends early (a Bug Squash with three escapes) still counts. The
+-- personal best and Badge are recorded whatever the clamp.
 -- ---------------------------------------------------------------------------
 
 create or replace function public.record_round(minigame_id text, score int, stats jsonb)
@@ -311,7 +319,8 @@ declare
   v_score int := record_round.score;
   v_stats jsonb := coalesce(record_round.stats, '{}'::jsonb);
   v_cap int;
-  v_interval interval;
+  v_duration_s int;
+  v_elapsed_s numeric;
   v_badge text;
   v_badge_met boolean;
   v_raw int;
@@ -356,7 +365,7 @@ begin
   case v_game
     when 'bug-squash' then
       v_cap := 250;
-      v_interval := interval '60 seconds';
+      v_duration_s := 60;
       v_badge := 'exterminator';
       v_raw := v_score / 10;
       v_best := v_score;
@@ -364,7 +373,7 @@ begin
 
     when 'pancake-flip' then
       v_cap := 400;
-      v_interval := interval '90 seconds';
+      v_duration_s := 90;
       v_badge := 'breakfast-club';
       v_raw := 10 * coalesce((v_stats -> 'golden')::numeric, 0)::int
              + 5 * coalesce((v_stats -> 'flipNow')::numeric, 0)::int
@@ -374,7 +383,7 @@ begin
 
     when 'coffee-rush' then
       v_cap := 400;
-      v_interval := interval '90 seconds';
+      v_duration_s := 90;
       v_badge := 'barista';
       v_raw := 5 * coalesce((v_stats -> 'small')::numeric, 0)::int
              + 10 * coalesce((v_stats -> 'medium')::numeric, 0)::int
@@ -387,7 +396,7 @@ begin
 
     when 'snow-cone-stand' then
       v_cap := 600;
-      v_interval := interval '120 seconds';
+      v_duration_s := 120;
       v_badge := 'brain-freeze';
       v_raw := 5 * coalesce((v_stats -> 'cone5')::numeric, 0)::int
              + 10 * coalesce((v_stats -> 'cone10')::numeric, 0)::int
@@ -419,8 +428,15 @@ begin
   select max(r.finished_at) into v_last_finished
   from public.minigame_rounds r
   where r.player_id = v_uid and r.minigame_id = v_game;
-  if v_last_finished is not null and now() - v_last_finished < v_interval then
-    raise exception 'round_too_soon';
+  if v_last_finished is not null then
+    v_elapsed_s := extract(epoch from now() - v_last_finished);
+    if v_elapsed_s < 10 then
+      raise exception 'round_too_soon';
+    end if;
+    v_payout := least(
+      v_payout,
+      floor(v_cap * least(1.0, v_elapsed_s / v_duration_s))::int
+    );
   end if;
 
   select b.best_score into v_prev_best
