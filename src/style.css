@@ -1,15 +1,62 @@
+/* JG design tokens (colors, type). Byte-exact mirror import: never copy or
+   edit these rules here. Verified to hold only `:root` custom properties and
+   class-scoped rules (no bare element selectors), so it's safe to import
+   wholesale. The build depends on this exact mirror path
+   (design/_ds/jahnel-group-design-system-019df630-6921-74f8-9d13-c9b8506c740c/);
+   if a design resync renames the design-system folder, this import path
+   must be updated to match. */
+@import url('../design/_ds/jahnel-group-design-system-019df630-6921-74f8-9d13-c9b8506c740c/colors_and_type.css');
+
+@font-face {
+  font-family: 'Bumbastika';
+  src: url('../design/assets/bumbastika.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  /* Stage chrome tokens. --stage-ring-inner/--stage-ring-outer reuse the JG
+     brand colors exactly; --stage-bg is a design room-surface color that
+     isn't one of the mirror's named tokens. */
+  --stage-bg: #0e1013;
+  --stage-ring-inner: var(--jg-secondary);
+  --stage-ring-outer: var(--jg-primary);
+  --stage-letterbox: #0a0b0d;
+  --font-game-display: 'Bumbastika', var(--font-display);
+  /* Repeated HUD edge insets (design/Room 01 Town Center.dc.html and
+     siblings), shared with `.player-badge` so it can sit clear of the HUD's
+     top-right cluster without duplicating the literal. */
+  --hud-inset-x: 36px;
+  --hud-inset-y: 28px;
+}
+
 html,
 body {
   margin: 0;
   padding: 0;
   height: 100%;
-  background: #0b1d2e;
+  background: var(--stage-letterbox);
 }
 
+/* Full-viewport letterbox behind the fitted stage. */
 #app {
   position: relative;
   width: 100%;
   height: 100%;
+  overflow: hidden;
+  background: var(--stage-letterbox);
+}
+
+/* Fitted 1600x900 (at `scale`) box, sized and positioned by
+   `mountStage`/`computeStageFit` in src/ui/stage.ts. Chrome background plus a
+   two-tone ring so the stage edge reads clearly against the letterbox. */
+#stage {
+  position: absolute;
+  background: var(--stage-bg);
+  box-shadow:
+    0 0 0 6px var(--stage-ring-inner),
+    0 0 0 9px var(--stage-ring-outer);
   overflow: hidden;
 }
 
@@ -18,10 +65,16 @@ body {
   inset: 0;
 }
 
-/* Overlay layer for DOM UI (login button, chat, dialogs). */
+/* Overlay layer for DOM UI (login button, chat, dialogs). Fixed at the
+   logical 1600x900 stage resolution and scaled by `mountStage` so overlay
+   coordinates are stage pixels, matching the Phaser canvas underneath. */
 #ui {
   position: absolute;
-  inset: 0;
+  top: 0;
+  left: 0;
+  width: 1600px;
+  height: 900px;
+  transform-origin: 0 0;
   z-index: 10;
   pointer-events: none;
 }
@@ -31,52 +84,314 @@ body {
   pointer-events: auto;
 }
 
-/* Signed-out: a centered card, no full-screen backdrop. */
-.login-card {
+/* Shown instead of #stage on small, short, or touch-only viewports (see the
+   media query below). The game still boots underneath; only visibility
+   changes. */
+#desktop-only {
+  display: none;
+  position: fixed;
+  inset: 0;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  text-align: center;
+  background: var(--stage-bg);
+  color: var(--fg-primary);
+  font-family: var(--font-game-display);
+  font-size: calc(18px + 2vw);
+  z-index: 20;
+  /* Same two-tone ring as #stage, inset since this element fills the
+     viewport (an outer box-shadow would be clipped by the edge). */
+  box-shadow:
+    inset 0 0 0 6px var(--stage-ring-inner),
+    inset 0 0 0 15px var(--stage-ring-outer);
+}
+
+@media (max-width: 1023.98px), (max-height: 575.98px), (not (any-pointer: fine)) {
+  #stage {
+    display: none;
+  }
+
+  #desktop-only {
+    display: flex;
+  }
+}
+
+/* Signed-out: the Landing page, filling the whole 1600x900 Stage. Ported
+   from design/Club JenGuin Landing.dc.html; all sizes are Stage pixels. */
+.landing {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+  inset: 0;
+  overflow: hidden;
+  background: linear-gradient(
+    180deg,
+    #0a0c0f 0%,
+    #0f3441 32%,
+    #bfe3f0 46%,
+    var(--jg-light) 60%,
+    var(--jg-light) 100%
+  );
+  color: var(--jg-light);
+  font-family: var(--font-body);
+}
+
+.landing__sky {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 420px;
+  overflow: hidden;
+}
+
+.landing__star {
+  position: absolute;
+  border-radius: 50%;
+  background: var(--jg-light);
+}
+
+/* The JG hex mark in the night sky. */
+.landing__hex {
+  position: absolute;
+  right: 150px;
+  top: 70px;
+  width: 110px;
+  height: 124px;
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  background: var(--jg-secondary);
+  opacity: 0.9;
+}
+
+.landing__hero {
+  position: absolute;
+  left: 110px;
+  top: 40px;
+  width: 230px;
+  animation: landing-bob 2.6s ease-in-out infinite;
+}
+
+.landing svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.landing__title {
+  position: absolute;
+  left: 380px;
+  top: 44px;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 1.5rem 2rem;
-  background: #ffffff;
-  border-radius: 0.5rem;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
-  font-family: system-ui, sans-serif;
+  gap: 6px;
 }
 
-.login-card__button {
-  padding: 0.5rem 1rem;
-  font-size: 1rem;
-  border: none;
-  border-radius: 0.25rem;
-  background: #4285f4;
-  color: #ffffff;
-  cursor: pointer;
-}
-
-.login-card__error {
+.landing__logo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   margin: 0;
-  min-height: 1em;
-  color: #c0392b;
-  font-size: 0.85rem;
+  font-family: var(--font-game-display);
+  font-weight: normal;
+  line-height: 0.86;
+  -webkit-text-stroke: 12px var(--jg-secondary);
+  paint-order: stroke fill;
+  text-shadow:
+    0 10px 0 var(--jg-secondary),
+    0 14px 0 #072e3b;
 }
 
-.login-card__error-signout {
-  padding: 0.25rem 0.5rem;
+.landing__logo-club {
+  font-size: 150px;
+  color: var(--jg-primary);
+}
+
+.landing__logo-jenguin {
+  margin-left: 40px;
+  font-size: 118px;
+  color: var(--jg-light);
+}
+
+.landing__logo-jg {
+  font-size: 34px;
+  vertical-align: top;
+  -webkit-text-stroke-width: 5px;
+  color: var(--jg-primary);
+}
+
+.landing__tagline {
+  margin: 14px 0 0 60px;
+  font: 700 26px var(--font-body);
+  text-shadow: 0 2px 0 var(--jg-secondary);
+}
+
+.landing__crowd {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 400px;
+  bottom: 0;
+  overflow: hidden;
+}
+
+.landing__bob {
+  position: absolute;
+  animation: landing-bob 3s ease-in-out infinite;
+}
+
+.landing__shadow {
+  position: absolute;
+  left: 15%;
+  bottom: 2px;
+  width: 70%;
+  height: 15%;
+  border-radius: 50%;
+  background: #000;
+  opacity: 0.18;
+}
+
+.landing__actions {
+  position: absolute;
+  left: 50%;
+  bottom: 190px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 14px;
+}
+
+.landing__play,
+.landing__login {
+  display: flex;
+  align-items: center;
+  height: 78px;
   border: none;
-  border-radius: 0.25rem;
+  clip-path: polygon(
+    20px 0,
+    calc(100% - 20px) 0,
+    100% 50%,
+    calc(100% - 20px) 100%,
+    20px 100%,
+    0 50%
+  );
+  font-family: var(--font-game-display);
+  cursor: pointer;
+  transition: filter var(--jg-anim-duration) var(--jg-ease);
+}
+
+.landing__play {
+  padding: 0 46px;
+  background: var(--jg-primary);
+  box-shadow: inset 0 -8px 0 var(--jg-secondary);
+  font-size: 34px;
+  color: var(--jg-dark);
+}
+
+.landing__login {
+  padding: 0 34px;
+  background: var(--jg-secondary);
+  box-shadow: inset 0 -8px 0 #06303d;
+  font-size: 26px;
+  color: var(--jg-light);
+}
+
+.landing__play:hover,
+.landing__login:hover {
+  filter: brightness(1.12);
+}
+
+.landing__play:active,
+.landing__login:active {
+  transform: translateY(3px);
+}
+
+/* clip-path would hide an outline, so focus shows as an inset ring. */
+.landing__play:focus-visible,
+.landing__login:focus-visible {
+  outline: none;
+  filter: brightness(1.12);
+  box-shadow:
+    inset 0 -8px 0 var(--jg-secondary),
+    inset 0 0 0 4px var(--jg-light);
+}
+
+.landing__pill {
+  position: absolute;
+  left: 50%;
+  bottom: 150px;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 6px 14px;
+  white-space: nowrap;
+  background: var(--jg-dark);
+  border: 2px solid var(--jg-secondary);
+  border-radius: 999px;
+  font: 400 12px var(--font-display);
+  letter-spacing: 0.2em;
+  color: var(--jg-inactive);
+}
+
+.landing__error-row {
+  position: absolute;
+  left: 50%;
+  bottom: 96px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  white-space: nowrap;
+}
+
+.landing__error {
+  margin: 0;
+  font: 700 18px var(--font-body);
+  color: #c0392b;
+}
+
+.landing__error-signout {
+  padding: 6px 14px;
+  border: 2px solid var(--jg-secondary);
+  border-radius: 999px;
+  background: var(--jg-dark);
+  font: 400 14px var(--font-display);
+  letter-spacing: 0.16em;
+  color: var(--jg-light);
   cursor: pointer;
 }
 
-/* Signed-in: a top-right badge (name, color swatch, sign out). */
+.landing__footer {
+  position: absolute;
+  left: 40px;
+  bottom: 22px;
+  margin: 0;
+  font: 400 11px var(--font-display);
+  letter-spacing: 0.2em;
+  color: var(--jg-dark-2);
+}
+
+@keyframes landing-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing__hero,
+  .landing__bob {
+    animation: none;
+  }
+}
+
+/* Signed-in: a badge (name, color swatch, sign out) below the HUD's MENU
+   panel's full open height (top: 76px + ~64px of padding/border/button), so
+   opening MENU never covers it -- `e2e/deployed-auth.spec.ts` depends on the
+   badge's own sign-out staying visible and clickable. */
 .player-badge {
   position: absolute;
-  top: 1rem;
-  right: 1rem;
+  top: 152px;
+  right: var(--hud-inset-x);
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -104,9 +419,198 @@ body {
 /* The `display: flex` above beats the UA `[hidden] { display: none }` rule
    (author origin wins over user-agent origin at equal specificity), so the
    hidden state needs its own explicit override. */
-.login-card[hidden],
+.landing[hidden],
 .player-badge[hidden] {
   display: none;
+}
+
+/* HUD (#32): Room title, Token balance, MENU/PENGUIN, and the bottom bar's
+   chat slot / MAP / IGLOO. Reproduces design/Room 01 Town Center.dc.html and
+   design/Club JenGuin HUD Menus.dc.html in Stage pixels (the `#ui` layer is
+   fixed at 1600x900 and scaled by mountStage). Shown on sign-in, hidden on
+   sign-out (src/main.ts).
+
+   Pointer events: `#ui > *` (above) opts every direct child of `#ui` back
+   into `pointer-events: auto`, including `.hud` itself, which would swallow
+   every canvas click across the whole Stage. `#ui > .hud` below re-overrides
+   that back to `none` -- it needs the extra `#ui >` specificity to win the
+   cascade over `#ui > *` -- and only the actual widgets (top-right cluster,
+   MENU panel, bottom bar) opt back into `auto`, so the canvas still gets
+   clicks everywhere the HUD has no widget. */
+.hud {
+  position: absolute;
+  inset: 0;
+}
+
+#ui > .hud {
+  pointer-events: none;
+}
+
+.hud[hidden] {
+  display: none;
+}
+
+.hud__title-block {
+  position: absolute;
+  top: var(--hud-inset-y);
+  left: var(--hud-inset-x);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  /* Not a widget: title/subtitle are read-only text, so clicks here fall
+     through to the canvas underneath (inherits `pointer-events: none` from
+     `.hud`). */
+}
+
+.hud__title {
+  font-family: var(--font-game-display);
+  font-size: 44px;
+  line-height: 1;
+  color: var(--jg-primary);
+  -webkit-text-stroke: 5px var(--jg-secondary);
+  paint-order: stroke fill;
+  text-shadow: 0 4px 0 var(--jg-secondary);
+  text-transform: uppercase;
+}
+
+.hud__subtitle {
+  font: 400 13px var(--font-display);
+  letter-spacing: 0.22em;
+  color: var(--fg-primary);
+  text-transform: uppercase;
+}
+
+.hud__top-right {
+  position: absolute;
+  top: var(--hud-inset-y);
+  right: var(--hud-inset-x);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  pointer-events: auto;
+}
+
+.hud__tokens {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 16px;
+  background: rgba(var(--jg-dark-rgb), 0.88);
+  border: 2px solid var(--jg-secondary);
+  border-radius: 999px;
+  font: 400 18px var(--font-display);
+  letter-spacing: 0.06em;
+  color: var(--fg-primary);
+}
+
+.hud__tokens-icon {
+  width: 18px;
+  height: 20px;
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  background: var(--jg-primary);
+}
+
+/* The top-right pill buttons (PENGUIN, MENU): the design's rounded-hexagon
+   "clip-path" chip, --jg-secondary fill. */
+.hud__button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  padding: 0 18px;
+  border: none;
+  background: var(--jg-secondary);
+  clip-path: polygon(
+    12px 0,
+    calc(100% - 12px) 0,
+    100% 50%,
+    calc(100% - 12px) 100%,
+    12px 100%,
+    0 50%
+  );
+  font: 400 15px var(--font-display);
+  letter-spacing: 0.1em;
+  color: var(--fg-primary);
+  cursor: pointer;
+}
+
+.hud__button[hidden] {
+  display: none;
+}
+
+.hud__menu-panel {
+  position: absolute;
+  /* 28px inset + the top-right row's 40px height + an 8px gap to the row
+     below. */
+  top: calc(var(--hud-inset-y) + 48px);
+  right: var(--hud-inset-x);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  background: rgba(var(--jg-dark-rgb), 0.94);
+  border: 2px solid var(--jg-secondary);
+  pointer-events: auto;
+}
+
+.hud__menu-panel[hidden] {
+  display: none;
+}
+
+.hud__menu-signout {
+  height: 36px;
+  padding: 0 16px;
+  border: none;
+  background: var(--jg-secondary);
+  font: 400 14px var(--font-display);
+  letter-spacing: 0.08em;
+  color: var(--fg-primary);
+  cursor: pointer;
+}
+
+.hud__bottom-bar {
+  position: absolute;
+  left: var(--hud-inset-x);
+  right: var(--hud-inset-x);
+  bottom: var(--hud-inset-y);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  pointer-events: auto;
+}
+
+.hud__chat-slot {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  height: 52px;
+  padding: 0 18px;
+  background: rgba(var(--jg-dark-rgb), 0.9);
+  border: 2px solid var(--jg-secondary);
+  font: 400 16px var(--font-body);
+  color: var(--jg-inactive);
+}
+
+/* The bottom bar's hexagon buttons (EMOTE, SNOWBALL, MAP, IGLOO, QUESTS). */
+.hud__button--bottom {
+  height: 52px;
+  padding: 0 26px;
+  clip-path: polygon(
+    14px 0,
+    calc(100% - 14px) 0,
+    100% 50%,
+    calc(100% - 14px) 100%,
+    14px 100%,
+    0 50%
+  );
+  font-family: var(--font-game-display);
+  font-size: 20px;
+  letter-spacing: 0.04em;
+  /* #06303d is a manual-darkened shade with no equivalent named design
+     token (same exception `.landing__login`'s inset shadow makes). */
+  box-shadow: inset 0 -5px 0 #06303d;
+  color: var(--fg-primary);
 }
 
 /* Debug overlay (stand-in for #15/#33/#35), mounted only under `?debug`. */

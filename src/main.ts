@@ -7,7 +7,11 @@ import { getSupabaseClient } from './auth/supabase-client';
 import { startAuth, toAuthClient } from './auth/auth-session';
 import { bindPlayer, type Player } from './auth/player';
 import { createLoginOverlay } from './ui/login-overlay';
+import { mountStage } from './ui/stage';
 import { getUiLayer } from './ui/ui-layer';
+import { createHud } from './ui/hud/hud';
+import { resolveRoomTitle } from './ui/hud/room-titles';
+import { initDevHudHook } from './ui/hud/dev-hud-hook';
 import { createDebugOverlay, isDebugEnabled } from './ui/debug-overlay';
 import {
   createRoomChannel,
@@ -27,6 +31,7 @@ import {
 loadEnv();
 
 const game = startGame();
+mountStage(game);
 const client = getSupabaseClient();
 const realtime = toRealtimeClient(client);
 const rooms = createStubRoomDriver(gameEvents);
@@ -167,6 +172,22 @@ const overlay = createLoginOverlay(uiLayer, {
   },
 });
 
+const hud = createHud(getUiLayer(), {
+  resolveRoomTitle,
+  onIgloo: () => {
+    // #15 changeRoom('igloo'); a no-op until then.
+  },
+  onSignOut: () => {
+    void auth.signOut();
+  },
+  initialBalance: 0, // until #34 loads the real Token balance
+});
+
+// Must run before `startAuth`: Supabase's `onAuthStateChange` always fires
+// asynchronously, so `devHudActive` needs to be settled before its first
+// (later-tick) SIGNED_OUT/SIGNED_IN callback checks it below.
+const devHudActive = initDevHudHook(hud);
+
 const auth = startAuth({
   client: toAuthClient(client),
   onSignedIn: (player) => {
@@ -175,15 +196,19 @@ const auth = startAuth({
     const previous = !samePlayer && roomChannel ? endSession() : null;
     // `room:enter` fires only after `registry.player` is set.
     bindPlayer(game.registry, player);
-    overlay.showSignedIn(player);
     if (!samePlayer) void startSession(player, previous);
+    if (devHudActive) return;
+    overlay.showSignedIn(player);
+    hud.show();
   },
   onSignedOut: () => {
     // Per `src/contracts/rooms.ts`, `room:leave` comes before `bindPlayer(null)`.
     const channel = endSession();
     bindPlayer(game.registry, null);
-    overlay.showSignedOut();
     if (channel) void stopChannel(channel);
+    if (devHudActive) return;
+    overlay.showSignedOut();
+    hud.hide();
   },
   onError: (message) => {
     overlay.showError(message);
