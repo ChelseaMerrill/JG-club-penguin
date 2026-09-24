@@ -439,6 +439,11 @@ export class RoomScene extends Scene {
 
     if (tilesEqual(reachableTarget, controller.state.tile)) {
       this.stopCleanly(controller);
+      // Already standing on an NPC's interaction tile or a door's approach
+      // tile: that still counts as arriving, so clicking an NPC you're next
+      // to opens its dialog (#36) and clicking the door you're at uses it
+      // (#15). An unreachable target that merely resolves to here doesn't.
+      if (onArrive && tilesEqual(target, controller.state.tile)) onArrive();
       return;
     }
 

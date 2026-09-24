@@ -212,6 +212,15 @@ test('click-to-move', async ({ page }) => {
     .toMatchObject({ tile: npcInteractionTile, moving: false });
   expect((await debugInfo(page))?.npcArrivedLog).toContain(npc.npcId);
 
+  // Clicking the same NPC again while already on its interaction tile still
+  // counts as arriving (no walk needed), so its dialog can reopen (#36).
+  const arrivalsBefore = (await debugInfo(page))?.npcArrivedLog?.length ?? 0;
+  await clickStagePoint(page, tileToScreen(npc.tile, origin));
+  await expect
+    .poll(async () => (await debugInfo(page))?.npcArrivedLog?.length)
+    .toBe(arrivalsBefore + 1);
+  expect((await debugInfo(page))?.localPenguin).toMatchObject({ tile: npcInteractionTile });
+
   // --- Clicking a door hotspot walks to its approach tile and logs
   // door:reached. Hand-computed like the NPC case above: DEV PIT's hotspot
   // centre (1180+75, 340+45) = (1255, 385) inverts, via `screenToTile`'s
