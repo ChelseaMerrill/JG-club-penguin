@@ -17,8 +17,9 @@
 alter table public.players alter column penguin_color set default '#161719';
 
 alter table public.players
+  -- #26: trimmed, at most 16 characters; '' only before the Creator is done.
   add column if not exists penguin_name text not null default ''
-    check (char_length(penguin_name) <= 20),
+    check (char_length(penguin_name) <= 16 and penguin_name !~ '^\s|\s$'),
   add column if not exists cap text not null default '#00BDFF'
     check (cap ~ '^#[0-9a-fA-F]{6}$'),
   add column if not exists beak text not null default '#00BDFF'
@@ -40,6 +41,11 @@ alter table public.players
     check (tokens >= 0),
   -- null = the Penguin Creator has not been completed yet.
   add column if not exists profile_created_at timestamptz null;
+
+-- Once the Creator is completed, the Penguin has a name (1-16 characters).
+alter table public.players drop constraint if exists players_name_set_once_created;
+alter table public.players add constraint players_name_set_once_created
+  check (profile_created_at is null or char_length(penguin_name) >= 1);
 
 -- Column-level grants replace #9's table-wide INSERT, which would otherwise
 -- let a first-sign-in insert choose its own Token balance. The Player may set
@@ -75,7 +81,7 @@ create table if not exists public.player_badges (
 create table if not exists public.minigame_bests (
   player_id uuid not null references public.players (id) on delete cascade,
   minigame_id text not null
-    check (minigame_id in ('bug-squash', 'pancake-flip', 'coffee-rush', 'snow-cone')),
+    check (minigame_id in ('bug-squash', 'pancake-flip', 'coffee-rush', 'snow-cone-stand')),
   best_score int not null check (best_score >= 0),
   updated_at timestamptz not null default now(),
   primary key (player_id, minigame_id)
@@ -85,7 +91,7 @@ create table if not exists public.minigame_rounds (
   id bigint generated always as identity primary key,
   player_id uuid not null references public.players (id) on delete cascade,
   minigame_id text not null
-    check (minigame_id in ('bug-squash', 'pancake-flip', 'coffee-rush', 'snow-cone')),
+    check (minigame_id in ('bug-squash', 'pancake-flip', 'coffee-rush', 'snow-cone-stand')),
   score int not null check (score >= 0),
   stats jsonb not null default '{}'::jsonb,
   tokens_awarded int not null check (tokens_awarded >= 0),
@@ -236,8 +242,9 @@ grant update (slot, item_id) on public.igloo_slots to authenticated;
 -- Errors (the message is the code): not_authenticated, no_player,
 -- unknown_minigame, invalid_score, invalid_stats, round_too_soon.
 --
--- Rules per Minigame (payout table decided 2026-09-24). Stats keys are
--- non-negative integers; a missing key counts as 0.
+-- Rules per Minigame (payout table decided 2026-09-24). Minigame, Badge and
+-- Pancake Flip stats keys match src/contracts/game-events.ts (#26). Stats
+-- values are non-negative integers; a missing key counts as 0.
 --
 --   Minigame      Payout per round                       Best            Badge (threshold)       Cap  Interval
 --   bug-squash    floor(score / 10)                      score           exterminator (500)      250  60 s
@@ -245,8 +252,8 @@ grant update (slot, item_id) on public.igloo_slots to authenticated;
 --   coffee-rush   5 small + 10 medium + 15 large         cups served     barista (15 cups)       400  90 s
 --                 + 5 perfect                            (small+medium
 --                                                        +large)
---   snow-cone     5 cone5 + 10 cone10 + 15 cone15        tokens earned   brain-freeze (200)      600  120 s
---                 + 25 cone25, rush-hour cones
+--   snow-cone-    5 cone5 + 10 cone10 + 15 cone15        tokens earned   brain-freeze (200)      600  120 s
+--   stand         + 25 cone25, rush-hour cones
 --                 (rushCone5 ... rushCone25) doubled
 --
 -- Caps are the proposals from #27, to be confirmed in the red-team review.
@@ -337,7 +344,7 @@ begin
               + coalesce((v_stats -> 'large')::numeric, 0)::int;
       v_badge_met := v_best >= 15;
 
-    when 'snow-cone' then
+    when 'snow-cone-stand' then
       v_cap := 600;
       v_interval := interval '120 seconds';
       v_badge := 'brain-freeze';
