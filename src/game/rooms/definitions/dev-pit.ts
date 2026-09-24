@@ -1,12 +1,10 @@
 import type { RoomDefinition } from '../room-definition';
+import { createGrid, fullyWalkable } from '../grid';
 
 // Same grid convention as Town Center; see that file's comment.
 const COLUMNS = 12;
 const ROWS = 10;
-
-function fullyWalkable(columns: number, rows: number): boolean[][] {
-  return Array.from({ length: rows }, () => Array.from({ length: columns }, () => true));
-}
+const ORIGIN = { x: 800, y: 250 };
 
 /**
  * Approximated from `design/Room 02 Dev Pit.dc.html`: a door back to Town
@@ -20,13 +18,7 @@ export const devPit: RoomDefinition = {
   title: 'Dev Pit',
   subtitle: 'Team RMs 1-4 · Floor 5',
   background: { kind: 'procedural' },
-  grid: {
-    origin: { x: 800, y: 250 },
-    tileWidth: 100,
-    tileHeight: 50,
-    columns: COLUMNS,
-    rows: ROWS,
-  },
+  grid: createGrid(ORIGIN, COLUMNS, ROWS),
   walkable: fullyWalkable(COLUMNS, ROWS),
   spawnTile: { col: 6, row: 1 },
   doors: [
@@ -44,5 +36,6 @@ export const devPit: RoomDefinition = {
     },
   ],
   npcSlots: [{ npcId: 'ashley', tile: { col: 7, row: 7 } }],
-  furnitureSlots: [{ id: 'desk', tile: { col: 4, row: 5 } }],
+  // A decorative prop, not Furniture (that's Igloo-only; #13 fix 6).
+  props: [{ id: 'desk', tile: { col: 4, row: 5 } }],
 };

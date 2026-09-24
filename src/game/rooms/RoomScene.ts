@@ -1,7 +1,9 @@
 import { Scene } from 'phaser';
 import { SPAWN_ROOM_ID, type RoomId } from '../../contracts';
+import { GAME_HEIGHT, GAME_WIDTH } from '../stage-size';
+import { planBackgroundDraw } from './background';
 import { exposeRoomDebug, resolveRoomIdFromLocation } from './dev-room-hook';
-import { depthForTile, tileToScreen } from './iso';
+import { depthForTile, tileCornerToScreen, tileToScreen, TILE_HEIGHT, TILE_WIDTH } from './iso';
 import { getRoomDefinition } from './registry';
 import type { RoomDefinition } from './room-definition';
 
@@ -15,6 +17,36 @@ const WALL_LEFT_COLOR = 0x121316;
 const WALL_RIGHT_COLOR = 0x17181b;
 const DOOR_COLOR = 0x0a0b0d;
 const DOOR_BORDER_COLOR = 0x00bdff;
+const DOOR_BORDER_WIDTH = 2;
+
+// The Stage's letterbox colour behind the Room (`design`'s `#0E1013` sky/base).
+const STAGE_BACKGROUND_COLOR = '#0e1013';
+
+// Draw depths, lowest-first. The exported design image (#13 D3) sits below
+// everything, including the procedural walls; doors sit above the floor but
+// below their own label.
+const IMAGE_BACKGROUND_DEPTH = -2;
+const WALL_DEPTH = -1;
+const FLOOR_DEPTH = -1;
+const DOOR_DEPTH = 0;
+const DOOR_LABEL_DEPTH = 1;
+
+const LABEL_FONT_FAMILY = 'sans-serif';
+const LABEL_TEXT_COLOR = '#F4F4F4';
+const DOOR_LABEL_FONT_SIZE = '14px';
+const NPC_LABEL_FONT_SIZE = '12px';
+const NPC_LABEL_OFFSET_Y = -30;
+
+const NPC_RADIUS = 18;
+const NPC_COLOR = 0x00bdff;
+
+const FURNITURE_WIDTH = 40;
+const FURNITURE_HEIGHT = 28;
+const FURNITURE_COLOR = 0x0c4b5f;
+
+const PROP_WIDTH = 32;
+const PROP_HEIGHT = 32;
+const PROP_COLOR = 0x3a3d42;
 
 export interface RoomSceneData {
   roomId?: RoomId;
@@ -22,9 +54,11 @@ export interface RoomSceneData {
 
 /**
  * Loads and renders any `RoomDefinition` by id. One `RoomScene` fills the
- * fixed 1600x900 stage with no camera scrolling (#13 D2): it never moves its
- * own camera, so `cameras.main.scrollX/scrollY` stay at their Phaser default
- * of 0.
+ * fixed 1600x900 stage with no camera scrolling (#13 D2): `create()`
+ * explicitly pins the camera scroll to `(0, 0)` rather than relying on a
+ * fresh Scene's default (also `0`), so scroll stays correct even if a later
+ * change nudges the camera; `cameras.main.scrollX/scrollY` are how
+ * `exposeRoomDebug` (and `e2e/room-framework.spec.ts`) confirm it.
  *
  * The room id comes from `init(data)` when the caller supplies one (future
  * Room-switching, #15), and otherwise from the `?room=` dev/e2e hook, which
@@ -41,14 +75,22 @@ export class RoomScene extends Scene {
     this.roomId = data.roomId ?? resolveRoomIdFromLocation(window.location);
   }
 
+  preload(): void {
+    const room = getRoomDefinition(this.roomId);
+    if (room.background.kind === 'image') {
+      this.load.image(room.background.key, room.background.url);
+    }
+  }
+
   create(): void {
     const room = getRoomDefinition(this.roomId);
-    this.cameras.main.setBackgroundColor('#0e1013');
+    this.cameras.main.setBackgroundColor(STAGE_BACKGROUND_COLOR);
     this.cameras.main.setScroll(0, 0);
 
     this.drawWalls(room);
-    this.drawFloor(room);
+    this.drawBackground(room);
     this.drawDoors(room);
+    this.drawProps(room);
     this.drawFurniture(room);
     this.drawNpcs(room);
 
@@ -59,24 +101,44 @@ export class RoomScene extends Scene {
     });
   }
 
+  /** Walls meet at tile corners, so they use `tileCornerToScreen`, not the floor's tile centres. */
   private drawWalls(room: RoomDefinition): void {
     const { origin, columns, rows } = room.grid;
-    const north = tileToScreen({ col: 0, row: 0 }, origin);
-    const west = tileToScreen({ col: 0, row: rows }, origin);
-    const east = tileToScreen({ col: columns, row: 0 }, origin);
+    const north = tileCornerToScreen({ col: 0, row: 0 }, origin);
+    const west = tileCornerToScreen({ col: 0, row: rows }, origin);
+    const east = tileCornerToScreen({ col: columns, row: 0 }, origin);
 
     const graphics = this.add.graphics();
     graphics.fillStyle(WALL_LEFT_COLOR, 1);
     graphics.fillPoints([{ x: west.x, y: 0 }, { x: north.x, y: 0 }, north, west], true);
     graphics.fillStyle(WALL_RIGHT_COLOR, 1);
     graphics.fillPoints([{ x: north.x, y: 0 }, { x: east.x, y: 0 }, east, north], true);
-    graphics.setDepth(-1);
+    graphics.setDepth(WALL_DEPTH);
   }
 
+  /**
+   * Draws the Room's `background` (#13 D3): the exported design image, sized
+   * to the whole 1600x900 stage at the lowest depth, when `kind === 'image'`
+   * (preloaded in `preload()`); otherwise the procedural isometric floor.
+   */
+  private drawBackground(room: RoomDefinition): void {
+    const plan = planBackgroundDraw(room.background);
+    if (plan.kind === 'image') {
+      this.add
+        .image(0, 0, plan.key)
+        .setOrigin(0, 0)
+        .setDisplaySize(GAME_WIDTH, GAME_HEIGHT)
+        .setDepth(IMAGE_BACKGROUND_DEPTH);
+      return;
+    }
+    this.drawFloor(room);
+  }
+
+  /** Floor tiles are drawn around each tile's centre (`tileToScreen`), not its corner. */
   private drawFloor(room: RoomDefinition): void {
-    const { origin, tileWidth, tileHeight, columns, rows } = room.grid;
+    const { origin, columns, rows } = room.grid;
     const graphics = this.add.graphics();
-    graphics.setDepth(-1);
+    graphics.setDepth(FLOOR_DEPTH);
 
     for (let row = 0; row < rows; row += 1) {
       for (let col = 0; col < columns; col += 1) {
@@ -85,10 +147,10 @@ export class RoomScene extends Scene {
         graphics.fillStyle((row + col) % 2 === 0 ? FLOOR_COLOR_A : FLOOR_COLOR_B, 1);
         graphics.fillPoints(
           [
-            { x: center.x, y: center.y - tileHeight / 2 },
-            { x: center.x + tileWidth / 2, y: center.y },
-            { x: center.x, y: center.y + tileHeight / 2 },
-            { x: center.x - tileWidth / 2, y: center.y },
+            { x: center.x, y: center.y - TILE_HEIGHT / 2 },
+            { x: center.x + TILE_WIDTH / 2, y: center.y },
+            { x: center.x, y: center.y + TILE_HEIGHT / 2 },
+            { x: center.x - TILE_WIDTH / 2, y: center.y },
           ],
           true,
         );
@@ -107,23 +169,35 @@ export class RoomScene extends Scene {
         door.hotspot.height,
         DOOR_COLOR,
       );
-      rect.setStrokeStyle(2, DOOR_BORDER_COLOR);
-      rect.setDepth(0);
+      rect.setStrokeStyle(DOOR_BORDER_WIDTH, DOOR_BORDER_COLOR);
+      rect.setDepth(DOOR_DEPTH);
       this.add
         .text(centerX, centerY, door.label, {
-          fontFamily: 'sans-serif',
-          fontSize: '14px',
-          color: '#F4F4F4',
+          fontFamily: LABEL_FONT_FAMILY,
+          fontSize: DOOR_LABEL_FONT_SIZE,
+          color: LABEL_TEXT_COLOR,
         })
         .setOrigin(0.5)
-        .setDepth(1);
+        .setDepth(DOOR_LABEL_DEPTH);
+    }
+  }
+
+  /** Non-interactive decorative placeholders (e.g. a planter, a desk); Furniture is Igloo-only (#16). */
+  private drawProps(room: RoomDefinition): void {
+    for (const prop of room.props ?? []) {
+      const point = tileToScreen(prop.tile, room.grid.origin);
+      this.add
+        .rectangle(point.x, point.y, PROP_WIDTH, PROP_HEIGHT, PROP_COLOR)
+        .setDepth(depthForTile(prop.tile));
     }
   }
 
   private drawFurniture(room: RoomDefinition): void {
     for (const slot of room.furnitureSlots ?? []) {
       const point = tileToScreen(slot.tile, room.grid.origin);
-      this.add.rectangle(point.x, point.y, 40, 28, 0x0c4b5f).setDepth(depthForTile(slot.tile));
+      this.add
+        .rectangle(point.x, point.y, FURNITURE_WIDTH, FURNITURE_HEIGHT, FURNITURE_COLOR)
+        .setDepth(depthForTile(slot.tile));
     }
   }
 
@@ -131,12 +205,12 @@ export class RoomScene extends Scene {
     for (const slot of room.npcSlots) {
       const point = tileToScreen(slot.tile, room.grid.origin);
       const depth = depthForTile(slot.tile);
-      this.add.circle(point.x, point.y, 18, 0x00bdff).setDepth(depth);
+      this.add.circle(point.x, point.y, NPC_RADIUS, NPC_COLOR).setDepth(depth);
       this.add
-        .text(point.x, point.y - 30, slot.npcId, {
-          fontFamily: 'sans-serif',
-          fontSize: '12px',
-          color: '#F4F4F4',
+        .text(point.x, point.y + NPC_LABEL_OFFSET_Y, slot.npcId, {
+          fontFamily: LABEL_FONT_FAMILY,
+          fontSize: NPC_LABEL_FONT_SIZE,
+          color: LABEL_TEXT_COLOR,
         })
         .setOrigin(0.5)
         .setDepth(depth + 1);

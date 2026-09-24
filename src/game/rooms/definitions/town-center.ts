@@ -1,13 +1,11 @@
 import type { RoomDefinition } from '../room-definition';
+import { createGrid, fullyWalkable } from '../grid';
 
 // Grid size from `design/build/isolib.js`'s defaults (`W=12, D=10`); origin
 // from `OX=800, OY=250`. Rough art per #13 D3 until #16 exports the design.
 const COLUMNS = 12;
 const ROWS = 10;
-
-function fullyWalkable(columns: number, rows: number): boolean[][] {
-  return Array.from({ length: rows }, () => Array.from({ length: columns }, () => true));
-}
+const ORIGIN = { x: 800, y: 250 };
 
 /**
  * Approximated from `design/Room 01 Town Center.dc.html`: doors to Dev Pit
@@ -18,13 +16,7 @@ export const townCenter: RoomDefinition = {
   title: 'Town Center',
   subtitle: 'JG HQ · 108 State St · Floor 5',
   background: { kind: 'procedural' },
-  grid: {
-    origin: { x: 800, y: 250 },
-    tileWidth: 100,
-    tileHeight: 50,
-    columns: COLUMNS,
-    rows: ROWS,
-  },
+  grid: createGrid(ORIGIN, COLUMNS, ROWS),
   walkable: fullyWalkable(COLUMNS, ROWS),
   spawnTile: { col: 6, row: 8 },
   doors: [
@@ -42,5 +34,6 @@ export const townCenter: RoomDefinition = {
     },
   ],
   npcSlots: [{ npcId: 'darrin', tile: { col: 5, row: 8 } }],
-  furnitureSlots: [{ id: 'planter', tile: { col: 3, row: 3 } }],
+  // A decorative prop, not Furniture (that's Igloo-only; #13 fix 6).
+  props: [{ id: 'planter', tile: { col: 3, row: 3 } }],
 };
