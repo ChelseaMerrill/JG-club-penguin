@@ -1,11 +1,13 @@
+import { DEFAULT_LOOK, isHexColor, type PenguinLook } from '../contracts';
+
 /**
- * The Player: identity plus Penguin color, read from `public.players` and
+ * The Player: identity plus Penguin look, read from `public.players` and
  * `auth.users`. See CONTEXT.md for the Player/Penguin distinction.
  */
 export interface Player {
   id: string;
   displayName: string;
-  penguinColor: string;
+  look: PenguinLook;
 }
 
 /** The subset of a Supabase auth user that a Player is derived from. */
@@ -62,6 +64,19 @@ function toDisplayName(user: AuthUserLike): string {
   return user.user_metadata?.full_name ?? user.email ?? '';
 }
 
+/**
+ * Until #27 adds the other look columns, only `penguin_color` exists in
+ * `public.players`; every other `PenguinLook` field falls back to
+ * `DEFAULT_LOOK`, including `name` (never seeded from the Google display
+ * name: `players` must not duplicate Google identity).
+ */
+function toLook(row: PlayerRow): PenguinLook {
+  return {
+    ...DEFAULT_LOOK,
+    body: isHexColor(row.penguin_color) ? row.penguin_color : DEFAULT_LOOK.body,
+  };
+}
+
 /** Reads the caller's own `players` row. Does not create it. */
 export async function loadPlayer(client: PlayersClient, user: AuthUserLike): Promise<PlayerResult> {
   const { data, error } = await client
@@ -75,7 +90,7 @@ export async function loadPlayer(client: PlayersClient, user: AuthUserLike): Pro
   }
 
   return {
-    player: { id: data.id, displayName: toDisplayName(user), penguinColor: data.penguin_color },
+    player: { id: data.id, displayName: toDisplayName(user), look: toLook(data) },
     error: null,
   };
 }

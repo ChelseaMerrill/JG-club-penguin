@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { DEFAULT_LOOK } from '../contracts';
 import { createLoginOverlay } from './login-overlay';
 
 function setup() {
@@ -46,7 +47,11 @@ describe('createLoginOverlay', () => {
   it('showSignedIn shows the badge with name, swatch color and hides the card', () => {
     const { root, overlay } = setup();
 
-    overlay.showSignedIn({ id: 'user-1', displayName: 'Ada Lovelace', penguinColor: '#00bdff' });
+    overlay.showSignedIn({
+      id: 'user-1',
+      displayName: 'Ada Lovelace',
+      look: { ...DEFAULT_LOOK, body: '#00bdff' },
+    });
 
     const badge = root.querySelector('.player-badge') as HTMLElement;
     const card = root.querySelector('.login-card') as HTMLElement;
@@ -60,7 +65,11 @@ describe('createLoginOverlay', () => {
 
   it('clicking sign out calls onSignOut', () => {
     const { root, overlay, onSignOut } = setup();
-    overlay.showSignedIn({ id: 'user-1', displayName: 'Ada Lovelace', penguinColor: '#00bdff' });
+    overlay.showSignedIn({
+      id: 'user-1',
+      displayName: 'Ada Lovelace',
+      look: { ...DEFAULT_LOOK, body: '#00bdff' },
+    });
 
     (root.querySelector('.player-badge__signout') as HTMLButtonElement).click();
 
@@ -69,7 +78,11 @@ describe('createLoginOverlay', () => {
 
   it('showSignedOut shows the card again and hides the badge', () => {
     const { root, overlay } = setup();
-    overlay.showSignedIn({ id: 'user-1', displayName: 'Ada Lovelace', penguinColor: '#00bdff' });
+    overlay.showSignedIn({
+      id: 'user-1',
+      displayName: 'Ada Lovelace',
+      look: { ...DEFAULT_LOOK, body: '#00bdff' },
+    });
 
     overlay.showSignedOut();
 
@@ -121,7 +134,11 @@ describe('createLoginOverlay', () => {
     const { root, overlay } = setup();
     overlay.showError('Unable to load player');
 
-    overlay.showSignedIn({ id: 'user-1', displayName: 'Ada Lovelace', penguinColor: '#00bdff' });
+    overlay.showSignedIn({
+      id: 'user-1',
+      displayName: 'Ada Lovelace',
+      look: { ...DEFAULT_LOOK, body: '#00bdff' },
+    });
 
     expect(root.querySelector('.login-card__error')?.textContent).toBe('');
     expect((root.querySelector('.login-card__error-signout') as HTMLElement).hidden).toBe(true);
