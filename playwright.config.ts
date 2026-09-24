@@ -17,6 +17,7 @@ export default defineConfig({
     ? undefined
     : {
         command: 'npm run build && npm run preview -- --port 4173 --strictPort',
+        env: { VITE_E2E_HOOKS: 'true' },
         url: 'http://localhost:4173',
         // Always build fresh so the smoke never tests a stale dist/.
         reuseExistingServer: false,
