@@ -14,7 +14,8 @@ import {
 import { PENGUIN_ANIMS, PENGUIN_FRAMES } from './poses';
 import {
   PENGUIN_FRAME_HEIGHT,
-  PENGUIN_FRAME_PADDING,
+  PENGUIN_FRAME_PADDING_X,
+  PENGUIN_FRAME_PADDING_Y,
   PENGUIN_FRAME_WIDTH,
   PENGUIN_VIEWBOX_HEIGHT,
   PENGUIN_VIEWBOX_WIDTH,
@@ -154,10 +155,10 @@ describe('renderPenguinSvg', () => {
     const width = Number(rect!.getAttribute('width'));
     const height = Number(rect!.getAttribute('height'));
 
-    const minX = -PENGUIN_FRAME_PADDING;
-    const minY = -PENGUIN_FRAME_PADDING;
-    const maxX = PENGUIN_VIEWBOX_WIDTH + PENGUIN_FRAME_PADDING;
-    const maxY = PENGUIN_VIEWBOX_HEIGHT + PENGUIN_FRAME_PADDING;
+    const minX = -PENGUIN_FRAME_PADDING_X;
+    const minY = -PENGUIN_FRAME_PADDING_Y;
+    const maxX = PENGUIN_VIEWBOX_WIDTH + PENGUIN_FRAME_PADDING_X;
+    const maxY = PENGUIN_VIEWBOX_HEIGHT + PENGUIN_FRAME_PADDING_Y;
     expect(maxX - minX).toBe(PENGUIN_FRAME_WIDTH);
     expect(maxY - minY).toBe(PENGUIN_FRAME_HEIGHT);
 

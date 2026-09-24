@@ -17,8 +17,13 @@ import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import opentype from 'opentype.js';
 import * as prettier from 'prettier';
+import { ACCENT, EYE_PUPIL } from '../src/game/penguin/palette.ts';
 
-const REPO_ROOT = process.cwd();
+// `scripts/` sits directly under the repo root, so its parent is the root
+// regardless of the caller's own working directory (unlike `process.cwd()`,
+// which only happens to be the repo root when this is run via `npm run
+// build:penguin-text` from the root) (#62 review fix 5).
+const REPO_ROOT = path.resolve(import.meta.dirname, '..');
 const BUMBASTIKA_PATH = path.join(REPO_ROOT, 'design', 'assets', 'bumbastika.ttf');
 const ANTON_PATH = path.join(REPO_ROOT, 'scripts', 'fonts', 'anton', 'Anton-Regular.ttf');
 const OUTPUT_PATH = path.join(REPO_ROOT, 'src', 'game', 'penguin', 'text-paths.ts');
@@ -26,8 +31,11 @@ const OUTPUT_PATH = path.join(REPO_ROOT, 'src', 'game', 'penguin', 'text-paths.t
 type TextAnchor = 'start' | 'middle';
 
 // One design string's layout spec, verbatim from `design/Penguin
-// Creator.dc.html`'s three `<text>` elements (#62 D1): "HA HA" (L64,
+// Creator.dc.html`'s three `<text>` elements (#62 D2): "HA HA" (L64,
 // default/`start` anchor), "JG" (L47) and "WAR WEEK" (L62, both `middle`).
+// `fill` values come from `palette.ts` (#62 review fix 6), the same module
+// `render-svg.ts` reads its own colours from, rather than repeating the hex
+// literals here.
 interface TextSpec {
   key: 'haha' | 'jgLogo' | 'warWeek';
   text: string;
@@ -50,7 +58,7 @@ const TEXT_SPECS: TextSpec[] = [
     y: 30,
     anchor: 'start',
     letterSpacing: 0,
-    fill: '#00BDFF',
+    fill: ACCENT,
   },
   {
     key: 'jgLogo',
@@ -61,7 +69,7 @@ const TEXT_SPECS: TextSpec[] = [
     y: 85,
     anchor: 'middle',
     letterSpacing: 0,
-    fill: '#00BDFF',
+    fill: ACCENT,
   },
   {
     key: 'warWeek',
@@ -72,26 +80,30 @@ const TEXT_SPECS: TextSpec[] = [
     y: 32.5,
     anchor: 'middle',
     letterSpacing: 1,
-    fill: '#161719',
+    fill: EYE_PUPIL,
   },
 ];
 
 // Lays out `spec.text` at its own baseline (a glyph path's `y` argument is
 // already the SVG baseline: a font's ascenders are negative-Y glyph
 // coordinates, the same sense as SVG's y-down space), applying
-// `letterSpacing` between glyphs (SVG's `letter-spacing` attribute is in the
-// same user-space units as `x`/`y`, so no unit conversion is needed) and
-// centring an `anchor: 'middle'` string on its own measured width -- the sum
-// of glyph advances plus spacing *between* glyphs only, not trailing the
-// last one, matching how the design's `text-anchor="middle"` visually
-// balances the string around `x` (#62 D2). Returns path data rounded to 2
-// decimals (#62 D2).
+// `letterSpacing` between glyphs when drawing (SVG's `letter-spacing`
+// attribute is in the same user-space units as `x`/`y`, so no unit
+// conversion is needed) and centring an `anchor: 'middle'` string on its own
+// measured width -- the sum of glyph advances plus letter-spacing for
+// *every* glyph, trailing one included, matching Chromium's own SVG
+// text-anchor="middle" layout, which applies `letter-spacing` after the
+// last glyph too when it measures a string's width for centring (#62 review
+// fix 2; `text-paths.test.ts`'s and the e2e bounding-box assertion both
+// check the "WAR WEEK" outlines land where Chromium's own text-anchor="middle"
+// centres real `letter-spacing="1"` text -- see #62 D2). Returns path data
+// rounded to 2 decimals (#62 D2).
 function layoutTextPath(font: opentype.Font, spec: TextSpec): string {
   const chars = Array.from(spec.text);
   const scale = spec.fontSize / font.unitsPerEm;
   const advances = chars.map((ch) => font.charToGlyph(ch).advanceWidth * scale);
   const totalWidth =
-    advances.reduce((sum, advance) => sum + advance, 0) + spec.letterSpacing * (chars.length - 1);
+    advances.reduce((sum, advance) => sum + advance, 0) + spec.letterSpacing * chars.length;
   const startX = spec.anchor === 'middle' ? spec.x - totalWidth / 2 : spec.x;
 
   const combined = new opentype.Path();
