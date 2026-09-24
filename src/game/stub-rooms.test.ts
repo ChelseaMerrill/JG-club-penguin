@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { createEmitter } from '../contracts/game-events';
-import type { GameEventMap } from '../contracts/game-events';
-import type { RoomEnterEvent, RoomLeaveEvent } from '../contracts/rooms';
+import { createEmitter, type RoomEventMap, type TypedEmitter } from '../contracts';
 import { createStubRoomDriver, ENTRY_TILE } from './stub-rooms';
 
-type Seen = { type: 'leave'; event: RoomLeaveEvent } | { type: 'enter'; event: RoomEnterEvent };
+type Seen =
+  | { type: 'leave'; event: RoomEventMap['room:leave'] }
+  | { type: 'enter'; event: RoomEventMap['room:enter'] };
 
-function setup(): { events: ReturnType<typeof createEmitter<GameEventMap>>; seen: Seen[] } {
-  const events = createEmitter<GameEventMap>();
+function setup(): { events: TypedEmitter<RoomEventMap>; seen: Seen[] } {
+  const events = createEmitter<RoomEventMap>();
   const seen: Seen[] = [];
   events.on('room:leave', (event) => seen.push({ type: 'leave', event }));
   events.on('room:enter', (event) => seen.push({ type: 'enter', event }));

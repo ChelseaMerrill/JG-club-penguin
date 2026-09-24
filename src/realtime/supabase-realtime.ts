@@ -1,24 +1,23 @@
 /**
  * Adapts the real `@supabase/supabase-js` Realtime client to
- * `RealtimeClientLike` / `PresenceChannelLike` (`src/realtime/room-channel.ts`),
- * one call at a time — the same narrowing approach as `toAuthClient` in
+ * `RealtimeClientLike` / `RoomChannelLike` (`src/realtime/room-channel.ts`),
+ * one call at a time: the same narrowing approach as `toAuthClient` in
  * `src/auth/auth-session.ts`. Verified against the installed
  * `@supabase/realtime-js` types (supabase-js 2.117.1).
+ *
+ * Wire format: each `RoomBroadcastMap` key is its own Supabase broadcast
+ * `event` name (`'move'`, `'chat'`), and the broadcast `payload` is exactly
+ * `RoomBroadcastMap[K]`, with no wrapping envelope.
  */
 import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js';
-import type { PresencePayload, RoomBroadcastEvent } from '../contracts/realtime';
-import type {
-  PresenceChannelLike,
-  PresenceChannelStatus,
-  RealtimeClientLike,
-} from './room-channel';
+import type { RealtimeClientLike, RoomChannelLike, RoomChannelStatus } from './room-channel';
 
-function toPresenceChannel(ch: RealtimeChannel): PresenceChannelLike {
+function toRoomChannel(ch: RealtimeChannel): RoomChannelLike {
   return {
     subscribe(cb) {
-      return ch.subscribe((status) => cb(status as PresenceChannelStatus));
+      return ch.subscribe((status) => cb(status as RoomChannelStatus));
     },
-    track(payload: PresencePayload) {
+    track(payload) {
       return ch.track(payload);
     },
     untrack() {
@@ -30,11 +29,11 @@ function toPresenceChannel(ch: RealtimeChannel): PresenceChannelLike {
     onPresenceSync(cb) {
       ch.on('presence', { event: 'sync' }, cb);
     },
-    onBroadcast(cb) {
-      ch.on('broadcast', { event: 'room' }, (m) => cb(m.payload));
+    onBroadcast(event, cb) {
+      ch.on('broadcast', { event }, (m) => cb(m.payload));
     },
-    send(payload: RoomBroadcastEvent) {
-      return ch.send({ type: 'broadcast', event: 'room', payload });
+    send(event, payload) {
+      return ch.send({ type: 'broadcast', event, payload });
     },
     teardown() {
       ch.teardown();
@@ -45,19 +44,19 @@ function toPresenceChannel(ch: RealtimeChannel): PresenceChannelLike {
 /**
  * Wraps a real `SupabaseClient` so `createRoomChannel` (`room-channel.ts`)
  * can drive it without depending on `@supabase/supabase-js` directly. Each
- * `PresenceChannelLike` returned by `channel()` is tracked against its real
+ * `RoomChannelLike` returned by `channel()` is tracked against its real
  * `RealtimeChannel` so `removeChannel` can hand the right one back to the
  * client.
  */
 export function toRealtimeClient(client: SupabaseClient): RealtimeClientLike {
-  const raw = new WeakMap<PresenceChannelLike, RealtimeChannel>();
+  const raw = new WeakMap<RoomChannelLike, RealtimeChannel>();
 
   return {
     channel(name, opts) {
       const ch = client.channel(name, {
         config: { presence: { key: opts.presenceKey }, broadcast: { self: false } },
       });
-      const wrapped = toPresenceChannel(ch);
+      const wrapped = toRoomChannel(ch);
       raw.set(wrapped, ch);
       return wrapped;
     },

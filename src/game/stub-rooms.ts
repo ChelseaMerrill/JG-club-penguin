@@ -3,9 +3,7 @@
  * `enter(roomId)` spawns at the same fixed entry tile. Replace wholesale
  * when #15 lands.
  */
-import type { GameEmitter } from '../contracts/game-events';
-import type { RoomId } from '../contracts/rooms';
-import type { Tile } from '../contracts/penguin';
+import type { RoomEventMap, RoomId, Tile, TypedEmitter } from '../contracts';
 
 /** The fixed spawn tile every stub Room entry lands on. */
 export const ENTRY_TILE: Tile = { col: 5, row: 5 };
@@ -18,7 +16,7 @@ export interface StubRoomDriver {
   reset(): void;
 }
 
-export function createStubRoomDriver(events: GameEmitter): StubRoomDriver {
+export function createStubRoomDriver(events: TypedEmitter<RoomEventMap>): StubRoomDriver {
   let current: RoomId | null = null;
 
   return {

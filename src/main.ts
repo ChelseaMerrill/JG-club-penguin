@@ -3,18 +3,18 @@ import { loadEnv } from './env';
 import { startGame, whenSceneReady } from './game/main';
 import { getSupabaseClient } from './auth/supabase-client';
 import { startAuth, toAuthClient } from './auth/auth-session';
-import { bindPlayer } from './auth/player';
-import type { Player } from './auth/player';
+import { bindPlayer, type Player } from './auth/player';
 import { createLoginOverlay } from './ui/login-overlay';
 import { getUiLayer } from './ui/ui-layer';
 import { createDebugOverlay, isDebugEnabled } from './ui/debug-overlay';
-import { createRoomChannel } from './realtime/room-channel';
-import type { RemotePenguinView, RoomChannel } from './realtime/room-channel';
+import {
+  createRoomChannel,
+  type RemotePenguinView,
+  type RoomChannel,
+} from './realtime/room-channel';
 import { toRealtimeClient } from './realtime/supabase-realtime';
-import { lookFromPlayer } from './realtime/look';
-import { gameEvents } from './game/events';
 import { createStubRoomDriver, ENTRY_TILE } from './game/stub-rooms';
-import { SPAWN_ROOM } from './contracts/rooms';
+import { DEFAULT_FACING, gameEvents, SPAWN_ROOM_ID } from './contracts';
 
 // Fail fast on a missing or malformed .env before anything boots.
 loadEnv();
@@ -65,8 +65,8 @@ async function handleSignedIn(player: Player): Promise<void> {
   const penguins = await sceneReady;
   if (roomChannel || token !== signInToken) return;
 
-  const look = lookFromPlayer(player);
-  penguins.showLocal({ playerId: player.id, look, tile: ENTRY_TILE, facing: 's' });
+  const { look } = player;
+  penguins.showLocal({ playerId: player.id, look, tile: ENTRY_TILE, facing: DEFAULT_FACING });
   debugOverlay?.setOwnLook(look);
 
   roomChannel = createRoomChannel({
@@ -76,7 +76,7 @@ async function handleSignedIn(player: Player): Promise<void> {
     look,
     view: composeView(penguins),
   });
-  rooms.enter(SPAWN_ROOM);
+  rooms.enter(SPAWN_ROOM_ID);
 }
 
 async function handleSignedOut(): Promise<void> {

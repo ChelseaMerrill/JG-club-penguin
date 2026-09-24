@@ -1,37 +1,41 @@
 /**
  * STUB for #15, #33, #35. Plain-DOM debug overlay (Room switcher, look
  * randomizer, remote-Penguin roster), mounted only when the URL has a
- * `debug` param. Replace piecemeal as each real Track lands.
+ * `debug` param. Replace piecemeal as each real track lands.
  */
-import { HATS } from '../contracts/penguin';
-import type { Hat, PenguinLook } from '../contracts/penguin';
-import { ROOM_IDS } from '../contracts/rooms';
-import type { RoomId } from '../contracts/rooms';
-import type { PresencePayload } from '../contracts/realtime';
+import {
+  BODY_COLORS,
+  HATS,
+  ROOM_IDS,
+  UNNAMED_PENGUIN,
+  type Hat,
+  type HexColor,
+  type PenguinLook,
+  type PresencePayload,
+  type RoomId,
+} from '../contracts';
 import type { RemotePenguinView } from '../realtime/room-channel';
+import { maskName } from './mask-names';
 
-const RANDOM_BODY_COLORS: readonly string[] = [
-  '#161719',
-  '#E63946',
-  '#2A9D8F',
-  '#E9C46A',
-  '#264653',
-  '#F4A261',
-  '#A8DADC',
-  '#6A4C93',
+/** Stand-in names for the #35 Creator, each within `PENGUIN_NAME_MAX`. */
+const RANDOM_NAMES: readonly string[] = [
+  'Pebble',
+  'Waddles',
+  'Flipper',
+  'Snowball',
+  'Pingu',
+  'Iceberg',
+  'Tux',
+  'Puffin',
 ];
 
 export function isDebugEnabled(search: string = window.location.search): boolean {
   return new URLSearchParams(search).has('debug');
 }
 
-export function isMaskNamesEnabled(search: string = window.location.search): boolean {
-  return new URLSearchParams(search).has('masknames');
-}
-
-function pickRandomBody(current: string): string {
-  const pool = RANDOM_BODY_COLORS.filter((c) => c !== current);
-  const options = pool.length > 0 ? pool : RANDOM_BODY_COLORS;
+function pickOther<T>(pool: readonly T[], current: T): T {
+  const others = pool.filter((v) => v !== current);
+  const options = others.length > 0 ? others : pool;
   return options[Math.floor(Math.random() * options.length)];
 }
 
@@ -39,8 +43,8 @@ function pickRandomHat(): Hat {
   return HATS[Math.floor(Math.random() * HATS.length)];
 }
 
-function rosterName(name: string): string {
-  return isMaskNamesEnabled() ? '•••' : name;
+function shownName(name: string): string {
+  return maskName(name || UNNAMED_PENGUIN);
 }
 
 export interface DebugOverlayCallbacks {
@@ -80,7 +84,7 @@ export function createDebugOverlay(
 
   function setOwnLookInternal(look: PenguinLook): void {
     currentLook = look;
-    container.dataset.ownBody = look.body;
+    container.dataset.ownLook = JSON.stringify(look);
   }
 
   const randomLookButton = document.createElement('button');
@@ -91,7 +95,8 @@ export function createDebugOverlay(
     if (!currentLook) return;
     const next: PenguinLook = {
       ...currentLook,
-      body: pickRandomBody(currentLook.body),
+      name: pickOther(RANDOM_NAMES, currentLook.name),
+      body: pickOther<HexColor>(BODY_COLORS, currentLook.body),
       hat: pickRandomHat(),
     };
     setOwnLookInternal(next);
@@ -124,9 +129,8 @@ export function createDebugOverlay(
         roster.append(li);
         rosterItems.set(p.playerId, li);
       }
-      li.dataset.body = p.look.body;
-      li.dataset.name = p.look.name;
-      li.textContent = rosterName(p.look.name);
+      li.dataset.look = JSON.stringify(p.look);
+      li.textContent = shownName(p.look.name);
     },
     remove(playerId: string): void {
       const li = rosterItems.get(playerId);

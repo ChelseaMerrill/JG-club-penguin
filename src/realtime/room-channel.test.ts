@@ -1,16 +1,23 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createEmitter, type Emitter, type GameEventMap } from '../contracts/game-events';
-import { DEFAULT_PENGUIN_LOOK } from '../contracts/penguin';
-import type { Facing, PenguinLook } from '../contracts/penguin';
-import type { PresencePayload, RoomBroadcastEvent } from '../contracts/realtime';
+import {
+  createEmitter,
+  DEFAULT_LOOK,
+  PENGUIN_NAME_MAX,
+  type Facing,
+  type GameEventMap,
+  type PenguinLook,
+  type PresencePayload,
+  type RoomBroadcastEvent,
+  type TypedEmitter,
+} from '../contracts';
 import {
   createRoomChannel,
   parsePresencePayload,
-  type PresenceChannelLike,
-  type PresenceChannelStatus,
   type RealtimeClientLike,
   type RemotePenguinView,
-  type SendableRoomEvent,
+  type RoomChannelLike,
+  type RoomChannelStatus,
+  type SendablePayload,
 } from './room-channel';
 
 /** Flushes the microtask queue enough for the room channel's internal promise chains to settle. */
@@ -56,39 +63,39 @@ function createManualTimer(): {
 
 /**
  * Mimics real `@supabase/realtime-js` channels closely enough to exercise
- * the double-registration hazard from the red-team review: `onPresenceSync`
- * / `onBroadcast` / `subscribe` each *add* a listener rather than replacing
- * one, and multiple registrations on the same instance all fire.
+ * double registration: `onPresenceSync` / `onBroadcast` / `subscribe` each
+ * *add* a listener rather than replacing one, and multiple registrations on
+ * the same instance all fire.
  */
-class FakePresenceChannel implements PresenceChannelLike {
+class FakeRoomChannel implements RoomChannelLike {
   trackCalls: PresencePayload[] = [];
-  sendCalls: RoomBroadcastEvent[] = [];
+  sendCalls: Array<{ event: RoomBroadcastEvent; payload: unknown }> = [];
   teardownCalls = 0;
   sendResult: 'ok' | 'timed out' | 'error' = 'ok';
+  trackResult: 'ok' | 'timed out' | 'error' = 'ok';
   untrackResult: Promise<unknown> | null = null;
 
-  private readonly statusCbs: Array<(status: PresenceChannelStatus) => void> = [];
+  private readonly statusCbs: Array<(status: RoomChannelStatus) => void> = [];
   private readonly syncCbs: Array<() => void> = [];
-  private readonly broadcastCbs: Array<(payload: unknown) => void> = [];
+  private readonly broadcastCbs = new Map<string, Array<(payload: unknown) => void>>();
   private state: Record<string, Array<Record<string, unknown>>> = {};
 
   constructor(
     public readonly name: string,
     public readonly presenceKey: string,
     private readonly log: string[],
-    private readonly onTeardown?: () => void,
   ) {}
 
-  subscribe(cb: (status: PresenceChannelStatus) => void): unknown {
+  subscribe(cb: (status: RoomChannelStatus) => void): unknown {
     this.log.push(`subscribe:${this.name}`);
     this.statusCbs.push(cb);
     return undefined;
   }
 
-  track(payload: PresencePayload): Promise<unknown> {
+  track(payload: PresencePayload): Promise<string> {
     this.log.push(`track:${this.name}`);
     this.trackCalls.push(payload);
-    return Promise.resolve();
+    return Promise.resolve(this.trackResult);
   }
 
   untrack(): Promise<unknown> {
@@ -104,22 +111,23 @@ class FakePresenceChannel implements PresenceChannelLike {
     this.syncCbs.push(cb);
   }
 
-  onBroadcast(cb: (payload: unknown) => void): void {
-    this.broadcastCbs.push(cb);
+  onBroadcast(event: RoomBroadcastEvent, cb: (payload: unknown) => void): void {
+    const cbs = this.broadcastCbs.get(event) ?? [];
+    cbs.push(cb);
+    this.broadcastCbs.set(event, cbs);
   }
 
-  send(payload: RoomBroadcastEvent): Promise<'ok' | 'timed out' | 'error' | string> {
+  send(event: RoomBroadcastEvent, payload: unknown): Promise<string> {
     this.log.push(`send:${this.name}`);
-    this.sendCalls.push(payload);
+    this.sendCalls.push({ event, payload });
     return Promise.resolve(this.sendResult);
   }
 
   teardown(): void {
     this.teardownCalls += 1;
-    this.onTeardown?.();
   }
 
-  emitStatus(status: PresenceChannelStatus): void {
+  emitStatus(status: RoomChannelStatus): void {
     for (const cb of this.statusCbs) cb(status);
   }
 
@@ -128,8 +136,8 @@ class FakePresenceChannel implements PresenceChannelLike {
     for (const cb of this.syncCbs) cb();
   }
 
-  emitBroadcast(payload: unknown): void {
-    for (const cb of this.broadcastCbs) cb(payload);
+  emitBroadcast(event: string, payload: unknown): void {
+    for (const cb of this.broadcastCbs.get(event) ?? []) cb(payload);
   }
 }
 
@@ -140,43 +148,31 @@ function hang(): Promise<unknown> {
   });
 }
 
+/**
+ * Fakes the `RealtimeClientLike` adapter contract (`supabase-realtime.ts`):
+ * every `channel()` call hands back a fresh, joinable instance. The
+ * realtime-js registry quirks behind that guarantee are faked and tested in
+ * `supabase-realtime.test.ts`.
+ */
 class FakeClient implements RealtimeClientLike {
   log: string[] = [];
-  channels: FakePresenceChannel[] = [];
+  channels: FakeRoomChannel[] = [];
   /** Shifted per `removeChannel` call; defaults to `'ok'` once exhausted. */
   removeChannelResults: Array<'ok' | 'timed out' | 'error'> = [];
-  removeChannelImpl:
-    ((ch: PresenceChannelLike) => Promise<'ok' | 'timed out' | 'error' | string>) | null = null;
+  removeChannelImpl: ((ch: RoomChannelLike) => Promise<string>) | null = null;
 
-  private readonly registry = new Map<string, FakePresenceChannel>();
-
-  channel(name: string, opts: { presenceKey: string }): FakePresenceChannel {
+  channel(name: string, opts: { presenceKey: string }): FakeRoomChannel {
     this.log.push(`channel:${name}`);
-    // Real realtime-js hands back the existing instance while a channel
-    // with this topic is still listed client-side.
-    const existing = this.registry.get(name);
-    if (existing) {
-      this.channels.push(existing);
-      return existing;
-    }
-    const ch = new FakePresenceChannel(name, opts.presenceKey, this.log, () => {
-      if (this.registry.get(name) === ch) this.registry.delete(name);
-    });
-    this.registry.set(name, ch);
+    const ch = new FakeRoomChannel(name, opts.presenceKey, this.log);
     this.channels.push(ch);
     return ch;
   }
 
-  removeChannel(ch: PresenceChannelLike): Promise<'ok' | 'timed out' | 'error' | string> {
-    const fake = ch as FakePresenceChannel;
+  removeChannel(ch: RoomChannelLike): Promise<string> {
+    const fake = ch as FakeRoomChannel;
     this.log.push(`removeChannel:${fake.name}`);
     if (this.removeChannelImpl) return this.removeChannelImpl(ch);
-    const result = this.removeChannelResults.shift() ?? 'ok';
-    if (result === 'ok') {
-      // Real unsubscribe('ok') drops the channel from the client's list.
-      if (this.registry.get(fake.name) === fake) this.registry.delete(fake.name);
-    }
-    return Promise.resolve(result);
+    return Promise.resolve(this.removeChannelResults.shift() ?? 'ok');
   }
 }
 
@@ -198,8 +194,8 @@ class FakeView implements RemotePenguinView {
   }
 }
 
-/** `DEFAULT_PENGUIN_LOOK` has an empty `name` (pre-customization); tests use a non-empty name so it round-trips unchanged unless a test is specifically about name handling. */
-const NAMED_LOOK: PenguinLook = { ...DEFAULT_PENGUIN_LOOK, name: 'Buddy' };
+/** `DEFAULT_LOOK` has an empty `name` (before the Creator is completed); most tests use a non-empty name so name handling stays visible. */
+const NAMED_LOOK: PenguinLook = { ...DEFAULT_LOOK, name: 'Buddy' };
 
 function meta(
   playerId: string,
@@ -209,12 +205,12 @@ function meta(
     playerId,
     look: NAMED_LOOK,
     tile: { col: 0, row: 0 },
-    facing: 's' satisfies Facing,
+    facing: 'left' satisfies Facing,
     ...overrides,
   };
 }
 
-function setup(): { client: FakeClient; events: Emitter<GameEventMap>; view: FakeView } {
+function setup(): { client: FakeClient; events: TypedEmitter<GameEventMap>; view: FakeView } {
   const client = new FakeClient();
   const events = createEmitter<GameEventMap>();
   const view = new FakeView();
@@ -223,10 +219,10 @@ function setup(): { client: FakeClient; events: Emitter<GameEventMap>; view: Fak
 
 function createChannel(
   client: FakeClient,
-  events: Emitter<GameEventMap>,
+  events: TypedEmitter<GameEventMap>,
   view: FakeView,
   playerId = 'me',
-  look: PenguinLook = DEFAULT_PENGUIN_LOOK,
+  look: PenguinLook = DEFAULT_LOOK,
   extra: Partial<{
     now: () => number;
     setTimeout: typeof setTimeout;
@@ -243,8 +239,8 @@ function createChannel(
   });
 }
 
-/** Establishes presence for `otherId` so it is in `shownIds` (required for N5 broadcast gating). */
-function showOther(ch: FakePresenceChannel, otherId: string): void {
+/** Establishes presence for `otherId` so it is in `shownIds` (broadcasts are gated on it). */
+function showOther(ch: FakeRoomChannel, otherId: string): void {
   ch.setPresenceState({ [otherId]: [meta(otherId)] });
 }
 
@@ -355,8 +351,8 @@ describe('createRoomChannel', () => {
 
     const ch = client.channels[0];
     ch.setPresenceState({
-      badColor: [meta('badColor', { look: { ...DEFAULT_PENGUIN_LOOK, body: 'not-a-hex' } })],
-      badEnum: [meta('badEnum', { look: { ...DEFAULT_PENGUIN_LOOK, hat: 'TOP HAT' } })],
+      badColor: [meta('badColor', { look: { ...DEFAULT_LOOK, body: 'not-a-hex' } })],
+      badEnum: [meta('badEnum', { look: { ...DEFAULT_LOOK, hat: 'TOP HAT' } })],
       badTile: [meta('badTile', { tile: { col: 1.5, row: 0 } })],
       mismatched: [meta('someoneElse')],
     });
@@ -398,7 +394,7 @@ describe('createRoomChannel', () => {
     await flush();
     expect(ch.trackCalls).toHaveLength(2);
 
-    const newLook: PenguinLook = { ...DEFAULT_PENGUIN_LOOK, name: 'Ada' };
+    const newLook: PenguinLook = { ...DEFAULT_LOOK, name: 'Ada' };
     rc.setLook(newLook);
     await flush();
     expect(ch.trackCalls).toHaveLength(3);
@@ -409,7 +405,7 @@ describe('createRoomChannel', () => {
     const { client, events, view } = setup();
     const rc = createChannel(client, events, view);
 
-    const result = await rc.send({ type: 'chat', text: 'hi' });
+    const result = await rc.send('chat', { text: 'hi' });
 
     expect(result).toBe(false);
     expect(client.channels).toHaveLength(0);
@@ -422,7 +418,7 @@ describe('createRoomChannel', () => {
     events.emit('room:enter', { roomId: 'town-center', entryTile: { col: 0, row: 0 } });
     await flush();
 
-    const result = await rc.send({ type: 'move', target: { col: 1, row: 1 } });
+    const result = await rc.send('move', { target: { col: 1, row: 1 } });
 
     expect(result).toBe(false);
     expect(client.channels[0].sendCalls).toEqual([]);
@@ -437,17 +433,17 @@ describe('createRoomChannel', () => {
     client.channels[0].emitStatus('SUBSCRIBED');
     await flush();
 
-    const result = await rc.send({ type: 'move', target: { col: 1, row: 1 } });
+    const result = await rc.send('move', { target: { col: 1, row: 1 } });
 
     expect(result).toBe(true);
     expect(client.channels[0].sendCalls).toEqual([
-      { type: 'move', playerId: 'me', target: { col: 1, row: 1 } },
+      { event: 'move', payload: { playerId: 'me', target: { col: 1, row: 1 } } },
     ]);
   });
 
   it('send stamps sentAt from the injectable now(), and normalizes chat text', async () => {
     const { client, events, view } = setup();
-    const rc = createChannel(client, events, view, 'me', DEFAULT_PENGUIN_LOOK, {
+    const rc = createChannel(client, events, view, 'me', DEFAULT_LOOK, {
       now: () => 12345,
     });
 
@@ -456,11 +452,11 @@ describe('createRoomChannel', () => {
     client.channels[0].emitStatus('SUBSCRIBED');
     await flush();
 
-    const result = await rc.send({ type: 'chat', text: '  hi there  ' });
+    const result = await rc.send('chat', { text: '  hi there  ' });
 
     expect(result).toBe(true);
     expect(client.channels[0].sendCalls).toEqual([
-      { type: 'chat', playerId: 'me', text: 'hi there', sentAt: 12345 },
+      { event: 'chat', payload: { playerId: 'me', text: 'hi there', sentAt: 12345 } },
     ]);
   });
 
@@ -473,7 +469,7 @@ describe('createRoomChannel', () => {
     client.channels[0].emitStatus('SUBSCRIBED');
     await flush();
 
-    const result = await rc.send({ type: 'move', target: { col: 256, row: 0 } });
+    const result = await rc.send('move', { target: { col: 256, row: 0 } });
 
     expect(result).toBe(false);
     expect(client.channels[0].sendCalls).toEqual([]);
@@ -490,7 +486,7 @@ describe('createRoomChannel', () => {
     await flush();
     ch.sendResult = 'timed out';
 
-    const result = await rc.send({ type: 'move', target: { col: 1, row: 1 } });
+    const result = await rc.send('move', { target: { col: 1, row: 1 } });
 
     expect(result).toBe(false);
   });
@@ -508,13 +504,13 @@ describe('createRoomChannel', () => {
     const moveCalls: unknown[] = [];
     rc.on('move', (event) => moveCalls.push(event));
 
-    ch.emitBroadcast({ type: 'move', playerId: 'other', target: { col: 3, row: 4 } });
-    ch.emitBroadcast({ type: 'move', playerId: 'me', target: { col: 9, row: 9 } });
-    ch.emitBroadcast({ type: 'move', playerId: 'other', target: { col: 'x', row: 4 } });
-    ch.emitBroadcast({ type: 'chat', playerId: 'other', text: 'hi', sentAt: 1 });
-    ch.emitBroadcast({ type: 'move', playerId: 'not-shown', target: { col: 1, row: 1 } });
+    ch.emitBroadcast('move', { playerId: 'other', target: { col: 3, row: 4 } });
+    ch.emitBroadcast('move', { playerId: 'me', target: { col: 9, row: 9 } });
+    ch.emitBroadcast('move', { playerId: 'other', target: { col: 'x', row: 4 } });
+    ch.emitBroadcast('chat', { playerId: 'other', text: 'hi', sentAt: 1 });
+    ch.emitBroadcast('move', { playerId: 'not-shown', target: { col: 1, row: 1 } });
 
-    expect(moveCalls).toEqual([{ type: 'move', playerId: 'other', target: { col: 3, row: 4 } }]);
+    expect(moveCalls).toEqual([{ playerId: 'other', target: { col: 3, row: 4 } }]);
   });
 
   it('stops delivering to a bus handler after its unsubscribe runs', async () => {
@@ -531,7 +527,7 @@ describe('createRoomChannel', () => {
     const unsubscribe = rc.on('chat', (event) => calls.push(event));
     unsubscribe();
 
-    ch.emitBroadcast({ type: 'chat', playerId: 'other', text: 'hi', sentAt: 1 });
+    ch.emitBroadcast('chat', { playerId: 'other', text: 'hi', sentAt: 1 });
 
     expect(calls).toEqual([]);
   });
@@ -588,7 +584,7 @@ describe('createRoomChannel', () => {
     expect(client.log).toEqual([]);
   });
 
-  it('N9: stop() unsubscribes from room:enter before queueing the final leave, so an enter fired during stop does not join', async () => {
+  it('stop() unsubscribes from room:enter before queueing the final leave, so an enter fired during stop does not join', async () => {
     const { client, events, view } = setup();
     const rc = createChannel(client, events, view);
 
@@ -603,7 +599,7 @@ describe('createRoomChannel', () => {
     expect(client.channels.some((c) => c.name === 'room:dev-pit')).toBe(false);
   });
 
-  it('N2: an enter while a channel exists leaves it first', async () => {
+  it('an enter while a channel exists leaves it first', async () => {
     const { client, events, view } = setup();
     createChannel(client, events, view);
 
@@ -622,7 +618,7 @@ describe('createRoomChannel', () => {
     ]);
   });
 
-  it('N1: clears the view and resets state before removeChannel settles, and does not wedge the queue when it throws', async () => {
+  it('clears the view and resets state before removeChannel settles, and does not wedge the queue when it throws', async () => {
     const { client, events, view } = setup();
     const rc = createChannel(client, events, view);
 
@@ -655,7 +651,7 @@ describe('createRoomChannel', () => {
     expect(client.channels.some((c) => c.name === 'room:dev-pit')).toBe(true);
   });
 
-  it('B1: a hanging untrack() does not block the next channel() call', async () => {
+  it('a hanging untrack() does not block the next channel() call', async () => {
     const { client, events, view } = setup();
     createChannel(client, events, view);
 
@@ -672,7 +668,7 @@ describe('createRoomChannel', () => {
     expect(client.log.some((entry) => entry.startsWith('untrack:'))).toBe(false);
   });
 
-  it('B2: a removeChannel that resolves a non-ok status tears the channel down, and the next join gets fresh, single-firing handlers that track on SUBSCRIBED', async () => {
+  it('a removeChannel that resolves a non-ok status tears the channel down, and the next join gets fresh, single-firing handlers that track on SUBSCRIBED', async () => {
     const { client, events, view } = setup();
     createChannel(client, events, view);
 
@@ -705,10 +701,10 @@ describe('createRoomChannel', () => {
     expect(ch2.trackCalls).toHaveLength(1);
   });
 
-  it('N4: schedules a queued rejoin with 1s/2s/4s backoff capped at 10s on an unexpected CLOSED/CHANNEL_ERROR/TIMED_OUT, and resets on SUBSCRIBED', async () => {
+  it('schedules a queued rejoin with 1s/2s/4s backoff capped at 10s on an unexpected CLOSED/CHANNEL_ERROR/TIMED_OUT, and resets on SUBSCRIBED', async () => {
     const { client, events, view } = setup();
     const timer = createManualTimer();
-    createChannel(client, events, view, 'me', DEFAULT_PENGUIN_LOOK, {
+    createChannel(client, events, view, 'me', DEFAULT_LOOK, {
       setTimeout: timer.setTimeout,
       clearTimeout: timer.clearTimeout,
     });
@@ -766,7 +762,7 @@ describe('createRoomChannel', () => {
     expect(timer.scheduled[0].delay).toBe(1000);
   });
 
-  it('N5: caps rendered remote Penguins at 50, preferring ids already shown, then key order', async () => {
+  it('caps rendered remote Penguins at 50, preferring ids already shown, then key order', async () => {
     const { client, events, view } = setup();
     createChannel(client, events, view, 'me');
 
@@ -805,7 +801,7 @@ describe('createRoomChannel', () => {
     }
   });
 
-  it('N6: in the igloo, joins and tracks but renders no remote Penguins and dispatches no broadcasts', async () => {
+  it('in the igloo, joins and tracks but renders no remote Penguins and dispatches no broadcasts', async () => {
     const { client, events, view } = setup();
     const rc = createChannel(client, events, view, 'me');
     const moveCalls: unknown[] = [];
@@ -823,7 +819,7 @@ describe('createRoomChannel', () => {
     await flush();
     expect(view.upsertCalls).toEqual([]);
 
-    ch.emitBroadcast({ type: 'move', playerId: 'other', target: { col: 1, row: 1 } });
+    ch.emitBroadcast('move', { playerId: 'other', target: { col: 1, row: 1 } });
     expect(moveCalls).toEqual([]);
   });
 });
@@ -835,15 +831,13 @@ describe('parsePresencePayload', () => {
   });
 
   it('rejects a meta with a non-hex color', () => {
-    const result = parsePresencePayload(
-      meta('other', { look: { ...DEFAULT_PENGUIN_LOOK, body: 'red' } }),
-    );
+    const result = parsePresencePayload(meta('other', { look: { ...DEFAULT_LOOK, body: 'red' } }));
     expect(result).toBeNull();
   });
 
   it('rejects a meta with an out-of-enum hat', () => {
     const result = parsePresencePayload(
-      meta('other', { look: { ...DEFAULT_PENGUIN_LOOK, hat: 'FEDORA' } }),
+      meta('other', { look: { ...DEFAULT_LOOK, hat: 'FEDORA' } }),
     );
     expect(result).toBeNull();
   });
@@ -863,42 +857,75 @@ describe('parsePresencePayload', () => {
     expect(result).toBeNull();
   });
 
-  it('falls back to a name of "Penguin" rather than dropping the Penguin, when the name exceeds 40 characters', () => {
-    const result = parsePresencePayload(
-      meta('other', { look: { ...DEFAULT_PENGUIN_LOOK, name: 'x'.repeat(41) } }),
-    );
-    expect(result).not.toBeNull();
-    expect(result?.look.name).toBe('Penguin');
+  it(`keeps a name of exactly PENGUIN_NAME_MAX (${PENGUIN_NAME_MAX}) characters`, () => {
+    const name = 'x'.repeat(16);
+    const result = parsePresencePayload(meta('other', { look: { ...DEFAULT_LOOK, name } }));
+    expect(result?.look.name).toBe(name);
   });
 
-  it('falls back to "Penguin" for an empty name (e.g. the pre-customization default look)', () => {
-    const result = parsePresencePayload(meta('other', { look: DEFAULT_PENGUIN_LOOK }));
-    expect(result).not.toBeNull();
-    expect(result?.look.name).toBe('Penguin');
-  });
-
-  it('falls back to "Penguin" when the name is empty after stripping control/bidi/zero-width characters', () => {
+  it('falls back to an empty name rather than dropping the Penguin, when the name is over PENGUIN_NAME_MAX', () => {
     const result = parsePresencePayload(
-      meta('other', { look: { ...DEFAULT_PENGUIN_LOOK, name: '​​‪' } }),
+      meta('other', { look: { ...DEFAULT_LOOK, name: 'x'.repeat(17) } }),
     );
     expect(result).not.toBeNull();
-    expect(result?.look.name).toBe('Penguin');
+    expect(result?.look.name).toBe('');
+  });
+
+  it('keeps an empty name (the Creator has not been completed yet)', () => {
+    const result = parsePresencePayload(meta('other', { look: DEFAULT_LOOK }));
+    expect(result).not.toBeNull();
+    expect(result?.look.name).toBe('');
+  });
+
+  it('measures the length after trimming, so a padded 16-character name is kept', () => {
+    const result = parsePresencePayload(
+      meta('other', { look: { ...DEFAULT_LOOK, name: `  ${'y'.repeat(16)}  ` } }),
+    );
+    expect(result?.look.name).toBe('y'.repeat(16));
+  });
+
+  it('yields an empty name when only control/bidi/zero-width characters remain', () => {
+    const result = parsePresencePayload(
+      meta('other', { look: { ...DEFAULT_LOOK, name: '\u200B\u200B\u202A' } }),
+    );
+    expect(result).not.toBeNull();
+    expect(result?.look.name).toBe('');
   });
 
   it('strips control/bidi/zero-width characters from an otherwise valid name', () => {
     const result = parsePresencePayload(
-      meta('other', { look: { ...DEFAULT_PENGUIN_LOOK, name: 'A​d‪a' } }),
+      meta('other', { look: { ...DEFAULT_LOOK, name: 'A\u200Bd\u202Aa' } }),
     );
     expect(result?.look.name).toBe('Ada');
+  });
+
+  it('rejects a facing that is not left or right', () => {
+    expect(parsePresencePayload(meta('other', { facing: 's' }))).toBeNull();
+    expect(parsePresencePayload(meta('other', { facing: 'right' }))).not.toBeNull();
+  });
+
+  it('rejects an out-of-enum emote, and accepts every idle emote from the contract', () => {
+    expect(
+      parsePresencePayload(meta('other', { look: { ...DEFAULT_LOOK, emote: 'SNOWBALL' } })),
+    ).toBeNull();
+    expect(
+      parsePresencePayload(meta('other', { look: { ...DEFAULT_LOOK, emote: 'SIT' } })),
+    ).not.toBeNull();
+  });
+
+  it("accepts the design's lowercase hex swatch", () => {
+    expect(
+      parsePresencePayload(meta('other', { look: { ...DEFAULT_LOOK, body: '#3a4046' } })),
+    ).not.toBeNull();
   });
 
   it('builds a fresh look object, dropping unknown keys the payload look carried', () => {
     const result = parsePresencePayload(
       meta('other', {
-        look: { ...DEFAULT_PENGUIN_LOOK, name: 'Ada', evil: 'proto-pollution' },
+        look: { ...DEFAULT_LOOK, name: 'Ada', evil: 'proto-pollution' },
       }),
     );
-    expect(result?.look).toEqual({ ...DEFAULT_PENGUIN_LOOK, name: 'Ada' });
+    expect(result?.look).toEqual({ ...DEFAULT_LOOK, name: 'Ada' });
     expect(result?.look).not.toHaveProperty('evil');
   });
 
@@ -908,11 +935,14 @@ describe('parsePresencePayload', () => {
   });
 });
 
-describe('SendableRoomEvent typing', () => {
+describe('SendablePayload typing', () => {
   it('accepts a move without playerId and a chat without playerId/sentAt (compile-time check)', () => {
-    const move: SendableRoomEvent = { type: 'move', target: { col: 0, row: 0 } };
-    const chat: SendableRoomEvent = { type: 'chat', text: 'hi' };
-    expect(move.type).toBe('move');
-    expect(chat.type).toBe('chat');
+    const move: SendablePayload<'move'> = { target: { col: 0, row: 0 } };
+    const chat: SendablePayload<'chat'> = { text: 'hi' };
+    // @ts-expect-error the channel stamps playerId itself
+    const spoofed: SendablePayload<'move'> = { playerId: 'x', target: { col: 0, row: 0 } };
+    expect(move.target).toEqual({ col: 0, row: 0 });
+    expect(chat.text).toBe('hi');
+    expect(spoofed).toBeDefined();
   });
 });

@@ -4,8 +4,9 @@
  * Text, with a gentle idle y-bob tween. Replace wholesale when #31 lands.
  */
 import type { GameObjects, Scene } from 'phaser';
-import type { PresencePayload } from '../contracts/realtime';
+import { UNNAMED_PENGUIN, type PenguinLook, type PresencePayload, type Tile } from '../contracts';
 import type { RemotePenguinView } from '../realtime/room-channel';
+import { maskName } from '../ui/mask-names';
 
 const BODY_WIDTH = 48;
 const BODY_HEIGHT = 60;
@@ -32,19 +33,15 @@ function hexToColor(hex: string): number {
 }
 
 /** Isometric projection: 100x50 tiles, matching the fixed Room layout. */
-function isoPosition(tile: { col: number; row: number }): { x: number; y: number } {
+function isoPosition(tile: Tile): { x: number; y: number } {
   return {
     x: 800 + (tile.col - tile.row) * (TILE_WIDTH / 2),
     y: 200 + (tile.col + tile.row) * (TILE_HEIGHT / 2),
   };
 }
 
-function maskNamesEnabled(): boolean {
-  return new URLSearchParams(window.location.search).has('masknames');
-}
-
-function displayName(name: string): string {
-  return maskNamesEnabled() ? '•••' : name;
+function shownName(name: string): string {
+  return maskName(name || UNNAMED_PENGUIN);
 }
 
 /** Renders remote (and the local) Penguins as Phaser Containers. */
@@ -74,7 +71,7 @@ export class PenguinSpriteView implements RemotePenguinView {
       hexToColor(look.beak),
     );
     const nameText = this.scene.add
-      .text(0, NAME_OFFSET_Y, displayName(look.name), { fontSize: '12px', color: '#ffffff' })
+      .text(0, NAME_OFFSET_Y, shownName(look.name), { fontSize: '12px', color: '#ffffff' })
       .setOrigin(0.5, 0);
     const container = this.scene.add.container(x, y, [body, belly, beak, nameText]);
 
@@ -90,11 +87,11 @@ export class PenguinSpriteView implements RemotePenguinView {
     return { container, body, belly, beak, nameText };
   }
 
-  private applyLook(entry: PenguinEntry, look: PresencePayload['look']): void {
+  private applyLook(entry: PenguinEntry, look: PenguinLook): void {
     entry.body.setFillStyle(hexToColor(look.body));
     entry.belly.setFillStyle(hexToColor(look.belly));
     entry.beak.setFillStyle(hexToColor(look.beak));
-    entry.nameText.setText(displayName(look.name));
+    entry.nameText.setText(shownName(look.name));
   }
 
   /** Adds or, for an already-shown `playerId`, updates in place (never a second Container). */

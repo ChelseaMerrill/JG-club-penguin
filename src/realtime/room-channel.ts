@@ -1,57 +1,61 @@
 /**
- * Contract B-1: per-Room Presence channels and the Room broadcast bus.
- * Consumes the #26 contract stubs from `src/contracts/`.
+ * Per-Room Presence (#28): the Room channel for whichever Room the Player is
+ * in, and the typed Room broadcast bus (`move`, `chat`) that rides on it.
+ * Consumes the #26 contracts in `src/contracts/`.
  */
-import { EMOTES, EYES, HATS, PATTERNS } from '../contracts/penguin';
-import type {
-  Eyes,
-  Facing,
-  Hat,
-  Hex,
-  Pattern,
-  PenguinLook,
-  Tile,
-  Emote,
-} from '../contracts/penguin';
-import type {
-  ChatEvent,
-  MoveEvent,
-  PresencePayload,
-  RoomBroadcastEvent,
-} from '../contracts/realtime';
-import { presenceChannelKey } from '../contracts/rooms';
-import type { RoomEnterEvent, RoomId } from '../contracts/rooms';
-import type { GameEmitter } from '../contracts/game-events';
+import {
+  EYES,
+  HATS,
+  IDLE_EMOTES,
+  isHexColor,
+  PATTERNS,
+  PENGUIN_NAME_MAX,
+  roomChannelKey,
+  type Facing,
+  type PenguinLook,
+  type PresencePayload,
+  type RoomBroadcastEvent,
+  type RoomBroadcastMap,
+  type RoomEventMap,
+  type RoomId,
+  type Tile,
+  type TypedEmitter,
+} from '../contracts';
 
-/** Status values a `PresenceChannelLike.subscribe` callback can be invoked with. */
-export type PresenceChannelStatus = 'SUBSCRIBED' | 'TIMED_OUT' | 'CLOSED' | 'CHANNEL_ERROR';
+/** Status values a `RoomChannelLike.subscribe` callback can be invoked with. */
+export type RoomChannelStatus = 'SUBSCRIBED' | 'TIMED_OUT' | 'CLOSED' | 'CHANNEL_ERROR';
 
-/** The narrow slice of a Supabase Realtime channel that `createRoomChannel` depends on. The adapter (D2) implements this against `@supabase/supabase-js`. */
-export interface PresenceChannelLike {
-  subscribe(cb: (status: PresenceChannelStatus) => void): unknown;
-  track(payload: PresencePayload): Promise<unknown>;
+/**
+ * The narrow slice of a Supabase Realtime channel that `createRoomChannel`
+ * depends on. `supabase-realtime.ts` implements it against
+ * `@supabase/supabase-js`.
+ */
+export interface RoomChannelLike {
+  subscribe(cb: (status: RoomChannelStatus) => void): unknown;
+  /** Resolves the push status ('ok' | 'timed out' | 'error'). */
+  track(payload: PresencePayload): Promise<string>;
   untrack(): Promise<unknown>;
   presenceState(): Record<string, Array<Record<string, unknown>>>;
   onPresenceSync(cb: () => void): void;
-  onBroadcast(cb: (payload: unknown) => void): void;
-  /** Resolves the push status ('ok' | 'timed out' | 'error', or another server string). */
-  send(payload: RoomBroadcastEvent): Promise<'ok' | 'timed out' | 'error' | string>;
+  /** Registers `cb` for one broadcast event name; `cb` gets the raw, unvalidated payload. */
+  onBroadcast(event: RoomBroadcastEvent, cb: (payload: unknown) => void): void;
+  /** Resolves the push status ('ok' | 'timed out' | 'error'). */
+  send(event: RoomBroadcastEvent, payload: unknown): Promise<string>;
   /**
    * Forcibly drops this channel instance client-side, independent of any
-   * server round trip. Called when `removeChannel` does not resolve `'ok'`,
-   * so a stale/leaked instance is never reused for the next join.
+   * server round trip. Called when `removeChannel` does not resolve `'ok'`.
    */
   teardown(): void;
 }
 
 /** The narrow slice of a Supabase Realtime client that `createRoomChannel` depends on. */
 export interface RealtimeClientLike {
-  channel(name: string, opts: { presenceKey: string }): PresenceChannelLike;
-  /** Resolves the leave push status ('ok' | 'timed out' | 'error', or another server string). */
-  removeChannel(ch: PresenceChannelLike): Promise<'ok' | 'timed out' | 'error' | string>;
+  channel(name: string, opts: { presenceKey: string }): RoomChannelLike;
+  /** Resolves the leave push status ('ok' | 'timed out' | 'error'). */
+  removeChannel(ch: RoomChannelLike): Promise<string>;
 }
 
-/** Where validated remote Presence is rendered. Implemented by the A-3 renderer. */
+/** Where validated remote Presence is rendered (the #31 renderer, stubbed in `penguin-sprites.ts`). */
 export interface RemotePenguinView {
   upsert(p: PresencePayload): void;
   remove(playerId: string): void;
@@ -60,7 +64,8 @@ export interface RemotePenguinView {
 
 export interface RoomChannelOptions {
   client: RealtimeClientLike;
-  events: GameEmitter;
+  /** The shared `gameEvents` bus; only its Room events are used. */
+  events: TypedEmitter<RoomEventMap>;
   playerId: string;
   look: PenguinLook;
   view: RemotePenguinView;
@@ -72,12 +77,11 @@ export interface RoomChannelOptions {
   clearTimeout?: typeof clearTimeout;
 }
 
-/** An outgoing move, before the channel stamps `playerId`. */
-export type SendableMoveEvent = Omit<MoveEvent, 'playerId'>;
-/** An outgoing chat message, before the channel stamps `playerId` and `sentAt`. */
-export type SendableChatEvent = Omit<ChatEvent, 'playerId' | 'sentAt'>;
-/** The union of events a caller can hand to `RoomChannel.send`. */
-export type SendableRoomEvent = SendableMoveEvent | SendableChatEvent;
+/** Fields the Room channel stamps on every outgoing broadcast itself. */
+type StampedField = 'playerId' | 'sentAt';
+
+/** An outgoing broadcast payload, before the channel stamps `playerId` (and `sentAt` for chat). */
+export type SendablePayload<K extends RoomBroadcastEvent> = Omit<RoomBroadcastMap[K], StampedField>;
 
 export interface RoomChannel {
   setLook(look: PenguinLook): void;
@@ -87,25 +91,34 @@ export interface RoomChannel {
    * motion travels as `move` broadcasts instead (#43), not repeated tracks.
    */
   setTile(tile: Tile, facing?: Facing): void;
-  send(event: SendableRoomEvent): Promise<boolean>;
-  on<T extends RoomBroadcastEvent['type']>(
-    type: T,
-    handler: (event: Extract<RoomBroadcastEvent, { type: T }>) => void,
+  /** Resolves `true` only once the broadcast was pushed and acknowledged `'ok'`. */
+  send<K extends RoomBroadcastEvent>(type: K, payload: SendablePayload<K>): Promise<boolean>;
+  on<K extends RoomBroadcastEvent>(
+    type: K,
+    handler: (payload: RoomBroadcastMap[K]) => void,
   ): () => void;
   currentRoom(): RoomId | null;
-  /** Fires after each Room entry (with the Room id) and each leave (with `null`), for consumers like chat (#44) that must clear on Room change. */
+  /**
+   * Fires after each Room entry (with the Room id) and each Room leave
+   * (with `null`), for consumers like chat (#44) that must clear on Room
+   * change. A reconnect is not a Room change and never fires it.
+   */
   onRoomChange(handler: (roomId: RoomId | null) => void): () => void;
   stop(): Promise<void>;
 }
 
-const HEX_RE = /^#[0-9A-Fa-f]{6}$/;
-const FACINGS: readonly Facing[] = ['n', 'ne', 'e', 'se', 's', 'sw', 'w', 'nw'];
 const MAX_TILE = 255;
 const MAX_PLAYER_ID_LEN = 64;
 const MAX_CHAT_LEN = 120;
 const MAX_REMOTE_PENGUINS = 50;
 const REJOIN_DELAYS_MS = [1000, 2000, 4000];
 const REJOIN_MAX_DELAY_MS = 10000;
+
+/**
+ * Every `Facing` from the contract. Typed as a `Record` so adding a facing
+ * to the contract fails to compile here until it is listed.
+ */
+const FACINGS: Record<Facing, true> = { left: true, right: true };
 
 /**
  * Control, bidi and zero-width characters stripped from names before they
@@ -116,8 +129,12 @@ const UNSAFE_NAME_CHARS_RE =
   // eslint-disable-next-line no-control-regex
   /[\u0000-\u001F\u007F-\u009F\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g;
 
-function isHex(v: unknown): v is Hex {
-  return typeof v === 'string' && HEX_RE.test(v);
+function isOneOf<T extends string>(values: readonly T[], v: unknown): v is T {
+  return typeof v === 'string' && (values as readonly string[]).includes(v);
+}
+
+function isHex(v: unknown): v is PenguinLook['body'] {
+  return typeof v === 'string' && isHexColor(v);
 }
 
 function isIntInRange(v: unknown, min: number, max: number): v is number {
@@ -131,7 +148,7 @@ function isTile(v: unknown): v is Tile {
 }
 
 function isFacing(v: unknown): v is Facing {
-  return typeof v === 'string' && (FACINGS as readonly string[]).includes(v);
+  return typeof v === 'string' && Object.prototype.hasOwnProperty.call(FACINGS, v);
 }
 
 function isValidPlayerId(v: unknown): v is string {
@@ -142,44 +159,38 @@ function isValidSentAt(v: unknown): v is number {
   return typeof v === 'number' && Number.isFinite(v) && v > 0;
 }
 
-/** Strips control/bidi/zero-width characters and trims; falls back to `'Penguin'` rather than rejecting the whole Presence payload. */
+/**
+ * Strips control/bidi/zero-width characters and trims. An empty name is
+ * valid (the Creator has not been completed yet); a non-string or a name
+ * over `PENGUIN_NAME_MAX` falls back to `''` rather than rejecting the whole
+ * Presence payload. Render it as `name || UNNAMED_PENGUIN`.
+ */
 function sanitizeName(raw: unknown): string {
-  if (typeof raw !== 'string') return 'Penguin';
+  if (typeof raw !== 'string') return '';
   const cleaned = raw.replace(UNSAFE_NAME_CHARS_RE, '').trim();
-  if (cleaned.length < 1 || cleaned.length > 40) return 'Penguin';
-  return cleaned;
+  return cleaned.length <= PENGUIN_NAME_MAX ? cleaned : '';
 }
 
-/** Validates every `PenguinLook` field except `name` (handled separately by `sanitizeName`). */
-function isLookShapeValid(v: unknown): v is Record<string, unknown> {
-  if (typeof v !== 'object' || v === null) return false;
+/** Builds a fresh `PenguinLook` containing only known, valid keys, or `null` if any field is invalid. */
+function parseLook(v: unknown): PenguinLook | null {
+  if (typeof v !== 'object' || v === null) return null;
   const l = v as Record<string, unknown>;
-  return (
-    isHex(l.body) &&
-    isHex(l.cap) &&
-    isHex(l.beak) &&
-    isHex(l.feet) &&
-    isHex(l.belly) &&
-    (HATS as readonly string[]).includes(l.hat as string) &&
-    (PATTERNS as readonly string[]).includes(l.pattern as string) &&
-    (EYES as readonly string[]).includes(l.eyes as string) &&
-    (EMOTES as readonly string[]).includes(l.emote as string)
-  );
-}
-
-/** Builds a fresh `PenguinLook` containing only known keys, dropping anything else the payload carried. */
-function buildLook(v: Record<string, unknown>): PenguinLook {
+  if (!isHex(l.body) || !isHex(l.cap) || !isHex(l.beak) || !isHex(l.feet) || !isHex(l.belly)) {
+    return null;
+  }
+  if (!isOneOf(HATS, l.hat) || !isOneOf(PATTERNS, l.pattern)) return null;
+  if (!isOneOf(EYES, l.eyes) || !isOneOf(IDLE_EMOTES, l.emote)) return null;
   return {
-    name: sanitizeName(v.name),
-    body: v.body as Hex,
-    cap: v.cap as Hex,
-    beak: v.beak as Hex,
-    feet: v.feet as Hex,
-    belly: v.belly as Hex,
-    hat: v.hat as Hat,
-    pattern: v.pattern as Pattern,
-    eyes: v.eyes as Eyes,
-    emote: v.emote as Emote,
+    name: sanitizeName(l.name),
+    body: l.body,
+    cap: l.cap,
+    beak: l.beak,
+    feet: l.feet,
+    belly: l.belly,
+    hat: l.hat,
+    pattern: l.pattern,
+    eyes: l.eyes,
+    emote: l.emote,
   };
 }
 
@@ -187,19 +198,19 @@ function buildLook(v: Record<string, unknown>): PenguinLook {
  * Validates and narrows an unknown Presence meta into a `PresencePayload`,
  * or returns `null` if it does not conform. Checking a meta's `playerId`
  * against the presence key it was filed under needs the key, which this
- * function is not given (its signature is fixed by contract); that check is
- * done by the sync handler below instead.
+ * function is not given; the sync handler below does that check.
  */
 export function parsePresencePayload(u: unknown): PresencePayload | null {
   if (typeof u !== 'object' || u === null) return null;
   const p = u as Record<string, unknown>;
   if (!isValidPlayerId(p.playerId)) return null;
-  if (!isLookShapeValid(p.look)) return null;
+  const look = parseLook(p.look);
+  if (!look) return null;
   if (!isTile(p.tile)) return null;
   if (!isFacing(p.facing)) return null;
   return {
     playerId: p.playerId,
-    look: buildLook(p.look),
+    look,
     tile: { col: p.tile.col, row: p.tile.row },
     facing: p.facing,
   };
@@ -210,39 +221,51 @@ function normalizeChatText(raw: string): string {
   return raw.replace(/\r\n/g, ' ').replace(/\n/g, ' ').trim();
 }
 
-function parseMoveEvent(u: unknown): MoveEvent | null {
-  if (typeof u !== 'object' || u === null) return null;
-  const p = u as Record<string, unknown>;
-  if (p.type !== 'move') return null;
-  if (!isValidPlayerId(p.playerId)) return null;
-  if (!isTile(p.target)) return null;
-  return { type: 'move', playerId: p.playerId, target: { col: p.target.col, row: p.target.row } };
+/**
+ * One validator per `RoomBroadcastMap` key. Its keys are also the broadcast
+ * event names the channel listens for, so the list is derived from the
+ * contract: adding an event to `RoomBroadcastMap` fails to compile here
+ * until it has a validator.
+ */
+const BROADCAST_PARSERS: {
+  [K in RoomBroadcastEvent]: (u: unknown) => RoomBroadcastMap[K] | null;
+} = {
+  move(u) {
+    if (typeof u !== 'object' || u === null) return null;
+    const p = u as Record<string, unknown>;
+    if (!isValidPlayerId(p.playerId)) return null;
+    if (!isTile(p.target)) return null;
+    return { playerId: p.playerId, target: { col: p.target.col, row: p.target.row } };
+  },
+  chat(u) {
+    if (typeof u !== 'object' || u === null) return null;
+    const p = u as Record<string, unknown>;
+    if (!isValidPlayerId(p.playerId)) return null;
+    if (typeof p.text !== 'string') return null;
+    const text = normalizeChatText(p.text);
+    if (text.length < 1 || text.length > MAX_CHAT_LEN) return null;
+    if (!isValidSentAt(p.sentAt)) return null;
+    return { playerId: p.playerId, text, sentAt: p.sentAt };
+  },
+};
+
+const BROADCAST_EVENTS = Object.keys(BROADCAST_PARSERS) as RoomBroadcastEvent[];
+
+function parseBroadcast<K extends RoomBroadcastEvent>(
+  type: K,
+  u: unknown,
+): RoomBroadcastMap[K] | null {
+  return BROADCAST_PARSERS[type](u) as RoomBroadcastMap[K] | null;
 }
 
-function parseChatEvent(u: unknown): ChatEvent | null {
-  if (typeof u !== 'object' || u === null) return null;
-  const p = u as Record<string, unknown>;
-  if (p.type !== 'chat') return null;
-  if (!isValidPlayerId(p.playerId)) return null;
-  if (typeof p.text !== 'string') return null;
-  const text = normalizeChatText(p.text);
-  if (text.length < 1 || text.length > MAX_CHAT_LEN) return null;
-  if (!isValidSentAt(p.sentAt)) return null;
-  return { type: 'chat', playerId: p.playerId, text, sentAt: p.sentAt };
-}
-
-function parseBroadcastEvent(u: unknown): RoomBroadcastEvent | null {
-  return parseMoveEvent(u) ?? parseChatEvent(u);
-}
-
-type BroadcastHandler = (event: RoomBroadcastEvent) => void;
+type AnyBroadcastHandler = (payload: RoomBroadcastMap[RoomBroadcastEvent]) => void;
 type RoomChangeHandler = (roomId: RoomId | null) => void;
 
 /**
- * Joins the Presence channel for whichever Room is currently entered,
- * tracking the local look/tile/facing and mirroring remote Penguins into
- * `view`. Also carries the Room's typed movement/chat broadcast bus. See
- * issue #28 for the full behavioral contract.
+ * Joins the Room channel for whichever Room is currently entered, tracking
+ * the local look/tile/facing and mirroring remote Penguins into `view`. Also
+ * carries the Room's typed broadcast bus. See issue #28 for the behavioral
+ * contract.
  */
 export function createRoomChannel(options: RoomChannelOptions): RoomChannel {
   const { client, events, playerId, view } = options;
@@ -252,22 +275,22 @@ export function createRoomChannel(options: RoomChannelOptions): RoomChannel {
 
   let look = options.look;
   let tile: Tile = { col: 0, row: 0 };
-  let facing: Facing = 's';
-  let channel: PresenceChannelLike | null = null;
+  let facing: Facing = 'right';
+  let channel: RoomChannelLike | null = null;
   let subscribed = false;
   let currentRoomId: RoomId | null = null;
   let shownIds = new Set<string>();
 
-  // Bumped on every enter and every leave. Callbacks registered against a
-  // channel capture the generation at registration time and no-op once it
-  // is stale, even if the underlying client hands back the same channel
-  // instance for a reused topic (see B-2).
+  // Bumped on every channel creation and teardown. Callbacks registered
+  // against a channel capture the generation at registration time and no-op
+  // once it is stale, even if the underlying client hands back the same
+  // channel instance for a reused topic.
   let generation = 0;
 
   let rejoinAttempt = 0;
   let rejoinTimer: ReturnType<typeof scheduleTimer> | null = null;
 
-  const listeners = new Map<RoomBroadcastEvent['type'], Set<BroadcastHandler>>();
+  const listeners = new Map<RoomBroadcastEvent, Set<AnyBroadcastHandler>>();
   const roomChangeListeners = new Set<RoomChangeHandler>();
 
   // Every channel operation (leave's removeChannel, enter's channel
@@ -322,12 +345,12 @@ export function createRoomChannel(options: RoomChannelOptions): RoomChannel {
       rejoinTimer = null;
       void enqueue(async () => {
         await doLeave();
-        doEnter({ roomId, entryTile: tile });
+        doEnter(roomId, tile);
       });
     }, delay);
   }
 
-  function handleSync(ch: PresenceChannelLike): void {
+  function handleSync(ch: RoomChannelLike): void {
     const state = ch.presenceState();
     const igloo = currentRoomId === 'igloo';
 
@@ -372,24 +395,24 @@ export function createRoomChannel(options: RoomChannelOptions): RoomChannel {
     shownIds = nextIds;
   }
 
-  function handleBroadcast(payload: unknown): void {
+  function handleBroadcast(type: RoomBroadcastEvent, raw: unknown): void {
     if (currentRoomId === 'igloo') return;
-    const event = parseBroadcastEvent(payload);
-    if (!event) return;
-    if (event.playerId === playerId) return;
-    if (!shownIds.has(event.playerId)) return;
-    const handlers = listeners.get(event.type);
+    const payload = parseBroadcast(type, raw);
+    if (!payload) return;
+    if (payload.playerId === playerId) return;
+    if (!shownIds.has(payload.playerId)) return;
+    const handlers = listeners.get(type);
     if (!handlers || handlers.size === 0) return;
     for (const handler of Array.from(handlers)) {
       try {
-        handler(event);
+        handler(payload);
       } catch (err) {
         console.error('[room-channel] broadcast handler failed', err);
       }
     }
   }
 
-  function handleStatus(ch: PresenceChannelLike, status: PresenceChannelStatus): void {
+  function handleStatus(ch: RoomChannelLike, status: RoomChannelStatus): void {
     if (status === 'SUBSCRIBED') {
       subscribed = true;
       rejoinAttempt = 0;
@@ -424,11 +447,10 @@ export function createRoomChannel(options: RoomChannelOptions): RoomChannel {
     }
   }
 
-  function doEnter(payload: RoomEnterEvent): void {
-    tile = payload.entryTile;
-    currentRoomId = payload.roomId;
-    const name = presenceChannelKey(payload.roomId, playerId);
-    const ch = client.channel(name, { presenceKey: playerId });
+  function doEnter(roomId: RoomId, entryTile: Tile): void {
+    tile = entryTile;
+    currentRoomId = roomId;
+    const ch = client.channel(roomChannelKey(roomId, playerId), { presenceKey: playerId });
     channel = ch;
     subscribed = false;
     const gen = ++generation;
@@ -437,10 +459,12 @@ export function createRoomChannel(options: RoomChannelOptions): RoomChannel {
       if (gen !== generation) return;
       handleSync(ch);
     });
-    ch.onBroadcast((message) => {
-      if (gen !== generation) return;
-      handleBroadcast(message);
-    });
+    for (const type of BROADCAST_EVENTS) {
+      ch.onBroadcast(type, (raw) => {
+        if (gen !== generation) return;
+        handleBroadcast(type, raw);
+      });
+    }
     ch.subscribe((status) => {
       if (gen !== generation) return;
       handleStatus(ch, status);
@@ -452,14 +476,14 @@ export function createRoomChannel(options: RoomChannelOptions): RoomChannel {
   const unsubscribeLeave = events.on('room:leave', () => {
     void enqueue(() => doLeave());
   });
-  const unsubscribeEnter = events.on('room:enter', (payload) => {
+  const unsubscribeEnter = events.on('room:enter', ({ roomId, entryTile }) => {
     void enqueue(async () => {
       if (channel) {
         await doLeave();
       }
       rejoinAttempt = 0;
       cancelRejoinTimer();
-      doEnter(payload);
+      doEnter(roomId, entryTile);
     });
   });
 
@@ -477,23 +501,24 @@ export function createRoomChannel(options: RoomChannelOptions): RoomChannel {
         void channel.track(buildPayload());
       }
     },
-    async send(event: SendableRoomEvent): Promise<boolean> {
+    async send<K extends RoomBroadcastEvent>(
+      type: K,
+      payload: SendablePayload<K>,
+    ): Promise<boolean> {
       if (!channel || !subscribed) return false;
-      const full: RoomBroadcastEvent =
-        event.type === 'move'
-          ? { type: 'move', playerId, target: event.target }
-          : { type: 'chat', playerId, text: event.text, sentAt: now() };
-      const parsed = parseBroadcastEvent(full);
+      const stamped =
+        type === 'chat' ? { ...payload, playerId, sentAt: now() } : { ...payload, playerId };
+      const parsed = parseBroadcast(type, stamped);
       if (!parsed) return false;
-      const status = await channel.send(parsed);
+      const status = await channel.send(type, parsed);
       return status === 'ok';
     },
-    on<T extends RoomBroadcastEvent['type']>(
-      type: T,
-      handler: (event: Extract<RoomBroadcastEvent, { type: T }>) => void,
+    on<K extends RoomBroadcastEvent>(
+      type: K,
+      handler: (payload: RoomBroadcastMap[K]) => void,
     ): () => void {
-      const set = listeners.get(type) ?? new Set<BroadcastHandler>();
-      const wrapped = handler as BroadcastHandler;
+      const set = listeners.get(type) ?? new Set<AnyBroadcastHandler>();
+      const wrapped = handler as AnyBroadcastHandler;
       set.add(wrapped);
       listeners.set(type, set);
       return () => {
