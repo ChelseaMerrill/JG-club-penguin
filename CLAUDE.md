@@ -12,6 +12,22 @@ Default label vocabulary: `needs-triage`, `needs-info`, `ready-for-agent`, `read
 
 Single-context layout (`CONTEXT.md` + `docs/adr/` at repo root, created lazily as terms/decisions are resolved). See `docs/agents/domain.md`.
 
+### Knowledge base
+
+Project knowledge base: `JahnelGroup/jg-club-penguin-kb`, cloned as a sibling at `../jg-club-penguin-kb/`. Read the local clone when it exists (it includes uncommitted work); otherwise fall back to `gh api repos/JahnelGroup/jg-club-penguin-kb/contents/<path>` (sees `main` only). Start from its `CLAUDE.md` router and directory `INDEX.md` files; never scan a register file-by-file.
+
+Each kind of truth has one owner; link to the other repo, never copy:
+
+| Truth | Owner |
+|---|---|
+| Domain vocabulary | This repo, `CONTEXT.md` |
+| Architecture decisions (ADRs) | This repo, `docs/adr/` |
+| Backlog, tickets, execution plans | GitHub Issues on this repo |
+| Source evidence, personas, needs, decisions, open questions, risks | KB `sources/` and `knowledge/` |
+| Requirements (FR-/NFR-) and epics | KB `planning/requirements/` and `planning/epics/` |
+
+When a ticket or plan depends on KB material, cite its ID (e.g. `NEED-003`, `FR-012`). When work here resolves a KB open question or changes a requirement, flag it for the KB rather than editing the KB from this repo.
+
 <!-- atlas-v3:guidance:start -->
 ## Workspace framing
 
