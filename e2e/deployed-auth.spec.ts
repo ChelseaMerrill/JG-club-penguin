@@ -48,18 +48,14 @@ test('deployed-auth-roundtrip', async ({ page, request }) => {
 
   await page.goto('/');
 
-  const badge = page.locator('#ui .player-badge');
+  // Signed in: the HUD is showing and the Landing page is gone. No Google
+  // name is drawn anywhere, so the screenshot needs no mask.
+  const hud = page.locator('#ui .hud');
   const card = page.locator('#ui .landing');
-  await expect(badge).toBeVisible();
+  await expect(hud).toBeVisible();
   await expect(card).toBeHidden();
 
-  const swatch = badge.locator('.player-badge__swatch');
-  await expect(swatch).toHaveAttribute('data-penguin-color', /^#[0-9a-fA-F]{6}$/);
-
-  await page.screenshot({
-    path: 'test-results/deployed-auth-roundtrip/screenshot.png',
-    mask: [badge.locator('.player-badge__name')],
-  });
+  await page.screenshot({ path: 'test-results/deployed-auth-roundtrip/screenshot.png' });
 
   const accessToken = await page.evaluate(() => {
     const entry = Object.entries(localStorage).find(([key]) => /^sb-.*-auth-token$/.test(key));
@@ -74,10 +70,16 @@ test('deployed-auth-roundtrip', async ({ page, request }) => {
   };
 
   // Own-row SELECT only: exactly one row, and it's mine (the fixture row exists too).
-  const selectResponse = await request.get(`${supabaseUrl}/rest/v1/players?select=id`, { headers });
+  const selectResponse = await request.get(
+    `${supabaseUrl}/rest/v1/players?select=id,penguin_color`,
+    {
+      headers,
+    },
+  );
   expect(selectResponse.ok()).toBe(true);
-  const rows = (await selectResponse.json()) as Array<{ id: string }>;
-  expect(rows).toEqual([{ id: ownId }]);
+  const rows = (await selectResponse.json()) as Array<{ id: string; penguin_color: string }>;
+  expect(rows.map((row) => row.id)).toEqual([ownId]);
+  expect(rows[0].penguin_color).toMatch(/^#[0-9a-fA-F]{6}$/);
 
   // RLS denies UPDATE on someone else's row (the H1b fixture Player).
   const patchFixtureResponse = await request.patch(
@@ -91,7 +93,7 @@ test('deployed-auth-roundtrip', async ({ page, request }) => {
   expect(await patchFixtureResponse.json()).toEqual([]);
 
   // UPDATE on your own row succeeds (Track D's color picker depends on this).
-  const currentColor = (await swatch.getAttribute('data-penguin-color')) ?? '#00bdff';
+  const currentColor = rows[0].penguin_color;
   const patchOwnResponse = await request.patch(`${supabaseUrl}/rest/v1/players?id=eq.${ownId}`, {
     headers: { ...headers, Prefer: 'return=representation' },
     data: { penguin_color: currentColor },
@@ -106,9 +108,11 @@ test('deployed-auth-roundtrip', async ({ page, request }) => {
   });
   expect([401, 403]).toContain(insertResponse.status());
 
-  await badge.locator('.player-badge__signout').click();
+  // Sign out through the HUD's MENU, the only Sign out a signed-in Player has.
+  await page.locator('#ui .hud__button--menu').click();
+  await page.locator('#ui .hud__menu-signout').click();
   await expect(card).toBeVisible();
-  await expect(badge).toBeHidden();
+  await expect(hud).toBeHidden();
 
   const hasAuthToken = await page.evaluate(() =>
     Object.keys(localStorage).some((key) => /^sb-.*-auth-token$/.test(key)),

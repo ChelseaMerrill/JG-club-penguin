@@ -71,7 +71,7 @@ const auth = startAuth({
   onSignedIn: (player) => {
     bindPlayer(game.registry, player);
     if (devHudActive || devMinigameActive) return;
-    overlay.showSignedIn(player);
+    overlay.showSignedIn();
     hud.show();
   },
   onSignedOut: () => {
