@@ -21,7 +21,7 @@ import {
   type RoomChannel,
 } from './realtime/room-channel';
 import { toRealtimeClient } from './realtime/supabase-realtime';
-import { DEFAULT_FACING, SPAWN_ROOM_ID, type PenguinLook, type Tile } from './contracts';
+import { SPAWN_ROOM_ID } from './contracts';
 import { createInMemoryProgressStore } from './persistence/in-memory-progress-store';
 import { STARTING_TOKENS } from './persistence/minigame-rules';
 import { createMinigameLauncher } from './minigames/minigame-launcher';
@@ -39,7 +39,14 @@ const realtime = toRealtimeClient(client);
 const rooms = createStubRoomDriver(gameEvents);
 const uiLayer = getUiLayer();
 
-/** The Room scene and its Penguin view, once `RoomScene.create()` has first run. */
+/**
+ * The Room scene and its Penguin view, once `RoomScene.create()` has first run.
+ *
+ * The local Penguin is drawn and driven by `RoomScene` itself (#14: spawn,
+ * click-to-move, look from `registry.player`). `RoomPenguinView` (#28) shows
+ * the Room channel's remote Penguins only, so there is exactly one local
+ * Penguin on screen.
+ */
 let roomScene: RoomScene | null = null;
 let penguins: RoomPenguinView | null = null;
 const sceneReady = whenSceneReady(game).then((scene) => {
@@ -51,9 +58,6 @@ const sceneReady = whenSceneReady(game).then((scene) => {
 /** The signed-in Player's Room channel, and the Player it belongs to. */
 let roomChannel: RoomChannel | null = null;
 let channelPlayerId: string | null = null;
-/** The local Penguin's look, and the tile it entered the current Room at. */
-let localLook: PenguinLook | null = null;
-let localTile: Tile | null = null;
 // Bumped on every sign-in and sign-out, so an in-flight sign-in that loses a
 // race with a later sign-out (or a newer sign-in) never creates a stray
 // Room channel.
@@ -65,33 +69,21 @@ const debugOverlay = isDebugEnabled()
         if (channelPlayerId) rooms.enter(roomId, channelPlayerId);
       },
       onSetLook: (look) => {
-        localLook = look;
         roomChannel?.setLook(look);
-        showLocalPenguin();
+        // `RoomScene` restyles the local Penguin from `registry.player`.
+        const player = game.registry.get('player') as Player | undefined;
+        if (player) bindPlayer(game.registry, { ...player, look });
       },
     })
   : null;
 
-// `room:enter` is emitted synchronously, before the Room channel's own
-// (queued) `onRoomChange` for that Room, so the tile is known by then.
-// It also shows the entered Room in `RoomScene` (a no-op for a Room with no
-// `RoomDefinition` yet).
-gameEvents.on('room:enter', ({ roomId, entryTile }) => {
-  localTile = entryTile;
+// Shows the entered Room in `RoomScene` (a no-op for a Room with no
+// `RoomDefinition` yet). The local Penguin spawns at the Room's `spawnTile`:
+// the stub entry tile (`stub-rooms.ts`) is not checked against the Room's
+// walkable mask, so it only feeds the Room channel's Presence payload.
+gameEvents.on('room:enter', ({ roomId }) => {
   roomScene?.showRoom(roomId);
 });
-
-/** Shows the local Penguin at its entry tile, only while signed in and in a Room. */
-function showLocalPenguin(): void {
-  if (!penguins || !channelPlayerId || !localLook || !localTile) return;
-  if (!roomChannel?.currentRoom()) return;
-  penguins.showLocal({
-    playerId: channelPlayerId,
-    look: localLook,
-    tile: localTile,
-    facing: DEFAULT_FACING,
-  });
-}
 
 function composeView(view: RemotePenguinView): RemotePenguinView {
   if (!debugOverlay) return view;
@@ -122,7 +114,7 @@ async function stopChannel(channel: RoomChannel): Promise<void> {
 /**
  * The synchronous half of leaving a Session (sign-out, or a sign-in as a
  * different Player): emits `room:leave` via `rooms.reset()` and clears every
- * view, including the local Penguin. Returns the Room channel still to stop.
+ * remote Penguin view. Returns the Room channel still to stop.
  */
 function endSession(): RoomChannel | null {
   signInGeneration += 1;
@@ -130,8 +122,6 @@ function endSession(): RoomChannel | null {
   rooms.reset();
   roomChannel = null;
   channelPlayerId = null;
-  localLook = null;
-  localTile = null;
   penguins?.clear();
   debugOverlay?.clear();
   debugOverlay?.setCurrentRoom(null);
@@ -150,7 +140,6 @@ async function startSession(player: Player, previous: RoomChannel | null): Promi
   if (generation !== signInGeneration) return;
 
   channelPlayerId = player.id;
-  localLook = player.look;
   debugOverlay?.setOwnLook(player.look);
 
   const channel = createRoomChannel({
@@ -161,10 +150,7 @@ async function startSession(player: Player, previous: RoomChannel | null): Promi
     view: composeView(view),
   });
   roomChannel = channel;
-  channel.onRoomChange((roomId) => {
-    debugOverlay?.setCurrentRoom(roomId);
-    if (roomId) showLocalPenguin();
-  });
+  channel.onRoomChange((roomId) => debugOverlay?.setCurrentRoom(roomId));
   channel.onSubscribedChange((subscribed) => debugOverlay?.setSubscribed(subscribed));
 
   rooms.enter(SPAWN_ROOM_ID, player.id);
