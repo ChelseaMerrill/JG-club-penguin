@@ -4,6 +4,8 @@
 interface ImportMetaEnv {
   readonly VITE_SUPABASE_URL?: string;
   readonly VITE_SUPABASE_ANON_KEY?: string;
+  /** Set by `playwright.config.ts`'s `webServer` only; see `src/game/rooms/dev-room-hook.ts` and `src/ui/hud/dev-hud-hook.ts`. */
+  readonly VITE_E2E_HOOKS?: string;
 }
 
 interface ImportMeta {

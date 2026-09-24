@@ -24,6 +24,11 @@
   --stage-ring-outer: var(--jg-primary);
   --stage-letterbox: #0a0b0d;
   --font-game-display: 'Bumbastika', var(--font-display);
+  /* Repeated HUD edge insets (design/Room 01 Town Center.dc.html and
+     siblings), shared with `.player-badge` so it can sit clear of the HUD's
+     top-right cluster without duplicating the literal. */
+  --hud-inset-x: 36px;
+  --hud-inset-y: 28px;
 }
 
 html,
@@ -379,11 +384,14 @@ body {
   }
 }
 
-/* Signed-in: a top-right badge (name, color swatch, sign out). */
+/* Signed-in: a badge (name, color swatch, sign out) below the HUD's MENU
+   panel's full open height (top: 76px + ~64px of padding/border/button), so
+   opening MENU never covers it -- `e2e/deployed-auth.spec.ts` depends on the
+   badge's own sign-out staying visible and clickable. */
 .player-badge {
   position: absolute;
-  top: 1rem;
-  right: 1rem;
+  top: 152px;
+  right: var(--hud-inset-x);
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -414,4 +422,193 @@ body {
 .landing[hidden],
 .player-badge[hidden] {
   display: none;
+}
+
+/* HUD (#32): Room title, Token balance, MENU/PENGUIN, and the bottom bar's
+   chat slot / MAP / IGLOO. Reproduces design/Room 01 Town Center.dc.html and
+   design/Club JenGuin HUD Menus.dc.html in Stage pixels (the `#ui` layer is
+   fixed at 1600x900 and scaled by mountStage). Shown on sign-in, hidden on
+   sign-out (src/main.ts).
+
+   Pointer events: `#ui > *` (above) opts every direct child of `#ui` back
+   into `pointer-events: auto`, including `.hud` itself, which would swallow
+   every canvas click across the whole Stage. `#ui > .hud` below re-overrides
+   that back to `none` -- it needs the extra `#ui >` specificity to win the
+   cascade over `#ui > *` -- and only the actual widgets (top-right cluster,
+   MENU panel, bottom bar) opt back into `auto`, so the canvas still gets
+   clicks everywhere the HUD has no widget. */
+.hud {
+  position: absolute;
+  inset: 0;
+}
+
+#ui > .hud {
+  pointer-events: none;
+}
+
+.hud[hidden] {
+  display: none;
+}
+
+.hud__title-block {
+  position: absolute;
+  top: var(--hud-inset-y);
+  left: var(--hud-inset-x);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  /* Not a widget: title/subtitle are read-only text, so clicks here fall
+     through to the canvas underneath (inherits `pointer-events: none` from
+     `.hud`). */
+}
+
+.hud__title {
+  font-family: var(--font-game-display);
+  font-size: 44px;
+  line-height: 1;
+  color: var(--jg-primary);
+  -webkit-text-stroke: 5px var(--jg-secondary);
+  paint-order: stroke fill;
+  text-shadow: 0 4px 0 var(--jg-secondary);
+  text-transform: uppercase;
+}
+
+.hud__subtitle {
+  font: 400 13px var(--font-display);
+  letter-spacing: 0.22em;
+  color: var(--fg-primary);
+  text-transform: uppercase;
+}
+
+.hud__top-right {
+  position: absolute;
+  top: var(--hud-inset-y);
+  right: var(--hud-inset-x);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  pointer-events: auto;
+}
+
+.hud__tokens {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 16px;
+  background: rgba(var(--jg-dark-rgb), 0.88);
+  border: 2px solid var(--jg-secondary);
+  border-radius: 999px;
+  font: 400 18px var(--font-display);
+  letter-spacing: 0.06em;
+  color: var(--fg-primary);
+}
+
+.hud__tokens-icon {
+  width: 18px;
+  height: 20px;
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  background: var(--jg-primary);
+}
+
+/* The top-right pill buttons (PENGUIN, MENU): the design's rounded-hexagon
+   "clip-path" chip, --jg-secondary fill. */
+.hud__button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  padding: 0 18px;
+  border: none;
+  background: var(--jg-secondary);
+  clip-path: polygon(
+    12px 0,
+    calc(100% - 12px) 0,
+    100% 50%,
+    calc(100% - 12px) 100%,
+    12px 100%,
+    0 50%
+  );
+  font: 400 15px var(--font-display);
+  letter-spacing: 0.1em;
+  color: var(--fg-primary);
+  cursor: pointer;
+}
+
+.hud__button[hidden] {
+  display: none;
+}
+
+.hud__menu-panel {
+  position: absolute;
+  /* 28px inset + the top-right row's 40px height + an 8px gap to the row
+     below. */
+  top: calc(var(--hud-inset-y) + 48px);
+  right: var(--hud-inset-x);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  background: rgba(var(--jg-dark-rgb), 0.94);
+  border: 2px solid var(--jg-secondary);
+  pointer-events: auto;
+}
+
+.hud__menu-panel[hidden] {
+  display: none;
+}
+
+.hud__menu-signout {
+  height: 36px;
+  padding: 0 16px;
+  border: none;
+  background: var(--jg-secondary);
+  font: 400 14px var(--font-display);
+  letter-spacing: 0.08em;
+  color: var(--fg-primary);
+  cursor: pointer;
+}
+
+.hud__bottom-bar {
+  position: absolute;
+  left: var(--hud-inset-x);
+  right: var(--hud-inset-x);
+  bottom: var(--hud-inset-y);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  pointer-events: auto;
+}
+
+.hud__chat-slot {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  height: 52px;
+  padding: 0 18px;
+  background: rgba(var(--jg-dark-rgb), 0.9);
+  border: 2px solid var(--jg-secondary);
+  font: 400 16px var(--font-body);
+  color: var(--jg-inactive);
+}
+
+/* The bottom bar's hexagon buttons (EMOTE, SNOWBALL, MAP, IGLOO, QUESTS). */
+.hud__button--bottom {
+  height: 52px;
+  padding: 0 26px;
+  clip-path: polygon(
+    14px 0,
+    calc(100% - 14px) 0,
+    100% 50%,
+    calc(100% - 14px) 100%,
+    14px 100%,
+    0 50%
+  );
+  font-family: var(--font-game-display);
+  font-size: 20px;
+  letter-spacing: 0.04em;
+  /* #06303d is a manual-darkened shade with no equivalent named design
+     token (same exception `.landing__login`'s inset shadow makes). */
+  box-shadow: inset 0 -5px 0 #06303d;
+  color: var(--fg-primary);
 }
