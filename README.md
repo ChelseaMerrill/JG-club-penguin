@@ -66,6 +66,10 @@ A human needs to do the following once, outside the app:
 
 > **Google Cloud redirect URI.** The only authorized redirect URI in the Google Cloud OAuth client is the Supabase callback, `https://<project-ref>.supabase.co/auth/v1/callback` — never the Vercel URL. The Vercel URL only ever goes into Supabase's Redirect URLs (step 3) and Site URL (step 4) above.
 
+### Running the deployed e2e specs
+
+`e2e/deployed-auth.spec.ts` and `e2e/deployed-progress.spec.ts` run against a live deployment instead of the local preview build; both `test.skip()` themselves unless `DEPLOY_URL` and `AUTH_STATE` are set. `DEPLOY_URL` is the deployed URL (added to Supabase's Redirect URLs above); `AUTH_STATE` is a path to Playwright storage state saved from signing in there with a test Google account (`await page.context().storageState({ path: ... })` after a manual sign-in). `deployed-progress.spec.ts` additionally writes real progress (look, a Minigame round, a purchase, an Igloo slot) to that test account through the real `ProgressStore`, so use an account that's fine to have its saved progress overwritten. Example: `DEPLOY_URL=https://your-preview.vercel.app AUTH_STATE=.auth/state.json npx playwright test e2e/deployed-progress.spec.ts`.
+
 ## Team
 
 Built by the JG hackathon team.
