@@ -47,6 +47,14 @@ describe('createHud', () => {
     expect(root.querySelector('.hud__tokens-value')?.textContent).toBe('1,250');
   });
 
+  it('shows the Town Center title and subtitle from creation, before any room:enter arrives', () => {
+    const { root, resolveRoomTitle } = setup();
+
+    expect(resolveRoomTitle).toHaveBeenCalledWith('town-center');
+    expect(root.querySelector('.hud__title')?.textContent).toBe('TOWN-CENTER');
+    expect(root.querySelector('.hud__subtitle')?.textContent).toBe('subtitle-town-center');
+  });
+
   it('updates the Room title and subtitle on room:enter via the injected resolveRoomTitle', () => {
     const resolveRoomTitle = vi.fn((): RoomTitle => ({
       title: 'TOWN CENTER',
@@ -81,6 +89,46 @@ describe('createHud', () => {
 
     expect(spy).toHaveBeenCalledTimes(1);
     unsubscribe();
+  });
+
+  it('PENGUIN closes an open MENU before emitting ui:open-creator', () => {
+    const { root } = setup();
+    const menuPanel = () => root.querySelector('.hud__menu-panel') as HTMLElement;
+
+    (root.querySelector('.hud__button--menu') as HTMLButtonElement).click();
+    expect(menuPanel().hidden).toBe(false);
+
+    (root.querySelector('.hud__button--penguin') as HTMLButtonElement).click();
+
+    expect(menuPanel().hidden).toBe(true);
+  });
+
+  it('MAP closes an open MENU before emitting ui:open-map', () => {
+    const { root } = setup();
+    const menuPanel = () => root.querySelector('.hud__menu-panel') as HTMLElement;
+
+    (root.querySelector('.hud__button--menu') as HTMLButtonElement).click();
+    expect(menuPanel().hidden).toBe(false);
+
+    (root.querySelector('.hud__button--map') as HTMLButtonElement).click();
+
+    expect(menuPanel().hidden).toBe(true);
+  });
+
+  it('exposes the overlay manager for other overlays (#33, #35) to register with', () => {
+    const { root, hud } = setup();
+
+    expect(hud.overlays.current()).toBeNull();
+
+    const onClose = vi.fn();
+    hud.overlays.open('creator', onClose);
+    expect(hud.overlays.current()).toBe('creator');
+
+    // Opening MENU closes the newly-registered overlay too: it's the same
+    // one-overlay-at-a-time manager.
+    (root.querySelector('.hud__button--menu') as HTMLButtonElement).click();
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(hud.overlays.current()).toBe('menu');
   });
 
   it('IGLOO calls the injected onIgloo', () => {

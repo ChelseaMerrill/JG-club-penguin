@@ -1,5 +1,5 @@
-import { gameEvents, type RoomId } from '../../contracts';
-import { createOverlayManager } from './overlay-manager';
+import { gameEvents, SPAWN_ROOM_ID, type RoomId } from '../../contracts';
+import { createOverlayManager, type OverlayManager } from './overlay-manager';
 import type { RoomTitle } from './room-titles';
 
 /** Dependencies injected so the HUD stays decoupled from parallel tickets. */
@@ -20,6 +20,10 @@ export interface Hud {
   show(): void;
   hide(): void;
   destroy(): void;
+  /** The one-overlay-at-a-time manager MENU registers with. Exposed so #33
+   *  (Map) and #35 (Penguin Creator) can register their own overlays on the
+   *  same manager instead of each building their own. */
+  overlays: OverlayManager;
 }
 
 const MENU_OVERLAY_ID = 'menu';
@@ -63,7 +67,12 @@ export function createHud(layer: HTMLElement, deps: HudDeps): Hud {
   penguinButton.type = 'button';
   penguinButton.className = 'hud__button hud__button--penguin';
   penguinButton.textContent = 'PENGUIN';
-  penguinButton.addEventListener('click', () => gameEvents.emit('ui:open-creator'));
+  penguinButton.addEventListener('click', () => {
+    // Closing MENU first keeps one overlay open at a time (#32 D6) even
+    // though the Creator itself isn't wired up yet.
+    overlays.close(MENU_OVERLAY_ID);
+    gameEvents.emit('ui:open-creator');
+  });
 
   const menuButton = document.createElement('button');
   menuButton.type = 'button';
@@ -101,7 +110,7 @@ export function createHud(layer: HTMLElement, deps: HudDeps): Hud {
     deps.onSignOut();
   });
 
-  // Bottom bar: chat slot (B-3 fills this in), MAP and IGLOO. EMOTE,
+  // Bottom bar: chat slot (#44 fills this in), MAP and IGLOO. EMOTE,
   // SNOWBALL and QUESTS stay hidden until their stretch tickets land.
   const bottomBar = document.createElement('div');
   bottomBar.className = 'hud__bottom-bar';
@@ -126,7 +135,12 @@ export function createHud(layer: HTMLElement, deps: HudDeps): Hud {
   mapButton.type = 'button';
   mapButton.className = 'hud__button hud__button--bottom hud__button--map';
   mapButton.textContent = 'MAP';
-  mapButton.addEventListener('click', () => gameEvents.emit('ui:open-map'));
+  mapButton.addEventListener('click', () => {
+    // Closing MENU first keeps one overlay open at a time (#32 D6) even
+    // though the Map itself isn't wired up yet.
+    overlays.close(MENU_OVERLAY_ID);
+    gameEvents.emit('ui:open-map');
+  });
 
   const iglooButton = document.createElement('button');
   iglooButton.type = 'button';
@@ -156,10 +170,16 @@ export function createHud(layer: HTMLElement, deps: HudDeps): Hud {
     subtitleEl.textContent = subtitle;
   }
 
+  // Every Session starts in Town Center (#32 D3/#15), so the HUD shows that
+  // title from creation rather than sitting blank until the first
+  // `room:enter`.
+  setRoom(SPAWN_ROOM_ID);
+
   const unsubscribeRoomEnter = gameEvents.on('room:enter', ({ roomId }) => setRoom(roomId));
   const unsubscribeTokens = gameEvents.on('tokens:changed', ({ balance }) => setBalance(balance));
 
   return {
+    overlays,
     show() {
       root.hidden = false;
     },

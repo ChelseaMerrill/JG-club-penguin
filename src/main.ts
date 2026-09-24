@@ -47,13 +47,15 @@ const auth = startAuth({
   client: toAuthClient(client),
   onSignedIn: (player) => {
     bindPlayer(game.registry, player);
+    if (devHudActive) return;
     overlay.showSignedIn(player);
-    if (!devHudActive) hud.show();
+    hud.show();
   },
   onSignedOut: () => {
     bindPlayer(game.registry, null);
+    if (devHudActive) return;
     overlay.showSignedOut();
-    if (!devHudActive) hud.hide();
+    hud.hide();
   },
   onError: (message) => {
     overlay.showError(message);

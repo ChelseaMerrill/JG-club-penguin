@@ -1,13 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
-
-const ROOM_IDS = ['town-center', 'dev-pit', 'the-melt', 'roof-deck', 'igloo'] as const;
+import { ROOM_IDS } from '../src/contracts';
+import type { HudTestHandle } from '../src/ui/hud/hud-test-handle';
 
 declare global {
   interface Window {
-    __hudTest?: {
-      emitRoomEnter(roomId: string): void;
-      openCreatorLog: number[];
-    };
+    __hudTest?: HudTestHandle;
+    canvasPointerDowns: number;
   }
 }
 
@@ -24,12 +22,22 @@ function collectErrors(page: Page): string[] {
 test('hud-town-center', async ({ page }) => {
   const errors = collectErrors(page);
 
+  // A viewport where the 1600x900 Stage renders at scale 1 with the 9px
+  // gutter per side (`computeStageFit` in src/ui/stage.ts):
+  // min((1618-18)/1600, (918-18)/900) = min(1, 1) = 1.
+  await page.setViewportSize({ width: 1618, height: 918 });
   await page.goto('/?hud');
+
   await expect(page.locator('.hud')).toBeVisible();
+  // The signed-in state: no login card or Landing page over the HUD.
+  await expect(page.locator('.landing')).toBeHidden();
+  await expect(page.locator('.player-badge')).toBeHidden();
 
   await page.evaluate(() => window.__hudTest!.emitRoomEnter('town-center'));
 
-  await expect(page.locator('.hud__title')).toHaveText('TOWN CENTER');
+  // Case-insensitive: the CSS applies text-transform: uppercase, so #13's
+  // mixed-case Room titles render correctly without this assertion caring.
+  await expect(page.locator('.hud__title')).toHaveText(/^town center$/i);
 
   await page.screenshot({ path: 'test-results/hud-town-center/screenshot.png' });
 
@@ -63,9 +71,9 @@ test('hud-clicks-stay-in-hud', async ({ page }) => {
   await page.evaluate(() => window.__hudTest!.emitRoomEnter('town-center'));
 
   await page.evaluate(() => {
-    (window as unknown as { canvasPointerDowns: number }).canvasPointerDowns = 0;
+    window.canvasPointerDowns = 0;
     document.querySelector('#game canvas')?.addEventListener('pointerdown', () => {
-      (window as unknown as { canvasPointerDowns: number }).canvasPointerDowns += 1;
+      window.canvasPointerDowns += 1;
     });
   });
 
@@ -98,10 +106,27 @@ test('hud-clicks-stay-in-hud', async ({ page }) => {
   // is left in a clean state.
   await page.keyboard.press('Escape');
 
-  const canvasPointerDowns = await page.evaluate(
-    () => (window as unknown as { canvasPointerDowns: number }).canvasPointerDowns,
+  const canvasPointerDownsAfterHudClicks = await page.evaluate(() => window.canvasPointerDowns);
+  expect(canvasPointerDownsAfterHudClicks).toBe(0);
+
+  // The other half: a point outside every HUD widget (the Stage centre)
+  // hits the canvas, not `.hud`, and a click there does reach the canvas's
+  // own pointerdown listener.
+  const canvasBox = await page.locator('#game canvas').boundingBox();
+  expect(canvasBox).not.toBeNull();
+  const centerX = canvasBox!.x + canvasBox!.width / 2;
+  const centerY = canvasBox!.y + canvasBox!.height / 2;
+
+  const centerHitsCanvas = await page.evaluate(
+    ([px, py]) => document.elementFromPoint(px, py)?.tagName,
+    [centerX, centerY],
   );
-  expect(canvasPointerDowns).toBe(0);
+  expect(centerHitsCanvas).toBe('CANVAS');
+
+  await page.mouse.click(centerX, centerY);
+
+  const canvasPointerDownsAfterCenterClick = await page.evaluate(() => window.canvasPointerDowns);
+  expect(canvasPointerDownsAfterCenterClick).toBe(1);
 
   expect(errors).toEqual([]);
 });

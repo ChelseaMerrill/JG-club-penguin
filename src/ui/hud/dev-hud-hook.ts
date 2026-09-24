@@ -1,13 +1,6 @@
-import { gameEvents, type RoomId } from '../../contracts';
+import { gameEvents } from '../../contracts';
 import type { Hud } from './hud';
-
-/** Test handle `initDevHudHook` exposes on `window` for e2e specs. */
-export interface HudTestHandle {
-  /** Emits `room:enter` for `roomId` with a throwaway entry tile. */
-  emitRoomEnter(roomId: RoomId): void;
-  /** Grows by one every time the HUD emits `ui:open-creator`. */
-  openCreatorLog: number[];
-}
+import type { HudTestHandle } from './hud-test-handle';
 
 declare global {
   interface Window {
@@ -25,16 +18,16 @@ declare global {
  * replacement turns them into literal `false` in a real (Vercel) production
  * build and the minifier strips this function's body as dead code.
  *
- * Returns whether the hook activated. `main.ts` uses that to stop wiring the
+ * Returns whether the hook activated. `main.ts` uses that to skip wiring the
  * real (asynchronous) auth `SIGNED_OUT`/`SIGNED_IN` events into
- * `hud.show()`/`hud.hide()`: Supabase's `onAuthStateChange` always fires on a
- * later tick, so without this an unauthenticated `SIGNED_OUT` arriving after
- * this function's synchronous `hud.show()` would immediately hide it again.
+ * `hud.show()`/`hud.hide()` and the login overlay's
+ * `showSignedIn()`/`showSignedOut()`: Supabase's `onAuthStateChange` always
+ * fires on a later tick, so without this an unauthenticated `SIGNED_OUT`
+ * arriving after this function's synchronous `hud.show()` would immediately
+ * hide the HUD again and reveal the Landing page over it.
  */
 export function initDevHudHook(hud: Hud): boolean {
-  const e2eHooksEnabled =
-    import.meta.env.DEV ||
-    (import.meta.env as unknown as { VITE_E2E_HOOKS?: string }).VITE_E2E_HOOKS === 'true';
+  const e2eHooksEnabled = import.meta.env.DEV || import.meta.env.VITE_E2E_HOOKS === 'true';
   if (!e2eHooksEnabled) return false;
 
   const params = new URLSearchParams(window.location.search);
