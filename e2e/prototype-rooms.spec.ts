@@ -6,7 +6,8 @@ import { roofDeck } from '../src/game/rooms/definitions/roof-deck';
 import { theMelt } from '../src/game/rooms/definitions/the-melt';
 import { townCenter } from '../src/game/rooms/definitions/town-center';
 import type { RoomDefinition } from '../src/game/rooms/room-definition';
-import type { RoomId } from '../src/contracts';
+import { ROOM_IDS, type RoomId } from '../src/contracts';
+import { GAME_HEIGHT, GAME_WIDTH } from '../src/game/stage-size';
 
 // Imports each definition module directly rather than
 // `src/game/rooms/registry.ts`'s `getRoomDefinition`: the registry's
@@ -22,10 +23,6 @@ const ROOM_DEFINITIONS: Record<RoomId, RoomDefinition> = {
   igloo,
 };
 
-// The five prototype Rooms this ticket defines (#16 D1); Town Center is the
-// only one reachable without the `?room=` dev/test hook (#13).
-const ROOM_IDS: readonly RoomId[] = ['town-center', 'dev-pit', 'the-melt', 'roof-deck', 'igloo'];
-
 /** Fails the test on any uncaught page error or console error. */
 function collectErrors(page: Page): string[] {
   const errors: string[] = [];
@@ -37,7 +34,7 @@ function collectErrors(page: Page): string[] {
 }
 
 /**
- * Hides the signed-out Landing page (the login card), the same way
+ * Hides the signed-out Landing page, the same way
  * `e2e/smoke.spec.ts` does, so the Room underneath is fully visible for the
  * screenshot. None of these Rooms touch auth, so every visit here is
  * signed-out.
@@ -63,10 +60,10 @@ async function drawDebugOverlay(page: Page, markers: DebugOverlayMarker[]): Prom
   if (!canvasBox) throw new Error('game canvas has no bounding box');
 
   await page.evaluate(
-    ({ markers, canvasBox }) => {
+    ({ markers, canvasBox, gameWidth, gameHeight }) => {
       const NS = 'http://www.w3.org/2000/svg';
       const svg = document.createElementNS(NS, 'svg');
-      svg.setAttribute('viewBox', '0 0 1600 900');
+      svg.setAttribute('viewBox', `0 0 ${gameWidth} ${gameHeight}`);
       svg.style.position = 'fixed';
       svg.style.left = `${canvasBox.x}px`;
       svg.style.top = `${canvasBox.y}px`;
@@ -123,12 +120,13 @@ async function drawDebugOverlay(page: Page, markers: DebugOverlayMarker[]): Prom
 
       document.body.appendChild(svg);
     },
-    { markers, canvasBox },
+    { markers, canvasBox, gameWidth: GAME_WIDTH, gameHeight: GAME_HEIGHT },
   );
 }
 
 for (const roomId of ROOM_IDS) {
-  test(`prototype-room-${roomId}`, async ({ page }) => {
+  // Named to match its `test-results/room-<id>/` output folder (#16 fix 6).
+  test(`room-${roomId}`, async ({ page }) => {
     const errors = collectErrors(page);
 
     const imageResponse = page.waitForResponse(

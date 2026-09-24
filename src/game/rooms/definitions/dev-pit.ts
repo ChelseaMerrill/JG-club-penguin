@@ -1,25 +1,29 @@
 import type { RoomDefinition } from '../room-definition';
-import { createGrid } from '../grid';
+import { createStandardRoomGrid } from '../grid';
 
-// Same grid convention as Town Center (#16 D2): see that file's comment.
-const COLUMNS = 12;
-const ROWS = 10;
-const ORIGIN = { x: 800, y: 250 };
+// The standard 12x10 grid every one of the five prototype Rooms shares
+// (#16 D2, `grid.ts`'s `createStandardRoomGrid`).
 
-// Traced from `design/Room 02 Dev Pit.dc.html`'s furniture: the "SPRINT 42"
+// The shape every door hotspot in this Room uses (the design's shared
+// `door()` isolib helper).
+const DOOR_HOTSPOT_SIZE = { width: 70, height: 165 };
+
+// Traced from `design/Room 02 Dev Pit.dc.html`'s fixtures: the "SPRINT 42"
 // whiteboard/desk cluster (cols 1-4, rows 1-3) and a small pedestal by THE
-// ICEBOX elevator (col 11, row 3).
+// ICEBOX elevator (col 11, row 3). Every NPC's own tile (see `npcSlots`
+// below) is additionally blocked so a Penguin can't walk through them (#16
+// fix 5) -- this Room's floor was otherwise fully open.
 const WALKABLE: readonly (readonly boolean[])[] = [
   [true, true, true, true, true, true, true, true, true, true, true, true],
   [true, false, false, false, true, true, true, true, true, true, true, true],
-  [true, false, false, false, false, true, true, true, true, true, true, true],
+  [true, false, false, false, false, true, true, false, false, true, true, true],
   [true, true, false, false, false, true, true, true, true, true, true, false],
   [true, true, true, true, true, true, true, true, true, true, true, true],
+  [true, true, true, false, true, true, true, true, true, true, true, true],
+  [true, true, false, true, true, true, true, true, true, true, true, true],
   [true, true, true, true, true, true, true, true, true, true, true, true],
-  [true, true, true, true, true, true, true, true, true, true, true, true],
-  [true, true, true, true, true, true, true, true, true, true, true, true],
-  [true, true, true, true, true, true, true, true, true, true, true, true],
-  [true, true, true, true, true, true, true, true, true, true, true, true],
+  [true, true, true, true, true, true, true, true, true, true, false, true],
+  [true, true, true, false, true, true, true, true, true, true, true, true],
 ];
 
 /**
@@ -34,21 +38,25 @@ export const devPit: RoomDefinition = {
   title: 'DEV PIT',
   subtitle: 'TEAM RMS 1–4 · FLOOR 5',
   background: { kind: 'image', key: 'room-dev-pit', url: 'rooms/dev-pit.png' },
-  grid: createGrid(ORIGIN, COLUMNS, ROWS),
+  grid: createStandardRoomGrid(),
   walkable: WALKABLE,
   spawnTile: { col: 6, row: 1 },
   doors: [
     {
       label: 'THE ICEBOX',
-      hotspot: { x: 830, y: 135, width: 70, height: 165 },
+      hotspot: { x: 830, y: 135, ...DOOR_HOTSPOT_SIZE },
       targetRoomId: null,
       entryTile: { col: 0, row: 0 },
     },
     {
       label: 'TOWN CENTER',
-      hotspot: { x: 700, y: 135, width: 70, height: 165 },
+      hotspot: { x: 700, y: 135, ...DOOR_HOTSPOT_SIZE },
       targetRoomId: 'town-center',
-      entryTile: { col: 6, row: 8 },
+      // The tile just inside Town Center's own "DEV PIT" door (#16 fix 4):
+      // the nearest walkable tile to that door's hotspot centre in Town
+      // Center's own grid, the same rule `reachability.test.ts` uses for a
+      // door's approach tile.
+      entryTile: { col: 10, row: 0 },
     },
   ],
   npcSlots: [
@@ -63,5 +71,10 @@ export const devPit: RoomDefinition = {
     { npcId: 'dom', tile: { col: 2, row: 6 } },
     { npcId: 'ryan', tile: { col: 7, row: 2 } },
     { npcId: 'sam', tile: { col: 8, row: 2 } },
+    // Matt is a Penguin (a Player), like "You", not an NPC -- see the export
+    // script's `LIVE_ELEMENT_RULES['dev-pit']` labels-rule comment. Players
+    // are never part of a static `RoomDefinition`; presence (#28) places
+    // them live. Contrast Town Center's Jory Hutchins, who *is* a designed
+    // NPC but still gets no slot here, for a different reason (#16 fix 5).
   ],
 };

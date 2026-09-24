@@ -29,6 +29,23 @@ const OUTPUT_DIR = path.join(REPO_ROOT, 'public', 'rooms');
 const STAGE_WIDTH = 1600;
 const STAGE_HEIGHT = 900;
 const MAX_BYTES = 1.5 * 1024 * 1024;
+// The Stage element's own CSS selector (`data-screen-label` is the design
+// runtime's per-Room Stage marker -- see every `design/Room *.dc.html`'s
+// `<div data-screen-label="...">`). Every export screenshots exactly this
+// element, never the viewport: the design's outer `<section>` has 40px of
+// padding and a breadcrumb row above the Stage, so once
+// `hideLiveElements`'s HUD cluster rule removes that breadcrumb, the Stage
+// sits at roughly (40, 40) in the *viewport*, not (0, 0) -- clipping the
+// viewport itself (#16 fix 1) shifted every exported PNG by that offset and
+// cropped its right/bottom 40px. A locator screenshot of the Stage element
+// is immune to this: it captures exactly the element's own 1600x900 box
+// regardless of where the surrounding layout puts it.
+const STAGE_SELECTOR = '[data-screen-label]';
+// How long `hideLiveElements`'s DOM mutations (display:none on hidden
+// clusters) take to settle before the screenshot, so the layout reflow from
+// hiding elements never lands mid-frame.
+const POST_HIDE_SETTLE_MS = 50;
+const PAGE_LOAD_TIMEOUT_MS = 15_000;
 
 type RoomId = 'town-center' | 'dev-pit' | 'the-melt' | 'roof-deck' | 'igloo';
 
@@ -538,11 +555,12 @@ async function exportRoom(
 
   await page.addInitScript(freezeAnimations);
   await page.goto(`http://127.0.0.1:${port}/${encodeURIComponent(file)}`, { waitUntil: 'load' });
-  await page.waitForSelector('#dc-root', { timeout: 15_000 });
-  // Let the CDN-loaded React/design runtime finish its first paint, and let
-  // the @font-face fonts finish loading -- without this, two runs can race
-  // a fallback-vs-real-font repaint and produce slightly different pixels.
-  await page.waitForTimeout(1500);
+  await page.waitForSelector('#dc-root', { timeout: PAGE_LOAD_TIMEOUT_MS });
+  const stage = page.locator(STAGE_SELECTOR);
+  await stage.waitFor({ state: 'visible', timeout: PAGE_LOAD_TIMEOUT_MS });
+  // Let the @font-face fonts finish loading before screenshotting -- without
+  // this, two runs can race a fallback-vs-real-font repaint and produce
+  // slightly different pixels.
   await page.evaluate(() => document.fonts.ready);
 
   if (pageErrors.length > 0) {
@@ -551,13 +569,13 @@ async function exportRoom(
   }
 
   await page.evaluate(hideLiveElements, rules);
-  await page.waitForTimeout(50);
+  await page.waitForTimeout(POST_HIDE_SETTLE_MS);
 
   const outPath = path.join(OUTPUT_DIR, `${roomId}.png`);
-  await page.screenshot({
-    path: outPath,
-    clip: { x: 0, y: 0, width: STAGE_WIDTH, height: STAGE_HEIGHT },
-  });
+  // A locator screenshot of the Stage element itself (#16 fix 1), not a
+  // viewport clip: the Stage never actually sits at viewport (0, 0) once its
+  // breadcrumb sibling is hidden (see STAGE_SELECTOR's comment above).
+  await stage.screenshot({ path: outPath });
   await page.close();
 
   const { size } = await stat(outPath);
