@@ -29,7 +29,7 @@ rereading this guide.
 ## Evidence policy
 
 - Repository-local proof-artifact root: `test-results`. It is gitignored:
-  evidence is written there locally and is never committed.
+  evidence is written there locally. Proof artifacts must not be committed.
 - For UI screenshots and videos, use one directory per test name beneath the
   proof-artifact root. Rerunning a test replaces that test directory.
 - Visual/browser behavior: screenshot per test name by default; video only for multiplayer movement/sync or multi-step interactions a still image cannot prove.
