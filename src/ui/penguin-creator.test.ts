@@ -144,6 +144,21 @@ describe('createPenguinCreator', () => {
     expect(q('.penguin-creator__error').textContent).toBe('Your Penguin needs a name.');
   });
 
+  it('clears the missing-name error once a name is typed', () => {
+    const { q, creator, submit } = setup();
+    creator.open(DEFAULT_LOOK, { dismissible: false });
+    submit();
+
+    const name = q<HTMLInputElement>('#penguin-creator-name');
+    name.value = '   ';
+    name.dispatchEvent(new Event('input'));
+    expect(q('.penguin-creator__error').textContent).toBe('Your Penguin needs a name.');
+
+    name.value = 'Waddles';
+    name.dispatchEvent(new Event('input'));
+    expect(q('.penguin-creator__error').textContent).toBe('');
+  });
+
   it('SHUFFLE changes the look but keeps the name and Idle animation', () => {
     const { q, creator, onSubmit, chip, submit } = setup();
     creator.open(initial, { dismissible: false });

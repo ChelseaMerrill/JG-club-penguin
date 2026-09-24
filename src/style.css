@@ -584,6 +584,52 @@ body {
   color: var(--fg-primary);
 }
 
+/* Debug overlay (stand-in for #15/#33/#35), mounted only under `?debug`.
+   Stage pixels: on the left, below the HUD's Room title block and above its
+   bottom bar (which starts at 900 - 28 - 52 = 820px), so it never sits under
+   a HUD widget; `z-index` keeps it painted over the full-Stage `.hud`. */
+.debug-overlay {
+  position: absolute;
+  top: 140px;
+  left: var(--hud-inset-x);
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: 420px;
+  max-height: 640px;
+  padding: 0.75rem 1rem;
+  overflow-y: auto;
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: 0.5rem;
+  color: #ffffff;
+  font-family: system-ui, sans-serif;
+  font-size: 0.8rem;
+}
+
+.debug-rooms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.debug-rooms button,
+.debug-random-look {
+  padding: 0.2rem 0.5rem;
+  border: none;
+  border-radius: 0.25rem;
+  cursor: pointer;
+}
+
+.debug-roster {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
 /* Minigame shell (#37): a full-Stage overlay above the HUD, reproducing
    `design/Minigame Bug Squash.dc.html` and `design/Minigame Pancake
    Flip.dc.html`'s shared how-to-play/play/done chrome. Unlike `.hud`, the

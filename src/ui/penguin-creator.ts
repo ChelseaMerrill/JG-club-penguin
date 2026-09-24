@@ -161,6 +161,7 @@ export function createPenguinCreator(
   nameInput.addEventListener('input', () => {
     if (!draft) return;
     draft = { ...draft, name: nameInput.value };
+    if (normalizeName(draft.name)) showError('');
     render();
   });
   nameField.append(label('NAME', nameInput), nameInput);
