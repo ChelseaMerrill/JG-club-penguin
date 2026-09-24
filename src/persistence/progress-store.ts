@@ -44,7 +44,9 @@ export interface ProgressSnapshot {
 /**
  * The result of a validated Minigame round. `tokensAwarded` is the round's
  * own payout; a first-time Badge bonus is folded into `balance` but not
- * into `tokensAwarded`. Producer: #27 (`record_round`). Consumers: #37, #32.
+ * into `tokensAwarded`. `newBest` is true only when the round beats the
+ * previous best, or 0 when there is none. Producer: #27 (`record_round`).
+ * Consumers: #37, #32.
  */
 export interface RoundResult {
   tokensAwarded: number;

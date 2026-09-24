@@ -1,5 +1,6 @@
 import type { TypedEmitter } from '../contracts/emitter';
 import {
+  DEFAULT_LOOK,
   EYES,
   HATS,
   IDLE_EMOTES,
@@ -18,6 +19,7 @@ import {
   STARTING_TOKENS,
   STAT_MAX,
   STAT_MIN,
+  STATS_MAX_KEYS,
 } from './minigame-rules';
 import {
   ProgressStoreError,
@@ -36,18 +38,7 @@ function emptySlots(): Record<IglooSlot, string | null> {
 }
 
 function defaultLook(): PenguinLook {
-  return {
-    name: '',
-    body: '#161719',
-    cap: '#00BDFF',
-    beak: '#00BDFF',
-    feet: '#00BDFF',
-    belly: '#F4F4F4',
-    hat: 'JG CAP',
-    pattern: 'PLAIN',
-    eyes: 'ROUND',
-    emote: 'WADDLE',
-  };
+  return { ...DEFAULT_LOOK };
 }
 
 /**
@@ -145,6 +136,10 @@ export function createInMemoryProgressStore(
     }
 
     const statsRecord = stats as unknown as Record<string, unknown>;
+    // The SQL also rejects stats over 2 kB; 16 numeric keys stay under that.
+    if (Object.keys(statsRecord).length > STATS_MAX_KEYS) {
+      throw new ProgressStoreError('invalid_stats');
+    }
     for (const value of Object.values(statsRecord)) {
       if (
         typeof value !== 'number' ||
@@ -173,7 +168,8 @@ export function createInMemoryProgressStore(
     const payout = Math.min(Math.max(rawPayout, 0), rule.cap);
     const rawBest = rule.rawBest(score, numericStats);
     const previousBest = state.bests[minigameId];
-    const newBest = previousBest === undefined || rawBest > previousBest;
+    // A best must beat the previous one; a first round scoring 0 is not a best.
+    const newBest = rawBest > (previousBest ?? 0);
     if (newBest) {
       state.bests[minigameId] = rawBest;
     }

@@ -159,6 +159,25 @@ export function describeProgressStoreContract(
       expect(second.newBest).toBe(false);
     });
 
+    it('does not record a first round scoring 0 as a personal best', async () => {
+      const { store } = await makeHarness();
+
+      const result = await store.recordRound('bug-squash', 0, { squashed: 0 });
+      expect(result.newBest).toBe(false);
+      expect((await store.loadAll()).bests['bug-squash']).toBeUndefined();
+    });
+
+    it('rejects stats with more than 16 keys as invalid_stats', async () => {
+      const { store } = await makeHarness();
+
+      const stats = Object.fromEntries(
+        Array.from({ length: 17 }, (_, i) => [`k${i}`, 0]),
+      ) as unknown as MinigameStatsMap['bug-squash'];
+      await expect(store.recordRound('bug-squash', 0, stats)).rejects.toMatchObject({
+        code: 'invalid_stats',
+      });
+    });
+
     it('rejects a negative stat as invalid_stats', async () => {
       const { store } = await makeHarness();
 

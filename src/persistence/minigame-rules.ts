@@ -19,6 +19,9 @@ export const SCORE_MAX = 1_000_000;
 export const STAT_MIN = 0;
 export const STAT_MAX = 100_000;
 
+/** At most 16 keys under a round's `stats` (the SQL also caps it at 2 kB). */
+export const STATS_MAX_KEYS = 16;
+
 function stat(stats: Readonly<Record<string, number>>, key: string): number {
   return stats[key] ?? 0;
 }
