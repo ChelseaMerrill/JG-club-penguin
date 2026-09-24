@@ -25,8 +25,7 @@
   --stage-letterbox: #0a0b0d;
   --font-game-display: 'Bumbastika', var(--font-display);
   /* Repeated HUD edge insets (design/Room 01 Town Center.dc.html and
-     siblings), shared with `.player-badge` so it can sit clear of the HUD's
-     top-right cluster without duplicating the literal. */
+     siblings). */
   --hud-inset-x: 36px;
   --hud-inset-y: 28px;
 }
@@ -384,35 +383,10 @@ body {
   }
 }
 
-/* Signed-in: a badge (name, color swatch) below the HUD's MENU panel's full
-   open height (top: 76px + ~64px of padding/border/button), so opening MENU
-   never covers it. Signing out is in the MENU (#32). */
-.player-badge {
-  position: absolute;
-  top: 152px;
-  right: var(--hud-inset-x);
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0.75rem;
-  background: rgba(255, 255, 255, 0.9);
-  border-radius: 0.5rem;
-  font-family: system-ui, sans-serif;
-}
-
-.player-badge__swatch {
-  display: inline-block;
-  width: 1rem;
-  height: 1rem;
-  border-radius: 50%;
-  border: 1px solid rgba(0, 0, 0, 0.2);
-}
-
 /* The `display: flex` above beats the UA `[hidden] { display: none }` rule
    (author origin wins over user-agent origin at equal specificity), so the
    hidden state needs its own explicit override. */
-.landing[hidden],
-.player-badge[hidden] {
+.landing[hidden] {
   display: none;
 }
 
