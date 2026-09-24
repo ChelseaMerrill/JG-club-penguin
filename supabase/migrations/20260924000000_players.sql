@@ -36,5 +36,8 @@ create policy "players update own row"
 -- id and created_at immutable.
 revoke all on public.players from anon;
 revoke all on public.players from authenticated;
-grant select, insert on public.players to authenticated;
+-- Column-level INSERT, so a first sign-in can't choose columns added later
+-- (such as #27's Token balance) if this file is ever rerun.
+grant select on public.players to authenticated;
+grant insert (id, penguin_color) on public.players to authenticated;
 grant update (penguin_color) on public.players to authenticated;
