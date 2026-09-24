@@ -14,10 +14,13 @@ export const PENGUIN_VIEWBOX_HEIGHT = 130;
 
 /**
  * Extra room on every side of the design box, so a raised arm, the "HA HA"
- * text (which starts at x=100) or the SIT seat (which extends past both
- * sides) never clips against the rendered frame's edge (#31 D4).
+ * text or the SIT seat never clips against the rendered frame's edge (#31
+ * D4). "HA HA" starts at x=100 and, drawn as real Bumbastika outlines (#62),
+ * reaches about x=182, so the padding must clear 62 units plus the LAUGH
+ * tilt. Kept equal on every side so the feet anchor stays centred for
+ * `setFlipX` mirroring.
  */
-export const PENGUIN_FRAME_PADDING = 30;
+export const PENGUIN_FRAME_PADDING = 70;
 
 export const PENGUIN_FRAME_WIDTH = PENGUIN_VIEWBOX_WIDTH + PENGUIN_FRAME_PADDING * 2;
 export const PENGUIN_FRAME_HEIGHT = PENGUIN_VIEWBOX_HEIGHT + PENGUIN_FRAME_PADDING * 2;
