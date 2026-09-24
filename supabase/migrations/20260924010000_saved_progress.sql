@@ -16,43 +16,63 @@
 -- penguin_color stays as the body colour. New Players get the design body.
 alter table public.players alter column penguin_color set default '#161719';
 
+-- Columns are added without inline checks: `add column if not exists` skips
+-- the whole clause on a rerun, so an edited inline check would never apply.
+-- Every check is a named constraint below, dropped and re-added each run.
 alter table public.players
-  -- #26: trimmed, at most 16 characters; '' only before the Creator is done.
-  add column if not exists penguin_name text not null default ''
-    check (char_length(penguin_name) <= 16 and penguin_name !~ '^\s|\s$'),
-  add column if not exists cap text not null default '#00BDFF'
-    check (cap ~ '^#[0-9a-fA-F]{6}$'),
-  add column if not exists beak text not null default '#00BDFF'
-    check (beak ~ '^#[0-9a-fA-F]{6}$'),
-  add column if not exists feet text not null default '#00BDFF'
-    check (feet ~ '^#[0-9a-fA-F]{6}$'),
-  add column if not exists belly text not null default '#F4F4F4'
-    check (belly ~ '^#[0-9a-fA-F]{6}$'),
-  add column if not exists hat text not null default 'JG CAP'
-    check (hat in ('JG CAP', 'SNORKEL', 'HEADPHONES', 'WAR WEEK BAND', 'NONE')),
-  add column if not exists pattern text not null default 'PLAIN'
-    check (pattern in ('PLAIN', 'HEX', 'STRIPES', 'JG LOGO', 'PIXEL HEART', 'SNOWFLAKE')),
-  add column if not exists eyes text not null default 'ROUND'
-    check (eyes in ('ROUND', 'SLEEPY', 'STAR', 'WINK')),
-  add column if not exists idle_emote text not null default 'WADDLE'
-    check (idle_emote in ('WADDLE', 'WAVE', 'DANCE', 'LAUGH', 'SIT')),
+  add column if not exists penguin_name text not null default '',
+  add column if not exists cap text not null default '#00BDFF',
+  add column if not exists beak text not null default '#00BDFF',
+  add column if not exists feet text not null default '#00BDFF',
+  add column if not exists belly text not null default '#F4F4F4',
+  add column if not exists hat text not null default 'JG CAP',
+  add column if not exists pattern text not null default 'PLAIN',
+  add column if not exists eyes text not null default 'ROUND',
+  add column if not exists idle_emote text not null default 'WADDLE',
   -- Starting balance 100. Existing Players get it too.
-  add column if not exists tokens int not null default 100
-    check (tokens >= 0),
+  add column if not exists tokens int not null default 100,
   -- null = the Penguin Creator has not been completed yet.
   add column if not exists profile_created_at timestamptz null;
 
--- Once the Creator is completed, the Penguin has a name (1-16 characters).
-alter table public.players drop constraint if exists players_name_set_once_created;
-alter table public.players add constraint players_name_set_once_created
-  check (profile_created_at is null or char_length(penguin_name) >= 1);
+alter table public.players
+  drop constraint if exists players_penguin_name_check,
+  drop constraint if exists players_cap_check,
+  drop constraint if exists players_beak_check,
+  drop constraint if exists players_feet_check,
+  drop constraint if exists players_belly_check,
+  drop constraint if exists players_hat_check,
+  drop constraint if exists players_pattern_check,
+  drop constraint if exists players_eyes_check,
+  drop constraint if exists players_idle_emote_check,
+  drop constraint if exists players_tokens_check,
+  drop constraint if exists players_name_set_once_created;
+
+alter table public.players
+  -- #26: trimmed, at most 16 characters; '' only before the Creator is done.
+  add constraint players_penguin_name_check
+    check (char_length(penguin_name) <= 16 and penguin_name !~ '^\s|\s$'),
+  add constraint players_cap_check check (cap ~ '^#[0-9a-fA-F]{6}$'),
+  add constraint players_beak_check check (beak ~ '^#[0-9a-fA-F]{6}$'),
+  add constraint players_feet_check check (feet ~ '^#[0-9a-fA-F]{6}$'),
+  add constraint players_belly_check check (belly ~ '^#[0-9a-fA-F]{6}$'),
+  add constraint players_hat_check
+    check (hat in ('JG CAP', 'SNORKEL', 'HEADPHONES', 'WAR WEEK BAND', 'NONE')),
+  add constraint players_pattern_check
+    check (pattern in ('PLAIN', 'HEX', 'STRIPES', 'JG LOGO', 'PIXEL HEART', 'SNOWFLAKE')),
+  add constraint players_eyes_check check (eyes in ('ROUND', 'SLEEPY', 'STAR', 'WINK')),
+  add constraint players_idle_emote_check
+    check (idle_emote in ('WADDLE', 'WAVE', 'DANCE', 'LAUGH', 'SIT')),
+  add constraint players_tokens_check check (tokens >= 0),
+  -- Once the Creator is completed, the Penguin has a name (1-16 characters).
+  add constraint players_name_set_once_created
+    check (profile_created_at is null or char_length(penguin_name) >= 1);
 
 -- Column-level grants replace #9's table-wide INSERT, which would otherwise
 -- let a first-sign-in insert choose its own Token balance. The Player may set
 -- the look and profile_created_at, and nothing else. id is insert-only;
 -- tokens and created_at are never client-writable.
--- Note: rerunning #9's migration after this one restores its table-wide
--- INSERT grant. Rerun this migration afterwards if that ever happens.
+-- Note: rerunning #9's migration after this one drops these grants (it
+-- revokes all first). Rerun this migration afterwards if that ever happens.
 revoke all on public.players from anon;
 revoke all on public.players from authenticated;
 grant select on public.players to authenticated;
@@ -72,16 +92,14 @@ grant update (
 
 create table if not exists public.player_badges (
   player_id uuid not null references public.players (id) on delete cascade,
-  badge_id text not null
-    check (badge_id in ('exterminator', 'breakfast-club', 'barista', 'brain-freeze')),
+  badge_id text not null,
   earned_at timestamptz not null default now(),
   primary key (player_id, badge_id)
 );
 
 create table if not exists public.minigame_bests (
   player_id uuid not null references public.players (id) on delete cascade,
-  minigame_id text not null
-    check (minigame_id in ('bug-squash', 'pancake-flip', 'coffee-rush', 'snow-cone-stand')),
+  minigame_id text not null,
   best_score int not null check (best_score >= 0),
   updated_at timestamptz not null default now(),
   primary key (player_id, minigame_id)
@@ -90,13 +108,24 @@ create table if not exists public.minigame_bests (
 create table if not exists public.minigame_rounds (
   id bigint generated always as identity primary key,
   player_id uuid not null references public.players (id) on delete cascade,
-  minigame_id text not null
-    check (minigame_id in ('bug-squash', 'pancake-flip', 'coffee-rush', 'snow-cone-stand')),
+  minigame_id text not null,
   score int not null check (score >= 0),
   stats jsonb not null default '{}'::jsonb,
   tokens_awarded int not null check (tokens_awarded >= 0),
   finished_at timestamptz not null default now()
 );
+
+-- Enum checks as named constraints, re-added each run (see players above).
+-- Ids match src/contracts/game-events.ts (#26).
+alter table public.player_badges drop constraint if exists player_badges_badge_id_check;
+alter table public.player_badges add constraint player_badges_badge_id_check
+  check (badge_id in ('exterminator', 'breakfast-club', 'barista', 'brain-freeze'));
+alter table public.minigame_bests drop constraint if exists minigame_bests_minigame_id_check;
+alter table public.minigame_bests add constraint minigame_bests_minigame_id_check
+  check (minigame_id in ('bug-squash', 'pancake-flip', 'coffee-rush', 'snow-cone-stand'));
+alter table public.minigame_rounds drop constraint if exists minigame_rounds_minigame_id_check;
+alter table public.minigame_rounds add constraint minigame_rounds_minigame_id_check
+  check (minigame_id in ('bug-squash', 'pancake-flip', 'coffee-rush', 'snow-cone-stand'));
 
 -- record_round() looks up the Player's previous round of a Minigame.
 create index if not exists minigame_rounds_player_game_finished_idx
@@ -226,6 +255,10 @@ grant select on public.player_items to authenticated;
 grant select, insert, delete on public.igloo_slots to authenticated;
 grant update (slot, item_id) on public.igloo_slots to authenticated;
 
+-- Supabase's default privileges also grant the rounds id sequence to anon and
+-- authenticated; revoking the table doesn't touch it.
+revoke all on sequence public.minigame_rounds_id_seq from anon, authenticated;
+
 -- ---------------------------------------------------------------------------
 -- record_round(minigame_id, score, stats)
 --
@@ -237,7 +270,10 @@ grant update (slot, item_id) on public.igloo_slots to authenticated;
 --
 -- Returns { tokensAwarded, balance, newBest, badgeEarned }. tokensAwarded is
 -- the round's payout; the first-time Badge bonus shows up in balance only.
--- badgeEarned is true only on the round that first earns the Badge.
+-- badgeEarned is true only on the round that first earns the Badge. newBest
+-- is true only when the best score beats the previous best, or 0 when there
+-- is none. score is stored with every round but only Bug Squash pays from it;
+-- the other Minigames pay and rank from their stats.
 --
 -- Errors (the message is the code): not_authenticated, no_player,
 -- unknown_minigame, invalid_score, invalid_stats, round_too_soon.
@@ -295,8 +331,11 @@ begin
   end if;
 
   -- Every stat must be a whole number from 0 to 100000. A negative count
-  -- would otherwise turn a penalty (Burnt -5) into a reward.
-  if jsonb_typeof(v_stats) <> 'object' then
+  -- would otherwise turn a penalty (Burnt -5) into a reward. At most 16 keys
+  -- and 2 kB, so a round can't be used to bloat storage.
+  if jsonb_typeof(v_stats) <> 'object'
+    or (select count(*) from jsonb_object_keys(v_stats)) > 16
+    or pg_catalog.pg_column_size(v_stats) > 2048 then
     raise exception 'invalid_stats';
   end if;
   if exists (
@@ -385,7 +424,8 @@ begin
   select b.best_score into v_prev_best
   from public.minigame_bests b
   where b.player_id = v_uid and b.minigame_id = v_game;
-  v_new_best := v_prev_best is null or v_best > v_prev_best;
+  -- A best must beat the previous one; a first round scoring 0 is not a best.
+  v_new_best := v_best > coalesce(v_prev_best, 0);
   if v_new_best then
     insert into public.minigame_bests (player_id, minigame_id, best_score, updated_at)
     values (v_uid, v_game, v_best, now())
@@ -490,6 +530,8 @@ $$;
 
 -- Postgres grants EXECUTE to PUBLIC by default, and Supabase adds anon and
 -- authenticated. Only signed-in Players may call these.
+-- If a signature ever changes, `create or replace` adds a second overload
+-- that anon can call: add `drop function if exists` for the old signature.
 revoke all on function public.record_round(text, int, jsonb) from public, anon, authenticated;
 revoke all on function public.purchase_item(text) from public, anon, authenticated;
 grant execute on function public.record_round(text, int, jsonb) to authenticated;
