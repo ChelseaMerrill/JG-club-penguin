@@ -112,45 +112,271 @@ body {
   }
 }
 
-/* Signed-out: a centered card, no full-screen backdrop. */
-.login-card {
+/* Signed-out: the Landing page, filling the whole 1600x900 Stage. Ported
+   from design/Club JenGuin Landing.dc.html; all sizes are Stage pixels. */
+.landing {
   position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
+  inset: 0;
+  overflow: hidden;
+  background: linear-gradient(
+    180deg,
+    #0a0c0f 0%,
+    #0f3441 32%,
+    #bfe3f0 46%,
+    var(--jg-light) 60%,
+    var(--jg-light) 100%
+  );
+  color: var(--jg-light);
+  font-family: var(--font-body);
+}
+
+.landing__sky {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 420px;
+  overflow: hidden;
+}
+
+.landing__star {
+  position: absolute;
+  border-radius: 50%;
+  background: var(--jg-light);
+}
+
+/* The JG hex mark in the night sky. */
+.landing__hex {
+  position: absolute;
+  right: 150px;
+  top: 70px;
+  width: 110px;
+  height: 124px;
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  background: var(--jg-secondary);
+  opacity: 0.9;
+}
+
+.landing__hero {
+  position: absolute;
+  left: 110px;
+  top: 40px;
+  width: 230px;
+  animation: landing-bob 2.6s ease-in-out infinite;
+}
+
+.landing svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.landing__title {
+  position: absolute;
+  left: 380px;
+  top: 44px;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 1.5rem 2rem;
-  background: #ffffff;
-  border-radius: 0.5rem;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
-  font-family: system-ui, sans-serif;
+  gap: 6px;
 }
 
-.login-card__button {
-  padding: 0.5rem 1rem;
-  font-size: 1rem;
-  border: none;
-  border-radius: 0.25rem;
-  background: #4285f4;
-  color: #ffffff;
-  cursor: pointer;
-}
-
-.login-card__error {
+.landing__logo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   margin: 0;
-  min-height: 1em;
-  color: #c0392b;
-  font-size: 0.85rem;
+  font-family: var(--font-game-display);
+  font-weight: normal;
+  line-height: 0.86;
+  -webkit-text-stroke: 12px var(--jg-secondary);
+  paint-order: stroke fill;
+  text-shadow:
+    0 10px 0 var(--jg-secondary),
+    0 14px 0 #072e3b;
 }
 
-.login-card__error-signout {
-  padding: 0.25rem 0.5rem;
+.landing__logo-club {
+  font-size: 150px;
+  color: var(--jg-primary);
+}
+
+.landing__logo-jenguin {
+  margin-left: 40px;
+  font-size: 118px;
+  color: var(--jg-light);
+}
+
+.landing__logo-jg {
+  font-size: 34px;
+  vertical-align: top;
+  -webkit-text-stroke-width: 5px;
+  color: var(--jg-primary);
+}
+
+.landing__tagline {
+  margin: 14px 0 0 60px;
+  font: 700 26px var(--font-body);
+  text-shadow: 0 2px 0 var(--jg-secondary);
+}
+
+.landing__crowd {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 400px;
+  bottom: 0;
+  overflow: hidden;
+}
+
+.landing__bob {
+  position: absolute;
+  animation: landing-bob 3s ease-in-out infinite;
+}
+
+.landing__shadow {
+  position: absolute;
+  left: 15%;
+  bottom: 2px;
+  width: 70%;
+  height: 15%;
+  border-radius: 50%;
+  background: #000;
+  opacity: 0.18;
+}
+
+.landing__actions {
+  position: absolute;
+  left: 50%;
+  bottom: 190px;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 14px;
+}
+
+.landing__play,
+.landing__login {
+  display: flex;
+  align-items: center;
+  height: 78px;
   border: none;
-  border-radius: 0.25rem;
+  clip-path: polygon(
+    20px 0,
+    calc(100% - 20px) 0,
+    100% 50%,
+    calc(100% - 20px) 100%,
+    20px 100%,
+    0 50%
+  );
+  font-family: var(--font-game-display);
   cursor: pointer;
+  transition: filter var(--jg-anim-duration) var(--jg-ease);
+}
+
+.landing__play {
+  padding: 0 46px;
+  background: var(--jg-primary);
+  box-shadow: inset 0 -8px 0 var(--jg-secondary);
+  font-size: 34px;
+  color: var(--jg-dark);
+}
+
+.landing__login {
+  padding: 0 34px;
+  background: var(--jg-secondary);
+  box-shadow: inset 0 -8px 0 #06303d;
+  font-size: 26px;
+  color: var(--jg-light);
+}
+
+.landing__play:hover,
+.landing__login:hover {
+  filter: brightness(1.12);
+}
+
+.landing__play:active,
+.landing__login:active {
+  transform: translateY(3px);
+}
+
+/* clip-path would hide an outline, so focus shows as an inset ring. */
+.landing__play:focus-visible,
+.landing__login:focus-visible {
+  outline: none;
+  filter: brightness(1.12);
+  box-shadow:
+    inset 0 -8px 0 var(--jg-secondary),
+    inset 0 0 0 4px var(--jg-light);
+}
+
+.landing__pill {
+  position: absolute;
+  left: 50%;
+  bottom: 150px;
+  transform: translateX(-50%);
+  margin: 0;
+  padding: 6px 14px;
+  white-space: nowrap;
+  background: var(--jg-dark);
+  border: 2px solid var(--jg-secondary);
+  border-radius: 999px;
+  font: 400 12px var(--font-display);
+  letter-spacing: 0.2em;
+  color: var(--jg-inactive);
+}
+
+.landing__error-row {
+  position: absolute;
+  left: 50%;
+  bottom: 96px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  white-space: nowrap;
+}
+
+.landing__error {
+  margin: 0;
+  font: 700 18px var(--font-body);
+  color: #c0392b;
+}
+
+.landing__error-signout {
+  padding: 6px 14px;
+  border: 2px solid var(--jg-secondary);
+  border-radius: 999px;
+  background: var(--jg-dark);
+  font: 400 14px var(--font-display);
+  letter-spacing: 0.16em;
+  color: var(--jg-light);
+  cursor: pointer;
+}
+
+.landing__footer {
+  position: absolute;
+  left: 40px;
+  bottom: 22px;
+  margin: 0;
+  font: 400 11px var(--font-display);
+  letter-spacing: 0.2em;
+  color: var(--jg-dark-2);
+}
+
+@keyframes landing-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing__hero,
+  .landing__bob {
+    animation: none;
+  }
 }
 
 /* Signed-in: a top-right badge (name, color swatch, sign out). */
@@ -185,7 +411,7 @@ body {
 /* The `display: flex` above beats the UA `[hidden] { display: none }` rule
    (author origin wins over user-agent origin at equal specificity), so the
    hidden state needs its own explicit override. */
-.login-card[hidden],
+.landing[hidden],
 .player-badge[hidden] {
   display: none;
 }

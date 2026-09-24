@@ -53,7 +53,7 @@ The heads-up display drawn over every Room: the Room title, the Token balance, t
 The screen for moving between floors of the World. Stretch for the prototype, whose Rooms are reached through doors and the Map.
 
 **Landing page**
-The screen signed-out visitors see, with the logo and sign-in buttons. Stretch for the prototype; until then a login card fills this role.
+The screen signed-out visitors see, with the logo and sign-in buttons (PLAY NOW and LOG IN, both Google sign-in). It covers the whole Stage and replaced the earlier login card.
 
 ### Multiplayer
 
