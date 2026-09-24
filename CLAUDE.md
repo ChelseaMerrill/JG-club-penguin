@@ -46,6 +46,8 @@ repository keeps its own base SHA, branch, verification result, and pull request
 
 **JG-club-penguin** — 3-day Jahnel Group hackathon build of a 2D top-down multiplayer Club Penguin-style game set in a replica of the JG office: Google SSO, per-Room real-time Presence and chat, Penguin color customization, and NPC Dialogue/Minigame Interactions, live-deployed for an end-of-day-3 demo.
 
+> Superseded 2026-09-24 (see `CONTEXT.md` Decisions): "2D top-down" is now isometric Rooms on a 1600x900 letterboxed, desktop-only Stage, and "Penguin color customization" is now the full Penguin look edited in the Penguin Creator. The prototype also adds Tokens, Badges, the Igloo and Furniture.
+
 ### Structure
 
 - `docs/agents/` — Agent guidance: tracker, triage labels, domain docs
