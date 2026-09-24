@@ -106,7 +106,9 @@ test('deployed-auth-roundtrip', async ({ page, request }) => {
   });
   expect([401, 403]).toContain(insertResponse.status());
 
-  await badge.locator('.player-badge__signout').click();
+  // Sign out through the HUD's MENU, the only Sign out a signed-in Player has.
+  await page.locator('#ui .hud__button--menu').click();
+  await page.locator('#ui .hud__menu-signout').click();
   await expect(card).toBeVisible();
   await expect(badge).toBeHidden();
 

@@ -37,13 +37,10 @@ export function createLoginOverlay(
   const swatchEl = document.createElement('span');
   swatchEl.className = 'player-badge__swatch';
 
-  const signOutButton = document.createElement('button');
-  signOutButton.type = 'button';
-  signOutButton.className = 'player-badge__signout';
-  signOutButton.textContent = 'Sign out';
-  signOutButton.addEventListener('click', () => callbacks.onSignOut());
-
-  badge.append(nameEl, swatchEl, signOutButton);
+  // Signing out lives in the HUD's MENU (#32); the badge only shows who is
+  // signed in. `callbacks.onSignOut` still backs the Landing page's error
+  // escape hatch.
+  badge.append(nameEl, swatchEl);
 
   root.append(landing.el, badge);
 

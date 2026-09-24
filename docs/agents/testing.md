@@ -28,24 +28,21 @@ rereading this guide.
 
 ## Evidence policy
 
-- Repository-local proof-artifact root: `test-results`.
-- Clear the entire proof-artifact root before capturing evidence for each work
-  package. It intentionally contains only the latest work package's evidence.
+- Repository-local proof-artifact root: `test-results`. It is gitignored:
+  evidence is written there locally. Proof artifacts must not be committed.
 - For UI screenshots and videos, use one directory per test name beneath the
   proof-artifact root. Rerunning a test replaces that test directory.
 - Visual/browser behavior: screenshot per test name by default; video only for multiplayer movement/sync or multi-step interactions a still image cannot prove.
-- Integration and non-UI behavior: committed captured test output when an artifact is needed beyond the command result.
+- Integration and non-UI behavior: captured test output under `test-results` when an artifact is needed beyond the command result.
 - External integration: smoke result against the Vercel deployment.
 - Sensitive data: never store Supabase keys or tokens; use test Google accounts and keep real JG emails/avatars out of screenshots.
 - Any screenshot, video, test report, captured output, or other artifact cited as
-  `PASS` evidence is saved beneath `test-results` and committed
-  on the feature branch. The PR links to the committed path; it never describes
-  an uncommitted local file as attached evidence.
+  `PASS` evidence is saved beneath `test-results` locally. The PR states each
+  check's command and result; paste output or attach a screenshot to the PR
+  when a reviewer needs to see it.
 - Screenshot is the default visual proof. Add video only when motion, timing, or
   a multi-step interaction is material and a still image cannot prove it. Do not
   require screenshots or video when the repository has no UI/browser surface.
-- Failure-only diagnostics not cited as `PASS` evidence, such as large traces,
-  may remain uncommitted when repository policy says so.
 - A blocked or skipped check records the attempted command and raw failure.
 - `BLOCKED`, `SKIPPED`, ambiguity, and worker self-report are never `PASS`.
 
