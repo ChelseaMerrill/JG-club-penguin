@@ -22,7 +22,8 @@ interface PlayerRow {
   penguin_color: string;
 }
 
-interface DbError {
+/** The narrow error shape returned by every supabase-js call this app uses. */
+export interface DbError {
   message: string;
 }
 

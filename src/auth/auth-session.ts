@@ -1,10 +1,18 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { ensurePlayer, type AuthUserLike, type Player, type PlayersClient } from './player';
+import {
+  ensurePlayer,
+  type AuthUserLike,
+  type DbError,
+  type Player,
+  type PlayersClient,
+} from './player';
 
 /**
  * The events `startAuth` acts on. Supabase also emits `TOKEN_REFRESHED`,
  * `USER_UPDATED`, `PASSWORD_RECOVERY` and `MFA_CHALLENGE_VERIFIED`; those are
- * ignored here (verified against the supabase-js v2 docs, see the PR notes).
+ * ignored here (verified against the supabase-js v2 docs,
+ * https://supabase.com/docs/reference/javascript/auth-onauthstatechange,
+ * supabase-js 2.117.1).
  */
 export type AuthEvent =
   | 'INITIAL_SESSION'
@@ -23,10 +31,6 @@ export type AuthStateChangeCallback = (event: AuthEvent, session: AuthSessionLik
 
 interface AuthSubscription {
   unsubscribe(): void;
-}
-
-interface DbError {
-  message: string;
 }
 
 /** The narrow slice of a Supabase client that `startAuth` needs. */
@@ -62,15 +66,34 @@ const RELEVANT_EVENTS: ReadonlySet<AuthEvent> = new Set([
   'SIGNED_OUT',
 ]);
 
+/** Local view of whether the app has ever announced a signed-in Player. */
+type LocalAuthState = 'unknown' | 'signed-in' | 'signed-out';
+
 /**
  * Drives Player sign-in/out purely from `onAuthStateChange`. De-duplicates by
  * user id (a PKCE redirect can emit `INITIAL_SESSION` and `SIGNED_IN` for the
  * same user) and defers the DB call with `setTimeout(0)` so it never runs
  * inside the Supabase auth callback (the documented deadlock hazard).
+ *
+ * A `generation` counter guards against stale results: if a `SIGNED_OUT`
+ * arrives, or a different user signs in, while an `ensurePlayer` load is
+ * still in flight, that load's result is dropped when it resolves. Only the
+ * load started by the most recent event may call `onSignedIn` or `onError`.
  */
 export function startAuth(options: StartAuthOptions): AuthController {
   const { client, onSignedIn, onSignedOut, onError } = options;
-  let lastUserId: string | null = null;
+  let currentUserId: string | null = null;
+  let localState: LocalAuthState = 'unknown';
+  let generation = 0;
+
+  function markSignedOut(): void {
+    generation += 1;
+    currentUserId = null;
+    if (localState !== 'signed-out') {
+      localState = 'signed-out';
+      onSignedOut();
+    }
+  }
 
   const { data } = client.auth.onAuthStateChange((event, session) => {
     if (!RELEVANT_EVENTS.has(event)) {
@@ -78,29 +101,37 @@ export function startAuth(options: StartAuthOptions): AuthController {
     }
 
     if (event === 'SIGNED_OUT') {
-      lastUserId = null;
-      onSignedOut();
+      markSignedOut();
       return;
     }
 
     const user = session?.user ?? null;
     if (!user) {
-      lastUserId = null;
-      onSignedOut();
+      markSignedOut();
       return;
     }
 
-    if (user.id === lastUserId) {
+    if (user.id === currentUserId) {
       return;
     }
-    lastUserId = user.id;
+    currentUserId = user.id;
+    const loadGeneration = (generation += 1);
 
     setTimeout(() => {
       void ensurePlayer(client, user).then(({ player, error }) => {
+        if (loadGeneration !== generation) {
+          // Superseded by a later SIGNED_OUT or a different user signing in;
+          // this result is stale and must not drive the UI.
+          return;
+        }
         if (error || !player) {
+          // Reset the dedupe key so a later SIGNED_IN/INITIAL_SESSION for the
+          // same user retries instead of being silently ignored.
+          currentUserId = null;
           onError(error ?? 'Unable to load player');
           return;
         }
+        localState = 'signed-in';
         onSignedIn(player);
       });
     }, 0);

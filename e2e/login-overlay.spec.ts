@@ -14,6 +14,7 @@ test('login-overlay-signed-out', async ({ page, context }) => {
   await page.route('**/auth/v1/authorize**', (route) => route.abort());
 
   await page.goto('/');
+  const pageOrigin = new URL(page.url()).origin;
 
   const signInButton = page.locator('#ui .login-card__button');
   await expect(signInButton).toBeVisible();
@@ -28,7 +29,15 @@ test('login-overlay-signed-out', async ({ page, context }) => {
 
   const authorizeRequest = page.waitForRequest(/\/auth\/v1\/authorize\?provider=google/);
   await signInButton.click();
-  await authorizeRequest;
+  const request = await authorizeRequest;
 
   expect(errors.filter((e) => !e.includes('net::ERR_FAILED'))).toEqual([]);
+
+  const requestUrl = new URL(request.url());
+  // PKCE: the authorize request carries a code_challenge.
+  expect(requestUrl.searchParams.get('code_challenge')).toBeTruthy();
+  // The redirect lands back on this page's own origin, not somewhere else.
+  const redirectTo = requestUrl.searchParams.get('redirect_to');
+  expect(redirectTo).not.toBeNull();
+  expect(redirectTo!.startsWith(pageOrigin)).toBe(true);
 });

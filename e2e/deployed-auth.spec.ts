@@ -1,10 +1,25 @@
 import { expect, test } from '@playwright/test';
-import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { loadEnv } from 'vite';
 
 const DEPLOY_URL = process.env.DEPLOY_URL;
 const AUTH_STATE = process.env.AUTH_STATE;
 const FIXTURE_PLAYER_ID = process.env.FIXTURE_PLAYER_ID;
+
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** Thrown when this spec is configured to run (DEPLOY_URL + AUTH_STATE set) but FIXTURE_PLAYER_ID is missing or malformed. */
+export class InvalidFixturePlayerIdError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'InvalidFixturePlayerIdError';
+  }
+}
+
+if (DEPLOY_URL && AUTH_STATE && (!FIXTURE_PLAYER_ID || !UUID_PATTERN.test(FIXTURE_PLAYER_ID))) {
+  throw new InvalidFixturePlayerIdError(
+    'FIXTURE_PLAYER_ID must be set to a UUID (the H1b fixture Player id) when DEPLOY_URL and AUTH_STATE are set',
+  );
+}
 
 test.use({
   baseURL: DEPLOY_URL,
@@ -13,20 +28,9 @@ test.use({
 
 /** Reads `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` from the local `.env` for the REST calls below. */
 function readLocalSupabaseEnv(): { url: string; anonKey: string } {
-  const envPath = fileURLToPath(new URL('../.env', import.meta.url));
-  const raw = readFileSync(envPath, 'utf8');
-  const vars = Object.fromEntries(
-    raw
-      .split('\n')
-      .map((line) => line.trim())
-      .filter((line) => line && !line.startsWith('#'))
-      .map((line) => {
-        const idx = line.indexOf('=');
-        return [line.slice(0, idx), line.slice(idx + 1)];
-      }),
-  );
-  const url = vars.VITE_SUPABASE_URL;
-  const anonKey = vars.VITE_SUPABASE_ANON_KEY;
+  const env = loadEnv('development', process.cwd(), 'VITE_');
+  const url = env.VITE_SUPABASE_URL;
+  const anonKey = env.VITE_SUPABASE_ANON_KEY;
   if (!url || !anonKey) {
     throw new Error('VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY missing from .env');
   }

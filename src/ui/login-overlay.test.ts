@@ -16,17 +16,27 @@ beforeEach(() => {
 });
 
 describe('createLoginOverlay', () => {
-  it('shows a Sign in with Google button and hides the badge by default', () => {
+  it('hides both the login card and the badge until auth resolves', () => {
     const { root } = setup();
 
     const button = root.querySelector('.login-card__button');
     expect(button?.textContent).toBe('Sign in with Google');
+    expect((root.querySelector('.login-card') as HTMLElement).hidden).toBe(true);
+    expect((root.querySelector('.player-badge') as HTMLElement).hidden).toBe(true);
+  });
+
+  it('showSignedOut reveals the login card', () => {
+    const { root, overlay } = setup();
+
+    overlay.showSignedOut();
+
     expect((root.querySelector('.login-card') as HTMLElement).hidden).toBe(false);
     expect((root.querySelector('.player-badge') as HTMLElement).hidden).toBe(true);
   });
 
   it('clicking the sign-in button calls onSignIn', () => {
-    const { root, onSignIn } = setup();
+    const { root, overlay, onSignIn } = setup();
+    overlay.showSignedOut();
 
     (root.querySelector('.login-card__button') as HTMLButtonElement).click();
 
@@ -73,5 +83,45 @@ describe('createLoginOverlay', () => {
     overlay.showError('Sign-in failed');
 
     expect(root.querySelector('.login-card__error')?.textContent).toBe('Sign-in failed');
+  });
+
+  it('showError reveals a Sign out escape hatch, hidden again once the error clears', () => {
+    const { root, overlay } = setup();
+    const signOutButton = () => root.querySelector('.login-card__error-signout') as HTMLElement;
+
+    expect(signOutButton().hidden).toBe(true);
+
+    overlay.showError('Unable to load player');
+
+    expect(signOutButton().hidden).toBe(false);
+
+    overlay.showError('');
+
+    expect(signOutButton().hidden).toBe(true);
+  });
+
+  it('clicking the error Sign out button calls onSignOut', () => {
+    const { root, overlay, onSignOut } = setup();
+    overlay.showError('Unable to load player');
+
+    (root.querySelector('.login-card__error-signout') as HTMLButtonElement).click();
+
+    expect(onSignOut).toHaveBeenCalledTimes(1);
+  });
+
+  it('showSignedIn and showSignedOut both clear the error and hide its Sign out button', () => {
+    const { root, overlay } = setup();
+    overlay.showError('Unable to load player');
+
+    overlay.showSignedIn({ id: 'user-1', displayName: 'Ada Lovelace', penguinColor: '#00bdff' });
+
+    expect(root.querySelector('.login-card__error')?.textContent).toBe('');
+    expect((root.querySelector('.login-card__error-signout') as HTMLElement).hidden).toBe(true);
+
+    overlay.showError('Unable to load player');
+    overlay.showSignedOut();
+
+    expect(root.querySelector('.login-card__error')?.textContent).toBe('');
+    expect((root.querySelector('.login-card__error-signout') as HTMLElement).hidden).toBe(true);
   });
 });

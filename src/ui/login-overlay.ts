@@ -24,6 +24,9 @@ export function createLoginOverlay(
 ): LoginOverlay {
   const card = document.createElement('div');
   card.className = 'login-card';
+  // Hidden until auth resolves (`showSignedOut()` reveals it), so a
+  // returning Player never sees a flash of a clickable login card.
+  card.hidden = true;
 
   const signInButton = document.createElement('button');
   signInButton.type = 'button';
@@ -35,7 +38,16 @@ export function createLoginOverlay(
   errorEl.className = 'login-card__error';
   errorEl.setAttribute('role', 'alert');
 
-  card.append(signInButton, errorEl);
+  // A way out when a load error strands the Player with a live Supabase auth
+  // session but no loaded Player row: shown only while an error is set.
+  const errorSignOutButton = document.createElement('button');
+  errorSignOutButton.type = 'button';
+  errorSignOutButton.className = 'login-card__error-signout';
+  errorSignOutButton.textContent = 'Sign out';
+  errorSignOutButton.hidden = true;
+  errorSignOutButton.addEventListener('click', () => callbacks.onSignOut());
+
+  card.append(signInButton, errorEl, errorSignOutButton);
 
   const badge = document.createElement('div');
   badge.className = 'player-badge';
@@ -59,6 +71,8 @@ export function createLoginOverlay(
 
   return {
     showSignedOut() {
+      errorEl.textContent = '';
+      errorSignOutButton.hidden = true;
       card.hidden = false;
       badge.hidden = true;
     },
@@ -67,11 +81,13 @@ export function createLoginOverlay(
       swatchEl.style.backgroundColor = player.penguinColor;
       swatchEl.dataset.penguinColor = player.penguinColor;
       errorEl.textContent = '';
+      errorSignOutButton.hidden = true;
       card.hidden = true;
       badge.hidden = false;
     },
     showError(message: string) {
       errorEl.textContent = message;
+      errorSignOutButton.hidden = !message;
     },
     destroy() {
       card.remove();

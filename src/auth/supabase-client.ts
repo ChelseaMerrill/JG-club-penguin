@@ -9,8 +9,9 @@ let client: SupabaseClient | undefined;
  * never call this function; see `session.test.ts` / `player.test.ts`).
  *
  * `flowType: 'pkce'` and `detectSessionInUrl: true` handle the Google OAuth
- * redirect; `persistSession: true` restores the session on reload. Verified
- * against the supabase-js v2 (2.117.1) docs — see the PR notes for the URLs.
+ * redirect; `persistSession: true` restores the auth session on reload.
+ * Verified against the supabase-js v2 (2.117.1) docs,
+ * https://supabase.com/docs/guides/auth/sessions/pkce-flow.
  */
 export function getSupabaseClient(): SupabaseClient {
   if (!client) {

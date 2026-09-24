@@ -2,7 +2,7 @@ import './style.css';
 import { loadEnv } from './env';
 import { startGame } from './game/main';
 import { getSupabaseClient } from './auth/supabase-client';
-import { startAuth, toAuthClient } from './auth/session';
+import { startAuth, toAuthClient } from './auth/auth-session';
 import { bindPlayer } from './auth/player';
 import { createLoginOverlay } from './ui/login-overlay';
 import { getUiLayer } from './ui/ui-layer';
