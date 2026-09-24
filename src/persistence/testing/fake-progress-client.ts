@@ -5,7 +5,7 @@ import type { ProgressClient } from '../supabase-progress-store';
 // A hand-written fake `ProgressClient`: no real network or database, but the
 // exact table/RPC/filter shape `createSupabaseProgressStore` depends on.
 // Every call is logged so tests can assert exactly what was sent. Shared by
-// `supabase-progress-store.test.ts` (D1) and `hud-progress.test.ts` (D2).
+// `supabase-progress-store.test.ts` and `hud-progress.test.ts` (#34).
 
 export interface FakeError {
   message: string;

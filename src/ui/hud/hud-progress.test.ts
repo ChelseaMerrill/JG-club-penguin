@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
 //
-// AC3 proof: the real HUD, the real `gameEvents` singleton, a real progress
-// session and the real `createSupabaseProgressStore` (over a fake
-// `ProgressClient`, D1's shared test double) show the loaded Token balance
-// on sign-in, then the balance after a finished Minigame round, then the
-// balance after a Furniture purchase — with no fake HUD or fake store in
-// between.
+// The real HUD, the real `gameEvents` singleton, a real progress session and
+// the real `createSupabaseProgressStore` (over a fake `ProgressClient`, the
+// shared test double in `fake-progress-client.ts`) show the loaded Token
+// balance on sign-in, then the balance after a finished Minigame round, then
+// the balance after a Furniture purchase — with no fake HUD or fake store in
+// between (#34).
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { gameEvents, DEFAULT_LOOK } from '../../contracts';
 import type { Player } from '../../auth/player';
@@ -39,7 +39,7 @@ afterEach(() => {
   currentHud = undefined;
 });
 
-describe('HUD balance (AC3)', () => {
+describe('HUD balance', () => {
   it('shows the loaded balance on sign-in, then after a finished round, then after a purchase', async () => {
     const root = document.createElement('div');
     document.body.append(root);

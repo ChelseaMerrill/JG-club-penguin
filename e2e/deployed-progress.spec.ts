@@ -48,6 +48,9 @@ function randomSlot(): IglooSlot {
 
 test('deployed-progress-restore', async ({ page }, testInfo) => {
   test.skip(!DEPLOY_URL || !AUTH_STATE, 'requires DEPLOY_URL and AUTH_STATE');
+  // The round_too_soon retry below sleeps 11s on top of everything else this
+  // test does against a live deployment.
+  test.setTimeout(90_000);
 
   await page.goto('/');
 
@@ -127,6 +130,12 @@ test('deployed-progress-restore', async ({ page }, testInfo) => {
 
   await page.reload();
 
+  // The HUD balance proves the progress session loaded in the freshly
+  // reloaded app (not just that the store's writes above landed). The badge
+  // swatch reads `players.penguin_color` at sign-in, so it proves the saved
+  // body colour survived a reload; it says nothing about tokens, badges,
+  // bests, owned items or slots. The full snapshot (including that new body
+  // colour) is checked below via a second, independent `loadAll()`.
   await expect(page.locator('.hud__tokens-value')).toHaveText(balance.toLocaleString('en-US'));
   const swatch = badge.locator('.player-badge__swatch');
   await expect(swatch).toHaveAttribute('data-penguin-color', new RegExp(`^${newBody}$`, 'i'));

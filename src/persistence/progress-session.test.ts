@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { Player } from '../auth/player';
+import { bindPlayer, type Player } from '../auth/player';
 import { createEmitter } from '../contracts/emitter';
 import type { GameEventMap } from '../contracts/game-events';
 import { DEFAULT_LOOK } from '../contracts/penguin';
@@ -143,7 +143,7 @@ describe('createProgressSession', () => {
       const store = createInMemoryProgressStore({ emitter });
       await session.start(PLAYER, store);
       const wrapped = registry.get(PROGRESS_STORE_KEY) as ProgressStore;
-      return { registry, emitter, wrapped };
+      return { registry, emitter, session, wrapped };
     }
 
     it('saveLook updates the snapshot look, sets profileCreatedAt once, and rebinds player.look', async () => {
@@ -226,6 +226,38 @@ describe('createProgressSession', () => {
       await wrapped.setSlot(2, null);
       expect((registry.get(PROGRESS_KEY) as ProgressSnapshot).slots[2]).toBeNull();
     });
+
+    it('a saveLook that resolves after stop() leaves `player` and `progress` absent', async () => {
+      const { registry, session, wrapped } = await setup();
+
+      // Simulate a sign-out racing the in-flight write: bindPlayer(null) and
+      // stop() both run (as main.ts's onSignedOut does) before this saveLook
+      // settles.
+      const pending = wrapped.saveLook({ ...DEFAULT_LOOK, name: 'Too Late' });
+      bindPlayer(registry, null);
+      session.stop();
+      await pending;
+
+      expect(registry.get(PROGRESS_KEY)).toBeUndefined();
+      expect(registry.get('player')).toBeUndefined();
+    });
+
+    it('a write from an old session does not modify the snapshot of a newer start()', async () => {
+      const registry = createFakeRegistry();
+      const emitter = createEmitter<GameEventMap>();
+      const session = createProgressSession({ registry, emitter });
+      const oldStore = createInMemoryProgressStore({ emitter });
+      await session.start(PLAYER, oldStore);
+      const oldWrapped = registry.get(PROGRESS_STORE_KEY) as ProgressStore;
+
+      const newStore = createInMemoryProgressStore({ emitter });
+      const fresh = await session.start(PLAYER, newStore);
+
+      const result = await oldWrapped.purchase('beanbag');
+
+      expect(result.balance).toBe(50);
+      expect(registry.get(PROGRESS_KEY)).toEqual(fresh);
+    });
   });
 
   describe('stop', () => {
@@ -242,6 +274,20 @@ describe('createProgressSession', () => {
 
       expect(registry.get(PROGRESS_KEY)).toBeUndefined();
       expect(registry.get(PROGRESS_STORE_KEY)).toBeUndefined();
+    });
+
+    it('emits tokens:changed with balance 0, so the HUD never shows a stale balance', async () => {
+      const registry = createFakeRegistry();
+      const emitter = createEmitter<GameEventMap>();
+      const balances: number[] = [];
+      emitter.on('tokens:changed', ({ balance }) => balances.push(balance));
+      const session = createProgressSession({ registry, emitter });
+      const store = createInMemoryProgressStore({ emitter });
+      await session.start(PLAYER, store);
+
+      session.stop();
+
+      expect(balances[balances.length - 1]).toBe(0);
     });
   });
 });

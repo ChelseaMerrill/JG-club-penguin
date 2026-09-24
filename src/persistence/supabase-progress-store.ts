@@ -232,7 +232,7 @@ function toProgressError(
 const TOAST_MESSAGES: Record<ProgressErrorCode, string> = {
   not_authenticated: "You're not signed in",
   no_player: "Couldn't find your Player",
-  unknown_minigame: "That minigame doesn't exist",
+  unknown_minigame: "That Minigame doesn't exist",
   invalid_score: "That round couldn't be saved",
   invalid_stats: "That round couldn't be saved",
   round_too_soon: 'Slow down! Try again in a few seconds',
@@ -263,11 +263,14 @@ export interface CreateSupabaseProgressStoreOptions {
 
 /**
  * The real `ProgressStore`, backed by #27's `saved_progress` migration
- * through a Supabase client. Every method rejects with a `ProgressStoreError`
- * (never throws synchronously: every method body is `async`, so even a
- * client-side validation failure becomes a rejected promise) and emits
- * `ui:toast` on every failure before rejecting, so a caller never needs its
- * own error UI. Producer: #34. Consumers: #35, #37, #40, #41, #42.
+ * through a Supabase client. Never throws synchronously (every method body is
+ * `async`, so even a client-side validation failure becomes a rejected
+ * promise). A known failure (one of #27's raised messages, or a client-side
+ * validation failure) rejects with a typed `ProgressStoreError`; a network
+ * failure or anything unrecognized rejects with a plain `Error` instead, since
+ * no `ProgressErrorCode` exists for it. `ui:toast` is emitted on every failure
+ * only when `options.emitter` is supplied (most unit tests omit it). Producer:
+ * #34. Consumers: #35, #37, #40, #41, #42.
  */
 export function createSupabaseProgressStore(
   options: CreateSupabaseProgressStoreOptions,
@@ -327,7 +330,9 @@ export function createSupabaseProgressStore(
 
       const slots = emptySlots();
       for (const row of slotsRes.data ?? []) {
-        slots[row.slot as IglooSlot] = row.item_id;
+        if (isIglooSlot(row.slot)) {
+          slots[row.slot] = row.item_id;
+        }
       }
 
       return {
@@ -357,6 +362,12 @@ export function createSupabaseProgressStore(
     return guarded(async () => {
       validateLook(look);
 
+      // Two requests, not one: PostgREST can't express
+      // `coalesce(profile_created_at, now())` in a single update, so the look
+      // and the first-save timestamp go in separately. The timestamp is the
+      // client's clock, not the server's. If the second request rejects, the
+      // look is already saved; a retry of `saveLook` completes the timestamp
+      // write (it's a no-op once `profile_created_at` is already set).
       const playersTable = client.from('players') as PlayersTable;
       const { error } = await playersTable
         .update({
@@ -429,6 +440,9 @@ export function createSupabaseProgressStore(
         throw new ProgressStoreError('invalid_slot');
       }
 
+      // The delete and the upsert below are two separate requests, not one
+      // transaction: an atomic move needs an RPC, owned by #27, that doesn't
+      // exist yet.
       const iglooSlotsTable = client.from('igloo_slots') as IglooSlotsTable;
 
       if (itemId === null) {
