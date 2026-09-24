@@ -23,6 +23,13 @@ end
 $$;
 
 grant usage on schema public to anon, authenticated;
+
+-- Supabase grants everything on new public objects to anon and authenticated
+-- by default. Mirroring that here makes every revoke in the migrations
+-- load-bearing in the local proofs.
+alter default privileges in schema public grant all on tables to anon, authenticated;
+alter default privileges in schema public grant all on sequences to anon, authenticated;
+alter default privileges in schema public grant all on functions to anon, authenticated;
 grant usage on schema auth to anon, authenticated;
 
 -- Real Supabase's auth.users has many more columns; the migrations under

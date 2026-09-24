@@ -253,7 +253,9 @@ grant select on public.minigame_rounds to authenticated;
 grant select on public.shop_items to authenticated;
 grant select on public.player_items to authenticated;
 grant select, insert, delete on public.igloo_slots to authenticated;
-grant update (slot, item_id) on public.igloo_slots to authenticated;
+-- player_id is included because a PostgREST upsert sets every sent column;
+-- the RLS WITH CHECK still pins it to the Player's own id.
+grant update (player_id, slot, item_id) on public.igloo_slots to authenticated;
 
 -- Supabase's default privileges also grant the rounds id sequence to anon and
 -- authenticated; revoking the table doesn't touch it.
@@ -292,7 +294,7 @@ revoke all on sequence public.minigame_rounds_id_seq from anon, authenticated;
 --   stand         + 25 cone25, rush-hour cones
 --                 (rushCone5 ... rushCone25) doubled
 --
--- Caps are the proposals from #27, to be confirmed in the red-team review.
+-- Caps confirmed in the #27 red-team review (2026-09-24).
 -- Intervals are each Minigame's round duration.
 -- ---------------------------------------------------------------------------
 
@@ -332,10 +334,10 @@ begin
 
   -- Every stat must be a whole number from 0 to 100000. A negative count
   -- would otherwise turn a penalty (Burnt -5) into a reward. At most 16 keys
-  -- and 2 kB, so a round can't be used to bloat storage.
+  -- of at most 32 characters, so a round can't be used to bloat storage.
   if jsonb_typeof(v_stats) <> 'object'
     or (select count(*) from jsonb_object_keys(v_stats)) > 16
-    or pg_catalog.pg_column_size(v_stats) > 2048 then
+    or exists (select 1 from jsonb_object_keys(v_stats) as k (key) where char_length(k.key) > 32) then
     raise exception 'invalid_stats';
   end if;
   if exists (
