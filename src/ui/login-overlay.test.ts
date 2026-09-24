@@ -85,6 +85,14 @@ describe('createLoginOverlay', () => {
     expect(root.querySelector('.login-card__error')?.textContent).toBe('Sign-in failed');
   });
 
+  it('showError reveals the card when it is still hidden (load error on a fresh page)', () => {
+    const { root, overlay } = setup();
+
+    overlay.showError('Unable to load player');
+
+    expect((root.querySelector('.login-card') as HTMLElement).hidden).toBe(false);
+  });
+
   it('showError reveals a Sign out escape hatch, hidden again once the error clears', () => {
     const { root, overlay } = setup();
     const signOutButton = () => root.querySelector('.login-card__error-signout') as HTMLElement;

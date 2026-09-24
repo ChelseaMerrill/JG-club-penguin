@@ -88,6 +88,8 @@ export function createLoginOverlay(
     showError(message: string) {
       errorEl.textContent = message;
       errorSignOutButton.hidden = !message;
+      // The card starts hidden, so a load error on a fresh page must reveal it.
+      if (message) card.hidden = false;
     },
     destroy() {
       card.remove();
