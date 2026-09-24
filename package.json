@@ -15,7 +15,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "export:room-art": "node --experimental-strip-types scripts/export-room-art.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.1",

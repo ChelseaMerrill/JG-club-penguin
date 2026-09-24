@@ -4,5 +4,5 @@
     // Tooling configs and Playwright specs run in Node; `e2e` page.evaluate callbacks still need DOM.
     "types": ["node"]
   },
-  "include": ["e2e", "vite.config.ts", "vitest.config.ts", "playwright.config.ts"]
+  "include": ["e2e", "scripts", "vite.config.ts", "vitest.config.ts", "playwright.config.ts"]
 }
