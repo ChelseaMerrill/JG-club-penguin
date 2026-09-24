@@ -1,6 +1,7 @@
 import { mkdirSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import { hasTestUsers, passwordSessionState } from './support/password-session';
 
 const AUTH_STATE_A = process.env.AUTH_STATE_A;
 const AUTH_STATE_B = process.env.AUTH_STATE_B;
@@ -9,6 +10,13 @@ const OUTPUT_DIR = 'test-results/presence-two-browsers';
 const VIDEO_DIR = 'playwright-output/presence-videos';
 /** The #28 acceptance budget for another browser to see a change. */
 const SYNC_TIMEOUT = 2000;
+/**
+ * Room round trips and look changes carry no time bound in #28. Supabase
+ * Realtime replicates Presence between its servers in batches: measured
+ * against this project, a leave takes ~3 s to reach a browser connected to
+ * a different server (~20 ms on the same one), so 2 s would be flaky here.
+ */
+const PROPAGATION_TIMEOUT = 5000;
 /** Boot, sign-in and the first Room channel join, before the budget starts. */
 const READY_TIMEOUT = 15_000;
 
@@ -42,27 +50,40 @@ async function readJsonAttribute(locator: Locator, name: string): Promise<unknow
 }
 
 /** Asserts, within the sync budget, that `rosterItem` shows exactly the other page's own look. */
-async function expectLookMatches(rosterItem: Locator, ownLookOwner: Page): Promise<void> {
+async function expectLookMatches(
+  rosterItem: Locator,
+  ownLookOwner: Page,
+  timeout = SYNC_TIMEOUT,
+): Promise<void> {
   const ownLook = await readJsonAttribute(ownLookOwner.locator('.debug-overlay'), 'data-own-look');
   expect(ownLook).not.toBeNull();
-  await expect
-    .poll(() => readJsonAttribute(rosterItem, 'data-look'), { timeout: SYNC_TIMEOUT })
-    .toEqual(ownLook);
+  await expect.poll(() => readJsonAttribute(rosterItem, 'data-look'), { timeout }).toEqual(ownLook);
 }
 
-test('presence-two-browsers', async ({ browser }) => {
-  test.skip(!AUTH_STATE_A || !AUTH_STATE_B, 'requires AUTH_STATE_A and AUTH_STATE_B');
+test('presence-two-browsers', async ({ browser, baseURL }) => {
+  // Five Room round trips at up to ~3 s of Presence propagation each.
+  test.setTimeout(120_000);
+  const haveStateFiles = Boolean(AUTH_STATE_A && AUTH_STATE_B);
+  test.skip(
+    !haveStateFiles && !hasTestUsers('A', 'B'),
+    'requires E2E_USER_A/B credentials in .env.test.local, or AUTH_STATE_A and AUTH_STATE_B',
+  );
+  // Prefer explicit storage-state files; otherwise mint fresh sessions for
+  // the two email/password test users (see e2e/support/password-session.ts).
+  const origin = new URL(baseURL ?? 'http://localhost:4173').origin;
+  const stateA = haveStateFiles ? AUTH_STATE_A : await passwordSessionState('A', origin);
+  const stateB = haveStateFiles ? AUTH_STATE_B : await passwordSessionState('B', origin);
 
   rmSync(OUTPUT_DIR, { recursive: true, force: true });
   mkdirSync(OUTPUT_DIR, { recursive: true });
   rmSync(VIDEO_DIR, { recursive: true, force: true });
 
   const contextA = await browser.newContext({
-    storageState: AUTH_STATE_A,
+    storageState: stateA,
     recordVideo: { dir: VIDEO_DIR },
   });
   const contextB = await browser.newContext({
-    storageState: AUTH_STATE_B,
+    storageState: stateB,
     recordVideo: { dir: VIDEO_DIR },
   });
 
@@ -105,10 +126,10 @@ test('presence-two-browsers', async ({ browser }) => {
     // time; A's own roster (which never shows A) never grows duplicates.
     for (let i = 0; i < 5; i++) {
       await pageA.click('button[data-room="dev-pit"]');
-      await expect(rosterOnB(idA)).toHaveCount(0, { timeout: SYNC_TIMEOUT });
+      await expect(rosterOnB(idA)).toHaveCount(0, { timeout: PROPAGATION_TIMEOUT });
 
       await pageA.click('button[data-room="town-center"]');
-      await expect(rosterOnB(idA)).toHaveCount(1, { timeout: SYNC_TIMEOUT });
+      await expect(rosterOnB(idA)).toHaveCount(1, { timeout: PROPAGATION_TIMEOUT });
 
       expect(await pageA.locator('ul.debug-roster li').count()).toBeLessThanOrEqual(1);
     }
@@ -116,7 +137,7 @@ test('presence-two-browsers', async ({ browser }) => {
     // AC3: a look change (including a new name) propagates to the other
     // browser without a reload.
     await pageA.click('button.debug-random-look');
-    await expectLookMatches(rosterOnB(idA), pageA);
+    await expectLookMatches(rosterOnB(idA), pageA, PROPAGATION_TIMEOUT);
   } finally {
     await pageA.screenshot({ path: path.join(OUTPUT_DIR, 'screenshot.png') }).catch(() => {});
 
