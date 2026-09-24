@@ -35,6 +35,10 @@ Setup and run instructions will be added once the tech stack is chosen.
 
 Built by the JG hackathon team.
 
+## Knowledge base
+
+Project evidence, needs, and requirements live in the knowledge base, [`JahnelGroup/jg-club-penguin-kb`](https://github.com/JahnelGroup/jg-club-penguin-kb). Clone it next to this repo, in the same parent folder, so agents can read it at `../jg-club-penguin-kb/`. Keep the default folder names.
+
 <!-- atlas-v3:readme:start -->
 ## Atlas
 
