@@ -30,3 +30,81 @@ body {
 #ui > * {
   pointer-events: auto;
 }
+
+/* Signed-out: a centered card, no full-screen backdrop. */
+.login-card {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1.5rem 2rem;
+  background: #ffffff;
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  font-family: system-ui, sans-serif;
+}
+
+.login-card__button {
+  padding: 0.5rem 1rem;
+  font-size: 1rem;
+  border: none;
+  border-radius: 0.25rem;
+  background: #4285f4;
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.login-card__error {
+  margin: 0;
+  min-height: 1em;
+  color: #c0392b;
+  font-size: 0.85rem;
+}
+
+.login-card__error-signout {
+  padding: 0.25rem 0.5rem;
+  border: none;
+  border-radius: 0.25rem;
+  cursor: pointer;
+}
+
+/* Signed-in: a top-right badge (name, color swatch, sign out). */
+.player-badge {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 0.5rem;
+  font-family: system-ui, sans-serif;
+}
+
+.player-badge__swatch {
+  display: inline-block;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.2);
+}
+
+.player-badge__signout {
+  padding: 0.25rem 0.5rem;
+  border: none;
+  border-radius: 0.25rem;
+  cursor: pointer;
+}
+
+/* The `display: flex` above beats the UA `[hidden] { display: none }` rule
+   (author origin wins over user-agent origin at equal specificity), so the
+   hidden state needs its own explicit override. */
+.login-card[hidden],
+.player-badge[hidden] {
+  display: none;
+}

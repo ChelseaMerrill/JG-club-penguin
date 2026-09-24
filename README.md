@@ -25,7 +25,7 @@ Locked in issue #7:
 
 ## Project Status
 
-🚧 **Initial codebase.** A blank Phaser scene with a DOM overlay layer (`#ui`) for UI such as the login button.
+🚧 **Google sign-in, the login screen and the Vercel deploy exist.** The Phaser scene has a DOM overlay layer (`#ui`) that shows the login screen signed out and a Player badge signed in, backed by Supabase Auth (Google OAuth), and the app is deployed to Vercel.
 
 ## Getting Started
 
@@ -50,6 +50,21 @@ npm run dev            # http://localhost:5173
 | `npm run test:e2e` | Run Playwright browser tests (first run: `npx playwright install chromium`) |
 
 CI runs typecheck, lint, format check, unit tests, and build on every pull request.
+
+## Supabase and Vercel setup
+
+The client reads two env vars, `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (see `.env.example`). Only the Supabase anon (public) key ever goes to the client; never put the service-role key in `.env` or in Vercel.
+
+A human needs to do the following once, outside the app:
+
+1. **Apply the `players` migration.** Paste `supabase/migrations/20260924000000_players.sql` into the Supabase Dashboard's SQL editor and run it. It's safe to rerun.
+2. **Set the Vercel env vars.** In the Vercel project settings, set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` for both the Production and Preview environments.
+3. **Configure Supabase Auth → URL Configuration → Redirect URLs.** Add `http://localhost:5173/` (dev) and `http://localhost:4173/` (preview build), plus the Vercel production URL and any preview URLs used for the deployed smoke test, each with a trailing slash.
+4. **Set the Site URL.** In the same URL Configuration screen, set **Site URL** to the production URL.
+5. **Disable the Email provider.** In Supabase Dashboard → Authentication → Providers, turn off Email so Google is the only sign-in path. Confirm **Phone** and **Anonymous** sign-ins are also off.
+6. **Confirm the Google OAuth consent screen's audience** allows every demo attendee's Google account (an internal Workspace audience, or "External / In production", not a short test-user list).
+
+> **Google Cloud redirect URI.** The only authorized redirect URI in the Google Cloud OAuth client is the Supabase callback, `https://<project-ref>.supabase.co/auth/v1/callback` — never the Vercel URL. The Vercel URL only ever goes into Supabase's Redirect URLs (step 3) and Site URL (step 4) above.
 
 ## Team
 
