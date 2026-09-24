@@ -1,18 +1,20 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  DEFAULT_LOOK,
   gameEvents,
   type MinigameCompleted,
   type MinigameStatsMap,
-} from '../contracts/game-events';
-import { DEFAULT_LOOK } from '../contracts/penguin';
+} from '../contracts';
 import {
   emptySlots,
   ProgressStoreError,
   type ProgressSnapshot,
   type ProgressStore,
+  type RoundResult,
 } from '../persistence/progress-store';
 import { createOverlayManager } from '../ui/hud/overlay-manager';
+import { isMinigameOpen } from './is-minigame-open';
 import { createMinigameLauncher, type MinigameLauncher } from './minigame-launcher';
 import { MINIGAME_OVERLAY_ID } from './minigame-shell';
 import type { Minigame, MinigameContext, MinigameFactory } from './minigame';
@@ -26,7 +28,7 @@ interface FakeGameHandle {
   endCalls: number;
 }
 
-function createFakeGame(durationSec = 5): FakeGameHandle {
+function createFakeGame(durationSec = 5, opts: { endThrows?: boolean } = {}): FakeGameHandle {
   let ctx: MinigameContext<'bug-squash'> | undefined;
   let score = 0;
   let stats: MinigameStatsMap['bug-squash'] = { squashed: 0 };
@@ -60,6 +62,7 @@ function createFakeGame(durationSec = 5): FakeGameHandle {
         },
         end() {
           handle.endCalls += 1;
+          if (opts.endThrows) throw new Error('boom');
           return { score, stats };
         },
       };
@@ -99,6 +102,22 @@ function createFakeStore(overrides: Partial<ProgressStore> = {}): ProgressStore 
   } as ProgressStore;
 }
 
+/** A promise plus its own `resolve`/`reject`, for tests that need to hold
+ *  `recordRound` open across assertions. */
+function deferred<T>(): {
+  promise: Promise<T>;
+  resolve: (value: T) => void;
+  reject: (err: unknown) => void;
+} {
+  let resolve!: (value: T) => void;
+  let reject!: (err: unknown) => void;
+  const promise = new Promise<T>((res, rej) => {
+    resolve = res;
+    reject = rej;
+  });
+  return { promise, resolve, reject };
+}
+
 let cleanupFns: Array<() => void> = [];
 
 function setup(opts: { store?: ProgressStore; game?: FakeGameHandle } = {}) {
@@ -123,13 +142,19 @@ function setup(opts: { store?: ProgressStore; game?: FakeGameHandle } = {}) {
 
 function startPlaying(layer: HTMLElement, launcher: MinigameLauncher): void {
   launcher.launch('bug-squash');
-  (layer.querySelector('.minigame__howto-start') as HTMLButtonElement).click();
+  (layer.querySelector('.minigame__button--start') as HTMLButtonElement).click();
 }
 
 /** `querySelector(selector)?.hidden`, typed: `hidden` is an `HTMLElement`
  *  property, not `Element`'s. */
 function isHidden(root: HTMLElement, selector: string): boolean {
   return (root.querySelector(selector) as HTMLElement | null)?.hidden ?? false;
+}
+
+function fakeTimerConfig(): Parameters<typeof vi.useFakeTimers>[0] {
+  return {
+    toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval', 'Date', 'performance'],
+  };
 }
 
 beforeEach(() => {
@@ -171,7 +196,67 @@ describe('minigame shell: finish vs quit', () => {
     expect(layer.querySelector('.minigame')).toBeNull();
   });
 
-  it('emits minigame:completed on finish and not on quit', async () => {
+  it('quitting from the how-to-play screen (before START) never calls end()', () => {
+    const { layer, gameHandle, launcher, overlays } = setup();
+    launcher.launch('bug-squash');
+    expect(layer.querySelector('.minigame__howto')).toBeTruthy();
+
+    overlays.close(MINIGAME_OVERLAY_ID);
+
+    expect(gameHandle.endCalls).toBe(0);
+    expect(layer.querySelector('.minigame')).toBeNull();
+  });
+
+  it('a real Escape keydown quits without recording', async () => {
+    const { layer, store, launcher } = setup();
+    startPlaying(layer, launcher);
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(store.recordRound).not.toHaveBeenCalled();
+    expect(layer.querySelector('.minigame')).toBeNull();
+  });
+
+  it('quitting while recordRound is still pending settles safely with exactly one call', async () => {
+    const gate = deferred<RoundResult>();
+    const recordRound = vi.fn(() => gate.promise);
+    const { layer, gameHandle, launcher, overlays } = setup({
+      store: createFakeStore({ recordRound }),
+    });
+    startPlaying(layer, launcher);
+    gameHandle.setScoreAndStats(20, { squashed: 2 });
+    gameHandle.finishNow();
+
+    expect(recordRound).toHaveBeenCalledTimes(1);
+
+    expect(() => overlays.close(MINIGAME_OVERLAY_ID)).not.toThrow();
+    expect(layer.querySelector('.minigame')).toBeNull();
+
+    gate.resolve({ tokensAwarded: 2, balance: 102, newBest: false, badgeEarned: false });
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(recordRound).toHaveBeenCalledTimes(1);
+  });
+
+  it('calling finish() twice (or a timer racing finish) still records exactly once', async () => {
+    const { layer, store, gameHandle, launcher } = setup();
+    startPlaying(layer, launcher);
+    gameHandle.setScoreAndStats(15, { squashed: 1 });
+
+    gameHandle.finishNow();
+    gameHandle.finishNow();
+
+    await vi.waitFor(() => expect(isHidden(layer, '.minigame__done')).toBe(false));
+    expect(store.recordRound).toHaveBeenCalledTimes(1);
+    expect(gameHandle.endCalls).toBe(1);
+  });
+
+  it('emits minigame:completed right after end() on finish, and never on quit', async () => {
     const completedSpy = vi.fn();
     const unsubscribe = gameEvents.on('minigame:completed', completedSpy);
 
@@ -193,13 +278,108 @@ describe('minigame shell: finish vs quit', () => {
 
     unsubscribe();
   });
+
+  it('still emits minigame:completed when recordRound rejects', async () => {
+    const completedSpy = vi.fn();
+    const unsubscribe = gameEvents.on('minigame:completed', completedSpy);
+
+    const { layer, gameHandle, launcher } = setup({
+      store: createFakeStore({
+        recordRound: vi.fn(async () => {
+          throw new ProgressStoreError('round_too_soon');
+        }),
+      }),
+    });
+    startPlaying(layer, launcher);
+    gameHandle.setScoreAndStats(33, { squashed: 3 });
+    gameHandle.finishNow();
+
+    await vi.waitFor(() => expect(completedSpy).toHaveBeenCalledTimes(1));
+    expect(completedSpy.mock.calls[0][0]).toEqual({
+      minigameId: 'bug-squash',
+      score: 33,
+      stats: { squashed: 3 },
+    });
+
+    unsubscribe();
+  });
+
+  it('shows an error on the done screen and skips recordRound and the event when end() throws', async () => {
+    const throwingGame = createFakeGame(5, { endThrows: true });
+    const completedSpy = vi.fn();
+    const unsubscribe = gameEvents.on('minigame:completed', completedSpy);
+
+    const { layer, store, launcher } = setup({ game: throwingGame });
+    startPlaying(layer, launcher);
+    throwingGame.finishNow();
+
+    await vi.waitFor(() => expect(isHidden(layer, '.minigame__done')).toBe(false));
+    expect(isHidden(layer, '.minigame__done-error')).toBe(false);
+    expect(store.recordRound).not.toHaveBeenCalled();
+    expect(completedSpy).not.toHaveBeenCalled();
+
+    unsubscribe();
+  });
+});
+
+describe('minigame shell: pending state', () => {
+  it('shows the score immediately and hides tokens/best behind a SAVING state until recordRound settles', async () => {
+    const gate = deferred<RoundResult>();
+    const { layer, gameHandle, launcher } = setup({
+      store: createFakeStore({ recordRound: vi.fn(() => gate.promise) }),
+    });
+    startPlaying(layer, launcher);
+    gameHandle.setScoreAndStats(40, { squashed: 4 });
+    gameHandle.finishNow();
+
+    expect(isHidden(layer, '.minigame__done')).toBe(false);
+    expect(
+      layer.querySelector('[data-done-stat="score"] .minigame__done-stat-value')?.textContent,
+    ).toBe('40');
+    expect(isHidden(layer, '.minigame__done-saving')).toBe(false);
+    expect(isHidden(layer, '[data-done-stat="tokens"]')).toBe(true);
+    expect(isHidden(layer, '[data-done-stat="best"]')).toBe(true);
+
+    gate.resolve({ tokensAwarded: 5, balance: 105, newBest: false, badgeEarned: false });
+    await vi.waitFor(() => expect(isHidden(layer, '.minigame__done-saving')).toBe(true));
+    expect(isHidden(layer, '[data-done-stat="tokens"]')).toBe(false);
+  });
+});
+
+describe('minigame shell: relaunch', () => {
+  it('launch() while a Minigame overlay is already open is a no-op that returns the open instance', () => {
+    const { layer, launcher, overlays } = setup();
+    const first = launcher.launch('bug-squash');
+    const second = launcher.launch('bug-squash');
+
+    expect(second).toBe(first);
+    expect(layer.querySelectorAll('.minigame').length).toBe(1);
+
+    overlays.close(MINIGAME_OVERLAY_ID);
+    expect(isMinigameOpen()).toBe(false);
+    expect(layer.querySelector('.minigame')).toBeNull();
+  });
+});
+
+describe('minigame shell: isMinigameOpen', () => {
+  it('is true only while a shell is mounted', () => {
+    const { layer, launcher, overlays } = setup();
+    expect(isMinigameOpen()).toBe(false);
+
+    launcher.launch('bug-squash');
+    expect(isMinigameOpen()).toBe(true);
+
+    overlays.close(MINIGAME_OVERLAY_ID);
+    expect(isMinigameOpen()).toBe(false);
+    expect(layer.querySelector('.minigame')).toBeNull();
+  });
 });
 
 describe('minigame shell: pause', () => {
-  it('stops the timer while paused, and P toggles pause/resume', () => {
-    vi.useFakeTimers();
+  it('stops the countdown while paused and resumes without losing elapsed time', () => {
+    vi.useFakeTimers(fakeTimerConfig());
     try {
-      const { layer, gameHandle, launcher } = setup();
+      const { layer, gameHandle, launcher } = setup({ game: createFakeGame(10) });
       startPlaying(layer, launcher);
 
       const timeValue = () => layer.querySelector('[data-counter="time"]')!.textContent;
@@ -208,7 +388,7 @@ describe('minigame shell: pause', () => {
       vi.advanceTimersByTime(1000);
       expect(timeValue()).not.toBe(initial);
 
-      (layer.querySelector('.minigame__pause') as HTMLButtonElement).click();
+      (layer.querySelector('.minigame__button--pause') as HTMLButtonElement).click();
       expect(gameHandle.pauseCalls).toBe(1);
       const frozenAt = timeValue();
 
@@ -224,12 +404,77 @@ describe('minigame shell: pause', () => {
       vi.useRealTimers();
     }
   });
+
+  it('P pauses directly, not just resumes', () => {
+    vi.useFakeTimers(fakeTimerConfig());
+    try {
+      const { layer, gameHandle, launcher } = setup({ game: createFakeGame(10) });
+      startPlaying(layer, launcher);
+
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'p' }));
+      expect(gameHandle.pauseCalls).toBe(1);
+      expect(
+        (layer.querySelector('.minigame__button--pause') as HTMLButtonElement).textContent,
+      ).toBe('RESUME');
+
+      const frozenAt = layer.querySelector('[data-counter="time"]')!.textContent;
+      vi.advanceTimersByTime(2000);
+      expect(layer.querySelector('[data-counter="time"]')!.textContent).toBe(frozenAt);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('ignores P with a modifier key, a repeat, or focus on an editable element', () => {
+    vi.useFakeTimers(fakeTimerConfig());
+    try {
+      const { layer, gameHandle, launcher } = setup({ game: createFakeGame(10) });
+      startPlaying(layer, launcher);
+
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'p', ctrlKey: true }));
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'p', metaKey: true }));
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'p', altKey: true }));
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'p', repeat: true }));
+      expect(gameHandle.pauseCalls).toBe(0);
+
+      const input = document.createElement('input');
+      document.body.append(input);
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'p', bubbles: true }));
+      expect(gameHandle.pauseCalls).toBe(0);
+      input.remove();
+
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'p' }));
+      expect(gameHandle.pauseCalls).toBe(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('running a round to 0 across a pause/resume still finishes exactly once', () => {
+    vi.useFakeTimers(fakeTimerConfig());
+    try {
+      const { layer, store, launcher } = setup({ game: createFakeGame(2) });
+      startPlaying(layer, launcher);
+
+      vi.advanceTimersByTime(1000);
+      (layer.querySelector('.minigame__button--pause') as HTMLButtonElement).click();
+      vi.advanceTimersByTime(5000); // a long pause must not count toward the round
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'p' })); // resume
+      vi.advanceTimersByTime(1000); // the remaining second elapses
+
+      expect(isHidden(layer, '.minigame__done')).toBe(false);
+      expect(store.recordRound).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe('minigame shell: done screen', () => {
   it('shows the Badge panel only when badgeEarned is true', async () => {
     const withBadge = setup({
       store: createFakeStore({
+        loadAll: vi.fn(async () => baseSnapshot({ bests: { 'bug-squash': 500 } })),
         recordRound: vi.fn(async () => ({
           tokensAwarded: 250,
           balance: 350,
@@ -267,18 +512,22 @@ describe('minigame shell: done screen', () => {
     });
     startPlaying(layer, launcher);
     gameHandle.setScoreAndStats(999, { squashed: 99 }); // deliberately not 77/10
+
     gameHandle.finishNow();
 
     await vi.waitFor(() =>
-      expect(layer.querySelector('.minigame__done-stat-value')?.textContent).toBeTruthy(),
+      expect(
+        layer.querySelector('[data-done-stat="tokens"] .minigame__done-stat-value')?.textContent,
+      ).toBeTruthy(),
     );
-    const tokensValue = layer.querySelectorAll('.minigame__done-stat-value')[1];
-    expect(tokensValue.textContent).toBe('+77');
+    const tokensValue = layer.querySelector('[data-done-stat="tokens"] .minigame__done-stat-value');
+    expect(tokensValue?.textContent).toBe('+77');
   });
 
-  it('shows the NEW BEST marker only when newBest is true', async () => {
+  it('shows the NEW BEST marker and the post-save best from loadAll, never a client-side rawBest', async () => {
     const { layer, gameHandle, launcher } = setup({
       store: createFakeStore({
+        loadAll: vi.fn(async () => baseSnapshot({ bests: { 'bug-squash': 300 } })),
         recordRound: vi.fn(async () => ({
           tokensAwarded: 10,
           balance: 110,
@@ -292,6 +541,9 @@ describe('minigame shell: done screen', () => {
     gameHandle.finishNow();
 
     await vi.waitFor(() => expect(isHidden(layer, '.minigame__done-newbest')).toBe(false));
+    expect(
+      layer.querySelector('[data-done-stat="best"] .minigame__done-stat-value')?.textContent,
+    ).toBe('300');
 
     const notBest = setup({
       store: createFakeStore({
@@ -308,10 +560,35 @@ describe('minigame shell: done screen', () => {
     notBest.gameHandle.setScoreAndStats(300, { squashed: 30 });
     notBest.gameHandle.finishNow();
 
-    await vi.waitFor(() => expect(notBest.store.recordRound).toHaveBeenCalledTimes(1));
+    await vi.waitFor(() => expect(isHidden(notBest.layer, '.minigame__done-saving')).toBe(true));
     expect(isHidden(notBest.layer, '.minigame__done-newbest')).toBe(true);
-    const bestValue = notBest.layer.querySelectorAll('.minigame__done-stat-value')[2];
-    expect(bestValue.textContent).toBe('900');
+    const bestValue = notBest.layer.querySelector(
+      '[data-done-stat="best"] .minigame__done-stat-value',
+    );
+    expect(bestValue?.textContent).toBe('900');
+  });
+
+  it('hides the PERSONAL BEST row (never falls back to 0) when the post-save loadAll fails', async () => {
+    const { layer, gameHandle, launcher } = setup({
+      store: createFakeStore({
+        loadAll: vi.fn(async () => {
+          throw new ProgressStoreError('not_authenticated');
+        }),
+        recordRound: vi.fn(async () => ({
+          tokensAwarded: 15,
+          balance: 115,
+          newBest: true,
+          badgeEarned: false,
+        })),
+      }),
+    });
+    startPlaying(layer, launcher);
+    gameHandle.setScoreAndStats(200, { squashed: 20 });
+    gameHandle.finishNow();
+
+    await vi.waitFor(() => expect(isHidden(layer, '[data-done-stat="tokens"]')).toBe(false));
+    expect(isHidden(layer, '[data-done-stat="best"]')).toBe(true);
+    expect(isHidden(layer, '.minigame__done-newbest')).toBe(true);
   });
 
   it('renders the score with no payout and a short message when recordRound rejects', async () => {
@@ -328,10 +605,11 @@ describe('minigame shell: done screen', () => {
     expect(() => gameHandle.finishNow()).not.toThrow();
 
     await vi.waitFor(() => expect(isHidden(layer, '.minigame__done-error')).toBe(false));
-    expect(layer.querySelector('.minigame__done-stat-value')?.textContent).toBe('60');
-    const rows = layer.querySelectorAll('.minigame__done-stat');
-    expect((rows[1] as HTMLElement).hidden).toBe(true); // tokens row: no payout shown
-    expect((rows[2] as HTMLElement).hidden).toBe(true); // personal best row: not shown either
+    expect(
+      layer.querySelector('[data-done-stat="score"] .minigame__done-stat-value')?.textContent,
+    ).toBe('60');
+    expect(isHidden(layer, '[data-done-stat="tokens"]')).toBe(true); // no payout shown
+    expect(isHidden(layer, '[data-done-stat="best"]')).toBe(true); // personal best not shown either
     expect((layer.querySelector('.minigame__done-error') as HTMLElement).textContent).toBeTruthy();
   });
 });

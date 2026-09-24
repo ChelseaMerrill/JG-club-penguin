@@ -1,9 +1,8 @@
-import { gameEvents, SPAWN_ROOM_ID, type RoomId } from '../contracts';
-import type { MinigameId } from '../contracts/game-events';
+import { gameEvents, SPAWN_ROOM_ID, type MinigameId, type RoomId } from '../contracts';
 import type { ProgressStore } from '../persistence/progress-store';
 import type { OverlayManager } from '../ui/hud/overlay-manager';
 import type { RoomTitle } from '../ui/hud/room-titles';
-import { createMinigameShell } from './minigame-shell';
+import { createMinigameShell, MINIGAME_OVERLAY_ID } from './minigame-shell';
 import type { Minigame, MinigameRegistry } from './minigame';
 
 export interface MinigameLauncherDeps {
@@ -24,10 +23,20 @@ export interface LaunchedMinigame {
 }
 
 export interface MinigameLauncher {
-  /** Launches `minigameId`'s shell (how-to-play -> play -> done) into
-   *  `deps.layer`, registered with `deps.overlays` so only one overlay is
-   *  open at a time. Throws if `minigameId` has no registered factory. */
+  /**
+   * Launches `minigameId`'s shell (how-to-play -> play -> done) into
+   * `deps.layer`, registered with `deps.overlays` so only one overlay is
+   * open at a time. Throws if `minigameId` has no registered factory.
+   *
+   * A Minigame overlay already open (`deps.overlays.current() ===
+   * MINIGAME_OVERLAY_ID`) makes this a no-op that returns the already-open
+   * instance instead of stacking a second shell on top of it — even if
+   * `minigameId` names a different Minigame than the one already running.
+   */
   launch(minigameId: MinigameId): LaunchedMinigame;
+  /** Unsubscribes `room:enter` and closes an open Minigame shell, matching
+   *  `Hud`/`OverlayManager`'s own `destroy()` handles. */
+  destroy(): void;
 }
 
 /**
@@ -41,11 +50,17 @@ export interface MinigameLauncher {
  */
 export function createMinigameLauncher(deps: MinigameLauncherDeps): MinigameLauncher {
   let currentRoomId: RoomId = SPAWN_ROOM_ID;
-  gameEvents.on('room:enter', ({ roomId }) => {
+  let currentLaunch: LaunchedMinigame | null = null;
+
+  const unsubscribeRoomEnter = gameEvents.on('room:enter', ({ roomId }) => {
     currentRoomId = roomId;
   });
 
   function launch(minigameId: MinigameId): LaunchedMinigame {
+    if (deps.overlays.current() === MINIGAME_OVERLAY_ID && currentLaunch) {
+      return currentLaunch;
+    }
+
     const factory = deps.registry[minigameId];
     if (!factory) {
       throw new Error(`No Minigame registered for "${minigameId}"`);
@@ -57,11 +72,17 @@ export function createMinigameLauncher(deps: MinigameLauncherDeps): MinigameLaun
       overlays: deps.overlays,
       store: deps.store,
       roomTitle: deps.resolveRoomTitle(currentRoomId).title,
-      game: minigame,
+      minigame,
     });
 
-    return { minigame };
+    currentLaunch = { minigame };
+    return currentLaunch;
   }
 
-  return { launch };
+  function destroy(): void {
+    unsubscribeRoomEnter();
+    deps.overlays.close(MINIGAME_OVERLAY_ID);
+  }
+
+  return { launch, destroy };
 }

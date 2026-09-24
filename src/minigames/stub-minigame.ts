@@ -1,4 +1,5 @@
-import type { MinigameContext, MinigameFactory } from './minigame';
+import { MINIGAME_RULES } from '../persistence/minigame-rules';
+import type { Minigame, MinigameContext } from './minigame';
 
 /** Test-only hooks `dev-minigame-hook.ts` drives from `window.__minigameTest`
  *  (`?minigame=bug-squash`). Not part of the `Minigame` interface. */
@@ -11,9 +12,10 @@ export interface StubMinigameTestHooks {
 }
 
 /** Default round length for the stub, before #38 gives Bug Squash a real
- *  60-second round. Short so manual and e2e runs don't wait out a full
- *  round. */
-const DEFAULT_DURATION_SEC = 10;
+ *  game: `MINIGAME_RULES['bug-squash'].durationSeconds`, the same round
+ *  length #27's payout rule already assumes. e2e and manual dev testing
+ *  skip waiting out the full round via `debugFinishNow()`/`finishNow()`. */
+const DEFAULT_DURATION_SEC = MINIGAME_RULES['bug-squash'].durationSeconds;
 const POINTS_PER_CLICK = 10;
 
 /**
@@ -26,7 +28,7 @@ const POINTS_PER_CLICK = 10;
  */
 export function createStubMinigame(
   options: { durationSec?: number } = {},
-): ReturnType<MinigameFactory<'bug-squash'>> & StubMinigameTestHooks {
+): Minigame<'bug-squash'> & StubMinigameTestHooks {
   const durationSec = options.durationSec ?? DEFAULT_DURATION_SEC;
 
   let score = 0;
@@ -45,7 +47,7 @@ export function createStubMinigame(
     durationSec,
     howToPlay: [
       'Click the button as many times as you can before time runs out.',
-      'Each click squashes one bug and adds 10 points.',
+      `Each click squashes one bug and adds ${POINTS_PER_CLICK} points.`,
     ],
     statLabels: { squashed: 'SQUASHED' },
 

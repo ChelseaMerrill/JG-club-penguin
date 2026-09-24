@@ -1,6 +1,7 @@
-import type { MinigameId } from '../contracts/game-events';
+import type { MinigameId } from '../contracts';
+import { MINIGAME_RULES } from '../persistence/minigame-rules';
 import type { Hud } from '../ui/hud/hud';
-import type { MinigameLauncher } from './minigame-launcher';
+import type { LaunchedMinigame, MinigameLauncher } from './minigame-launcher';
 import type { MinigameTestHandle } from './minigame-test-handle';
 import type { StubMinigameTestHooks } from './stub-minigame';
 
@@ -16,6 +17,11 @@ function hasStubHooks(value: unknown): value is StubMinigameTestHooks {
     typeof (value as Partial<StubMinigameTestHooks>).debugSetScore === 'function' &&
     typeof (value as Partial<StubMinigameTestHooks>).debugFinishNow === 'function'
   );
+}
+
+/** True when `value` is one of `MINIGAME_RULES`'s registered ids. */
+function isMinigameId(value: string): value is MinigameId {
+  return value in MINIGAME_RULES;
 }
 
 /**
@@ -36,14 +42,14 @@ export function initDevMinigameHook(hud: Hud, launcher: MinigameLauncher): boole
   if (!e2eHooksEnabled) return false;
 
   const params = new URLSearchParams(window.location.search);
-  const minigameId = params.get('minigame') as MinigameId | null;
-  if (!minigameId) return false;
-
+  const rawId = params.get('minigame');
   // An unrecognized or not-yet-registered id (e.g. `?minigame=pancake-flip`
   // before #39 lands) is a no-op rather than an uncaught throw into the page.
-  let launched: ReturnType<MinigameLauncher['launch']>;
+  if (!rawId || !isMinigameId(rawId)) return false;
+
+  let launched: LaunchedMinigame;
   try {
-    launched = launcher.launch(minigameId);
+    launched = launcher.launch(rawId);
   } catch {
     return false;
   }

@@ -1,4 +1,4 @@
-import type { MinigameId, MinigameStatsMap } from '../contracts/game-events';
+import type { MinigameId, MinigameStatsMap } from '../contracts';
 
 /**
  * Given to a `Minigame` by the shell when it calls `start`. The game reports
@@ -52,9 +52,9 @@ export interface Minigame<K extends MinigameId = MinigameId> {
   pause(): void;
   /** Called when the shell's PAUSE button or the P key resumes the round. */
   resume(): void;
-  /** Called once, when the round ends (timer reached 0, the game called
-   *  `context.finish()`, or the Player quit). Must return synchronously;
-   *  a quit discards this return value without recording it. */
+  /** Called once per started round, when the round ends (timer reached 0,
+   *  the game called `context.finish()`, or the Player quit). Must return
+   *  synchronously; a quit discards this return value without recording it. */
   end(): { score: number; stats: MinigameStatsMap[K] };
 }
 

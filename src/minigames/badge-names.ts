@@ -1,4 +1,4 @@
-import type { BadgeId } from '../contracts/game-events';
+import type { BadgeId } from '../contracts';
 
 /**
  * Display names for the done screen's "Badge unlocked: <name>" panel, taken
