@@ -20,7 +20,7 @@ for cmd in docker openssl; do
 done
 
 # Evidence policy: captured output cited as PASS evidence is saved under
-# test-results/ and committed. Tee everything (stdout and stderr) to that
+# test-results/ (gitignored, local only). Tee everything (stdout and stderr) to that
 # file as well as the terminal, from here to the end of the script.
 OUTPUT_DIR="$REPO_ROOT/test-results/27-saved-progress-local"
 mkdir -p "$OUTPUT_DIR"

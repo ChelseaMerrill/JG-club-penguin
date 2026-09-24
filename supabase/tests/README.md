@@ -20,7 +20,8 @@ exits non-zero on any failure.
 
 The complete output (every command's stdout and stderr) is teed to
 `test-results/27-saved-progress-local/output.txt`, relative to the repo
-root. That file is the evidence for a passing local run and is committed.
+root. That file is the evidence for a passing local run; it is gitignored,
+not committed.
 
 ## Real Supabase (gate H2)
 
