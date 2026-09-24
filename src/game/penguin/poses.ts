@@ -1,11 +1,16 @@
-import type { IdleEmote } from '../../contracts';
+import { IDLE_EMOTES, type IdleEmote } from '../../contracts';
+import { DESIGN_TO_VIEWBOX_SCALE } from './design-scale';
 
 /**
- * The five idle emotes from `IdleEmote`, plus `WALK` for #14's movement.
+ * The five idle animations from `IdleEmote`, plus `WALK` for #14's movement.
  * `WALK` has no design keyframes (the Creator never walks); its two frames
  * are this renderer's own invention, in the spirit of the idle poses.
  */
 export type PenguinAnim = IdleEmote | 'WALK';
+
+/** Every `PenguinAnim` value, the single source `texture.ts` and callers use
+ * to enumerate the full set (#31 review fix 9). */
+export const PENGUIN_ANIMS: readonly PenguinAnim[] = [...IDLE_EMOTES, 'WALK'];
 
 /**
  * A single static frame to render: one extreme of `anim`'s CSS keyframe
@@ -56,6 +61,17 @@ export interface PenguinFramePose {
   showHaha: boolean;
 }
 
+/**
+ * The design's `@keyframes` lift each idle animation's body by a CSS
+ * `translateY` in px (`design/Penguin Creator.dc.html`'s `<style>`:
+ * `waddle`'s 25%/75% extremes, `dance`'s 50% extreme, `laugh`'s 30%/60%
+ * extremes). Converted to this renderer's viewBox units via
+ * `DESIGN_TO_VIEWBOX_SCALE` (#31 review fix 2).
+ */
+const WADDLE_LIFT = -6 / DESIGN_TO_VIEWBOX_SCALE; // -6px -> ~-2.12
+const DANCE_LIFT = -14 / DESIGN_TO_VIEWBOX_SCALE; // -14px -> ~-4.94
+const LAUGH_LIFT = -4 / DESIGN_TO_VIEWBOX_SCALE; // -4px -> ~-1.41
+
 const NEUTRAL_FRAME_POSE: PenguinFramePose = {
   bodyRotateDeg: 0,
   bodyTranslateY: 0,
@@ -82,7 +98,7 @@ const NEUTRAL_FRAME_POSE: PenguinFramePose = {
  *   (the design offsets the right arm's `wave` cycle by half its duration).
  * - LAUGH: the body's `laugh` keyframe extremes (neutral, then −3°/−4px);
  *   both frames force sleepy eyes and the "HA HA" text, as the design does
- *   for the whole LAUGH emote regardless of frame.
+ *   for the whole LAUGH animation regardless of frame.
  * - SIT: one static frame with the seat shown, no arm or body motion.
  * - WALK: not in the design; a small alternating tilt with the trailing
  *   foot lifted, to read as a step.
@@ -95,7 +111,7 @@ export function resolvePenguinFramePose(pose: PenguinPose): PenguinFramePose {
     case 'WADDLE':
       return frame === 0
         ? { ...NEUTRAL_FRAME_POSE, bodyRotateDeg: -5 }
-        : { ...NEUTRAL_FRAME_POSE, bodyRotateDeg: 4, bodyTranslateY: -6 };
+        : { ...NEUTRAL_FRAME_POSE, bodyRotateDeg: 4, bodyTranslateY: WADDLE_LIFT };
     case 'WAVE':
       return frame === 0
         ? { ...NEUTRAL_FRAME_POSE, rightArmRotateDeg: 0 }
@@ -103,14 +119,19 @@ export function resolvePenguinFramePose(pose: PenguinPose): PenguinFramePose {
     case 'DANCE':
       return frame === 0
         ? { ...NEUTRAL_FRAME_POSE, bodyRotateDeg: -8, rightArmRotateDeg: -40 }
-        : { ...NEUTRAL_FRAME_POSE, bodyRotateDeg: 8, bodyTranslateY: -14, leftArmRotateDeg: -40 };
+        : {
+            ...NEUTRAL_FRAME_POSE,
+            bodyRotateDeg: 8,
+            bodyTranslateY: DANCE_LIFT,
+            leftArmRotateDeg: -40,
+          };
     case 'LAUGH':
       return frame === 0
         ? { ...NEUTRAL_FRAME_POSE, forceSleepyEyes: true, showHaha: true }
         : {
             ...NEUTRAL_FRAME_POSE,
             bodyRotateDeg: -3,
-            bodyTranslateY: -4,
+            bodyTranslateY: LAUGH_LIFT,
             forceSleepyEyes: true,
             showHaha: true,
           };

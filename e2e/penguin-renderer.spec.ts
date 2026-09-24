@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
-import { DEFAULT_LOOK, EYES, HATS, IDLE_EMOTES, PATTERNS } from '../src/contracts';
-import { PENGUIN_FRAMES, type PenguinAnim } from '../src/game/penguin/poses';
+import { DEFAULT_LOOK, EYES, HATS, PATTERNS } from '../src/contracts';
+import { PENGUIN_ANIMS, PENGUIN_FRAMES } from '../src/game/penguin/poses';
 import { renderPenguinSvg } from '../src/game/penguin/render-svg';
 
 // Renders `renderPenguinSvg` in this Node test process (not the browser under
@@ -12,29 +12,38 @@ interface GridRow {
   svg: string;
 }
 
-const ALL_ANIMS: readonly PenguinAnim[] = [...IDLE_EMOTES, 'WALK'];
-
 function buildRows(): GridRow[] {
   const rows: GridRow[] = [];
+  // Every cell gets its own `idPrefix` (#31 review fix 7), so the many
+  // inline SVGs on this one page never clash on the belly `clipPath` id.
+  const nextIdPrefix = (): string => `cell-${rows.length}`;
 
   for (const hat of HATS) {
-    rows.push({ label: `HAT · ${hat}`, svg: renderPenguinSvg({ ...DEFAULT_LOOK, hat }) });
+    rows.push({
+      label: `HAT · ${hat}`,
+      svg: renderPenguinSvg({ ...DEFAULT_LOOK, hat }, undefined, { idPrefix: nextIdPrefix() }),
+    });
   }
   for (const pattern of PATTERNS) {
     rows.push({
       label: `PATTERN · ${pattern}`,
-      svg: renderPenguinSvg({ ...DEFAULT_LOOK, pattern }),
+      svg: renderPenguinSvg({ ...DEFAULT_LOOK, pattern }, undefined, {
+        idPrefix: nextIdPrefix(),
+      }),
     });
   }
   for (const eyes of EYES) {
-    rows.push({ label: `EYES · ${eyes}`, svg: renderPenguinSvg({ ...DEFAULT_LOOK, eyes }) });
+    rows.push({
+      label: `EYES · ${eyes}`,
+      svg: renderPenguinSvg({ ...DEFAULT_LOOK, eyes }, undefined, { idPrefix: nextIdPrefix() }),
+    });
   }
-  for (const anim of ALL_ANIMS) {
+  for (const anim of PENGUIN_ANIMS) {
     const frameCount = PENGUIN_FRAMES[anim];
     for (let frame = 0; frame < frameCount; frame++) {
       rows.push({
         label: `ANIM · ${anim} · frame ${frame}`,
-        svg: renderPenguinSvg({ ...DEFAULT_LOOK, emote: 'WADDLE' }, { anim, frame }),
+        svg: renderPenguinSvg(DEFAULT_LOOK, { anim, frame }, { idPrefix: nextIdPrefix() }),
       });
     }
   }
@@ -68,6 +77,13 @@ ${rowsHtml}
 }
 
 test('penguin-renderer-grid', async ({ page }) => {
+  // Fail on any uncaught page error or console error, like e2e/smoke.spec.ts.
+  const errors: string[] = [];
+  page.on('pageerror', (err) => errors.push(err.message));
+  page.on('console', (msg) => {
+    if (msg.type() === 'error') errors.push(msg.text());
+  });
+
   const rows = buildRows();
 
   await page.setContent(buildHtml(rows));
@@ -78,4 +94,6 @@ test('penguin-renderer-grid', async ({ page }) => {
     path: 'test-results/penguin-renderer-grid/screenshot.png',
     fullPage: true,
   });
+
+  expect(errors).toEqual([]);
 });

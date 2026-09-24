@@ -1,4 +1,5 @@
 import type { Eyes, Hat, Pattern, PenguinLook } from '../../contracts';
+import { DESIGN_TO_VIEWBOX_SCALE } from './design-scale';
 import { penguinLookHash } from './look-hash';
 import { type PenguinPose, resolvePenguinFramePose } from './poses';
 
@@ -30,6 +31,18 @@ export const PENGUIN_FRAME_HEIGHT = PENGUIN_VIEWBOX_HEIGHT + PENGUIN_FRAME_PADDI
  */
 export const PENGUIN_ORIGIN = { x: 60, y: 120 };
 
+/**
+ * The design's own body-rotation pivot: `design/Penguin Creator.dc.html`
+ * line 37's `transform-origin: 50% 100%` on the figure's animated wrapper
+ * div. 50% of its width is this viewBox's horizontal centre (`60`); 100% of
+ * its height is this viewBox's bottom edge (`130`, `PENGUIN_VIEWBOX_HEIGHT`)
+ * — a percentage-based origin needs no `DESIGN_TO_VIEWBOX_SCALE` conversion,
+ * since it is already relative to the box's own size in either coordinate
+ * system (#31 review fix 2). Distinct from `PENGUIN_ORIGIN`, which anchors
+ * the *sprite* at its feet for #14/#28, not the body's rotation.
+ */
+const BODY_ROTATE_ORIGIN = { x: PENGUIN_VIEWBOX_WIDTH / 2, y: PENGUIN_VIEWBOX_HEIGHT };
+
 const STROKE = '#0C4B5F';
 const EYE_WHITE = '#F4F4F4';
 const EYE_PUPIL = '#161719';
@@ -38,6 +51,48 @@ const SEAT_FILL = '#3a4046';
 const SNORKEL_MASK = '#F2C12E';
 const SNORKEL_LENS = '#BFE3F0';
 const BAND_TEXT = '#161719';
+
+/**
+ * The SIT seat, converted from the design's own CSS box (#31 review fix 1):
+ * `design/Penguin Creator.dc.html` line 67's
+ * `left:50%; bottom:40px; width:200px; height:40px; margin-left:-100px;
+ * border:3px solid; border-radius:6px` inside its 520x470 Creator canvas
+ * (line 34, `display:grid; place-items:center`), which centres the figure's
+ * 340px-wide, `130 * DESIGN_TO_VIEWBOX_SCALE`px-tall (~368.33px) box inside
+ * it — a `(520-340)/2 = 90`px horizontal gap and a
+ * `(470-368.33)/2 ≈ 50.83`px vertical gap on every side.
+ *
+ * The seat sets `left`/`bottom` explicitly (not `auto`), so it is positioned
+ * from the *canvas's* edges regardless of `place-items`, not centred on the
+ * figure's own grid cell:
+ * - width/height/stroke/radius are lengths, so dividing by
+ *   `DESIGN_TO_VIEWBOX_SCALE` converts them directly.
+ * - x: the seat is centred on the same vertical centreline as the figure
+ *   (both are centred on the canvas), which is this viewBox's `x = 60`
+ *   (`PENGUIN_VIEWBOX_WIDTH / 2`); so `x = 60 - width/2`.
+ * - y: the seat's top edge sits
+ *   `470 - 40(bottom) - 40(height) = 390`px from the canvas top. Relative to
+ *   the figure's own top edge (`50.83`px from the canvas top, above), that's
+ *   `390 - 50.83 ≈ 339.17`px into the figure's own box, which converts to
+ *   viewBox units by the same scale.
+ */
+const DESIGN_SEAT_WIDTH = 200;
+const DESIGN_SEAT_HEIGHT = 40;
+const DESIGN_SEAT_BOTTOM = 40;
+const DESIGN_SEAT_STROKE = 3;
+const DESIGN_SEAT_RADIUS = 6;
+const DESIGN_CANVAS_HEIGHT = 470;
+const DESIGN_FIGURE_HEIGHT = PENGUIN_VIEWBOX_HEIGHT * DESIGN_TO_VIEWBOX_SCALE;
+const DESIGN_FIGURE_TOP_GAP = (DESIGN_CANVAS_HEIGHT - DESIGN_FIGURE_HEIGHT) / 2;
+const DESIGN_SEAT_TOP_FROM_CANVAS_TOP =
+  DESIGN_CANVAS_HEIGHT - DESIGN_SEAT_BOTTOM - DESIGN_SEAT_HEIGHT;
+
+const SEAT_WIDTH = DESIGN_SEAT_WIDTH / DESIGN_TO_VIEWBOX_SCALE; // ~70.6
+const SEAT_HEIGHT = DESIGN_SEAT_HEIGHT / DESIGN_TO_VIEWBOX_SCALE; // ~14.1
+const SEAT_STROKE_WIDTH = DESIGN_SEAT_STROKE / DESIGN_TO_VIEWBOX_SCALE; // ~1.06
+const SEAT_RADIUS = DESIGN_SEAT_RADIUS / DESIGN_TO_VIEWBOX_SCALE; // ~2.12
+const SEAT_X = PENGUIN_VIEWBOX_WIDTH / 2 - SEAT_WIDTH / 2; // ~24.7
+const SEAT_Y = (DESIGN_SEAT_TOP_FROM_CANVAS_TOP - DESIGN_FIGURE_TOP_GAP) / DESIGN_TO_VIEWBOX_SCALE; // ~119.7
 
 function renderPattern(pattern: Pattern, bodyColor: string): string {
   switch (pattern) {
@@ -97,15 +152,23 @@ function renderHat(hat: Hat, capColor: string): string {
  * preview, #35) alike.
  *
  * `look.name` never appears in the output (#31 D2).
+ *
+ * `options.idPrefix`, when given, replaces the hash+pose suffix in the belly
+ * `clipPath` id (#31 review fix 7), so a caller rendering many instances
+ * inline on one DOM page (e.g. the e2e grid) can guarantee unique ids itself
+ * without relying on every cell happening to differ by look or pose.
  */
 export function renderPenguinSvg(
   look: PenguinLook,
   pose: PenguinPose = { anim: look.emote, frame: 0 },
+  options: { idPrefix?: string } = {},
 ): string {
   const framePose = resolvePenguinFramePose(pose);
-  const clipId = `penguin-belly-${penguinLookHash(look)}-${pose.anim}-${pose.frame}`;
+  const clipId = options.idPrefix
+    ? `penguin-belly-${options.idPrefix}`
+    : `penguin-belly-${penguinLookHash(look)}-${pose.anim}-${pose.frame}`;
 
-  const bodyTransform = `rotate(${framePose.bodyRotateDeg} ${PENGUIN_ORIGIN.x} ${PENGUIN_ORIGIN.y}) translate(0 ${framePose.bodyTranslateY})`;
+  const bodyTransform = `rotate(${framePose.bodyRotateDeg} ${BODY_ROTATE_ORIGIN.x} ${BODY_ROTATE_ORIGIN.y}) translate(0 ${framePose.bodyTranslateY})`;
   const leftFootAttr = framePose.leftFootLift
     ? ` transform="translate(0 ${framePose.leftFootLift})"`
     : '';
@@ -113,8 +176,12 @@ export function renderPenguinSvg(
     ? ` transform="translate(0 ${framePose.rightFootLift})"`
     : '';
 
+  // Painted after (outside) the figure's rotate/translate group, as a
+  // sibling rather than a child, matching the design (`sc-if sitting` at
+  // line 67 is a sibling of the animated figure div at line 37) (#31 review
+  // fix 1).
   const seat = framePose.sitting
-    ? `<rect x="-40" y="128" width="200" height="40" rx="6" fill="${SEAT_FILL}" stroke="${STROKE}" stroke-width="3"></rect>`
+    ? `<rect x="${SEAT_X}" y="${SEAT_Y}" width="${SEAT_WIDTH}" height="${SEAT_HEIGHT}" rx="${SEAT_RADIUS}" fill="${SEAT_FILL}" stroke="${STROKE}" stroke-width="${SEAT_STROKE_WIDTH}"></rect>`
     : '';
 
   const haha = framePose.showHaha
@@ -124,7 +191,6 @@ export function renderPenguinSvg(
   const figure = [
     `<g transform="${bodyTransform}">`,
     `<defs><clipPath id="${clipId}"><path d="M60 40 C46 40 38 62 38 84 C38 102 48 112 60 112 C72 112 82 102 82 84 C82 62 74 40 60 40 Z"></path></clipPath></defs>`,
-    seat,
     `<path d="M60 14 C30 14 22 50 22 82 C22 106 40 118 60 118 C80 118 98 106 98 82 C98 50 90 14 60 14 Z" fill="${look.body}" stroke="${STROKE}" stroke-width="6"></path>`,
     `<path d="M60 40 C46 40 38 62 38 84 C38 102 48 112 60 112 C72 112 82 102 82 84 C82 62 74 40 60 40 Z" fill="${look.belly}"></path>`,
     `<g clip-path="url(#${clipId})">${renderPattern(look.pattern, look.body)}</g>`,
@@ -137,6 +203,7 @@ export function renderPenguinSvg(
     renderHat(look.hat, look.cap),
     haha,
     `</g>`,
+    seat,
   ].join('');
 
   const minX = -PENGUIN_FRAME_PADDING;

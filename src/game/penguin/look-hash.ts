@@ -14,10 +14,15 @@ function fnv1a(input: string): string {
 }
 
 /**
- * Hashes everything about a look that changes its rendered appearance, but
- * never `name`, so a renamed Penguin keeps sharing its textures with every
- * other Penguin that looks the same (#31 D6). Colours are lowercased first,
- * since `#3a4046` and `#3A4046` render identically.
+ * Hashes everything about a look that changes its *rendered textures*, but
+ * never `name` or `emote` (#31 review fix 3): every anim is registered per
+ * look regardless of which one is current (`ensurePenguinTextures` loops
+ * over every `PENGUIN_ANIMS` value), so two looks that differ only in
+ * `emote` already share the identical set of textures, and hashing `emote`
+ * in would only fragment that sharing pointlessly. A renamed Penguin, for
+ * the same reason `name` is excluded, keeps sharing its textures with every
+ * other Penguin that looks the same. Colours are lowercased first, since
+ * `#3a4046` and `#3A4046` render identically.
  */
 export function penguinLookHash(look: PenguinLook): string {
   const normalized = {
@@ -29,7 +34,6 @@ export function penguinLookHash(look: PenguinLook): string {
     hat: look.hat,
     pattern: look.pattern,
     eyes: look.eyes,
-    emote: look.emote,
   };
   return fnv1a(JSON.stringify(normalized));
 }
