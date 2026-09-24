@@ -94,6 +94,7 @@ body {
   border: 1px solid rgba(0, 0, 0, 0.2);
 }
 
+.player-badge__edit,
 .player-badge__signout {
   padding: 0.25rem 0.5rem;
   border: none;

@@ -41,7 +41,7 @@ describe('loadPlayer', () => {
     });
 
     expect(result).toEqual({
-      player: { id: 'user-1', displayName: 'Ada Lovelace', penguinColor: '#00bdff' },
+      player: { id: 'user-1', displayName: 'Ada Lovelace', penguinColor: '#00bdff', penguin: null },
       error: null,
     });
   });
@@ -59,6 +59,7 @@ describe('loadPlayer', () => {
       id: 'user-1',
       displayName: 'ada@example.com',
       penguinColor: '#123456',
+      penguin: null,
     });
   });
 
@@ -84,7 +85,7 @@ describe('ensurePlayer', () => {
       { onConflict: 'id', ignoreDuplicates: true },
     );
     expect(result).toEqual({
-      player: { id: 'user-1', displayName: 'ada@example.com', penguinColor: '#00bdff' },
+      player: { id: 'user-1', displayName: 'ada@example.com', penguinColor: '#00bdff', penguin: null },
       error: null,
     });
   });
@@ -102,7 +103,7 @@ describe('ensurePlayer', () => {
 describe('bindPlayer', () => {
   it('sets the player on the registry under the player key', () => {
     const registry: PlayerRegistry = { set: vi.fn(), remove: vi.fn() };
-    const player = { id: 'user-1', displayName: 'Ada Lovelace', penguinColor: '#00bdff' };
+    const player = { id: 'user-1', displayName: 'Ada Lovelace', penguinColor: '#00bdff', penguin: null };
 
     bindPlayer(registry, player);
 

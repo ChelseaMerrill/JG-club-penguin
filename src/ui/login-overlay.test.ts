@@ -7,8 +7,9 @@ function setup() {
   document.body.append(root);
   const onSignIn = vi.fn();
   const onSignOut = vi.fn();
-  const overlay = createLoginOverlay(root, { onSignIn, onSignOut });
-  return { root, overlay, onSignIn, onSignOut };
+  const onEditPenguin = vi.fn();
+  const overlay = createLoginOverlay(root, { onSignIn, onSignOut, onEditPenguin });
+  return { root, overlay, onSignIn, onSignOut, onEditPenguin };
 }
 
 beforeEach(() => {
@@ -46,7 +47,7 @@ describe('createLoginOverlay', () => {
   it('showSignedIn shows the badge with name, swatch color and hides the card', () => {
     const { root, overlay } = setup();
 
-    overlay.showSignedIn({ id: 'user-1', displayName: 'Ada Lovelace', penguinColor: '#00bdff' });
+    overlay.showSignedIn({ id: 'user-1', displayName: 'Ada Lovelace', penguinColor: '#00bdff', penguin: null });
 
     const badge = root.querySelector('.player-badge') as HTMLElement;
     const card = root.querySelector('.login-card') as HTMLElement;
@@ -60,16 +61,47 @@ describe('createLoginOverlay', () => {
 
   it('clicking sign out calls onSignOut', () => {
     const { root, overlay, onSignOut } = setup();
-    overlay.showSignedIn({ id: 'user-1', displayName: 'Ada Lovelace', penguinColor: '#00bdff' });
+    overlay.showSignedIn({ id: 'user-1', displayName: 'Ada Lovelace', penguinColor: '#00bdff', penguin: null });
 
     (root.querySelector('.player-badge__signout') as HTMLButtonElement).click();
 
     expect(onSignOut).toHaveBeenCalledTimes(1);
   });
 
+  it('shows the Penguin name instead of the Google name once a Penguin is saved', () => {
+    const { root, overlay } = setup();
+
+    overlay.showSignedIn({
+      id: 'user-1',
+      displayName: 'Ada Lovelace',
+      penguinColor: '#3a4046',
+      penguin: {
+        name: 'Waddles',
+        body: '#3a4046',
+        cap: '#00bdff',
+        beak: '#00bdff',
+        feet: '#00bdff',
+        hat: 'NONE',
+        pattern: 'PLAIN',
+        eyes: 'ROUND',
+      },
+    });
+
+    expect(root.querySelector('.player-badge__name')?.textContent).toBe('Waddles');
+  });
+
+  it('clicking Edit Penguin calls onEditPenguin', () => {
+    const { root, overlay, onEditPenguin } = setup();
+    overlay.showSignedIn({ id: 'user-1', displayName: 'Ada Lovelace', penguinColor: '#00bdff', penguin: null });
+
+    (root.querySelector('.player-badge__edit') as HTMLButtonElement).click();
+
+    expect(onEditPenguin).toHaveBeenCalledTimes(1);
+  });
+
   it('showSignedOut shows the card again and hides the badge', () => {
     const { root, overlay } = setup();
-    overlay.showSignedIn({ id: 'user-1', displayName: 'Ada Lovelace', penguinColor: '#00bdff' });
+    overlay.showSignedIn({ id: 'user-1', displayName: 'Ada Lovelace', penguinColor: '#00bdff', penguin: null });
 
     overlay.showSignedOut();
 
@@ -121,7 +153,7 @@ describe('createLoginOverlay', () => {
     const { root, overlay } = setup();
     overlay.showError('Unable to load player');
 
-    overlay.showSignedIn({ id: 'user-1', displayName: 'Ada Lovelace', penguinColor: '#00bdff' });
+    overlay.showSignedIn({ id: 'user-1', displayName: 'Ada Lovelace', penguinColor: '#00bdff', penguin: null });
 
     expect(root.querySelector('.login-card__error')?.textContent).toBe('');
     expect((root.querySelector('.login-card__error-signout') as HTMLElement).hidden).toBe(true);

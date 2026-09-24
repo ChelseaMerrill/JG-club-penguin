@@ -96,6 +96,7 @@ describe('startAuth', () => {
       id: 'user-1',
       displayName: 'Ada Lovelace',
       penguinColor: '#ff0000',
+      penguin: null,
     });
   });
 
@@ -120,6 +121,7 @@ describe('startAuth', () => {
       id: 'user-1',
       displayName: 'Ada Lovelace',
       penguinColor: '#00bdff',
+      penguin: null,
     });
   });
 
@@ -244,6 +246,7 @@ describe('startAuth', () => {
       id: 'user-b',
       displayName: 'Player B',
       penguinColor: '#222222',
+      penguin: null,
     });
   });
 
@@ -269,6 +272,7 @@ describe('startAuth', () => {
       id: 'user-1',
       displayName: 'Ada Lovelace',
       penguinColor: '#00bdff',
+      penguin: null,
     });
   });
 

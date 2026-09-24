@@ -3,6 +3,7 @@ import type { Player } from '../auth/player';
 export interface LoginOverlayCallbacks {
   onSignIn: () => void;
   onSignOut: () => void;
+  onEditPenguin: () => void;
 }
 
 export interface LoginOverlay {
@@ -65,7 +66,13 @@ export function createLoginOverlay(
   signOutButton.textContent = 'Sign out';
   signOutButton.addEventListener('click', () => callbacks.onSignOut());
 
-  badge.append(nameEl, swatchEl, signOutButton);
+  const editButton = document.createElement('button');
+  editButton.type = 'button';
+  editButton.className = 'player-badge__edit';
+  editButton.textContent = 'Edit Penguin';
+  editButton.addEventListener('click', () => callbacks.onEditPenguin());
+
+  badge.append(nameEl, swatchEl, editButton, signOutButton);
 
   root.append(card, badge);
 
@@ -77,7 +84,7 @@ export function createLoginOverlay(
       badge.hidden = true;
     },
     showSignedIn(player: Player) {
-      nameEl.textContent = player.displayName;
+      nameEl.textContent = player.penguin?.name ?? player.displayName;
       swatchEl.style.backgroundColor = player.penguinColor;
       swatchEl.dataset.penguinColor = player.penguinColor;
       errorEl.textContent = '';

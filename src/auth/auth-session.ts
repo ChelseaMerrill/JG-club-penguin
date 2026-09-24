@@ -174,6 +174,10 @@ export function toAuthClient(client: SupabaseClient): AuthClient {
       const table = client.from('players');
       return {
         upsert: (values, options) => table.upsert(values, options),
+        update: (values) => {
+          const updated = table.update(values);
+          return { eq: (column, value) => updated.eq(column, value) };
+        },
         select: (columns) => {
           const selected = table.select(columns);
           return {

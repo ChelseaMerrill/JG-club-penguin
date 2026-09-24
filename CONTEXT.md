@@ -6,7 +6,7 @@
 The persistent identity behind a person playing the game, backed by their Google account (Google SSO). A Player is who you *are* across sessions — not what you look like, and not a single live connection.
 
 **Penguin**
-A Player's in-world avatar. Has a customizable color. One Player has exactly one Penguin. Distinguish from Player: "Player" is the identity, "Penguin" is its visible representation in the World.
+A Player's in-world avatar, made in the Penguin Creator on first sign-in: a name, colors (body, hat, beak, feet), hat, belly pattern, and eyes. One Player has exactly one Penguin — there is no creating a second one — but the Player can edit it at any time. Distinguish from Player: "Player" is the identity, "Penguin" is its visible representation in the World.
 
 **World**
 The full multi-room office environment, modeled from the real JG office blueprint. Composed of one or more Rooms.
