@@ -51,6 +51,18 @@ npm run dev            # http://localhost:5173
 
 CI runs typecheck, lint, format check, unit tests, and build on every pull request.
 
+## Supabase and Vercel setup
+
+The client reads two env vars, `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` (see `.env.example`). Only the Supabase anon (public) key ever goes to the client; never put the service-role key in `.env` or in Vercel.
+
+A human needs to do the following once, outside the app:
+
+1. **Apply the `players` migration.** Paste `supabase/migrations/20260924000000_players.sql` into the Supabase Dashboard's SQL editor and run it. It's idempotent-safe to rerun.
+2. **Set the Vercel env vars.** In the Vercel project settings, set `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` for both the Production and Preview environments.
+3. **Configure Supabase Auth → URL Configuration → Redirect URLs.** Add `http://localhost:5173/` (dev) and `http://localhost:4173/` (preview build), plus the Vercel production URL and any preview URLs used for the deployed smoke test, each with a trailing slash.
+4. **Disable the Email provider.** In Supabase Dashboard → Authentication → Providers, turn off Email so Google is the only sign-in path.
+5. **Confirm the Google OAuth consent screen's audience** allows every demo attendee's Google account (an internal Workspace audience, or "External / In production", not a short test-user list).
+
 ## Team
 
 Built by the JG hackathon team.
