@@ -78,8 +78,8 @@ export function createLoginOverlay(
     },
     showSignedIn(player: Player) {
       nameEl.textContent = player.displayName;
-      swatchEl.style.backgroundColor = player.penguinColor;
-      swatchEl.dataset.penguinColor = player.penguinColor;
+      swatchEl.style.backgroundColor = player.look.body;
+      swatchEl.dataset.penguinColor = player.look.body;
       errorEl.textContent = '';
       errorSignOutButton.hidden = true;
       card.hidden = true;
