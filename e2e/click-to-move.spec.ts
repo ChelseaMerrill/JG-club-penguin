@@ -73,6 +73,12 @@ async function clickStagePoint(page: Page, point: { x: number; y: number }): Pro
 }
 
 test('click-to-move', async ({ page }) => {
+  // This test walks the Penguin through many real, animated 250ms-per-tile
+  // moves (far tile, off-grid snap, a re-route, a facing check, the NPC, the
+  // door, plus two Scene restarts) end to end, well past Playwright's default
+  // 30s per-test budget.
+  test.setTimeout(120_000);
+
   const errors = collectErrors(page);
 
   await page.goto('/');
@@ -80,7 +86,11 @@ test('click-to-move', async ({ page }) => {
   await expect(canvas).toBeVisible();
   await hideLandingPage(page);
 
-  await expect.poll(async () => (await debugInfo(page))?.localPenguin).not.toBeUndefined();
+  // A generous timeout: the very first poll also waits out Phaser/WebGL's
+  // cold-start init, which can be slow on a freshly booted webServer.
+  await expect
+    .poll(async () => (await debugInfo(page))?.localPenguin, { timeout: LONG_WALK_TIMEOUT })
+    .not.toBeUndefined();
 
   const origin = townCenter.grid.origin;
   const spawnTile = townCenter.spawnTile;
