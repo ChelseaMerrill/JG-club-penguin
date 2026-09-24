@@ -14,8 +14,8 @@ GRANT
 == applying #9 migration (players) ==
 CREATE TABLE
 ALTER TABLE
-DROP POLICY
 psql:<stdin>:15: NOTICE:  policy "players select own row" for relation "public.players" does not exist, skipping
+DROP POLICY
 CREATE POLICY
 psql:<stdin>:21: NOTICE:  policy "players insert own row" for relation "public.players" does not exist, skipping
 DROP POLICY
@@ -72,32 +72,32 @@ ALTER TABLE
 ALTER TABLE
 ALTER TABLE
 ALTER TABLE
-DROP POLICY
 psql:<stdin>:193: NOTICE:  policy "player_badges select own rows" for relation "public.player_badges" does not exist, skipping
+DROP POLICY
 CREATE POLICY
 psql:<stdin>:198: NOTICE:  policy "minigame_bests select own rows" for relation "public.minigame_bests" does not exist, skipping
 DROP POLICY
 CREATE POLICY
-DROP POLICY
 psql:<stdin>:203: NOTICE:  policy "minigame_rounds select own rows" for relation "public.minigame_rounds" does not exist, skipping
+DROP POLICY
 CREATE POLICY
 DROP POLICY
 psql:<stdin>:208: NOTICE:  policy "player_items select own rows" for relation "public.player_items" does not exist, skipping
 CREATE POLICY
+DROP POLICY
 psql:<stdin>:214: NOTICE:  policy "shop_items select signed in" for relation "public.shop_items" does not exist, skipping
-DROP POLICY
 CREATE POLICY
+DROP POLICY
 psql:<stdin>:220: NOTICE:  policy "igloo_slots select own rows" for relation "public.igloo_slots" does not exist, skipping
-DROP POLICY
 CREATE POLICY
-DROP POLICY
 psql:<stdin>:225: NOTICE:  policy "igloo_slots insert own rows" for relation "public.igloo_slots" does not exist, skipping
+DROP POLICY
 CREATE POLICY
 psql:<stdin>:230: NOTICE:  policy "igloo_slots update own rows" for relation "public.igloo_slots" does not exist, skipping
 DROP POLICY
 CREATE POLICY
-psql:<stdin>:236: NOTICE:  policy "igloo_slots delete own rows" for relation "public.igloo_slots" does not exist, skipping
 DROP POLICY
+psql:<stdin>:236: NOTICE:  policy "igloo_slots delete own rows" for relation "public.igloo_slots" does not exist, skipping
 CREATE POLICY
 REVOKE
 REVOKE
@@ -152,13 +152,13 @@ ALTER TABLE
 ALTER TABLE
 ALTER TABLE
 ALTER TABLE
-psql:<stdin>:132: NOTICE:  relation "minigame_rounds_player_game_finished_idx" already exists, skipping
 CREATE INDEX
+psql:<stdin>:132: NOTICE:  relation "minigame_rounds_player_game_finished_idx" already exists, skipping
 psql:<stdin>:144: NOTICE:  relation "shop_items" already exists, skipping
 CREATE TABLE
 INSERT 0 7
-CREATE TABLE
 psql:<stdin>:168: NOTICE:  relation "player_items" already exists, skipping
+CREATE TABLE
 psql:<stdin>:180: NOTICE:  relation "igloo_slots" already exists, skipping
 CREATE TABLE
 ALTER TABLE
@@ -257,7 +257,26 @@ DELETE 0
 DELETE 0
 UPDATE 1
 == launching two parallel purchases: desk (80) and speakers (100) ==
----- desk session output (exit 3) ----
+---- desk session output (exit 0) ----
+BEGIN
+SET
+                              set_config                               
+-----------------------------------------------------------------------
+ {"sub":"00000000-0000-0000-0000-00000000f1f0","role":"authenticated"}
+(1 row)
+
+  purchase_item  
+-----------------
+ {"balance": 20}
+(1 row)
+
+ pg_sleep 
+----------
+ 
+(1 row)
+
+COMMIT
+---- speakers session output (exit 3) ----
 BEGIN
 SET
                               set_config                               
@@ -267,25 +286,6 @@ SET
 
 psql:<stdin>:4: ERROR:  insufficient_tokens
 CONTEXT:  PL/pgSQL function public.purchase_item(text) line 36 at RAISE
----- speakers session output (exit 0) ----
-BEGIN
-SET
-                              set_config                               
------------------------------------------------------------------------
- {"sub":"00000000-0000-0000-0000-00000000f1f0","role":"authenticated"}
-(1 row)
-
- purchase_item  
-----------------
- {"balance": 0}
-(1 row)
-
- pg_sleep 
-----------
- 
-(1 row)
-
-COMMIT
-== final state: tokens=0 owned_items=1 (speakers) ==
+== final state: tokens=20 owned_items=1 (desk) ==
 == parallel purchase check PASSED: exactly one purchase succeeded, balance matches, one item owned ==
 == all #27 proofs PASSED ==
