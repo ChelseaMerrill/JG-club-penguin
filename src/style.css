@@ -1,0 +1,32 @@
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: #0b1d2e;
+}
+
+#app {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+#game {
+  position: absolute;
+  inset: 0;
+}
+
+/* Overlay layer for DOM UI (login button, chat, dialogs). */
+#ui {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  pointer-events: none;
+}
+
+/* Overlays opt back in so the canvas keeps receiving input everywhere else. */
+#ui > * {
+  pointer-events: auto;
+}
