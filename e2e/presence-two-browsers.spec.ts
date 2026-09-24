@@ -94,18 +94,6 @@ test('presence-two-browsers', async ({ browser, baseURL }) => {
     recordVideo: { dir: VIDEO_DIR },
   });
 
-  // Keep real display names out of the video: the login badge shows the
-  // Player's name, so hide it before the first frame is painted.
-  for (const context of [contextA, contextB]) {
-    await context.addInitScript(() => {
-      document.addEventListener('DOMContentLoaded', () => {
-        const style = document.createElement('style');
-        style.textContent = '.player-badge__name { visibility: hidden !important; }';
-        document.head.append(style);
-      });
-    });
-  }
-
   const pageA = await contextA.newPage();
   const pageB = await contextB.newPage();
 

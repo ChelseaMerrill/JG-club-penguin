@@ -10,6 +10,7 @@ import { bindPlayer, type Player } from './auth/player';
 import { createLoginOverlay } from './ui/login-overlay';
 import { mountStage } from './ui/stage';
 import { getUiLayer } from './ui/ui-layer';
+import { gameEvents } from './contracts';
 import { createHud } from './ui/hud/hud';
 import { resolveRoomTitle } from './ui/hud/room-titles';
 import { initDevHudHook } from './ui/hud/dev-hud-hook';
@@ -20,13 +21,13 @@ import {
   type RoomChannel,
 } from './realtime/room-channel';
 import { toRealtimeClient } from './realtime/supabase-realtime';
-import {
-  DEFAULT_FACING,
-  gameEvents,
-  SPAWN_ROOM_ID,
-  type PenguinLook,
-  type Tile,
-} from './contracts';
+import { DEFAULT_FACING, SPAWN_ROOM_ID, type PenguinLook, type Tile } from './contracts';
+import { createInMemoryProgressStore } from './persistence/in-memory-progress-store';
+import { STARTING_TOKENS } from './persistence/minigame-rules';
+import { createMinigameLauncher } from './minigames/minigame-launcher';
+import { createDefaultMinigameRegistry } from './minigames/minigame-registry';
+import { initDevMinigameHook } from './minigames/dev-minigame-hook';
+import { MINIGAME_OVERLAY_ID } from './minigames/minigame-shell';
 
 // Fail fast on a missing or malformed .env before anything boots.
 loadEnv();
@@ -186,13 +187,29 @@ const hud = createHud(getUiLayer(), {
   onSignOut: () => {
     void auth.signOut();
   },
-  initialBalance: 0, // until #34 loads the real Token balance
+  // Seeded from the fake store's own starting balance until #34 loads the
+  // real Token balance.
+  initialBalance: STARTING_TOKENS,
+});
+
+// In-memory fake until #34's real ProgressStore lands; the HUD's Token
+// balance updates via `tokens:changed`, which this store emits on every
+// `recordRound`.
+const progressStore = createInMemoryProgressStore({ emitter: gameEvents });
+const minigameLauncher = createMinigameLauncher({
+  layer: getUiLayer(),
+  store: progressStore,
+  overlays: hud.overlays,
+  resolveRoomTitle,
+  registry: createDefaultMinigameRegistry(),
 });
 
 // Must run before `startAuth`: Supabase's `onAuthStateChange` always fires
-// asynchronously, so `devHudActive` needs to be settled before its first
-// (later-tick) SIGNED_OUT/SIGNED_IN callback checks it below.
+// asynchronously, so `devHudActive`/`devMinigameActive` need to be settled
+// before its first (later-tick) SIGNED_OUT/SIGNED_IN callback checks them
+// below.
 const devHudActive = initDevHudHook(hud);
+const devMinigameActive = initDevMinigameHook(hud, minigameLauncher);
 
 const auth = startAuth({
   client: toAuthClient(client),
@@ -203,8 +220,8 @@ const auth = startAuth({
     // `room:enter` fires only after `registry.player` is set.
     bindPlayer(game.registry, player);
     if (!samePlayer) void startSession(player, previous);
-    if (devHudActive) return;
-    overlay.showSignedIn(player);
+    if (devHudActive || devMinigameActive) return;
+    overlay.showSignedIn();
     hud.show();
   },
   onSignedOut: () => {
@@ -212,7 +229,10 @@ const auth = startAuth({
     const channel = endSession();
     bindPlayer(game.registry, null);
     if (channel) void stopChannel(channel);
-    if (devHudActive) return;
+    if (devHudActive || devMinigameActive) return;
+    // Quits any in-progress round (no `recordRound`) rather than leaving it
+    // open behind a signed-out session.
+    hud.overlays.close(MINIGAME_OVERLAY_ID);
     overlay.showSignedOut();
     hud.hide();
   },

@@ -1,4 +1,3 @@
-import type { Player } from '../auth/player';
 import { createLandingPage } from './landing-page';
 
 export interface LoginOverlayCallbacks {
@@ -8,15 +7,15 @@ export interface LoginOverlayCallbacks {
 
 export interface LoginOverlay {
   showSignedOut(): void;
-  showSignedIn(player: Player): void;
+  showSignedIn(): void;
   showError(message: string): void;
   destroy(): void;
 }
 
 /**
- * Mounts the Landing page (signed-out) and Player badge (signed-in) into
- * `root` (the `#ui` overlay layer). The Landing page covers the whole Stage;
- * the badge is a small corner element, so the canvas keeps its input.
+ * Mounts the signed-out Landing page into `root` (the `#ui` overlay layer).
+ * It covers the whole Stage while signed out and is hidden once signed in;
+ * the signed-in chrome (including Sign out) is the HUD (#32).
  */
 export function createLoginOverlay(
   root: HTMLElement,
@@ -27,39 +26,16 @@ export function createLoginOverlay(
   // returning Player never sees a flash of the Landing page.
   landing.el.hidden = true;
 
-  const badge = document.createElement('div');
-  badge.className = 'player-badge';
-  badge.hidden = true;
-
-  const nameEl = document.createElement('span');
-  nameEl.className = 'player-badge__name';
-
-  const swatchEl = document.createElement('span');
-  swatchEl.className = 'player-badge__swatch';
-
-  const signOutButton = document.createElement('button');
-  signOutButton.type = 'button';
-  signOutButton.className = 'player-badge__signout';
-  signOutButton.textContent = 'Sign out';
-  signOutButton.addEventListener('click', () => callbacks.onSignOut());
-
-  badge.append(nameEl, swatchEl, signOutButton);
-
-  root.append(landing.el, badge);
+  root.append(landing.el);
 
   return {
     showSignedOut() {
       landing.setError('');
       landing.el.hidden = false;
-      badge.hidden = true;
     },
-    showSignedIn(player: Player) {
-      nameEl.textContent = player.displayName;
-      swatchEl.style.backgroundColor = player.look.body;
-      swatchEl.dataset.penguinColor = player.look.body;
+    showSignedIn() {
       landing.setError('');
       landing.el.hidden = true;
-      badge.hidden = false;
     },
     showError(message: string) {
       landing.setError(message);
@@ -69,7 +45,6 @@ export function createLoginOverlay(
     },
     destroy() {
       landing.el.remove();
-      badge.remove();
     },
   };
 }
