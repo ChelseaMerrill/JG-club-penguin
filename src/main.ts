@@ -6,11 +6,13 @@ import { startAuth, toAuthClient } from './auth/auth-session';
 import { bindPlayer } from './auth/player';
 import { createLoginOverlay } from './ui/login-overlay';
 import { getUiLayer } from './ui/ui-layer';
+import { mountStage } from './ui/stage';
 
 // Fail fast on a missing or malformed .env before anything boots.
 loadEnv();
 
 const game = startGame();
+mountStage(game);
 const client = getSupabaseClient();
 
 const overlay = createLoginOverlay(getUiLayer(), {

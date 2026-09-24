@@ -1,8 +1,8 @@
 import { AUTO, Scale, type Types } from 'phaser';
 import { MainScene } from './scenes/MainScene';
 
-export const GAME_WIDTH = 1024;
-export const GAME_HEIGHT = 768;
+export const GAME_WIDTH = 1600;
+export const GAME_HEIGHT = 900;
 
 export function createGameConfig(): Types.Core.GameConfig {
   return {
