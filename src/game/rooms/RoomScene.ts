@@ -1,10 +1,12 @@
-import { Scene } from 'phaser';
+import { Scene, Scenes } from 'phaser';
 import { SPAWN_ROOM_ID, type RoomId } from '../../contracts';
 import { GAME_HEIGHT, GAME_WIDTH } from '../stage-size';
 import { planBackgroundDraw } from './background';
 import { exposeRoomDebug, resolveRoomIdFromLocation } from './dev-room-hook';
 import { depthForTile, tileCornerToScreen, tileToScreen, TILE_HEIGHT, TILE_WIDTH } from './iso';
-import { getRoomDefinition } from './registry';
+import { createPenguin } from '../penguin/penguin-sprite';
+import { getRoomDefinition, hasRoomDefinition } from './registry';
+import { RoomPenguinView, type PlacePenguin } from './room-penguin-view';
 import type { RoomDefinition } from './room-definition';
 
 export const ROOM_SCENE_KEY = 'RoomScene';
@@ -63,16 +65,49 @@ export interface RoomSceneData {
  * The room id comes from `init(data)` when the caller supplies one (future
  * Room-switching, #15), and otherwise from the `?room=` dev/e2e hook, which
  * itself falls back to `SPAWN_ROOM_ID`.
+ *
+ * `penguins` (#28) draws the Room channel's Penguins with the #31 renderer.
+ * It outlives each `create()`: `showRoom()` restarts this scene for another
+ * Room, and `penguins` re-places every Penguin it knows once the new Room is
+ * drawn. `whenReady()` resolves after the first `create()`.
  */
 export class RoomScene extends Scene {
   private roomId: RoomId = SPAWN_ROOM_ID;
+  readonly penguins = new RoomPenguinView();
+  private readonly readyPromise: Promise<void>;
+  private resolveReady!: () => void;
 
   constructor() {
     super(ROOM_SCENE_KEY);
+    this.readyPromise = new Promise((resolve) => {
+      this.resolveReady = resolve;
+    });
   }
 
   init(data: RoomSceneData = {}): void {
     this.roomId = data.roomId ?? resolveRoomIdFromLocation(window.location);
+  }
+
+  /** Resolves once the first `create()` has run. */
+  whenReady(): Promise<void> {
+    return this.readyPromise;
+  }
+
+  /** The Room currently shown (or being restarted into). */
+  get currentRoomId(): RoomId {
+    return this.roomId;
+  }
+
+  /**
+   * Restarts this scene to show `roomId` (a Room change). A no-op for the
+   * Room already shown, and for a Room with no `RoomDefinition` yet (#16),
+   * which leaves the current Room's art on screen. Returns whether it switched.
+   */
+  showRoom(roomId: RoomId): boolean {
+    if (roomId === this.roomId || !hasRoomDefinition(roomId)) return false;
+    this.roomId = roomId;
+    this.scene.restart({ roomId } satisfies RoomSceneData);
+    return true;
   }
 
   preload(): void {
@@ -94,11 +129,16 @@ export class RoomScene extends Scene {
     this.drawFurniture(room);
     this.drawNpcs(room);
 
+    this.penguins.attach(placePenguinsIn(this), room.grid.origin);
+    // Phaser destroys this scene's Penguins with its display list on shutdown.
+    this.events.once(Scenes.Events.SHUTDOWN, () => this.penguins.detach());
+
     exposeRoomDebug({
       roomId: this.roomId,
       scrollX: this.cameras.main.scrollX,
       scrollY: this.cameras.main.scrollY,
     });
+    this.resolveReady();
   }
 
   /** Walls meet at tile corners, so they use `tileCornerToScreen`, not the floor's tile centres. */
@@ -216,4 +256,21 @@ export class RoomScene extends Scene {
         .setDepth(depth + 1);
     }
   }
+}
+
+/** Places #31 Penguins (figure, name tag, idle animation) in `scene`. */
+function placePenguinsIn(scene: Scene): PlacePenguin {
+  return (look, point, depth, facing) => {
+    const penguin = createPenguin(scene, point.x, point.y, look, { facing });
+    penguin.container.setDepth(depth);
+    return {
+      setLook: (next) => penguin.setLook(next),
+      setFacing: (next) => penguin.setFacing(next),
+      moveTo: (next, nextDepth) => {
+        penguin.container.setPosition(next.x, next.y);
+        penguin.container.setDepth(nextDepth);
+      },
+      destroy: () => penguin.destroy(),
+    };
+  };
 }
