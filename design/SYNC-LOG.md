@@ -2,6 +2,25 @@
 
 Newest first. Written by design_resync.py apply.
 
+## 2026-09-24 · plan 67c1efa4da78
+
+From Club JenGuin logo directions.zip by milliehime.
+
+Pancake Flip added; mini-game rules, Map, Elevator, Dev Pit, Roof Deck, The Mullet updated; snowcone build fragments excluded
+
+- added: `Minigame Pancake Flip.dc.html`
+- added: `build/josh-sprite.txt`
+- added: `build/snowcone-logic.js`
+- changed: `Club JenGuin Map.dc.html`
+- changed: `Elevator.dc.html`
+- changed: `Minigame Bug Squash.dc.html`
+- changed: `Minigame Coffee Rush.dc.html`
+- changed: `Minigame Snow Cone Stand.dc.html`
+- changed: `Room 02 Dev Pit.dc.html`
+- changed: `Room 05 Roof Deck.dc.html`
+- changed: `Room 05b Roof Deck Day.dc.html`
+- changed: `The Mullet.dc.html`
+
 ## 2026-09-24 · plan e3cda7fbc769
 
 From Club JenGuin logo directions.zip by Millie Elliott.

@@ -18,6 +18,7 @@
     "*-print-*",
     "**/*-print-*",
     "re:.*-[0-9a-f]{8}\\.[A-Za-z0-9.]+$",
-    "re:design_handoff_club_jenguin/(?!README\\.md$|screenshots/).*"
+    "re:design_handoff_club_jenguin/(?!README\\.md$|screenshots/).*",
+    "build/snowcone-*.html"
   ]
 }

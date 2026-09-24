@@ -3,9 +3,9 @@
   "source": "6050d967-ba2e-4edd-819f-f7dcf4ed9d61",
   "source_url": "https://claude.ai/design/p/6050d967-ba2e-4edd-819f-f7dcf4ed9d61",
   "synced": "2026-09-24",
-  "synced_by": "Millie Elliott",
+  "synced_by": "milliehime",
   "snapshot": "Club JenGuin logo directions.zip",
-  "plan_id": "e3cda7fbc769",
+  "plan_id": "67c1efa4da78",
   "files": {
     "Characters.dc.html": {
       "sha256": "6a357a2adf750ce56651c90ddbfa39fec7e3bfb085588638d0d3bb44fdcd1dff",
@@ -28,28 +28,32 @@
       "bytes": 16937
     },
     "Club JenGuin Map.dc.html": {
-      "sha256": "5bf2237d0ab5ec4310a89e8890872aa30af7eccda2086621286ead9789c05507",
-      "bytes": 805088
+      "sha256": "bb0f141635dac21cbf256bdf14cfe649ba16e9bc9b8bad9667830b6b3f391b9a",
+      "bytes": 728106
     },
     "Club JenGuin Rooms.dc.html": {
       "sha256": "8d390f900d8e33591cbfac205711753d251887e0fc9444be945bcebbc7d5126f",
       "bytes": 117751
     },
     "Elevator.dc.html": {
-      "sha256": "3c2202dd61390f7c4e1389fd9f93077d1ded0da6fb5c0e8f538783bbb2932cc6",
-      "bytes": 30251
+      "sha256": "4b6b9fcb05c5d26121a26f76c1c6619adffab7f5f49d6311b5836f692d6c97e7",
+      "bytes": 52153
     },
     "Minigame Bug Squash.dc.html": {
-      "sha256": "44d236c3e25faedf4bd373d3cb77c308950a25b32f753f34b49e535fcee8d08e",
-      "bytes": 35051
+      "sha256": "902f21b5a651cce6e8fdb5ae4f51c04210c6320b13fd478de2955cb29f526766",
+      "bytes": 45613
     },
     "Minigame Coffee Rush.dc.html": {
-      "sha256": "c70a837f3685ec8e229dedd6e3109460c60ce57e05bc97a72b17b3fa1a53bdac",
-      "bytes": 38439
+      "sha256": "47b8e7523cd48054bf84c277bf692f804d014803c8a61d1bb3dd44f8a3e08d13",
+      "bytes": 53582
+    },
+    "Minigame Pancake Flip.dc.html": {
+      "sha256": "4380db3bb02277cacf9cf7753ee0d164e856488f5dedb9d4426e6260b26e9b97",
+      "bytes": 53286
     },
     "Minigame Snow Cone Stand.dc.html": {
-      "sha256": "8d7bd61cd6dbcca9c7e82d805e2efa1e8e31a676a531363910a66d6c9719b462",
-      "bytes": 62515
+      "sha256": "cbfd32cc5050e280182ab77bad2a767387b4feca6df322c8fdf591ff990d2504",
+      "bytes": 80935
     },
     "Penguin Creator.dc.html": {
       "sha256": "b67c195b61e411de7f448952d20145112a701b6cb8010621e021eb4f0a2ccc4e",
@@ -60,8 +64,8 @@
       "bytes": 75215
     },
     "Room 02 Dev Pit.dc.html": {
-      "sha256": "fd07987e4c8988208bdf033ea1af8e08288e276df7890c5343e897c1062a5b59",
-      "bytes": 66452
+      "sha256": "9f41138537e4db5b8e8c926c56f2db3ecc015a9fab53f8d19953d24f519daddb",
+      "bytes": 55293
     },
     "Room 03 The Icebox.dc.html": {
       "sha256": "73d2bfab29c89f8357cfb73c6f4abd00714ba2b257530b47278fedbfb0e2fc66",
@@ -72,12 +76,12 @@
       "bytes": 51094
     },
     "Room 05 Roof Deck.dc.html": {
-      "sha256": "e4e35e40bc0671db928ea29f1023bbd684be6e616177efd7e5f63cab936bf832",
-      "bytes": 151748
+      "sha256": "585355bf0f27f10869ba39c2da9486617d7ae3d0a3af6c92ce8ed86e069355bb",
+      "bytes": 96375
     },
     "Room 05b Roof Deck Day.dc.html": {
-      "sha256": "4c57d51f1386bd720ce364f0779f3194bc594de68295611e7b602df366ca32a6",
-      "bytes": 143166
+      "sha256": "21d9740d0f9057f97bdf710abf4f6310403526d31af351aaf4181a850a9c52e4",
+      "bytes": 87765
     },
     "Room 06 Igloo.dc.html": {
       "sha256": "a71da5d8a4c6b8afc44ca7e7a36b1ef0cae3527d538ad6930eb82f25f603d50f",
@@ -112,8 +116,8 @@
       "bytes": 51640
     },
     "The Mullet.dc.html": {
-      "sha256": "043e65b8dc52fbffdac86207142a2b5ec935b85c863eba412d37036b60d03058",
-      "bytes": 108809
+      "sha256": "fae68105f8479d992549620adbd9cd294a3603e9f63d70b1a56433f4ab34a0ce",
+      "bytes": 88094
     },
     "Trophy Case.dc.html": {
       "sha256": "d0dfd5d8930fe8022c94b25f1ed61a33c03b67a7e77402e31ebfbeefb1fe95e8",
@@ -198,6 +202,14 @@
     "build/isolib.js": {
       "sha256": "7aa92c5c9ebc0a02b5a4264590f72956a12b98f155c478a8b9c35860d88359df",
       "bytes": 13533
+    },
+    "build/josh-sprite.txt": {
+      "sha256": "a9b0aa5a3729cac2286b4d15be88ea83c4ff9cc83ccafd660ecdfd98f096cbb0",
+      "bytes": 2469
+    },
+    "build/snowcone-logic.js": {
+      "sha256": "f5fa38f764dedcdbd2203dbb64d5dafa5dbd91667996ec96870a90a426373633",
+      "bytes": 6535
     },
     "build/tr3.jpg": {
       "sha256": "9aae9e9e34a3ec0326ed24880cb8557770c5ba6715be4fe6068d8e64d9d496e4",
