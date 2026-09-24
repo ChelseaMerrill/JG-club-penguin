@@ -34,7 +34,7 @@ Requires Node 22.12 or newer (see `.nvmrc`).
 ```sh
 nvm use
 npm ci
-cp .env.example .env   # fill in VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY
+cp .env.example .env   # fill in VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY (the app refuses to boot without them)
 npm run dev            # http://localhost:5173
 ```
 
@@ -43,7 +43,7 @@ npm run dev            # http://localhost:5173
 | `npm run dev` | Start the Vite dev server |
 | `npm run build` | Typecheck and build the production bundle to `dist/` |
 | `npm run preview` | Serve the production build locally |
-| `npm run typecheck` | Run `tsc --noEmit` |
+| `npm run typecheck` | Typecheck browser code (`tsconfig.json`) and Node tooling/e2e (`tsconfig.node.json`) |
 | `npm run lint` | Run ESLint |
 | `npm run format` / `format:check` | Format with Prettier / check formatting |
 | `npm test` | Run Vitest unit tests |

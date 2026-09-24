@@ -18,9 +18,12 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    languageOptions: {
-      globals: { ...globals.browser, ...globals.node },
-    },
+    files: ['src/**'],
+    languageOptions: { globals: globals.browser },
+  },
+  {
+    files: ['e2e/**', '*.config.{js,ts}'],
+    languageOptions: { globals: { ...globals.browser, ...globals.node } },
   },
   prettier,
 );
