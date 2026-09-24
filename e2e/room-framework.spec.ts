@@ -1,15 +1,33 @@
 import { expect, test, type Page } from '@playwright/test';
-import type { RoomId } from '../src/contracts';
+import type { Facing, RoomId, Tile } from '../src/contracts';
+import type { PenguinAnim } from '../src/game/penguin/poses';
 
-// Mirrors `src/game/rooms/dev-room-hook.ts`'s `RoomDebugInfo`, matching its
-// `roomId: RoomId` field, rather than redeclaring it with a looser `string`.
-// Importing that type directly isn't possible here: it drags in
-// `dev-room-hook.ts`'s `import.meta.env` usage, which the `e2e` tsconfig
-// (no `vite/client` types) doesn't type-check.
+// Mirrors `src/game/rooms/dev-room-hook.ts`'s `RoomDebugInfo` (#14 D8 added
+// the local-Penguin fields this spec doesn't use). Importing that type
+// directly isn't possible here: it drags in `dev-room-hook.ts`'s
+// `import.meta.env` usage, which the `e2e` tsconfig (no `vite/client` types)
+// doesn't type-check. Kept identical, field for field, to
+// `e2e/click-to-move.spec.ts`'s own copy: TypeScript's global `Window`
+// augmentation requires every redeclaration of `__roomDebug` to resolve to
+// the same type.
+interface LocalPenguinDebugInfo {
+  tile: Tile;
+  target?: Tile;
+  anim: PenguinAnim;
+  facing: Facing;
+  moving: boolean;
+}
+
 interface RoomDebugInfo {
   roomId: RoomId;
   scrollX: number;
   scrollY: number;
+  localPenguin?: LocalPenguinDebugInfo;
+  textureListenerCount?: number;
+  npcArrivedLog?: string[];
+  doorReachedLog?: string[];
+  localPenguinMoveLog?: Tile[];
+  restartRoom?: () => void;
 }
 
 declare global {
