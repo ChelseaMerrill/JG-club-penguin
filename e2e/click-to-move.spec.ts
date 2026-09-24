@@ -44,6 +44,7 @@ interface RoomDebugInfo {
   restartRoom?: () => void;
   restartCount?: number;
   penguinCount?: number;
+  remotePenguinCount?: number;
   setRegisteredPlayer?: (player: RegisteredPlayer) => void;
   spawnDebugPenguin?: (tile: Tile, look: PenguinLook) => void;
 }
@@ -250,6 +251,8 @@ test('click-to-move', async ({ page }) => {
   const baselineListenerCount = (await debugInfo(page))?.textureListenerCount;
   expect(typeof baselineListenerCount).toBe('number');
   expect((await debugInfo(page))?.penguinCount).toBe(1);
+  // Signed out: no Room channel, so `RoomPenguinView` (#28) draws no remote Penguins.
+  expect((await debugInfo(page))?.remotePenguinCount).toBe(0);
 
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const hasRestartHelper = await page.evaluate(

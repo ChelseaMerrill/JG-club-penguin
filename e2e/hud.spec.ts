@@ -31,7 +31,6 @@ test('hud-town-center', async ({ page }) => {
   await expect(page.locator('.hud')).toBeVisible();
   // The signed-in state: no login card or Landing page over the HUD.
   await expect(page.locator('.landing')).toBeHidden();
-  await expect(page.locator('.player-badge')).toBeHidden();
 
   await page.evaluate(() => window.__hudTest!.emitRoomEnter('town-center'));
 

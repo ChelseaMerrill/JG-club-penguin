@@ -94,8 +94,14 @@ export interface RoomDebugInfo {
    * pre-restart state.
    */
   restartCount?: number;
-  /** Count of Penguin `Container`s currently in the Scene's display list (review fix 8's Room-restart leak check). */
+  /**
+   * Count of the local and debug Penguin `Container`s currently in the
+   * Scene's display list (review fix 8's Room-restart leak check); excludes
+   * remote Penguins.
+   */
   penguinCount?: number;
+  /** Count of remote Penguin `Container`s (#28's `RoomPenguinView`) in the Scene's display list. */
+  remotePenguinCount?: number;
   /**
    * Test-only: sets `registry.player`, exercising the real sign-in
    * look/id-update path end to end (review fixes 1 and 4) rather than

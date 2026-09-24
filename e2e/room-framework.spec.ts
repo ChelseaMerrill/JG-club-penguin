@@ -37,6 +37,7 @@ interface RoomDebugInfo {
   restartRoom?: () => void;
   restartCount?: number;
   penguinCount?: number;
+  remotePenguinCount?: number;
   setRegisteredPlayer?: (player: RegisteredPlayer) => void;
   spawnDebugPenguin?: (tile: Tile, look: PenguinLook) => void;
 }

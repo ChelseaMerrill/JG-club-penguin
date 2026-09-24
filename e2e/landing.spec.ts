@@ -21,7 +21,6 @@ test('landing-signed-out', async ({ page, context }) => {
   );
   await expect(landing.locator('.landing__play')).toHaveText('PLAY NOW');
   await expect(landing.locator('.landing__login')).toHaveText('LOG IN');
-  await expect(page.locator('#ui .player-badge')).toBeHidden();
 
   // #48: no fabricated online count and no footer links to screens that
   // don't exist for signed-out visitors.

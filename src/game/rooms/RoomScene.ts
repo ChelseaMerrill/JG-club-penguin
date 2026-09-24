@@ -35,8 +35,9 @@ import {
   TILE_HEIGHT,
   TILE_WIDTH,
 } from './iso';
-import { getRoomDefinition } from './registry';
+import { getRoomDefinition, hasRoomDefinition } from './registry';
 import type { RoomDefinition, RoomDoor, RoomNpcSlot } from './room-definition';
+import { RoomPenguinView, type PlacePenguin } from './room-penguin-view';
 
 export const ROOM_SCENE_KEY = 'RoomScene';
 
@@ -107,6 +108,9 @@ const TILE_STEP_MS = 1000 / TILE_SPEED;
 /** The registry key #14/`src/auth/player.ts`'s `bindPlayer` sets/removes. */
 const PLAYER_REGISTRY_KEY = 'player';
 
+/** The `Container` name `placePenguinsIn` gives each remote Penguin (#28). */
+const REMOTE_PENGUIN_NAME = 'remote-penguin';
+
 /** One entry in an interactive hit-area lookup table (`onPointerDown`). */
 interface HitArea<T> {
   object: GameObjects.GameObject;
@@ -157,9 +161,19 @@ export interface RoomSceneData {
  * same `RoomScene` instance (and its `events` emitter) is reused across a
  * `scene.restart()`, so a listener attached once keeps receiving events
  * after every later restart without needing to be re-attached.
+ *
+ * `penguins` (#28) draws the Room channel's *remote* Penguins with the #31
+ * renderer; the local Penguin is this scene's own (#14), not the view's.
+ * `penguins` outlives each `create()`: `showRoom()` restarts this scene for
+ * another Room, and `penguins` re-places every Penguin it knows once the new
+ * Room is drawn. Both sort with `depthForTile`. `whenReady()` resolves after
+ * the first `create()`.
  */
 export class RoomScene extends Scene {
   private roomId: RoomId = SPAWN_ROOM_ID;
+  readonly penguins = new RoomPenguinView();
+  private readonly readyPromise: Promise<void>;
+  private resolveReady!: () => void;
   private entryTile: Tile | undefined;
   private room: RoomDefinition | null = null;
   private controller: LocalPenguinController | null = null;
@@ -226,6 +240,9 @@ export class RoomScene extends Scene {
 
   constructor() {
     super(ROOM_SCENE_KEY);
+    this.readyPromise = new Promise((resolve) => {
+      this.resolveReady = resolve;
+    });
   }
 
   init(data: RoomSceneData = {}): void {
@@ -243,6 +260,30 @@ export class RoomScene extends Scene {
     this.doorReachedLog = [];
     this.localPenguinMoveLog = [];
     this.debugPenguins = [];
+  }
+
+  /** Resolves once the first `create()` has run. */
+  whenReady(): Promise<void> {
+    return this.readyPromise;
+  }
+
+  /** The Room currently shown (or being restarted into). */
+  get currentRoomId(): RoomId {
+    return this.roomId;
+  }
+
+  /**
+   * Restarts this scene to show `roomId` (a Room change). A no-op for the
+   * Room already shown, and for a Room with no `RoomDefinition` yet (#16),
+   * which leaves the current Room's art on screen. Returns whether it switched.
+   * The local Penguin spawns at `entryTile` when given, else at the Room's
+   * `spawnTile` (#14's `init`).
+   */
+  showRoom(roomId: RoomId, entryTile?: Tile): boolean {
+    if (roomId === this.roomId || !hasRoomDefinition(roomId)) return false;
+    this.roomId = roomId;
+    this.scene.restart({ roomId, entryTile } satisfies RoomSceneData);
+    return true;
   }
 
   preload(): void {
@@ -274,9 +315,16 @@ export class RoomScene extends Scene {
       Data.Events.CHANGE_DATA_KEY + PLAYER_REGISTRY_KEY,
       this.handleRegistryPlayerChanged,
     );
+    // `cleanup` destroys only #14's own Penguins (local and debug).
     this.events.once(Scenes.Events.SHUTDOWN, this.cleanup);
 
+    // The remote Penguins (#28). Phaser destroys them with its display list
+    // on shutdown; `detach()` only forgets them, so nothing is destroyed twice.
+    this.penguins.attach(placePenguinsIn(this), room.grid.origin);
+    this.events.once(Scenes.Events.SHUTDOWN, () => this.penguins.detach());
+
     if (HOOKS_ENABLED) this.publishRoomDebug();
+    this.resolveReady();
   }
 
   update(): void {
@@ -308,7 +356,8 @@ export class RoomScene extends Scene {
       localPenguinMoveLog: this.localPenguinMoveLog,
       restartRoom: () => this.scene.restart(),
       restartCount: this.restartCount,
-      penguinCount: this.countPenguinContainers(),
+      penguinCount: this.countPenguinContainers((name) => name !== REMOTE_PENGUIN_NAME),
+      remotePenguinCount: this.countPenguinContainers((name) => name === REMOTE_PENGUIN_NAME),
       setRegisteredPlayer: (player) => this.registry.set(PLAYER_REGISTRY_KEY, player),
       spawnDebugPenguin: (tile, look) => this.spawnDebugPenguin(tile, look),
     });
@@ -321,9 +370,15 @@ export class RoomScene extends Scene {
     );
   }
 
-  /** Every Penguin `Container` in the Scene's display list (#14 review fix 8's restart-leak check). */
-  private countPenguinContainers(): number {
-    return this.children.list.filter((child) => child instanceof GameObjects.Container).length;
+  /**
+   * Penguin `Container`s in the Scene's display list whose name matches
+   * (#14 review fix 8's restart-leak check). Remote Penguins (#28) are named
+   * `REMOTE_PENGUIN_NAME`; the local and debug Penguins are unnamed.
+   */
+  private countPenguinContainers(matches: (name: string) => boolean): number {
+    return this.children.list.filter(
+      (child) => child instanceof GameObjects.Container && matches(child.name),
+    ).length;
   }
 
   // --- Local Penguin & click-to-move --------------------------------------
@@ -652,4 +707,26 @@ export class RoomScene extends Scene {
         .setDepth(depth + 1);
     }
   }
+}
+
+/**
+ * Places #31 Penguins (figure, name tag, idle animation) in `scene`, for
+ * `RoomPenguinView`'s remote Penguins. Each is named `REMOTE_PENGUIN_NAME`
+ * so the debug hook can count remote and local Penguins apart.
+ */
+function placePenguinsIn(scene: Scene): PlacePenguin {
+  return (look, point, depth, facing) => {
+    const penguin = createPenguin(scene, point.x, point.y, look, { facing });
+    penguin.container.setName(REMOTE_PENGUIN_NAME);
+    penguin.container.setDepth(depth);
+    return {
+      setLook: (next) => penguin.setLook(next),
+      setFacing: (next) => penguin.setFacing(next),
+      moveTo: (next, nextDepth) => {
+        penguin.container.setPosition(next.x, next.y);
+        penguin.container.setDepth(nextDepth);
+      },
+      destroy: () => penguin.destroy(),
+    };
+  };
 }
