@@ -8,8 +8,8 @@ import { createLoginOverlay } from './ui/login-overlay';
 import { mountStage } from './ui/stage';
 import { getUiLayer } from './ui/ui-layer';
 import { createHud } from './ui/hud/hud';
-import { resolveRoomTitle } from './ui/hud/room-titles';
 import { initDevHudHook } from './ui/hud/dev-hud-hook';
+import { getRoomDefinition } from './game/rooms/registry';
 
 // Fail fast on a missing or malformed .env before anything boots.
 loadEnv();
@@ -28,7 +28,12 @@ const overlay = createLoginOverlay(getUiLayer(), {
 });
 
 const hud = createHud(getUiLayer(), {
-  resolveRoomTitle,
+  // #13's `getRoomDefinition` replaces the standalone `room-titles.ts` map
+  // (#16 D7): title/subtitle are just the registered Room's own fields.
+  resolveRoomTitle: (roomId) => {
+    const room = getRoomDefinition(roomId);
+    return { title: room.title, subtitle: room.subtitle };
+  },
   onIgloo: () => {
     // #15 changeRoom('igloo'); a no-op until then.
   },

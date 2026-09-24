@@ -1,11 +1,20 @@
 import type { RoomId } from '../../contracts';
 import { devPit } from './definitions/dev-pit';
+import { igloo } from './definitions/igloo';
+import { roofDeck } from './definitions/roof-deck';
+import { theMelt } from './definitions/the-melt';
 import { townCenter } from './definitions/town-center';
 import type { RoomDefinition } from './room-definition';
 import { assertValidRoomDefinitions } from './validate';
 
-/** Every Room defined so far. Town Center and Dev Pit only; see #13 D1. */
-export const ROOM_DEFINITIONS: readonly RoomDefinition[] = [townCenter, devPit];
+/** All five prototype Rooms, traced from the designs (#16). */
+export const ROOM_DEFINITIONS: readonly RoomDefinition[] = [
+  townCenter,
+  devPit,
+  theMelt,
+  roofDeck,
+  igloo,
+];
 
 // Fails fast on a broken RoomDefinition in dev (`npm run dev`) and test
 // (`npm test`) builds; skipped in the Vercel production build, matching the

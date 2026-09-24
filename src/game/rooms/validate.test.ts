@@ -228,6 +228,65 @@ describe('validateRoomDefinitions', () => {
     );
   });
 
+  it('flags a duplicate hotspot id', () => {
+    const rooms = [
+      room({
+        id: 'town-center',
+        hotspots: [
+          { id: 'trophy-case', label: 'A', rect: { x: 0, y: 0, width: 10, height: 10 } },
+          { id: 'trophy-case', label: 'B', rect: { x: 20, y: 20, width: 10, height: 10 } },
+        ],
+      }),
+    ];
+
+    const errors = validateRoomDefinitions(rooms);
+
+    expect(errors).toContainEqual({
+      roomId: 'town-center',
+      message: 'duplicate hotspot id "trophy-case"',
+    });
+  });
+
+  it('flags a hotspot rect that falls outside the 1600x900 Stage', () => {
+    const rooms = [
+      room({
+        id: 'town-center',
+        hotspots: [
+          {
+            id: 'trophy-case',
+            label: 'Trophy Case',
+            rect: { x: 1550, y: 0, width: 100, height: 60 },
+          },
+        ],
+      }),
+    ];
+
+    const errors = validateRoomDefinitions(rooms);
+
+    expect(errors).toContainEqual({
+      roomId: 'town-center',
+      message:
+        'hotspot "trophy-case" rect { x: 1550, y: 0, width: 100, height: 60 } is outside the 1600x900 Stage',
+    });
+  });
+
+  it('accepts a hotspot rect that lies entirely within the Stage', () => {
+    const rooms = [
+      room({
+        id: 'town-center',
+        hotspots: [
+          {
+            id: 'trophy-case',
+            label: 'Trophy Case',
+            rect: { x: 880, y: 700, width: 120, height: 60 },
+          },
+        ],
+      }),
+    ];
+
+    expect(validateRoomDefinitions(rooms)).toEqual([]);
+  });
+
   it('accepts a disabled door (targetRoomId: null) with no defined destination', () => {
     const rooms = [
       room({
