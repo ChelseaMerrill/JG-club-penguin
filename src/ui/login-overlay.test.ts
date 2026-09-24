@@ -74,17 +74,16 @@ describe('createLoginOverlay', () => {
     expect(swatch.dataset.penguinColor).toBe('#00bdff');
   });
 
-  it('clicking sign out calls onSignOut', () => {
-    const { root, overlay, onSignOut } = setup();
+  it('the badge has no Sign out button (signing out lives in the HUD MENU)', () => {
+    const { root, overlay } = setup();
     overlay.showSignedIn({
       id: 'user-1',
       displayName: 'Ada Lovelace',
       look: { ...DEFAULT_LOOK, body: '#00bdff' },
     });
 
-    (root.querySelector('.player-badge__signout') as HTMLButtonElement).click();
-
-    expect(onSignOut).toHaveBeenCalledTimes(1);
+    const badge = root.querySelector('.player-badge') as HTMLElement;
+    expect(badge.querySelector('button')).toBeNull();
   });
 
   it('showSignedOut shows the Landing page again and hides the badge', () => {
