@@ -371,73 +371,117 @@ export function describeProgressStoreContract(
       },
     );
 
-    const intervalCases: Array<{
+    // Interval rule (#27 RT3, option A): a round less than 10 s after the
+    // previous round of the same Minigame is round_too_soon; otherwise the
+    // payout is at most floor(cap * min(1, elapsed / duration)).
+    const durationCases: Array<{
       minigameId: MinigameId;
-      intervalSeconds: number;
+      durationSeconds: number;
+      score: number;
       stats: Record<string, number>;
+      cap: number;
     }> = [
-      { minigameId: 'bug-squash', intervalSeconds: 60, stats: { squashed: 0 } },
-      { minigameId: 'pancake-flip', intervalSeconds: 90, stats: NEUTRAL_PANCAKE_STATS },
-      { minigameId: 'coffee-rush', intervalSeconds: 90, stats: {} },
-      { minigameId: 'snow-cone-stand', intervalSeconds: 120, stats: {} },
+      {
+        minigameId: 'bug-squash',
+        durationSeconds: 60,
+        score: 1_000_000,
+        stats: { squashed: 1 },
+        cap: 250,
+      },
+      {
+        minigameId: 'pancake-flip',
+        durationSeconds: 90,
+        score: 0,
+        stats: { ...NEUTRAL_PANCAKE_STATS, golden: 100 },
+        cap: 400,
+      },
+      { minigameId: 'coffee-rush', durationSeconds: 90, score: 0, stats: { large: 30 }, cap: 400 },
+      {
+        minigameId: 'snow-cone-stand',
+        durationSeconds: 120,
+        score: 0,
+        stats: { rushCone25: 100 },
+        cap: 600,
+      },
     ];
-    it.each(intervalCases)(
-      '$minigameId: a second round $intervalSeconds s minus 1 s later is round_too_soon',
-      async ({ minigameId, intervalSeconds, stats }) => {
+    it.each(durationCases)(
+      '$minigameId: a second round 9 s later is round_too_soon, 10 s later is accepted',
+      async ({ minigameId, score, stats }) => {
         const { store, advanceSeconds } = await makeHarness();
 
-        await store.recordRound(minigameId, 0, stats as never);
-        await advanceSeconds(intervalSeconds - 1);
-        await expect(store.recordRound(minigameId, 0, stats as never)).rejects.toMatchObject({
+        await store.recordRound(minigameId, score, stats as never);
+        await advanceSeconds(9);
+        await expect(store.recordRound(minigameId, score, stats as never)).rejects.toMatchObject({
           code: 'round_too_soon',
         });
+        await advanceSeconds(10);
+        await expect(store.recordRound(minigameId, score, stats as never)).resolves.toBeDefined();
       },
     );
-    it.each(intervalCases)(
-      '$minigameId: a second round exactly $intervalSeconds s later is accepted',
-      async ({ minigameId, intervalSeconds, stats }) => {
+    it.each(durationCases)(
+      '$minigameId: half its $durationSeconds s duration after the previous round, an over-cap round pays half the cap',
+      async ({ minigameId, durationSeconds, score, stats, cap }) => {
         const { store, advanceSeconds } = await makeHarness();
 
-        await store.recordRound(minigameId, 0, stats as never);
-        await advanceSeconds(intervalSeconds);
-        await expect(store.recordRound(minigameId, 0, stats as never)).resolves.toMatchObject({
-          tokensAwarded: 0,
-        });
+        await store.recordRound(minigameId, score, stats as never);
+        await advanceSeconds(durationSeconds / 2);
+        const result = await store.recordRound(minigameId, score, stats as never);
+        expect(result.tokensAwarded).toBe(cap / 2);
       },
     );
+    it.each(durationCases)(
+      '$minigameId: a full $durationSeconds s after the previous round, an over-cap round pays the full cap',
+      async ({ minigameId, durationSeconds, score, stats, cap }) => {
+        const { store, advanceSeconds } = await makeHarness();
+
+        await store.recordRound(minigameId, score, stats as never);
+        await advanceSeconds(durationSeconds);
+        const result = await store.recordRound(minigameId, score, stats as never);
+        expect(result.tokensAwarded).toBe(cap);
+      },
+    );
+    it('a small honest round shortly after the previous one is paid in full', async () => {
+      const { store, advanceSeconds } = await makeHarness();
+
+      await store.recordRound('bug-squash', 100, { squashed: 10 });
+      await advanceSeconds(30);
+      const result = await store.recordRound('bug-squash', 400, { squashed: 40 });
+      // floor(250 * 30 / 60) = 125 allowed; 400 / 10 = 40 earned.
+      expect(result.tokensAwarded).toBe(40);
+    });
 
     const badgeThresholdCases: Array<{
       minigameId: MinigameId;
       badgeId: BadgeId;
-      intervalSeconds: number;
+      durationSeconds: number;
       belowThreshold: { score: number; stats: Record<string, number> };
       atThreshold: { score: number; stats: Record<string, number> };
     }> = [
       {
         minigameId: 'bug-squash',
         badgeId: 'exterminator',
-        intervalSeconds: 60,
+        durationSeconds: 60,
         belowThreshold: { score: 499, stats: { squashed: 499 } },
         atThreshold: { score: 500, stats: { squashed: 500 } },
       },
       {
         minigameId: 'pancake-flip',
         badgeId: 'breakfast-club',
-        intervalSeconds: 90,
+        durationSeconds: 90,
         belowThreshold: { score: 0, stats: { ...NEUTRAL_PANCAKE_STATS, stacked: 19 } },
         atThreshold: { score: 0, stats: { ...NEUTRAL_PANCAKE_STATS, stacked: 20 } },
       },
       {
         minigameId: 'coffee-rush',
         badgeId: 'barista',
-        intervalSeconds: 90,
+        durationSeconds: 90,
         belowThreshold: { score: 0, stats: { small: 14 } },
         atThreshold: { score: 0, stats: { small: 15 } },
       },
       {
         minigameId: 'snow-cone-stand',
         badgeId: 'brain-freeze',
-        intervalSeconds: 120,
+        durationSeconds: 120,
         // The 200-token threshold falls on a multiple of 5, the granularity
         // of every cone weight; 195 is the largest reachable value below it.
         belowThreshold: { score: 0, stats: { cone5: 39 } },
@@ -446,7 +490,7 @@ export function describeProgressStoreContract(
     ];
     it.each(badgeThresholdCases)(
       '$minigameId: earns $badgeId at the threshold but not one below it',
-      async ({ minigameId, intervalSeconds, belowThreshold, atThreshold }) => {
+      async ({ minigameId, durationSeconds, belowThreshold, atThreshold }) => {
         const { store, advanceSeconds } = await makeHarness();
 
         const below = await store.recordRound(
@@ -456,7 +500,7 @@ export function describeProgressStoreContract(
         );
         expect(below.badgeEarned).toBe(false);
 
-        await advanceSeconds(intervalSeconds);
+        await advanceSeconds(durationSeconds);
         const at = await store.recordRound(
           minigameId,
           atThreshold.score,

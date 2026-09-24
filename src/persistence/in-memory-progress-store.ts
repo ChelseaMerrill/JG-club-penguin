@@ -20,6 +20,7 @@ import {
   STAT_MAX,
   STAT_MIN,
   STATS_MAX_KEY_LENGTH,
+  MIN_ROUND_INTERVAL_SECONDS,
   STATS_MAX_KEYS,
 } from './minigame-rules';
 import {
@@ -177,13 +178,19 @@ export function createInMemoryProgressStore(
 
     const nowMs = now();
     const lastFinishedAtMs = state.lastRoundFinishedAtMs[minigameId];
-    if (lastFinishedAtMs !== undefined && nowMs - lastFinishedAtMs < rule.intervalSeconds * 1000) {
+    const elapsedSeconds =
+      lastFinishedAtMs === undefined ? undefined : (nowMs - lastFinishedAtMs) / 1000;
+    if (elapsedSeconds !== undefined && elapsedSeconds < MIN_ROUND_INTERVAL_SECONDS) {
       throw new ProgressStoreError('round_too_soon');
     }
 
     const numericStats = statsRecord as Record<string, number>;
     const rawPayout = rule.rawPayout(score, numericStats);
-    const payout = Math.min(Math.max(rawPayout, 0), rule.cap);
+    let payout = Math.min(Math.max(rawPayout, 0), rule.cap);
+    if (elapsedSeconds !== undefined) {
+      const allowed = Math.floor(rule.cap * Math.min(1, elapsedSeconds / rule.durationSeconds));
+      payout = Math.min(payout, allowed);
+    }
     const rawBest = rule.rawBest(score, numericStats);
     const previousBest = state.bests[minigameId];
     // A best must beat the previous one; a first round scoring 0 is not a best.

@@ -148,6 +148,12 @@ export interface ProgressStore {
    */
   saveLook(look: PenguinLook): Promise<void>;
 
+  /**
+   * Records one finished round; the server computes the payout. A round
+   * less than 10 s after the previous round of the same Minigame rejects
+   * with `round_too_soon`; otherwise the payout is at most
+   * `floor(cap * min(1, secondsSincePreviousRound / duration))`.
+   */
   recordRound<K extends MinigameId>(
     minigameId: K,
     score: number,

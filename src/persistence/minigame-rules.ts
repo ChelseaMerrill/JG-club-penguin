@@ -28,6 +28,14 @@ export const STATS_MAX_KEYS = 16;
 /** Each key under a round's `stats` is at most this many characters. */
 export const STATS_MAX_KEY_LENGTH = 32;
 
+/**
+ * Interval rule (#27 RT3, option A): a round less than this many seconds
+ * after the previous round of the same Minigame is `round_too_soon`.
+ * Otherwise the payout is at most
+ * `floor(cap * min(1, secondsSincePreviousRound / durationSeconds))`.
+ */
+export const MIN_ROUND_INTERVAL_SECONDS = 10;
+
 function stat(stats: Readonly<Record<string, number>>, key: string): number {
   return stats[key] ?? 0;
 }
@@ -56,8 +64,8 @@ export interface MinigameRule {
   id: MinigameId;
   /** The round's maximum Token payout. */
   cap: number;
-  /** Minimum time between two rounds of this Minigame. */
-  intervalSeconds: number;
+  /** The Minigame's round length; the payout clamp scales by it. */
+  durationSeconds: number;
   badgeId: BadgeId;
   badgeThreshold: number;
   rawPayout(score: number, stats: Readonly<Record<string, number>>): number;
@@ -72,7 +80,7 @@ export const MINIGAME_RULES: Record<MinigameId, MinigameRule> = {
   'bug-squash': {
     id: 'bug-squash',
     cap: 250,
-    intervalSeconds: 60,
+    durationSeconds: 60,
     badgeId: 'exterminator',
     badgeThreshold: 500,
     rawPayout: (score) => Math.floor(score / 10),
@@ -81,7 +89,7 @@ export const MINIGAME_RULES: Record<MinigameId, MinigameRule> = {
   'pancake-flip': {
     id: 'pancake-flip',
     cap: 400,
-    intervalSeconds: 90,
+    durationSeconds: 90,
     badgeId: 'breakfast-club',
     badgeThreshold: 20,
     rawPayout: (_score, stats) =>
@@ -91,7 +99,7 @@ export const MINIGAME_RULES: Record<MinigameId, MinigameRule> = {
   'coffee-rush': {
     id: 'coffee-rush',
     cap: 400,
-    intervalSeconds: 90,
+    durationSeconds: 90,
     badgeId: 'barista',
     badgeThreshold: 15,
     rawPayout: (_score, stats) =>
@@ -104,7 +112,7 @@ export const MINIGAME_RULES: Record<MinigameId, MinigameRule> = {
   'snow-cone-stand': {
     id: 'snow-cone-stand',
     cap: 600,
-    intervalSeconds: 120,
+    durationSeconds: 120,
     badgeId: 'brain-freeze',
     badgeThreshold: 200,
     rawPayout: (_score, stats) => snowConeRaw(stats),
