@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { DEFAULT_LOOK } from '../contracts/penguin';
 import {
   bindPlayer,
   ensurePlayer,
@@ -41,7 +42,11 @@ describe('loadPlayer', () => {
     });
 
     expect(result).toEqual({
-      player: { id: 'user-1', displayName: 'Ada Lovelace', penguinColor: '#00bdff' },
+      player: {
+        id: 'user-1',
+        displayName: 'Ada Lovelace',
+        look: { ...DEFAULT_LOOK, body: '#00bdff' },
+      },
       error: null,
     });
   });
@@ -58,8 +63,16 @@ describe('loadPlayer', () => {
     expect(result.player).toEqual({
       id: 'user-1',
       displayName: 'ada@example.com',
-      penguinColor: '#123456',
+      look: { ...DEFAULT_LOOK, body: '#123456' },
     });
+  });
+
+  it('falls back to the default body color when the stored penguin_color is not a valid hex value', async () => {
+    const { client } = createFakeClient({ row: { id: 'user-1', penguin_color: 'not-a-color' } });
+
+    const result = await loadPlayer(client, { id: 'user-1', email: 'ada@example.com' });
+
+    expect(result.player?.look).toEqual(DEFAULT_LOOK);
   });
 
   it('reports an error when the row is missing', async () => {
@@ -84,7 +97,11 @@ describe('ensurePlayer', () => {
       { onConflict: 'id', ignoreDuplicates: true },
     );
     expect(result).toEqual({
-      player: { id: 'user-1', displayName: 'ada@example.com', penguinColor: '#00bdff' },
+      player: {
+        id: 'user-1',
+        displayName: 'ada@example.com',
+        look: { ...DEFAULT_LOOK, body: '#00bdff' },
+      },
       error: null,
     });
   });
@@ -102,7 +119,7 @@ describe('ensurePlayer', () => {
 describe('bindPlayer', () => {
   it('sets the player on the registry under the player key', () => {
     const registry: PlayerRegistry = { set: vi.fn(), remove: vi.fn() };
-    const player = { id: 'user-1', displayName: 'Ada Lovelace', penguinColor: '#00bdff' };
+    const player = { id: 'user-1', displayName: 'Ada Lovelace', look: DEFAULT_LOOK };
 
     bindPlayer(registry, player);
 
