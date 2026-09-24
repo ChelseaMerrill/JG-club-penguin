@@ -12,6 +12,21 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
+for cmd in docker openssl; do
+  if ! command -v "$cmd" >/dev/null 2>&1; then
+    echo "run-local.sh requires '$cmd' on PATH; install it and retry." >&2
+    exit 1
+  fi
+done
+
+# Evidence policy: captured output cited as PASS evidence is saved under
+# test-results/ and committed. Tee everything (stdout and stderr) to that
+# file as well as the terminal, from here to the end of the script.
+OUTPUT_DIR="$REPO_ROOT/test-results/27-saved-progress-local"
+mkdir -p "$OUTPUT_DIR"
+OUTPUT_FILE="$OUTPUT_DIR/output.txt"
+exec > >(tee "$OUTPUT_FILE") 2>&1
+
 CONTAINER="jgcp-27-pg"
 IMAGE="postgres:17"
 PGPASS="$(openssl rand -hex 12)"
@@ -21,6 +36,9 @@ PLAYER_B_ID="b2222222-2222-2222-2222-222222222222"
 DESK_OUT="$(mktemp)"
 SPEAKERS_OUT="$(mktemp)"
 
+# The container name is fixed (not per-run) so a crashed previous run never
+# leaves an orphan behind; it is force-removed here on every exit, success
+# or failure.
 cleanup() {
   docker rm -f "$CONTAINER" >/dev/null 2>&1 || true
   rm -f "$DESK_OUT" "$SPEAKERS_OUT"

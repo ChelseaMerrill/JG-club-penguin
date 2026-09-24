@@ -1,0 +1,291 @@
+== starting postgres:17 as jgcp-27-pg ==
+== waiting for postgres to accept connections ==
+== applying local-supabase-stub.sql ==
+CREATE SCHEMA
+DO
+GRANT
+ALTER DEFAULT PRIVILEGES
+ALTER DEFAULT PRIVILEGES
+ALTER DEFAULT PRIVILEGES
+GRANT
+CREATE TABLE
+CREATE FUNCTION
+GRANT
+== applying #9 migration (players) ==
+CREATE TABLE
+ALTER TABLE
+DROP POLICY
+psql:<stdin>:15: NOTICE:  policy "players select own row" for relation "public.players" does not exist, skipping
+CREATE POLICY
+psql:<stdin>:21: NOTICE:  policy "players insert own row" for relation "public.players" does not exist, skipping
+DROP POLICY
+CREATE POLICY
+psql:<stdin>:27: NOTICE:  policy "players update own row" for relation "public.players" does not exist, skipping
+DROP POLICY
+CREATE POLICY
+REVOKE
+REVOKE
+GRANT
+GRANT
+GRANT
+== applying #27 migration (saved progress) ==
+ALTER TABLE
+ALTER TABLE
+psql:<stdin>:48: NOTICE:  constraint "players_penguin_name_check" of relation "players" does not exist, skipping
+psql:<stdin>:48: NOTICE:  constraint "players_cap_check" of relation "players" does not exist, skipping
+psql:<stdin>:48: NOTICE:  constraint "players_beak_check" of relation "players" does not exist, skipping
+psql:<stdin>:48: NOTICE:  constraint "players_feet_check" of relation "players" does not exist, skipping
+psql:<stdin>:48: NOTICE:  constraint "players_belly_check" of relation "players" does not exist, skipping
+psql:<stdin>:48: NOTICE:  constraint "players_hat_check" of relation "players" does not exist, skipping
+psql:<stdin>:48: NOTICE:  constraint "players_pattern_check" of relation "players" does not exist, skipping
+psql:<stdin>:48: NOTICE:  constraint "players_eyes_check" of relation "players" does not exist, skipping
+psql:<stdin>:48: NOTICE:  constraint "players_idle_emote_check" of relation "players" does not exist, skipping
+psql:<stdin>:48: NOTICE:  constraint "players_tokens_check" of relation "players" does not exist, skipping
+psql:<stdin>:48: NOTICE:  constraint "players_name_set_once_created" of relation "players" does not exist, skipping
+ALTER TABLE
+ALTER TABLE
+REVOKE
+REVOKE
+GRANT
+GRANT
+GRANT
+CREATE TABLE
+CREATE TABLE
+CREATE TABLE
+psql:<stdin>:120: NOTICE:  constraint "player_badges_badge_id_check" of relation "player_badges" does not exist, skipping
+ALTER TABLE
+ALTER TABLE
+psql:<stdin>:123: NOTICE:  constraint "minigame_bests_minigame_id_check" of relation "minigame_bests" does not exist, skipping
+ALTER TABLE
+ALTER TABLE
+psql:<stdin>:126: NOTICE:  constraint "minigame_rounds_minigame_id_check" of relation "minigame_rounds" does not exist, skipping
+ALTER TABLE
+ALTER TABLE
+CREATE INDEX
+CREATE TABLE
+INSERT 0 7
+CREATE TABLE
+CREATE TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+DROP POLICY
+psql:<stdin>:193: NOTICE:  policy "player_badges select own rows" for relation "public.player_badges" does not exist, skipping
+CREATE POLICY
+DROP POLICY
+psql:<stdin>:198: NOTICE:  policy "minigame_bests select own rows" for relation "public.minigame_bests" does not exist, skipping
+CREATE POLICY
+DROP POLICY
+psql:<stdin>:203: NOTICE:  policy "minigame_rounds select own rows" for relation "public.minigame_rounds" does not exist, skipping
+CREATE POLICY
+psql:<stdin>:208: NOTICE:  policy "player_items select own rows" for relation "public.player_items" does not exist, skipping
+DROP POLICY
+CREATE POLICY
+psql:<stdin>:214: NOTICE:  policy "shop_items select signed in" for relation "public.shop_items" does not exist, skipping
+DROP POLICY
+CREATE POLICY
+psql:<stdin>:220: NOTICE:  policy "igloo_slots select own rows" for relation "public.igloo_slots" does not exist, skipping
+DROP POLICY
+CREATE POLICY
+psql:<stdin>:225: NOTICE:  policy "igloo_slots insert own rows" for relation "public.igloo_slots" does not exist, skipping
+DROP POLICY
+CREATE POLICY
+psql:<stdin>:230: NOTICE:  policy "igloo_slots update own rows" for relation "public.igloo_slots" does not exist, skipping
+DROP POLICY
+CREATE POLICY
+DROP POLICY
+psql:<stdin>:236: NOTICE:  policy "igloo_slots delete own rows" for relation "public.igloo_slots" does not exist, skipping
+CREATE POLICY
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+REVOKE
+CREATE FUNCTION
+CREATE FUNCTION
+REVOKE
+REVOKE
+GRANT
+GRANT
+== re-applying #27 migration a second time (must rerun cleanly) ==
+ALTER TABLE
+psql:<stdin>:35: NOTICE:  column "penguin_name" of relation "players" already exists, skipping
+psql:<stdin>:35: NOTICE:  column "cap" of relation "players" already exists, skipping
+psql:<stdin>:35: NOTICE:  column "beak" of relation "players" already exists, skipping
+psql:<stdin>:35: NOTICE:  column "feet" of relation "players" already exists, skipping
+psql:<stdin>:35: NOTICE:  column "belly" of relation "players" already exists, skipping
+psql:<stdin>:35: NOTICE:  column "hat" of relation "players" already exists, skipping
+psql:<stdin>:35: NOTICE:  column "pattern" of relation "players" already exists, skipping
+psql:<stdin>:35: NOTICE:  column "eyes" of relation "players" already exists, skipping
+psql:<stdin>:35: NOTICE:  column "idle_emote" of relation "players" already exists, skipping
+psql:<stdin>:35: NOTICE:  column "tokens" of relation "players" already exists, skipping
+psql:<stdin>:35: NOTICE:  column "profile_created_at" of relation "players" already exists, skipping
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+REVOKE
+REVOKE
+GRANT
+GRANT
+GRANT
+CREATE TABLE
+psql:<stdin>:98: NOTICE:  relation "player_badges" already exists, skipping
+CREATE TABLE
+psql:<stdin>:106: NOTICE:  relation "minigame_bests" already exists, skipping
+psql:<stdin>:116: NOTICE:  relation "minigame_rounds" already exists, skipping
+CREATE TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+psql:<stdin>:132: NOTICE:  relation "minigame_rounds_player_game_finished_idx" already exists, skipping
+CREATE INDEX
+psql:<stdin>:144: NOTICE:  relation "shop_items" already exists, skipping
+CREATE TABLE
+INSERT 0 7
+psql:<stdin>:168: NOTICE:  relation "player_items" already exists, skipping
+CREATE TABLE
+psql:<stdin>:180: NOTICE:  relation "igloo_slots" already exists, skipping
+CREATE TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+ALTER TABLE
+DROP POLICY
+CREATE POLICY
+DROP POLICY
+CREATE POLICY
+DROP POLICY
+CREATE POLICY
+DROP POLICY
+CREATE POLICY
+DROP POLICY
+CREATE POLICY
+DROP POLICY
+CREATE POLICY
+DROP POLICY
+CREATE POLICY
+DROP POLICY
+CREATE POLICY
+DROP POLICY
+CREATE POLICY
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+REVOKE
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+GRANT
+REVOKE
+CREATE FUNCTION
+CREATE FUNCTION
+REVOKE
+REVOKE
+GRANT
+GRANT
+== seeding the fixture Player and a second Player (B) ==
+INSERT 0 2
+INSERT 0 2
+== running 27_rls_proof.sql as-is ==
+CREATE FUNCTION
+                     check_name                      | pass |                                                               detail                                                                
+-----------------------------------------------------+------+-------------------------------------------------------------------------------------------------------------------------------------
+ fixture_sees_only_own_players_row                   | t    | visible players rows=1 (expected 1)
+ direct_update_tokens_blocked_42501                  | t    | sqlstate=42501 sqlerrm=permission denied for table players
+ direct_update_tokens_balance_unchanged              | t    | tokens=100 (expected 100)
+ direct_insert_player_badges_blocked_42501           | t    | sqlstate=42501 sqlerrm=permission denied for table player_badges
+ direct_insert_minigame_bests_blocked_42501          | t    | sqlstate=42501 sqlerrm=permission denied for table minigame_bests
+ direct_insert_minigame_rounds_blocked_42501         | t    | sqlstate=42501 sqlerrm=permission denied for table minigame_rounds
+ direct_insert_player_items_blocked_42501            | t    | sqlstate=42501 sqlerrm=permission denied for table player_items
+ fixture_sees_zero_of_b_player_badges                | t    | visible rows=0 (expected 0)
+ fixture_sees_zero_of_b_player_items                 | t    | visible rows=0 (expected 0)
+ fixture_sees_zero_of_b_minigame_bests               | t    | visible rows=0 (expected 0)
+ fixture_sees_zero_of_b_minigame_rounds              | t    | visible rows=0 (expected 0)
+ fixture_sees_zero_of_b_igloo_slots                  | t    | visible rows=0 (expected 0)
+ igloo_slot_unowned_item_blocked_23503               | t    | sqlstate=23503 sqlerrm=insert or update on table "igloo_slots" violates foreign key constraint "igloo_slots_player_id_item_id_fkey"
+ igloo_slot_wrong_player_blocked_42501               | t    | sqlstate=42501 sqlerrm=new row violates row-level security policy for table "igloo_slots"
+ record_round_burnt_floored_tokens_awarded_zero      | t    | tokensAwarded=0 (expected 0)
+ record_round_burnt_floored_balance_100              | t    | balance=100 (expected 100)
+ record_round_second_round_too_soon                  | t    | sqlerrm=round_too_soon
+ record_round_badge_tokens_awarded_capped_400        | t    | tokensAwarded=400 (expected 400)
+ record_round_badge_earned_true                      | t    | badgeEarned=true (expected true)
+ record_round_badge_balance_550                      | t    | balance=550 (expected 550)
+ record_round_badge_paid_once_badge_earned_false     | t    | badgeEarned=false (expected false)
+ record_round_badge_paid_once_balance_560            | t    | balance=560 (expected 560)
+ purchase_item_insufficient_tokens_error             | t    | sqlerrm=insufficient_tokens
+ purchase_item_insufficient_tokens_balance_unchanged | t    | tokens=10 (expected 10)
+ purchase_item_desk_success_balance_20               | t    | balance=20 (expected 20)
+ purchase_item_desk_already_owned_error              | t    | sqlerrm=already_owned
+ purchase_item_hoverboard_unknown_item_error         | t    | sqlerrm=unknown_item
+ anon_select_players_blocked_42501                   | t    | sqlstate=42501 sqlerrm=permission denied for table players
+ anon_select_player_badges_blocked_42501             | t    | sqlstate=42501 sqlerrm=permission denied for table player_badges
+ anon_select_minigame_bests_blocked_42501            | t    | sqlstate=42501 sqlerrm=permission denied for table minigame_bests
+ anon_select_minigame_rounds_blocked_42501           | t    | sqlstate=42501 sqlerrm=permission denied for table minigame_rounds
+ anon_select_shop_items_blocked_42501                | t    | sqlstate=42501 sqlerrm=permission denied for table shop_items
+ anon_select_player_items_blocked_42501              | t    | sqlstate=42501 sqlerrm=permission denied for table player_items
+ anon_select_igloo_slots_blocked_42501               | t    | sqlstate=42501 sqlerrm=permission denied for table igloo_slots
+ anon_purchase_item_blocked_42501                    | t    | sqlstate=42501 sqlerrm=permission denied for function purchase_item
+ anon_record_round_blocked_42501                     | t    | sqlstate=42501 sqlerrm=permission denied for function record_round
+ anon_insert_players_blocked_42501                   | t    | sqlstate=42501 sqlerrm=permission denied for table players
+ ALL                                                 | t    | 37 checks, all pass = t
+(38 rows)
+== RLS proof: ALL row reports pass = t ==
+== resetting the fixture to 100 Tokens with no items, for the parallel-purchase check ==
+DELETE 0
+DELETE 0
+UPDATE 1
+== launching two parallel purchases: desk (80) and speakers (100) ==
+---- desk session output (exit 0) ----
+BEGIN
+SET
+                              set_config                               
+-----------------------------------------------------------------------
+ {"sub":"00000000-0000-0000-0000-00000000f1f0","role":"authenticated"}
+(1 row)
+
+  purchase_item  
+-----------------
+ {"balance": 20}
+(1 row)
+
+ pg_sleep 
+----------
+ 
+(1 row)
+
+COMMIT
+---- speakers session output (exit 3) ----
+BEGIN
+SET
+                              set_config                               
+-----------------------------------------------------------------------
+ {"sub":"00000000-0000-0000-0000-00000000f1f0","role":"authenticated"}
+(1 row)
+
+psql:<stdin>:4: ERROR:  insufficient_tokens
+CONTEXT:  PL/pgSQL function public.purchase_item(text) line 36 at RAISE
+== final state: tokens=20 owned_items=1 (desk) ==
+== parallel purchase check PASSED: exactly one purchase succeeded, balance matches, one item owned ==
+== all #27 proofs PASSED ==
