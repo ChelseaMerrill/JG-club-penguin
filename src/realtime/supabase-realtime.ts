@@ -6,7 +6,8 @@
  * `@supabase/realtime-js` (supabase-js 2.117.1).
  *
  * Wire format: each `RoomBroadcastMap` key is its own Supabase broadcast
- * `event` name (`'move'`, `'chat'`), and the broadcast `payload` is exactly
+ * `event` name (`'move'`, `'chat'`, `'presence:hello'`, `'presence:bye'`),
+ * and the broadcast `payload` is exactly
  * `RoomBroadcastMap[K]`, with no wrapping envelope.
  */
 import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js';

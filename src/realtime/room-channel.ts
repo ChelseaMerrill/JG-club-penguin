@@ -2,6 +2,14 @@
  * Per-Room Presence (#28): the Room channel for whichever Room the Player is
  * in, and the typed Room broadcast bus (`move`, `chat`) that rides on it.
  * Consumes the #26 contracts in `src/contracts/`.
+ *
+ * Presence fast path: Presence propagates between Realtime servers in up to
+ * ~3 s, broadcasts in ~30 ms. So the channel also sends and consumes its own
+ * `presence:hello` / `presence:bye` broadcasts, which show and remove
+ * Penguins ahead of Presence. Presence stays the source of truth: a hinted
+ * Penguin missing from sync is kept only for a grace after its last hello,
+ * and a departed one is suppressed only while sync still lists the
+ * `presence_ref` it had when it said bye.
  */
 import {
   DEFAULT_FACING,
@@ -85,6 +93,15 @@ export interface RoomChannelOptions {
   onError?: (context: string, err: unknown) => void;
 }
 
+/**
+ * Broadcast events the Room channel sends and consumes itself (the Presence
+ * fast path); they never reach `send` callers or `on` listeners.
+ */
+export type InternalBroadcastEvent = 'presence:hello' | 'presence:bye';
+
+/** Broadcast events open to `send` and `on`: the Room bus (`move`, `chat`). */
+export type PublicBroadcastEvent = Exclude<RoomBroadcastEvent, InternalBroadcastEvent>;
+
 /** Fields the Room channel stamps on every outgoing broadcast itself. */
 type StampedField = 'playerId' | 'sentAt';
 
@@ -100,8 +117,8 @@ export interface RoomChannel {
    */
   setTile(tile: Tile, facing?: Facing): void;
   /** Resolves `true` only once the broadcast was pushed and acknowledged `'ok'`. */
-  send<K extends RoomBroadcastEvent>(type: K, payload: SendablePayload<K>): Promise<boolean>;
-  on<K extends RoomBroadcastEvent>(
+  send<K extends PublicBroadcastEvent>(type: K, payload: SendablePayload<K>): Promise<boolean>;
+  on<K extends PublicBroadcastEvent>(
     type: K,
     handler: (payload: RoomBroadcastMap[K]) => void,
   ): () => void;
@@ -126,6 +143,12 @@ const MAX_CHAT_LEN = 120;
 const MAX_REMOTE_PENGUINS = 50;
 const REJOIN_DELAYS_MS = [1000, 2000, 4000];
 const REJOIN_MAX_DELAY_MS = 10000;
+/** How long a hello keeps a Penguin shown that Presence sync does not list (yet). */
+const HINT_GRACE_MS = 5000;
+/** At most one hello reply per sender in this window. */
+const HELLO_REPLY_INTERVAL_MS = 2000;
+/** A leave waits at most this long for its bye to be pushed. */
+const BYE_TIMEOUT_MS = 300;
 
 /**
  * Every `Facing` from the contract. Typed as a `Record` so adding a facing
@@ -260,6 +283,13 @@ const BROADCAST_PARSERS: {
     if (!isValidSentAt(p.sentAt)) return null;
     return { playerId: p.playerId, text, sentAt: p.sentAt };
   },
+  'presence:hello': parsePresencePayload,
+  'presence:bye'(u) {
+    if (typeof u !== 'object' || u === null) return null;
+    const p = u as Record<string, unknown>;
+    if (!isValidPlayerId(p.playerId)) return null;
+    return { playerId: p.playerId };
+  },
 };
 
 const BROADCAST_EVENTS = Object.keys(BROADCAST_PARSERS) as RoomBroadcastEvent[];
@@ -271,7 +301,30 @@ function parseBroadcast<K extends RoomBroadcastEvent>(
   return BROADCAST_PARSERS[type](u) as RoomBroadcastMap[K] | null;
 }
 
-type AnyBroadcastHandler = (payload: RoomBroadcastMap[RoomBroadcastEvent]) => void;
+type AnyBroadcastHandler = (payload: RoomBroadcastMap[PublicBroadcastEvent]) => void;
+type RemoteMeta = Record<string, unknown>;
+
+/** A remote Penguin as the last Presence sync listed it. */
+interface SyncedPenguin {
+  payload: PresencePayload;
+  /** Supabase's `presence_ref` for the meta, when present. */
+  ref: string | null;
+}
+
+/** A remote Penguin shown from its last hello, ahead of Presence. */
+interface Hint {
+  payload: PresencePayload;
+  at: number;
+}
+
+/**
+ * A remote Penguin that said bye. `ref` is the `presence_ref` sync listed it
+ * with; `null` until sync lists it, when the first ref seen is adopted.
+ */
+interface Departure {
+  ref: string | null;
+  at: number;
+}
 type RoomChangeHandler = (roomId: RoomId | null) => void;
 type SubscribedHandler = (subscribed: boolean) => void;
 
@@ -305,6 +358,11 @@ export function createRoomChannel(options: RoomChannelOptions): RoomChannel {
   let subscribed = false;
   let currentRoomId: RoomId | null = null;
   let shownIds = new Set<string>();
+  let synced = new Map<string, SyncedPenguin>();
+  let hints = new Map<string, Hint>();
+  let departed = new Map<string, Departure>();
+  let lastReplyAt = new Map<string, number>();
+  let hintTimer: ReturnType<typeof scheduleTimer> | null = null;
 
   // Bumped whenever a channel is opened or detached. Callbacks registered
   // against a channel capture the generation at registration time and no-op
@@ -314,7 +372,7 @@ export function createRoomChannel(options: RoomChannelOptions): RoomChannel {
   let rejoinAttempt = 0;
   let rejoinTimer: ReturnType<typeof scheduleTimer> | null = null;
 
-  const listeners = new Map<RoomBroadcastEvent, Set<AnyBroadcastHandler>>();
+  const listeners = new Map<PublicBroadcastEvent, Set<AnyBroadcastHandler>>();
   const roomChangeListeners = new Set<RoomChangeHandler>();
   const subscribedListeners = new Set<SubscribedHandler>();
 
@@ -383,12 +441,25 @@ export function createRoomChannel(options: RoomChannelOptions): RoomChannel {
     }, nextRejoinDelay());
   }
 
+  /** Best effort: a lost hello only means waiting for Presence to propagate. */
+  function sendHello(ch: RoomChannelLike): void {
+    if (currentRoomId === 'igloo') return;
+    try {
+      ch.send('presence:hello', buildPayload()).catch((err: unknown) => {
+        onError('hello failed', err);
+      });
+    } catch (err) {
+      onError('hello failed', err);
+    }
+  }
+
   function track(ch: RoomChannelLike, gen: number): void {
     ch.track(buildPayload()).then(
       (status) => {
         if (gen !== generation) return;
         if (status === 'ok') {
           rejoinAttempt = 0;
+          sendHello(ch);
           return;
         }
         onError('track was not acknowledged', status);
@@ -402,39 +473,150 @@ export function createRoomChannel(options: RoomChannelOptions): RoomChannel {
     );
   }
 
-  function handleSync(ch: RoomChannelLike): void {
-    const state = ch.presenceState();
-    const igloo = currentRoomId === 'igloo';
-
-    const preferred: string[] = [];
-    const rest: string[] = [];
-    for (const key of Object.keys(state)) {
-      if (key === playerId) continue;
-      const metas = state[key];
-      if (!metas || metas.length === 0) continue;
-      if (shownIds.has(key)) preferred.push(key);
-      else rest.push(key);
+  function cancelHintTimer(): void {
+    if (hintTimer !== null) {
+      cancelTimer(hintTimer);
+      hintTimer = null;
     }
-    const selected = [...preferred, ...rest].slice(0, MAX_REMOTE_PENGUINS);
+  }
 
+  /** Re-reconciles when the oldest hint's grace runs out, so sync wins without a new sync. */
+  function armHintTimer(): void {
+    cancelHintTimer();
+    if (hints.size === 0) return;
+    const t = now();
+    let due = Infinity;
+    for (const hint of hints.values()) due = Math.min(due, hint.at + HINT_GRACE_MS - t);
+    hintTimer = scheduleTimer(
+      () => {
+        hintTimer = null;
+        reconcile();
+      },
+      Math.max(0, due),
+    );
+  }
+
+  function resetRemoteState(): void {
+    shownIds = new Set();
+    synced = new Map();
+    hints = new Map();
+    departed = new Map();
+    lastReplyAt = new Map();
+    cancelHintTimer();
+  }
+
+  /** Whether a synced Penguin is a departed one that sync still lists because of lag. */
+  function isSuppressed(id: string, s: SyncedPenguin): boolean {
+    const departure = departed.get(id);
+    if (!departure) return false;
+    if (departure.ref === null) {
+      departure.ref = s.ref;
+      return true;
+    }
+    if (departure.ref === s.ref) return true;
+    departed.delete(id);
+    return false;
+  }
+
+  /**
+   * Shows the union of the last sync and fresh hints, capped at 50 and
+   * preferring ids already shown. A fresh hint's payload wins over a
+   * lagging sync's; departed Penguins are left out.
+   */
+  function reconcile(): void {
+    const t = now();
+    for (const [id, hint] of hints) {
+      if (t - hint.at >= HINT_GRACE_MS) hints.delete(id);
+    }
+    for (const [id, departure] of departed) {
+      if (synced.has(id)) continue;
+      if (departure.ref !== null || t - departure.at >= HINT_GRACE_MS) departed.delete(id);
+    }
+
+    const candidates = new Map<string, PresencePayload>();
+    for (const [id, s] of synced) {
+      const hint = hints.get(id);
+      if (hint) candidates.set(id, hint.payload);
+      else if (!isSuppressed(id, s)) candidates.set(id, s.payload);
+    }
+    for (const [id, hint] of hints) {
+      if (!candidates.has(id)) candidates.set(id, hint.payload);
+    }
+
+    const ids = Array.from(candidates.keys());
+    const selected = [
+      ...ids.filter((id) => shownIds.has(id)),
+      ...ids.filter((id) => !shownIds.has(id)),
+    ].slice(0, MAX_REMOTE_PENGUINS);
+
+    const igloo = currentRoomId === 'igloo';
     const nextIds = new Set<string>();
-    for (const key of selected) {
-      const metas = state[key];
-      if (!metas) continue;
-      const parsed = parsePresencePayload(metas[metas.length - 1]);
-      if (!parsed) continue;
-      if (parsed.playerId !== key) continue;
-      nextIds.add(key);
-      if (!igloo) guarded('view.upsert failed', () => view.upsert(parsed));
+    for (const id of selected) {
+      nextIds.add(id);
+      const payload = candidates.get(id);
+      if (!igloo && payload) guarded('view.upsert failed', () => view.upsert(payload));
     }
     for (const id of shownIds) {
       if (nextIds.has(id)) continue;
       if (!igloo) guarded('view.remove failed', () => view.remove(id));
     }
     shownIds = nextIds;
+    armHintTimer();
   }
 
-  function handleBroadcast(type: RoomBroadcastEvent, raw: unknown): void {
+  function handleSync(ch: RoomChannelLike): void {
+    const state = ch.presenceState();
+    const next = new Map<string, SyncedPenguin>();
+    for (const key of Object.keys(state)) {
+      if (key === playerId) continue;
+      const metas = state[key];
+      if (!metas || metas.length === 0) continue;
+      const last: RemoteMeta = metas[metas.length - 1];
+      const parsed = parsePresencePayload(last);
+      if (!parsed) continue;
+      if (parsed.playerId !== key) continue;
+      const ref = typeof last.presence_ref === 'string' ? last.presence_ref : null;
+      next.set(key, { payload: parsed, ref });
+    }
+    synced = next;
+    reconcile();
+  }
+
+  function handleHello(raw: unknown): void {
+    if (currentRoomId === 'igloo') return;
+    const hello = parseBroadcast('presence:hello', raw);
+    if (!hello || hello.playerId === playerId) return;
+    const id = hello.playerId;
+    const wasShown = shownIds.has(id);
+    if (!wasShown && shownIds.size >= MAX_REMOTE_PENGUINS) return;
+
+    const t = now();
+    departed.delete(id);
+    hints.set(id, { payload: hello, at: t });
+    shownIds.add(id);
+    guarded('view.upsert failed', () => view.upsert(hello));
+    armHintTimer();
+
+    // A newcomer: tell it about us now rather than after Presence propagates.
+    if (wasShown || !channel || !subscribed) return;
+    const lastReply = lastReplyAt.get(id);
+    if (lastReply !== undefined && t - lastReply < HELLO_REPLY_INTERVAL_MS) return;
+    lastReplyAt.set(id, t);
+    sendHello(channel);
+  }
+
+  function handleBye(raw: unknown): void {
+    if (currentRoomId === 'igloo') return;
+    const bye = parseBroadcast('presence:bye', raw);
+    if (!bye || bye.playerId === playerId) return;
+    const id = bye.playerId;
+    hints.delete(id);
+    departed.set(id, { ref: synced.get(id)?.ref ?? null, at: now() });
+    if (shownIds.delete(id)) guarded('view.remove failed', () => view.remove(id));
+    armHintTimer();
+  }
+
+  function handleBroadcast(type: PublicBroadcastEvent, raw: unknown): void {
     if (currentRoomId === 'igloo') return;
     const payload = parseBroadcast(type, raw);
     if (!payload) return;
@@ -498,7 +680,9 @@ export function createRoomChannel(options: RoomChannelOptions): RoomChannel {
       for (const type of BROADCAST_EVENTS) {
         ch.onBroadcast(type, (raw) => {
           if (gen !== generation) return;
-          handleBroadcast(type, raw);
+          if (type === 'presence:hello') handleHello(raw);
+          else if (type === 'presence:bye') handleBye(raw);
+          else handleBroadcast(type, raw);
         });
       }
       ch.subscribe((status) => {
@@ -511,15 +695,38 @@ export function createRoomChannel(options: RoomChannelOptions): RoomChannel {
     }
   }
 
-  /** A Room change: clear the view and notify, then release the channel. */
+  /** Pushes a bye, waiting for it at most `BYE_TIMEOUT_MS` so a leave never blocks on it. */
+  async function sendBye(ch: RoomChannelLike): Promise<void> {
+    let sent: Promise<unknown>;
+    try {
+      sent = ch.send('presence:bye', { playerId }).catch((err: unknown) => {
+        onError('bye failed', err);
+      });
+    } catch (err) {
+      onError('bye failed', err);
+      return;
+    }
+    let expire: () => void = () => {};
+    const timeout = new Promise<void>((resolve) => {
+      expire = resolve;
+    });
+    const timer = scheduleTimer(() => expire(), BYE_TIMEOUT_MS);
+    await Promise.race([sent, timeout]);
+    cancelTimer(timer);
+  }
+
+  /** A Room change: clear the view and notify, then say bye and release the channel. */
   async function leaveRoom(): Promise<void> {
+    const sayBye = subscribed && currentRoomId !== 'igloo';
     const ch = detachChannel();
     currentRoomId = null;
-    shownIds = new Set();
+    resetRemoteState();
     cancelRejoinTimer();
     guarded('view.clear failed', () => view.clear());
     notifyRoomChange(null);
-    if (ch) await releaseChannel(ch);
+    if (!ch) return;
+    if (sayBye) await sendBye(ch);
+    await releaseChannel(ch);
   }
 
   async function enterRoom(roomId: RoomId, entryTile: Tile): Promise<void> {
@@ -534,8 +741,9 @@ export function createRoomChannel(options: RoomChannelOptions): RoomChannel {
 
   /**
    * A reconnect, not a Room change: tears down and re-creates the same
-   * Room's channel. Keeps `currentRoomId` and `shownIds` and never touches
-   * the view or `onRoomChange`; the next sync reconciles remote Penguins.
+   * Room's channel without a bye. Keeps `currentRoomId` and the remote
+   * Penguin state and never touches the view or `onRoomChange`; the next
+   * sync reconciles remote Penguins.
    */
   async function rebuildChannel(): Promise<void> {
     const roomId = currentRoomId;
@@ -562,7 +770,7 @@ export function createRoomChannel(options: RoomChannelOptions): RoomChannel {
       if (newFacing) facing = newFacing;
       if (channel && subscribed) track(channel, generation);
     },
-    async send<K extends RoomBroadcastEvent>(
+    async send<K extends PublicBroadcastEvent>(
       type: K,
       payload: SendablePayload<K>,
     ): Promise<boolean> {
@@ -574,7 +782,7 @@ export function createRoomChannel(options: RoomChannelOptions): RoomChannel {
       const status = await channel.send(type, parsed);
       return status === 'ok';
     },
-    on<K extends RoomBroadcastEvent>(
+    on<K extends PublicBroadcastEvent>(
       type: K,
       handler: (payload: RoomBroadcastMap[K]) => void,
     ): () => void {

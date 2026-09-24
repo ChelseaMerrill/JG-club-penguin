@@ -35,6 +35,7 @@ function createManualTimer(): {
   clearTimeout: typeof clearTimeout;
   scheduled: Array<{ id: number; delay: number }>;
   fireNext: () => void;
+  fireDelay: (delay: number) => void;
 } {
   let nextId = 1;
   const scheduled: Array<{ id: number; delay: number; cb: () => void }> = [];
@@ -58,6 +59,12 @@ function createManualTimer(): {
       const next = scheduled.shift();
       next?.cb();
     },
+    fireDelay(delay: number): void {
+      const index = scheduled.findIndex((entry) => entry.delay === delay);
+      if (index === -1) throw new Error(`no timer scheduled with delay ${delay}`);
+      const [entry] = scheduled.splice(index, 1);
+      entry.cb();
+    },
   };
 }
 
@@ -74,6 +81,8 @@ class FakeRoomChannel implements RoomChannelLike {
   sendResult: 'ok' | 'timed out' | 'error' = 'ok';
   trackResult: 'ok' | 'timed out' | 'error' = 'ok';
   untrackResult: Promise<unknown> | null = null;
+  /** Overrides the resolved `send` push status, e.g. with a never-settling promise. */
+  sendImpl: (() => Promise<string>) | null = null;
 
   private readonly statusCbs: Array<(status: RoomChannelStatus) => void> = [];
   private readonly syncCbs: Array<() => void> = [];
@@ -120,6 +129,7 @@ class FakeRoomChannel implements RoomChannelLike {
   send(event: RoomBroadcastEvent, payload: unknown): Promise<string> {
     this.log.push(`send:${this.name}`);
     this.sendCalls.push({ event, payload });
+    if (this.sendImpl) return this.sendImpl();
     return Promise.resolve(this.sendResult);
   }
 
@@ -422,7 +432,7 @@ describe('createRoomChannel', () => {
     const result = await rc.send('move', { target: { col: 1, row: 1 } });
 
     expect(result).toBe(false);
-    expect(client.channels[0].sendCalls).toEqual([]);
+    expect(busSends(client.channels[0])).toEqual([]);
   });
 
   it('send stamps playerId, resolves true and forwards the event once a channel is joined', async () => {
@@ -437,7 +447,7 @@ describe('createRoomChannel', () => {
     const result = await rc.send('move', { target: { col: 1, row: 1 } });
 
     expect(result).toBe(true);
-    expect(client.channels[0].sendCalls).toEqual([
+    expect(busSends(client.channels[0])).toEqual([
       { event: 'move', payload: { playerId: 'me', target: { col: 1, row: 1 } } },
     ]);
   });
@@ -456,7 +466,7 @@ describe('createRoomChannel', () => {
     const result = await rc.send('chat', { text: '  hi there  ' });
 
     expect(result).toBe(true);
-    expect(client.channels[0].sendCalls).toEqual([
+    expect(busSends(client.channels[0])).toEqual([
       { event: 'chat', payload: { playerId: 'me', text: 'hi there', sentAt: 12345 } },
     ]);
   });
@@ -473,7 +483,7 @@ describe('createRoomChannel', () => {
     const result = await rc.send('move', { target: { col: 256, row: 0 } });
 
     expect(result).toBe(false);
-    expect(client.channels[0].sendCalls).toEqual([]);
+    expect(busSends(client.channels[0])).toEqual([]);
   });
 
   it('send returns false when the underlying push status is not ok', async () => {
@@ -1085,5 +1095,385 @@ describe('SendablePayload typing', () => {
     expect(move.target).toEqual({ col: 0, row: 0 });
     expect(chat.text).toBe('hi');
     expect(spoofed).toBeDefined();
+  });
+});
+
+/** Enters Town Center and marks its channel SUBSCRIBED (tracked 'ok'). */
+async function joinTownCenter(
+  client: FakeClient,
+  events: TypedEmitter<GameEventMap>,
+): Promise<FakeRoomChannel> {
+  events.emit('room:enter', { roomId: 'town-center', entryTile: { col: 0, row: 0 } });
+  await flush();
+  const ch = client.channels[client.channels.length - 1];
+  ch.emitStatus('SUBSCRIBED');
+  await flush();
+  return ch;
+}
+
+/** Sends on the public Room bus, leaving out the channel's own hello/bye. */
+function busSends(ch: FakeRoomChannel): FakeRoomChannel['sendCalls'] {
+  return ch.sendCalls.filter((c) => !c.event.startsWith('presence:'));
+}
+
+function sendsOf(ch: FakeRoomChannel, event: RoomBroadcastEvent): unknown[] {
+  return ch.sendCalls.filter((c) => c.event === event).map((c) => c.payload);
+}
+
+describe('presence hello/bye fast path', () => {
+  it('shows a remote Penguin from a hello before any Presence sync, and dispatches its moves', async () => {
+    const { client, events, view } = setup();
+    const rc = createChannel(client, events, view, 'me');
+    const ch = await joinTownCenter(client, events);
+    const moves: unknown[] = [];
+    rc.on('move', (m) => moves.push(m));
+
+    ch.emitBroadcast('presence:hello', meta('other', { tile: { col: 3, row: 2 } }));
+    ch.emitBroadcast('move', { playerId: 'other', target: { col: 5, row: 5 } });
+
+    expect(view.upsertCalls).toEqual([
+      { playerId: 'other', look: NAMED_LOOK, tile: { col: 3, row: 2 }, facing: 'left' },
+    ]);
+    expect(moves).toEqual([{ playerId: 'other', target: { col: 5, row: 5 } }]);
+  });
+
+  it('sends a hello with the full payload after every acknowledged track, and none after an unacknowledged one', async () => {
+    const { client, events, view } = setup();
+    const rc = createChannel(client, events, view, 'me', NAMED_LOOK);
+    const ch = await joinTownCenter(client, events);
+
+    expect(sendsOf(ch, 'presence:hello')).toEqual([
+      { playerId: 'me', look: NAMED_LOOK, tile: { col: 0, row: 0 }, facing: 'right' },
+    ]);
+
+    const ada: PenguinLook = { ...NAMED_LOOK, name: 'Ada' };
+    rc.setLook(ada);
+    await flush();
+    rc.setTile({ col: 7, row: 8 }, 'left');
+    await flush();
+    expect(sendsOf(ch, 'presence:hello')).toEqual([
+      { playerId: 'me', look: NAMED_LOOK, tile: { col: 0, row: 0 }, facing: 'right' },
+      { playerId: 'me', look: ada, tile: { col: 0, row: 0 }, facing: 'right' },
+      { playerId: 'me', look: ada, tile: { col: 7, row: 8 }, facing: 'left' },
+    ]);
+
+    ch.trackResult = 'timed out';
+    rc.setTile({ col: 1, row: 1 });
+    await flush();
+    expect(sendsOf(ch, 'presence:hello')).toHaveLength(3);
+  });
+
+  it('sends no hello in the igloo, and ignores hellos there', async () => {
+    const { client, events, view } = setup();
+    createChannel(client, events, view, 'me');
+    events.emit('room:enter', { roomId: 'igloo', entryTile: { col: 0, row: 0 } });
+    await flush();
+    const ch = client.channels[0];
+    ch.emitStatus('SUBSCRIBED');
+    await flush();
+
+    ch.emitBroadcast('presence:hello', meta('other'));
+    await flush();
+
+    expect(ch.trackCalls).toHaveLength(1);
+    expect(ch.sendCalls).toEqual([]);
+    expect(view.upsertCalls).toEqual([]);
+  });
+
+  it('replies once with its own hello to a hello from a Penguin not shown yet', async () => {
+    const { client, events, view } = setup();
+    createChannel(client, events, view, 'me', NAMED_LOOK);
+    const ch = await joinTownCenter(client, events);
+    const ownHello = {
+      playerId: 'me',
+      look: NAMED_LOOK,
+      tile: { col: 0, row: 0 },
+      facing: 'right',
+    };
+
+    ch.emitBroadcast('presence:hello', meta('other'));
+    await flush();
+    expect(sendsOf(ch, 'presence:hello')).toEqual([ownHello, ownHello]);
+
+    // Already shown: no second reply.
+    ch.emitBroadcast('presence:hello', meta('other'));
+    await flush();
+    expect(sendsOf(ch, 'presence:hello')).toHaveLength(2);
+
+    // Shown via Presence first: no reply either.
+    ch.setPresenceState({ synced: [meta('synced')] });
+    ch.emitBroadcast('presence:hello', meta('synced'));
+    await flush();
+    expect(sendsOf(ch, 'presence:hello')).toHaveLength(2);
+  });
+
+  it('drops an invalid hello and never shows its own playerId', async () => {
+    const { client, events, view } = setup();
+    createChannel(client, events, view, 'me');
+    const ch = await joinTownCenter(client, events);
+
+    ch.emitBroadcast('presence:hello', meta('other', { tile: { col: 1.5, row: 0 } }));
+    ch.emitBroadcast('presence:hello', meta('me'));
+    ch.emitBroadcast('presence:hello', { playerId: 'other' });
+    await flush();
+
+    expect(view.upsertCalls).toEqual([]);
+    expect(sendsOf(ch, 'presence:hello')).toHaveLength(1);
+  });
+
+  it('respects the 50 remote Penguin cap for a hello, and does not reply to one it cannot show', async () => {
+    const { client, events, view } = setup();
+    createChannel(client, events, view, 'me');
+    const ch = await joinTownCenter(client, events);
+    const state: Record<string, Array<Record<string, unknown>>> = {};
+    for (let i = 0; i < 50; i++) state[`p${i}`] = [meta(`p${i}`)];
+    ch.setPresenceState(state);
+    const upserts = view.upsertCalls.length;
+
+    ch.emitBroadcast('presence:hello', meta('p50'));
+    await flush();
+
+    expect(view.upsertCalls).toHaveLength(upserts);
+    expect(sendsOf(ch, 'presence:hello')).toHaveLength(1);
+  });
+
+  it('rate-limits hello replies to one per sender per 2 s, using the injectable clock', async () => {
+    const { client, events, view } = setup();
+    let t = 10_000;
+    createChannel(client, events, view, 'me', NAMED_LOOK, { now: () => t });
+    const ch = await joinTownCenter(client, events);
+
+    ch.emitBroadcast('presence:hello', meta('other'));
+    await flush();
+    expect(sendsOf(ch, 'presence:hello')).toHaveLength(2);
+
+    ch.emitBroadcast('presence:bye', { playerId: 'other' });
+    t += 1999;
+    ch.emitBroadcast('presence:hello', meta('other'));
+    await flush();
+    expect(view.upsertCalls.filter((p) => p.playerId === 'other')).toHaveLength(2);
+    expect(sendsOf(ch, 'presence:hello')).toHaveLength(2);
+
+    ch.emitBroadcast('presence:bye', { playerId: 'other' });
+    t += 1;
+    ch.emitBroadcast('presence:hello', meta('other'));
+    await flush();
+    expect(sendsOf(ch, 'presence:hello')).toHaveLength(3);
+  });
+
+  it('keeps a hinted Penguin missing from sync for a 5 s grace after its last hello, then lets sync win', async () => {
+    const { client, events, view } = setup();
+    const timer = createManualTimer();
+    let t = 0;
+    createChannel(client, events, view, 'me', NAMED_LOOK, {
+      now: () => t,
+      setTimeout: timer.setTimeout,
+      clearTimeout: timer.clearTimeout,
+    });
+    const ch = await joinTownCenter(client, events);
+
+    ch.emitBroadcast('presence:hello', meta('other'));
+    t = 1000;
+    ch.setPresenceState({});
+    expect(view.removeCalls).toEqual([]);
+
+    // A newer hello restarts the grace.
+    t = 3000;
+    ch.emitBroadcast('presence:hello', meta('other'));
+    t = 7999;
+    ch.setPresenceState({});
+    expect(view.removeCalls).toEqual([]);
+
+    // Grace expiry needs no further sync to remove the Penguin.
+    t = 8000;
+    expect(timer.scheduled).toHaveLength(1);
+    timer.fireNext();
+    expect(view.removeCalls).toEqual(['other']);
+    expect(timer.scheduled).toEqual([]);
+  });
+
+  it('prefers the hinted look over a lagging sync during the grace', async () => {
+    const { client, events, view } = setup();
+    let t = 0;
+    createChannel(client, events, view, 'me', NAMED_LOOK, { now: () => t });
+    const ch = await joinTownCenter(client, events);
+    const ada: PenguinLook = { ...NAMED_LOOK, name: 'Ada' };
+    ch.setPresenceState({ other: [meta('other')] });
+
+    ch.emitBroadcast('presence:hello', meta('other', { look: ada }));
+    t = 100;
+    ch.setPresenceState({ other: [meta('other')] });
+
+    expect(view.upsertCalls[view.upsertCalls.length - 1].look).toEqual(ada);
+  });
+
+  it('a bye removes the Penguin, and a lagging sync with the same presence_ref does not re-add it until it drops out', async () => {
+    const { client, events, view } = setup();
+    const rc = createChannel(client, events, view, 'me');
+    const ch = await joinTownCenter(client, events);
+    const moves: unknown[] = [];
+    rc.on('move', (m) => moves.push(m));
+    const stale = { other: [meta('other', { presence_ref: 'r1' })] };
+    ch.setPresenceState(stale);
+    const upserts = view.upsertCalls.length;
+
+    ch.emitBroadcast('presence:bye', { playerId: 'other' });
+    expect(view.removeCalls).toEqual(['other']);
+
+    ch.setPresenceState(stale);
+    ch.emitBroadcast('move', { playerId: 'other', target: { col: 1, row: 1 } });
+    expect(view.upsertCalls).toHaveLength(upserts);
+    expect(moves).toEqual([]);
+
+    // Once it drops out of sync, a later listing shows it again.
+    ch.setPresenceState({});
+    ch.setPresenceState(stale);
+    expect(view.upsertCalls).toHaveLength(upserts + 1);
+    expect(view.removeCalls).toEqual(['other']);
+  });
+
+  it('a different presence_ref or a new hello un-departs a Penguin', async () => {
+    const { client, events, view } = setup();
+    createChannel(client, events, view, 'me');
+    const ch = await joinTownCenter(client, events);
+    ch.setPresenceState({
+      a: [meta('a', { presence_ref: 'a1' })],
+      b: [meta('b', { presence_ref: 'b1' })],
+    });
+    ch.emitBroadcast('presence:bye', { playerId: 'a' });
+    ch.emitBroadcast('presence:bye', { playerId: 'b' });
+    view.upsertCalls = [];
+
+    ch.emitBroadcast('presence:hello', meta('b'));
+    ch.setPresenceState({
+      a: [meta('a', { presence_ref: 'a2' })],
+      b: [meta('b', { presence_ref: 'b1' })],
+    });
+
+    expect(new Set(view.upsertCalls.map((p) => p.playerId))).toEqual(new Set(['a', 'b']));
+    expect(view.removeCalls).toEqual(['a', 'b']);
+  });
+
+  it('a bye from a Penguin only hinted so far suppresses its lagging Presence join', async () => {
+    const { client, events, view } = setup();
+    createChannel(client, events, view, 'me');
+    const ch = await joinTownCenter(client, events);
+
+    ch.emitBroadcast('presence:hello', meta('other'));
+    ch.emitBroadcast('presence:bye', { playerId: 'other' });
+    const upserts = view.upsertCalls.length;
+    ch.setPresenceState({ other: [meta('other', { presence_ref: 'r1' })] });
+
+    expect(view.upsertCalls).toHaveLength(upserts);
+    expect(view.removeCalls).toEqual(['other']);
+  });
+
+  it('drops an invalid bye', async () => {
+    const { client, events, view } = setup();
+    createChannel(client, events, view, 'me');
+    const ch = await joinTownCenter(client, events);
+    showOther(ch, 'other');
+
+    ch.emitBroadcast('presence:bye', { playerId: '' });
+    ch.emitBroadcast('presence:bye', { playerId: 'x'.repeat(65) });
+    ch.emitBroadcast('presence:bye', 'other');
+
+    expect(view.removeCalls).toEqual([]);
+  });
+
+  it('never dispatches hello or bye to on() listeners', async () => {
+    const { client, events, view } = setup();
+    const rc = createChannel(client, events, view, 'me');
+    const ch = await joinTownCenter(client, events);
+    const received: unknown[] = [];
+    // Bypass the public typing to prove the runtime guarantee too.
+    const untypedOn = rc.on as unknown as (type: string, h: (p: unknown) => void) => () => void;
+    untypedOn('presence:hello', (p) => received.push(p));
+    untypedOn('presence:bye', (p) => received.push(p));
+
+    ch.emitBroadcast('presence:hello', meta('other'));
+    ch.emitBroadcast('presence:bye', { playerId: 'other' });
+
+    expect(received).toEqual([]);
+  });
+
+  it('sends a bye before removeChannel on a Room leave and on stop(), only while joined', async () => {
+    const { client, events, view } = setup();
+    const rc = createChannel(client, events, view, 'me');
+    const ch1 = await joinTownCenter(client, events);
+    client.log.length = 0;
+
+    events.emit('room:leave', { roomId: 'town-center' });
+    await flush();
+    expect(client.log).toEqual(['send:room:town-center', 'removeChannel:room:town-center']);
+    expect(sendsOf(ch1, 'presence:bye')).toEqual([{ playerId: 'me' }]);
+
+    events.emit('room:enter', { roomId: 'dev-pit', entryTile: { col: 0, row: 0 } });
+    await flush();
+    const unjoined = client.channels[1];
+    events.emit('room:leave', { roomId: 'dev-pit' });
+    await flush();
+    expect(unjoined.sendCalls).toEqual([]);
+
+    const ch3 = await joinTownCenter(client, events);
+    await rc.stop();
+    expect(sendsOf(ch3, 'presence:bye')).toEqual([{ playerId: 'me' }]);
+  });
+
+  it('a reconnect rebuild sends no bye', async () => {
+    const { client, events, view } = setup();
+    const timer = createManualTimer();
+    createChannel(client, events, view, 'me', DEFAULT_LOOK, {
+      setTimeout: timer.setTimeout,
+      clearTimeout: timer.clearTimeout,
+    });
+    const ch1 = await joinTownCenter(client, events);
+
+    ch1.trackResult = 'error';
+    ch1.emitStatus('SUBSCRIBED');
+    await flush();
+    timer.fireDelay(1000);
+    await flush();
+
+    expect(client.channels).toHaveLength(2);
+    expect(sendsOf(ch1, 'presence:bye')).toEqual([]);
+  });
+
+  it('a leave whose bye never settles still progresses after 300 ms', async () => {
+    const { client, events, view } = setup();
+    const timer = createManualTimer();
+    createChannel(client, events, view, 'me', DEFAULT_LOOK, {
+      setTimeout: timer.setTimeout,
+      clearTimeout: timer.clearTimeout,
+    });
+    const ch = await joinTownCenter(client, events);
+    ch.sendImpl = () => hang() as Promise<string>;
+
+    events.emit('room:leave', { roomId: 'town-center' });
+    events.emit('room:enter', { roomId: 'dev-pit', entryTile: { col: 0, row: 0 } });
+    await flush();
+    expect(view.clearCalls).toBe(1);
+    expect(client.log).not.toContain('removeChannel:room:town-center');
+
+    timer.fireDelay(300);
+    await flush();
+    expect(client.log).toContain('removeChannel:room:town-center');
+    expect(client.channels.some((c) => c.name === 'room:dev-pit')).toBe(true);
+  });
+});
+
+describe('internal broadcast typing', () => {
+  it('keeps hello and bye out of the public send/on typing (compile-time check)', () => {
+    const { client, events, view } = setup();
+    const rc = createChannel(client, events, view);
+    // @ts-expect-error hello is sent by the Room channel itself
+    void rc.send('presence:hello', {
+      look: DEFAULT_LOOK,
+      tile: { col: 0, row: 0 },
+      facing: 'left',
+    });
+    // @ts-expect-error bye is consumed by the Room channel itself
+    rc.on('presence:bye', () => {});
+    expect(rc.currentRoom()).toBeNull();
   });
 });
