@@ -2,6 +2,7 @@ import type { Eyes, Hat, Pattern, PenguinLook } from '../../contracts';
 import { DESIGN_TO_VIEWBOX_SCALE } from './design-scale';
 import { penguinLookHash } from './look-hash';
 import { type PenguinPose, resolvePenguinFramePose } from './poses';
+import { PENGUIN_TEXT_PATHS } from './text-paths';
 
 /**
  * The design's own figure box (`design/Penguin Creator.dc.html`'s
@@ -50,7 +51,6 @@ const ACCENT = '#00BDFF';
 const SEAT_FILL = '#3a4046';
 const SNORKEL_MASK = '#F2C12E';
 const SNORKEL_LENS = '#BFE3F0';
-const BAND_TEXT = '#161719';
 
 /**
  * The SIT seat, converted from the design's own CSS box (#31 review fix 1):
@@ -101,7 +101,7 @@ function renderPattern(pattern: Pattern, bodyColor: string): string {
     case 'STRIPES':
       return `<g fill="${bodyColor}" opacity=".55"><rect x="30" y="56" width="60" height="5"></rect><rect x="30" y="68" width="60" height="5"></rect><rect x="30" y="80" width="60" height="5"></rect><rect x="30" y="92" width="60" height="5"></rect><rect x="30" y="104" width="60" height="5"></rect></g>`;
     case 'JG LOGO':
-      return `<g><polygon points="60,64 74,72 74,88 60,96 46,88 46,72" fill="${STROKE}"></polygon><text x="60" y="85" text-anchor="middle" font-family="Anton, Impact, sans-serif" font-size="13" fill="${ACCENT}">JG</text></g>`;
+      return `<g><polygon points="60,64 74,72 74,88 60,96 46,88 46,72" fill="${STROKE}"></polygon><path d="${PENGUIN_TEXT_PATHS.jgLogo.d}" fill="${PENGUIN_TEXT_PATHS.jgLogo.fill}"></path></g>`;
     case 'PIXEL HEART':
       return `<g fill="${ACCENT}"><rect x="50" y="68" width="6" height="6"></rect><rect x="64" y="68" width="6" height="6"></rect><rect x="44" y="74" width="32" height="6"></rect><rect x="47" y="80" width="26" height="6"></rect><rect x="51" y="86" width="18" height="6"></rect><rect x="57" y="92" width="6" height="6"></rect></g>`;
     case 'SNOWFLAKE':
@@ -136,7 +136,7 @@ function renderHat(hat: Hat, capColor: string): string {
     case 'HEADPHONES':
       return `<g><path d="M30 34 C30 10 90 10 90 34" fill="none" stroke="${STROKE}" stroke-width="5"></path><rect x="24" y="28" width="10" height="16" rx="4" fill="${capColor}" stroke="${STROKE}" stroke-width="2"></rect><rect x="86" y="28" width="10" height="16" rx="4" fill="${capColor}" stroke="${STROKE}" stroke-width="2"></rect></g>`;
     case 'WAR WEEK BAND':
-      return `<g><path d="M28 26 L92 26 L92 34 L28 34 Z" fill="${capColor}" stroke="${STROKE}" stroke-width="2"></path><path d="M88 26 L100 30 L98 60 L90 58 Z" fill="${capColor}" stroke="${STROKE}" stroke-width="2"></path><text x="60" y="32.5" text-anchor="middle" font-family="Anton, Impact, sans-serif" font-size="7" fill="${BAND_TEXT}" letter-spacing="1">WAR WEEK</text></g>`;
+      return `<g><path d="M28 26 L92 26 L92 34 L28 34 Z" fill="${capColor}" stroke="${STROKE}" stroke-width="2"></path><path d="M88 26 L100 30 L98 60 L90 58 Z" fill="${capColor}" stroke="${STROKE}" stroke-width="2"></path><path d="${PENGUIN_TEXT_PATHS.warWeek.d}" fill="${PENGUIN_TEXT_PATHS.warWeek.fill}"></path></g>`;
     case 'NONE':
     default:
       return '';
@@ -185,7 +185,7 @@ export function renderPenguinSvg(
     : '';
 
   const haha = framePose.showHaha
-    ? `<text x="100" y="30" font-family="Bumbastika, Anton, sans-serif" font-size="14" fill="${ACCENT}">HA HA</text>`
+    ? `<path d="${PENGUIN_TEXT_PATHS.haha.d}" fill="${PENGUIN_TEXT_PATHS.haha.fill}"></path>`
     : '';
 
   const figure = [
