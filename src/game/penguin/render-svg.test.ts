@@ -14,18 +14,20 @@ import {
 import { PENGUIN_ANIMS, PENGUIN_FRAMES } from './poses';
 import {
   PENGUIN_FRAME_HEIGHT,
-  PENGUIN_FRAME_PADDING,
+  PENGUIN_FRAME_PADDING_X,
+  PENGUIN_FRAME_PADDING_Y,
   PENGUIN_FRAME_WIDTH,
   PENGUIN_VIEWBOX_HEIGHT,
   PENGUIN_VIEWBOX_WIDTH,
   renderPenguinSvg,
 } from './render-svg';
+import { PENGUIN_TEXT_PATHS } from './text-paths';
 
 // Distinct from every colour in render-svg.ts's own fixed palette (STROKE
-// `#0C4B5F`, EYE_WHITE/BAND_TEXT `#F4F4F4`/`#161719`, EYE_PUPIL `#161719`,
-// ACCENT `#00BDFF`, SEAT_FILL `#3a4046`, SNORKEL_MASK `#F2C12E`,
-// SNORKEL_LENS `#BFE3F0`) and from `DEFAULT_LOOK`'s own colours, so a fill
-// assertion can only be satisfied by the part it names (#31 review fix 8).
+// `#0C4B5F`, EYE_WHITE `#F4F4F4`, EYE_PUPIL `#161719`, ACCENT `#00BDFF`,
+// SEAT_FILL `#3a4046`, SNORKEL_MASK `#F2C12E`, SNORKEL_LENS `#BFE3F0`) and
+// from `DEFAULT_LOOK`'s own colours, so a fill assertion can only be
+// satisfied by the part it names (#31 review fix 8).
 const CUSTOM_BODY = '#123456';
 const CUSTOM_BELLY = '#abcdef';
 const CUSTOM_BEAK = '#a1b2c3';
@@ -38,7 +40,6 @@ const ROUND_EYE_RIGHT = 'cx="70" cy="34" r="4.5"';
 const ROUND_EYE_RADIUS_ATTR = 'r="4.5"';
 const WINK_EYE_LINE = 'M65 34 L75 34';
 const STAR_EYE_POLYGON_START = 'polygon points="50,28';
-const HAHA_TEXT = 'HA HA';
 
 function assertValidSvg(svg: string): Document {
   const doc = new DOMParser().parseFromString(svg, 'image/svg+xml');
@@ -137,7 +138,7 @@ describe('renderPenguinSvg', () => {
         expect(svg).not.toContain(ROUND_EYE_RADIUS_ATTR);
         expect(svg).not.toContain(WINK_EYE_LINE);
         expect(svg).not.toContain(STAR_EYE_POLYGON_START);
-        expect(svg).toContain(HAHA_TEXT);
+        expect(svg).toContain(PENGUIN_TEXT_PATHS.haha.d);
       }
     }
   });
@@ -154,10 +155,10 @@ describe('renderPenguinSvg', () => {
     const width = Number(rect!.getAttribute('width'));
     const height = Number(rect!.getAttribute('height'));
 
-    const minX = -PENGUIN_FRAME_PADDING;
-    const minY = -PENGUIN_FRAME_PADDING;
-    const maxX = PENGUIN_VIEWBOX_WIDTH + PENGUIN_FRAME_PADDING;
-    const maxY = PENGUIN_VIEWBOX_HEIGHT + PENGUIN_FRAME_PADDING;
+    const minX = -PENGUIN_FRAME_PADDING_X;
+    const minY = -PENGUIN_FRAME_PADDING_Y;
+    const maxX = PENGUIN_VIEWBOX_WIDTH + PENGUIN_FRAME_PADDING_X;
+    const maxY = PENGUIN_VIEWBOX_HEIGHT + PENGUIN_FRAME_PADDING_Y;
     expect(maxX - minX).toBe(PENGUIN_FRAME_WIDTH);
     expect(maxY - minY).toBe(PENGUIN_FRAME_HEIGHT);
 
@@ -165,6 +166,28 @@ describe('renderPenguinSvg', () => {
     expect(y).toBeGreaterThanOrEqual(minY);
     expect(x + width).toBeLessThanOrEqual(maxX);
     expect(y + height).toBeLessThanOrEqual(maxY);
+  });
+
+  it('never draws a <text> element, for any hat, pattern, eyes option or anim frame (#62 D3)', () => {
+    // Browsers don't let an SVG loaded as an `<img>`/Phaser texture use the
+    // page's web fonts, so any `<text>` here would fall back to a system
+    // font in Rooms (#62); the JG LOGO/WAR WEEK BAND/"HA HA" strings must be
+    // pre-baked `<path>` outlines instead (`PENGUIN_TEXT_PATHS`).
+    for (const hat of HATS) {
+      expect(renderPenguinSvg({ ...DEFAULT_LOOK, hat })).not.toContain('<text');
+    }
+    for (const pattern of PATTERNS) {
+      expect(renderPenguinSvg({ ...DEFAULT_LOOK, pattern })).not.toContain('<text');
+    }
+    for (const eyes of EYES) {
+      expect(renderPenguinSvg({ ...DEFAULT_LOOK, eyes })).not.toContain('<text');
+    }
+    for (const anim of PENGUIN_ANIMS) {
+      const frameCount = PENGUIN_FRAMES[anim];
+      for (let frame = 0; frame < frameCount; frame++) {
+        expect(renderPenguinSvg(DEFAULT_LOOK, { anim, frame })).not.toContain('<text');
+      }
+    }
   });
 
   it('accepts an idPrefix so multiple inline renders never clash on clipPath ids (#31 review fix 7)', () => {

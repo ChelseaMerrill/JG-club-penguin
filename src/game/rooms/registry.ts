@@ -29,6 +29,11 @@ const BY_ID: ReadonlyMap<RoomId, RoomDefinition> = new Map(
   ROOM_DEFINITIONS.map((room) => [room.id, room]),
 );
 
+/** Whether `id` has a registered `RoomDefinition` (only some Rooms are built so far). */
+export function hasRoomDefinition(id: RoomId): boolean {
+  return BY_ID.has(id);
+}
+
 /** Throws if `id` has no registered `RoomDefinition` (e.g. not built yet). */
 export function getRoomDefinition(id: RoomId): RoomDefinition {
   const room = BY_ID.get(id);
