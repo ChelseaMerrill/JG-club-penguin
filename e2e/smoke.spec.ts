@@ -35,10 +35,11 @@ test('smoke-canvas-and-ui-layer', async ({ page }) => {
   });
   expect(Number(uiZ)).toBeGreaterThan(gameZ === 'auto' ? 0 : Number(gameZ));
 
-  // The top element at the canvas centre is the canvas itself (the #ui layer lets input through).
+  // The top element 10px inside the canvas's top-left corner (off the
+  // centered login card) is the canvas itself (the #ui layer lets input through).
   const hit = await page.evaluate(
     ([x, y]) => document.elementFromPoint(x, y)?.tagName,
-    [canvasBox!.x + canvasBox!.width / 2, canvasBox!.y + canvasBox!.height / 2],
+    [canvasBox!.x + 10, canvasBox!.y + 10],
   );
   expect(hit).toBe('CANVAS');
 
