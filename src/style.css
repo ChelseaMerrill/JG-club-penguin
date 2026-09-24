@@ -153,11 +153,13 @@ body {
   cursor: pointer;
 }
 
-/* Signed-in: a top-right badge (name, color swatch, sign out). */
+/* Signed-in: a badge (name, color swatch, sign out) under the HUD's
+   top-right cluster (tokens/PENGUIN/MENU end at top:28px + 40px tall), so
+   the two never overlap. */
 .player-badge {
   position: absolute;
-  top: 1rem;
-  right: 1rem;
+  top: 76px;
+  right: 36px;
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -188,4 +190,179 @@ body {
 .login-card[hidden],
 .player-badge[hidden] {
   display: none;
+}
+
+/* HUD (#32): Room title, Token balance, MENU/PENGUIN, and the bottom bar's
+   chat slot / MAP / IGLOO. Reproduces design/Room 01 Town Center.dc.html and
+   design/Club JenGuin HUD Menus.dc.html in Stage pixels (the `#ui` layer is
+   fixed at 1600x900 and scaled by mountStage). Shown on sign-in, hidden on
+   sign-out (src/main.ts). */
+.hud {
+  position: absolute;
+  inset: 0;
+}
+
+.hud[hidden] {
+  display: none;
+}
+
+.hud__title-block {
+  position: absolute;
+  top: 28px;
+  left: 36px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.hud__title {
+  font-family: var(--font-game-display);
+  font-size: 44px;
+  line-height: 1;
+  color: #00bdff;
+  -webkit-text-stroke: 5px #0c4b5f;
+  paint-order: stroke fill;
+  text-shadow: 0 4px 0 #0c4b5f;
+}
+
+.hud__subtitle {
+  font:
+    400 13px 'Anton',
+    sans-serif;
+  letter-spacing: 0.22em;
+  color: #f4f4f4;
+}
+
+.hud__top-right {
+  position: absolute;
+  top: 28px;
+  right: 36px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.hud__tokens {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 16px;
+  background: rgba(22, 23, 25, 0.88);
+  border: 2px solid #0c4b5f;
+  border-radius: 999px;
+  font:
+    400 18px 'Anton',
+    sans-serif;
+  letter-spacing: 0.06em;
+  color: #f4f4f4;
+}
+
+.hud__tokens-icon {
+  width: 18px;
+  height: 20px;
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  background: #00bdff;
+}
+
+/* The top-right pill buttons (PENGUIN, MENU): the design's rounded-hexagon
+   "clip-path" chip, #0C4B5F fill. */
+.hud__button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  padding: 0 18px;
+  border: none;
+  background: #0c4b5f;
+  clip-path: polygon(
+    12px 0,
+    calc(100% - 12px) 0,
+    100% 50%,
+    calc(100% - 12px) 100%,
+    12px 100%,
+    0 50%
+  );
+  font:
+    400 15px 'Anton',
+    sans-serif;
+  letter-spacing: 0.1em;
+  color: #f4f4f4;
+  cursor: pointer;
+}
+
+.hud__button[hidden] {
+  display: none;
+}
+
+.hud__menu-panel {
+  position: absolute;
+  top: 76px;
+  right: 36px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  background: rgba(22, 23, 25, 0.94);
+  border: 2px solid #0c4b5f;
+}
+
+.hud__menu-panel[hidden] {
+  display: none;
+}
+
+.hud__menu-signout {
+  height: 36px;
+  padding: 0 16px;
+  border: none;
+  background: #0c4b5f;
+  font:
+    400 14px 'Anton',
+    sans-serif;
+  letter-spacing: 0.08em;
+  color: #f4f4f4;
+  cursor: pointer;
+}
+
+.hud__bottom-bar {
+  position: absolute;
+  left: 36px;
+  right: 36px;
+  bottom: 28px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.hud__chat-slot {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  height: 52px;
+  padding: 0 18px;
+  background: rgba(22, 23, 25, 0.9);
+  border: 2px solid #0c4b5f;
+  font:
+    400 16px 'Libre Franklin',
+    sans-serif;
+  color: #b3b6c9;
+}
+
+/* The bottom bar's hexagon buttons (EMOTE, SNOWBALL, MAP, IGLOO, QUESTS). */
+.hud__button--bottom {
+  height: 52px;
+  padding: 0 26px;
+  clip-path: polygon(
+    14px 0,
+    calc(100% - 14px) 0,
+    100% 50%,
+    calc(100% - 14px) 100%,
+    14px 100%,
+    0 50%
+  );
+  font-family: var(--font-game-display);
+  font-size: 20px;
+  letter-spacing: 0.04em;
+  box-shadow: inset 0 -5px 0 #06303d;
+  color: #f4f4f4;
 }
