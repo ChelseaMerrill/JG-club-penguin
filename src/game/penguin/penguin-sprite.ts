@@ -4,7 +4,8 @@ import { penguinLookHash } from './look-hash';
 import { PENGUIN_FRAME_MS, PENGUIN_FRAMES, type PenguinAnim } from './poses';
 import {
   PENGUIN_FRAME_HEIGHT,
-  PENGUIN_FRAME_PADDING,
+  PENGUIN_FRAME_PADDING_X,
+  PENGUIN_FRAME_PADDING_Y,
   PENGUIN_FRAME_WIDTH,
   PENGUIN_ORIGIN,
 } from './render-svg';
@@ -60,8 +61,8 @@ export function createPenguin(
   look: PenguinLook,
   state?: PenguinInitialState,
 ): Penguin {
-  const originX = (PENGUIN_ORIGIN.x + PENGUIN_FRAME_PADDING) / PENGUIN_FRAME_WIDTH;
-  const originY = (PENGUIN_ORIGIN.y + PENGUIN_FRAME_PADDING) / PENGUIN_FRAME_HEIGHT;
+  const originX = (PENGUIN_ORIGIN.x + PENGUIN_FRAME_PADDING_X) / PENGUIN_FRAME_WIDTH;
+  const originY = (PENGUIN_ORIGIN.y + PENGUIN_FRAME_PADDING_Y) / PENGUIN_FRAME_HEIGHT;
 
   let currentLook = look;
   let currentHash = penguinLookHash(look);
