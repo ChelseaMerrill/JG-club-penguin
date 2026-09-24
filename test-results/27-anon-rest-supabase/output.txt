@@ -1,0 +1,13 @@
+# AC1 post-check after gate H1: anon-key requests to the real Supabase REST API, 2026-09-24.
+# curl -s "$VITE_SUPABASE_URL/rest/v1/<table>?select=*" -H "apikey: $ANON" -H "Authorization: Bearer $ANON"
+# (keys come from the local .env and are not recorded here)
+GET players          401 "code":"42501"
+GET player_badges    401 "code":"42501"
+GET minigame_bests   401 "code":"42501"
+GET minigame_rounds  401 "code":"42501"
+GET shop_items       401 "code":"42501"
+GET player_items     401 "code":"42501"
+GET igloo_slots      401 "code":"42501"
+POST rpc/record_round   401 "code":"42501"
+POST rpc/purchase_item  401 "code":"42501"
+# GET /auth/v1/settings: external.anonymous_users = false, external.google = true

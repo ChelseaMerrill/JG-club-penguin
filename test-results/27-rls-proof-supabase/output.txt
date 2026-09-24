@@ -1,0 +1,44 @@
+# Gate H2: supabase/tests/27_rls_proof.sql run by the operator in the Supabase SQL editor
+# against the #9 fixture Player, after gate H1 applied the migration at c9be48d. 2026-09-24.
+# The operator pasted the table on #27. It contains no ids or emails.
+
+| check_name                                          | pass | detail |
+| --------------------------------------------------- | ---- | ------ |
+| fixture_sees_only_own_players_row                   | true | visible players rows=1 (expected 1) |
+| direct_update_tokens_blocked_42501                  | true | sqlstate=42501 sqlerrm=permission denied for table players |
+| direct_update_tokens_balance_unchanged              | true | tokens=100 (expected 100) |
+| direct_insert_player_badges_blocked_42501           | true | sqlstate=42501 sqlerrm=permission denied for table player_badges |
+| direct_insert_minigame_bests_blocked_42501          | true | sqlstate=42501 sqlerrm=permission denied for table minigame_bests |
+| direct_insert_minigame_rounds_blocked_42501         | true | sqlstate=42501 sqlerrm=permission denied for table minigame_rounds |
+| direct_insert_player_items_blocked_42501            | true | sqlstate=42501 sqlerrm=permission denied for table player_items |
+| fixture_sees_zero_of_b_player_badges                | true | visible rows=0 (expected 0) |
+| fixture_sees_zero_of_b_player_items                 | true | visible rows=0 (expected 0) |
+| fixture_sees_zero_of_b_minigame_bests               | true | visible rows=0 (expected 0) |
+| fixture_sees_zero_of_b_minigame_rounds              | true | visible rows=0 (expected 0) |
+| fixture_sees_zero_of_b_igloo_slots                  | true | visible rows=0 (expected 0) |
+| igloo_slot_unowned_item_blocked_23503               | true | sqlstate=23503 sqlerrm=insert or update on table "igloo_slots" violates foreign key constraint "igloo_slots_player_id_item_id_fkey" |
+| igloo_slot_wrong_player_blocked_42501               | true | sqlstate=42501 sqlerrm=new row violates row-level security policy for table "igloo_slots" |
+| record_round_burnt_floored_tokens_awarded_zero      | true | tokensAwarded=0 (expected 0) |
+| record_round_burnt_floored_balance_100              | true | balance=100 (expected 100) |
+| record_round_second_round_too_soon                  | true | sqlerrm=round_too_soon |
+| record_round_badge_tokens_awarded_capped_400        | true | tokensAwarded=400 (expected 400) |
+| record_round_badge_earned_true                      | true | badgeEarned=true (expected true) |
+| record_round_badge_balance_550                      | true | balance=550 (expected 550) |
+| record_round_badge_paid_once_badge_earned_false     | true | badgeEarned=false (expected false) |
+| record_round_badge_paid_once_balance_560            | true | balance=560 (expected 560) |
+| purchase_item_insufficient_tokens_error             | true | sqlerrm=insufficient_tokens |
+| purchase_item_insufficient_tokens_balance_unchanged | true | tokens=10 (expected 10) |
+| purchase_item_desk_success_balance_20               | true | balance=20 (expected 20) |
+| purchase_item_desk_already_owned_error              | true | sqlerrm=already_owned |
+| purchase_item_hoverboard_unknown_item_error         | true | sqlerrm=unknown_item |
+| anon_select_players_blocked_42501                   | true | sqlstate=42501 sqlerrm=permission denied for table players |
+| anon_select_player_badges_blocked_42501             | true | sqlstate=42501 sqlerrm=permission denied for table player_badges |
+| anon_select_minigame_bests_blocked_42501            | true | sqlstate=42501 sqlerrm=permission denied for table minigame_bests |
+| anon_select_minigame_rounds_blocked_42501           | true | sqlstate=42501 sqlerrm=permission denied for table minigame_rounds |
+| anon_select_shop_items_blocked_42501                | true | sqlstate=42501 sqlerrm=permission denied for table shop_items |
+| anon_select_player_items_blocked_42501              | true | sqlstate=42501 sqlerrm=permission denied for table player_items |
+| anon_select_igloo_slots_blocked_42501               | true | sqlstate=42501 sqlerrm=permission denied for table igloo_slots |
+| anon_purchase_item_blocked_42501                    | true | sqlstate=42501 sqlerrm=permission denied for function purchase_item |
+| anon_record_round_blocked_42501                     | true | sqlstate=42501 sqlerrm=permission denied for function record_round |
+| anon_insert_players_blocked_42501                   | true | sqlstate=42501 sqlerrm=permission denied for table players |
+| ALL                                                 | true | 37 checks, all pass = t |
