@@ -69,7 +69,7 @@ export interface RealtimeClientLike {
   removeChannel(ch: RoomChannelLike): Promise<string>;
 }
 
-/** Where validated remote Presence is rendered (the #31 renderer, stubbed in `penguin-sprites.ts`). */
+/** Where validated remote Presence is rendered (the #31 renderer, via `src/game/rooms/room-penguin-view.ts`). */
 export interface RemotePenguinView {
   upsert(p: PresencePayload): void;
   remove(playerId: string): void;

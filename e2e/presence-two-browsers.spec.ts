@@ -45,6 +45,13 @@ async function waitUntilJoined(page: Page): Promise<void> {
   await expect(overlay).toHaveAttribute('data-subscribed', 'true', { timeout: READY_TIMEOUT });
 }
 
+/** The Room `RoomScene` is showing, via the `VITE_E2E_HOOKS` `window.__roomDebug` hook. */
+async function shownRoom(page: Page): Promise<string | undefined> {
+  return page.evaluate(
+    () => (window as unknown as { __roomDebug?: { roomId: string } }).__roomDebug?.roomId,
+  );
+}
+
 async function readJsonAttribute(locator: Locator, name: string): Promise<unknown> {
   return JSON.parse((await locator.getAttribute(name)) ?? 'null') as unknown;
 }
@@ -127,9 +134,11 @@ test('presence-two-browsers', async ({ browser, baseURL }) => {
     for (let i = 0; i < 5; i++) {
       await pageA.click('button[data-room="dev-pit"]');
       await expect(rosterOnB(idA)).toHaveCount(0, { timeout: PROPAGATION_TIMEOUT });
+      await expect.poll(() => shownRoom(pageA)).toBe('dev-pit');
 
       await pageA.click('button[data-room="town-center"]');
       await expect(rosterOnB(idA)).toHaveCount(1, { timeout: PROPAGATION_TIMEOUT });
+      await expect.poll(() => shownRoom(pageA)).toBe('town-center');
 
       expect(await pageA.locator('ul.debug-roster li').count()).toBeLessThanOrEqual(1);
     }

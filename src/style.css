@@ -613,15 +613,20 @@ body {
   color: var(--fg-primary);
 }
 
-/* Debug overlay (stand-in for #15/#33/#35), mounted only under `?debug`. */
+/* Debug overlay (stand-in for #15/#33/#35), mounted only under `?debug`.
+   Stage pixels: on the left, below the HUD's Room title block and above its
+   bottom bar (which starts at 900 - 28 - 52 = 820px), so it never sits under
+   a HUD widget; `z-index` keeps it painted over the full-Stage `.hud`. */
 .debug-overlay {
   position: absolute;
-  bottom: 1rem;
-  left: 1rem;
+  top: 140px;
+  left: var(--hud-inset-x);
+  z-index: 1;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  max-height: 60vh;
+  max-width: 420px;
+  max-height: 640px;
   padding: 0.75rem 1rem;
   overflow-y: auto;
   background: rgba(0, 0, 0, 0.55);

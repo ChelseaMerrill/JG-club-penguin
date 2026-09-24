@@ -1,7 +1,8 @@
 import './style.css';
 import { loadEnv } from './env';
 import { startGame, whenSceneReady } from './game/main';
-import type { PenguinSpriteView } from './game/penguin-sprites';
+import type { RoomScene } from './game/rooms/RoomScene';
+import type { RoomPenguinView } from './game/rooms/room-penguin-view';
 import { createStubRoomDriver } from './game/stub-rooms';
 import { getSupabaseClient } from './auth/supabase-client';
 import { startAuth, toAuthClient } from './auth/auth-session';
@@ -37,11 +38,13 @@ const realtime = toRealtimeClient(client);
 const rooms = createStubRoomDriver(gameEvents);
 const uiLayer = getUiLayer();
 
-/** The scene's Penguin view, once `MainScene.create()` has run. */
-let penguins: PenguinSpriteView | null = null;
-const sceneReady = whenSceneReady(game).then((view) => {
-  penguins = view;
-  return view;
+/** The Room scene and its Penguin view, once `RoomScene.create()` has first run. */
+let roomScene: RoomScene | null = null;
+let penguins: RoomPenguinView | null = null;
+const sceneReady = whenSceneReady(game).then((scene) => {
+  roomScene = scene;
+  penguins = scene.penguins;
+  return scene.penguins;
 });
 
 /** The signed-in Player's Room channel, and the Player it belongs to. */
@@ -70,8 +73,11 @@ const debugOverlay = isDebugEnabled()
 
 // `room:enter` is emitted synchronously, before the Room channel's own
 // (queued) `onRoomChange` for that Room, so the tile is known by then.
-gameEvents.on('room:enter', ({ entryTile }) => {
+// It also shows the entered Room in `RoomScene` (a no-op for a Room with no
+// `RoomDefinition` yet).
+gameEvents.on('room:enter', ({ roomId, entryTile }) => {
   localTile = entryTile;
+  roomScene?.showRoom(roomId);
 });
 
 /** Shows the local Penguin at its entry tile, only while signed in and in a Room. */
