@@ -20,12 +20,12 @@ All matched files use Prettier code style!
  RUN  v5.0.1 C:/Users/MillieInma/Club Penguin/JG-club-penguin/.claude/worktrees/32/JG-club-penguin
 
 
- Test Files  16 passed (16)
-      Tests  120 passed (120)
-   Start at  17:33:24
-   Duration  6.86s (environment 52%, transform 27%, import 9%, tests 6%, setup 5%, worker 1%)
+ Test Files  20 passed (20)
+      Tests  152 passed (152)
+   Start at  17:37:41
+   Duration  7.43s (environment 48%, transform 30%, import 9%, setup 6%, tests 5%, worker 1%)
 
-  Transform  transforming modules took 5.02s · 27% of tracked time, re-done on every run
+  Transform  transforming modules took 6.58s · 30% of tracked time, re-done on every run
              persist transforms across runs with fsModuleCache: true
              learn more: https://vitest.dev/guide/improving-performance#caching-between-reruns
 
@@ -35,37 +35,38 @@ All matched files use Prettier code style!
 
 vite v8.3.0 building client environment for production...
 transforming...
-✓ 72 modules transformed.
+✓ 80 modules transformed.
 rendering chunks...
 computing gzip size...
 dist/index.html                          0.56 kB │ gzip:   0.32 kB
 dist/assets/bumbastika-Dy_063jZ.ttf     14.79 kB
 dist/assets/index-B-2ytl2B.css          11.18 kB │ gzip:   2.95 kB
-dist/assets/index-B7UW8l10.js        1,430.05 kB │ gzip: 379.82 kB
+dist/assets/index-BK4HSAYE.js        1,434.07 kB │ gzip: 381.36 kB
 
-✓ built in 1.23s
+✓ built in 1.28s
 [plugin builtin:vite-reporter] 
 (!) Some chunks are larger than 500 kB after minification. Consider:
 - Using dynamic import() to code-split the application
 - Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting
 - Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
 
-Running 14 tests using 7 workers
+Running 15 tests using 8 workers
 
-  -   7 [chromium] › e2e\deployed-auth.spec.ts:46:1 › deployed-auth-roundtrip
+  -   8 [chromium] › e2e\deployed-auth.spec.ts:46:1 › deployed-auth-roundtrip
   ✓   3 [chromium] › e2e\penguin-renderer.spec.ts:79:1 › penguin-renderer-grid (2.5s)
-  ✓   5 [chromium] › e2e\hud.spec.ts:22:1 › hud-town-center (12.9s)
-  ✓   4 [chromium] › e2e\smoke.spec.ts:3:1 › smoke-canvas-and-ui-layer (16.4s)
-  ✓   6 [chromium] › e2e\stage.spec.ts:99:3 › stage-letterbox-1920x1080 (17.0s)
-  ✓   2 [chromium] › e2e\login-overlay.spec.ts:3:1 › login-overlay-signed-out (18.7s)
-  ✓   1 [chromium] › e2e\landing.spec.ts:5:1 › landing-signed-out (19.6s)
-  ✓   9 [chromium] › e2e\stage.spec.ts:99:3 › stage-letterbox-1440x900 (5.7s)
-  ✓  10 [chromium] › e2e\stage.spec.ts:99:3 › stage-letterbox-1280x720 (4.6s)
-  ✓   8 [chromium] › e2e\hud.spec.ts:47:1 › hud-penguin-opens-creator (15.2s)
-  ✓  11 [chromium] › e2e\stage.spec.ts:117:1 › stage-overlay-alignment (9.4s)
-  ✓  12 [chromium] › e2e\hud.spec.ts:66:1 › hud-clicks-stay-in-hud (13.0s)
-  ✓  13 [chromium] › e2e\stage.spec.ts:133:1 › stage-live-resize (5.3s)
-  ✓  14 [chromium] › e2e\stage.spec.ts:163:1 › desktop-only-overlay (14.5s)
+  ✓   7 [chromium] › e2e\stage.spec.ts:99:3 › stage-letterbox-1920x1080 (19.6s)
+  ✓   6 [chromium] › e2e\hud.spec.ts:22:1 › hud-town-center (22.1s)
+  ✓   5 [chromium] › e2e\smoke.spec.ts:3:1 › smoke-canvas-and-ui-layer (22.3s)
+  ✓   4 [chromium] › e2e\login-overlay.spec.ts:3:1 › login-overlay-signed-out (24.7s)
+  ✓   1 [chromium] › e2e\landing.spec.ts:5:1 › landing-signed-out (25.6s)
+  ✓   2 [chromium] › e2e\room-framework.spec.ts:43:1 › room-framework (28.7s)
+  ✓   9 [chromium] › e2e\stage.spec.ts:99:3 › stage-letterbox-1440x900 (10.9s)
+  ✓  11 [chromium] › e2e\stage.spec.ts:99:3 › stage-letterbox-1280x720 (6.3s)
+  ✓  10 [chromium] › e2e\hud.spec.ts:47:1 › hud-penguin-opens-creator (19.5s)
+  ✓  12 [chromium] › e2e\stage.spec.ts:117:1 › stage-overlay-alignment (11.9s)
+  ✓  14 [chromium] › e2e\stage.spec.ts:133:1 › stage-live-resize (6.7s)
+  ✓  13 [chromium] › e2e\hud.spec.ts:66:1 › hud-clicks-stay-in-hud (17.0s)
+  ✓  15 [chromium] › e2e\stage.spec.ts:163:1 › desktop-only-overlay (17.7s)
 
   1 skipped
-  13 passed (1.0m)
+  14 passed (1.3m)
