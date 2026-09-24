@@ -1,13 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_LOOK, PENGUIN_NAME_MAX, type PenguinLook } from '../contracts/penguin';
-import type { MinigameId, MinigameStatsMap } from '../contracts/game-events';
-import { IGLOO_GEAR_CATALOG } from './minigame-rules';
-import type { IglooSlot, ProgressStore, ShopItem } from './progress-store';
+import { DEFAULT_LOOK, PENGUIN_NAME_MAX, type PenguinLook } from '../../contracts/penguin';
+import type { BadgeId, MinigameId, MinigameStatsMap } from '../../contracts/game-events';
+import { IGLOO_GEAR_CATALOG } from '../minigame-rules';
+import type { IglooSlot, ProgressStore, ShopItem } from '../progress-store';
 
 /** One fresh Player, wired to whichever `ProgressStore` implementation is under test. */
 export interface ProgressStoreHarness {
   store: ProgressStore;
-  /** Rewinds the Player's Minigame round history by `seconds` seconds. */
+  /** Makes `seconds` seconds appear to have passed since every earlier round. */
   advanceSeconds(seconds: number): Promise<void>;
 }
 
@@ -78,6 +78,14 @@ export function describeProgressStoreContract(
       const { store } = await makeHarness();
 
       await expect(store.saveLook(look)).rejects.toMatchObject({ code: 'invalid_look' });
+    });
+
+    it('accepts 16 emoji as the name, counted in code points rather than UTF-16 units', async () => {
+      const { store } = await makeHarness();
+      const look: PenguinLook = { ...DEFAULT_LOOK, name: '😀'.repeat(16) };
+
+      await expect(store.saveLook(look)).resolves.toBeUndefined();
+      expect((await store.loadAll()).look.name).toBe(look.name);
     });
 
     it('Pancake Flip: 2 golden and 5 burnt pays 0, not a negative amount', async () => {
@@ -206,10 +214,36 @@ export function describeProgressStoreContract(
       });
     });
 
+    it('rejects an array for stats as invalid_stats', async () => {
+      const { store } = await makeHarness();
+
+      const stats = [1, 2, 3] as unknown as MinigameStatsMap['bug-squash'];
+      await expect(store.recordRound('bug-squash', 0, stats)).rejects.toMatchObject({
+        code: 'invalid_stats',
+      });
+    });
+
+    it('rejects a 33 character stats key as invalid_stats', async () => {
+      const { store } = await makeHarness();
+
+      const stats = { ['k'.repeat(33)]: 0 } as unknown as MinigameStatsMap['bug-squash'];
+      await expect(store.recordRound('bug-squash', 0, stats)).rejects.toMatchObject({
+        code: 'invalid_stats',
+      });
+    });
+
     it('rejects a negative score as invalid_score', async () => {
       const { store } = await makeHarness();
 
       await expect(store.recordRound('bug-squash', -1, { squashed: 0 })).rejects.toMatchObject({
+        code: 'invalid_score',
+      });
+    });
+
+    it('rejects a non-integer score as invalid_score', async () => {
+      const { store } = await makeHarness();
+
+      await expect(store.recordRound('bug-squash', 10.5, { squashed: 0 })).rejects.toMatchObject({
         code: 'invalid_score',
       });
     });
@@ -305,5 +339,163 @@ export function describeProgressStoreContract(
       expect(snapshot.ownedItems).toEqual(['beanbag']);
       expect(snapshot.slots).toEqual({ 1: 'beanbag', 2: null, 3: null, 4: null, 5: null, 6: null });
     });
+
+    // Table-driven cases below use literal values from the #27 payout table
+    // (2026-09-24), not `MINIGAME_RULES`, so a bug that changes both the
+    // rule and the expectation together can't hide.
+
+    const overCapCases: Array<{
+      minigameId: MinigameId;
+      score: number;
+      stats: Record<string, number>;
+      cap: number;
+    }> = [
+      { minigameId: 'bug-squash', score: 1_000_000, stats: { squashed: 100_000 }, cap: 250 },
+      {
+        minigameId: 'pancake-flip',
+        score: 0,
+        stats: { ...NEUTRAL_PANCAKE_STATS, golden: 100 },
+        cap: 400,
+      },
+      { minigameId: 'coffee-rush', score: 0, stats: { large: 30 }, cap: 400 },
+      { minigameId: 'snow-cone-stand', score: 0, stats: { rushCone25: 100 }, cap: 600 },
+    ];
+    it.each(overCapCases)(
+      '$minigameId: an over-cap round pays exactly the cap ($cap)',
+      async ({ minigameId, score, stats, cap }) => {
+        const { store } = await makeHarness();
+
+        const result = await store.recordRound(minigameId, score, stats as never);
+
+        expect(result.tokensAwarded).toBe(cap);
+      },
+    );
+
+    const intervalCases: Array<{
+      minigameId: MinigameId;
+      intervalSeconds: number;
+      stats: Record<string, number>;
+    }> = [
+      { minigameId: 'bug-squash', intervalSeconds: 60, stats: { squashed: 0 } },
+      { minigameId: 'pancake-flip', intervalSeconds: 90, stats: NEUTRAL_PANCAKE_STATS },
+      { minigameId: 'coffee-rush', intervalSeconds: 90, stats: {} },
+      { minigameId: 'snow-cone-stand', intervalSeconds: 120, stats: {} },
+    ];
+    it.each(intervalCases)(
+      '$minigameId: a second round $intervalSeconds s minus 1 s later is round_too_soon',
+      async ({ minigameId, intervalSeconds, stats }) => {
+        const { store, advanceSeconds } = await makeHarness();
+
+        await store.recordRound(minigameId, 0, stats as never);
+        await advanceSeconds(intervalSeconds - 1);
+        await expect(store.recordRound(minigameId, 0, stats as never)).rejects.toMatchObject({
+          code: 'round_too_soon',
+        });
+      },
+    );
+    it.each(intervalCases)(
+      '$minigameId: a second round exactly $intervalSeconds s later is accepted',
+      async ({ minigameId, intervalSeconds, stats }) => {
+        const { store, advanceSeconds } = await makeHarness();
+
+        await store.recordRound(minigameId, 0, stats as never);
+        await advanceSeconds(intervalSeconds);
+        await expect(store.recordRound(minigameId, 0, stats as never)).resolves.toMatchObject({
+          tokensAwarded: 0,
+        });
+      },
+    );
+
+    const badgeThresholdCases: Array<{
+      minigameId: MinigameId;
+      badgeId: BadgeId;
+      intervalSeconds: number;
+      belowThreshold: { score: number; stats: Record<string, number> };
+      atThreshold: { score: number; stats: Record<string, number> };
+    }> = [
+      {
+        minigameId: 'bug-squash',
+        badgeId: 'exterminator',
+        intervalSeconds: 60,
+        belowThreshold: { score: 499, stats: { squashed: 499 } },
+        atThreshold: { score: 500, stats: { squashed: 500 } },
+      },
+      {
+        minigameId: 'pancake-flip',
+        badgeId: 'breakfast-club',
+        intervalSeconds: 90,
+        belowThreshold: { score: 0, stats: { ...NEUTRAL_PANCAKE_STATS, stacked: 19 } },
+        atThreshold: { score: 0, stats: { ...NEUTRAL_PANCAKE_STATS, stacked: 20 } },
+      },
+      {
+        minigameId: 'coffee-rush',
+        badgeId: 'barista',
+        intervalSeconds: 90,
+        belowThreshold: { score: 0, stats: { small: 14 } },
+        atThreshold: { score: 0, stats: { small: 15 } },
+      },
+      {
+        minigameId: 'snow-cone-stand',
+        badgeId: 'brain-freeze',
+        intervalSeconds: 120,
+        // The 200-token threshold falls on a multiple of 5, the granularity
+        // of every cone weight; 195 is the largest reachable value below it.
+        belowThreshold: { score: 0, stats: { cone5: 39 } },
+        atThreshold: { score: 0, stats: { cone5: 40 } },
+      },
+    ];
+    it.each(badgeThresholdCases)(
+      '$minigameId: earns $badgeId at the threshold but not one below it',
+      async ({ minigameId, intervalSeconds, belowThreshold, atThreshold }) => {
+        const { store, advanceSeconds } = await makeHarness();
+
+        const below = await store.recordRound(
+          minigameId,
+          belowThreshold.score,
+          belowThreshold.stats as never,
+        );
+        expect(below.badgeEarned).toBe(false);
+
+        await advanceSeconds(intervalSeconds);
+        const at = await store.recordRound(
+          minigameId,
+          atThreshold.score,
+          atThreshold.stats as never,
+        );
+        expect(at.badgeEarned).toBe(true);
+      },
+    );
+
+    it('Pancake Flip: flipNow pays 5 Tokens per flip', async () => {
+      const { store } = await makeHarness();
+
+      const result = await store.recordRound('pancake-flip', 0, {
+        ...NEUTRAL_PANCAKE_STATS,
+        flipNow: 1,
+      });
+
+      expect(result.tokensAwarded).toBe(5);
+    });
+
+    const snowConeStatWeights: Array<[key: string, tokensPerUnit: number]> = [
+      ['cone5', 5],
+      ['cone10', 10],
+      ['cone15', 15],
+      ['cone25', 25],
+      ['rushCone5', 10],
+      ['rushCone10', 20],
+      ['rushCone15', 30],
+      ['rushCone25', 50],
+    ];
+    it.each(snowConeStatWeights)(
+      'Snow Cone Stand: one %s pays %i Tokens',
+      async (key, tokensPerUnit) => {
+        const { store } = await makeHarness();
+
+        const result = await store.recordRound('snow-cone-stand', 0, { [key]: 1 });
+
+        expect(result.tokensAwarded).toBe(tokensPerUnit);
+      },
+    );
   });
 }

@@ -1,12 +1,12 @@
 /// <reference types="node" />
 // Test-only: builds a real Postgres database (PGlite, in-process WASM) from
-// #27's `players` and `saved_progress` migrations, plus a minimal
-// Supabase stand-in for `auth.users` / `auth.uid()` and the `anon` /
+// #9's `players` and #27's `saved_progress` migrations, on top of
+// `supabase/tests/local-supabase-stub.sql`'s stand-in for `auth.users` /
+// `auth.uid()`, Supabase's default privileges and the `anon` /
 // `authenticated` roles. `describeProgressStoreContract` runs unmodified
 // against the `ProgressStore` this file builds, so the same contract suite
 // exercises both the in-memory fake and the rules the real Supabase project
-// will enforce. Nothing under `src/` (outside this `testing/` folder)
-// imports this file.
+// will enforce. Only `sql-progress-store.test.ts` imports this file.
 
 import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
@@ -18,38 +18,21 @@ import type { BadgeId, MinigameId, MinigameStatsMap } from '../../contracts/game
 import type { Eyes, Hat, IdleEmote, Pattern, PenguinLook } from '../../contracts/penguin';
 import {
   ProgressStoreError,
-  isIglooSlot,
+  emptySlots,
+  isProgressErrorCode,
   type IglooSlot,
-  type ProgressErrorCode,
   type ProgressSnapshot,
   type ProgressStore,
   type PurchaseResult,
   type RoundResult,
 } from '../progress-store';
-import type { ProgressStoreHarness } from '../progress-store.contract';
+import type { ProgressStoreHarness } from './progress-store.contract';
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(currentDir, '../../..');
 
-// A stand-in for the parts of a Supabase project this migration relies on:
-// the `auth.users` table `players` references, `auth.uid()` (read from a
-// session variable in place of a real JWT), and the `anon` / `authenticated`
-// roles the migration grants to.
-const SUPABASE_STAND_IN_SQL = `
-  create role anon nologin;
-  create role authenticated nologin;
-  grant usage on schema public to anon, authenticated;
-  create schema auth;
-  grant usage on schema auth to anon, authenticated;
-  create table auth.users (id uuid primary key);
-  create function auth.uid() returns uuid language sql stable as $$
-    select nullif(current_setting('request.jwt.claim.sub', true), '')::uuid
-  $$;
-  grant execute on function auth.uid() to anon, authenticated;
-`;
-
-function readMigration(fileName: string): string {
-  return readFileSync(path.join(REPO_ROOT, 'supabase', 'migrations', fileName), 'utf8');
+function readSqlFile(...segments: string[]): string {
+  return readFileSync(path.join(REPO_ROOT, ...segments), 'utf8');
 }
 
 let sharedDb: PGliteInterface | null = null;
@@ -60,9 +43,9 @@ async function getSharedDb(): Promise<PGliteInterface> {
     return sharedDb;
   }
   const db = new PGlite();
-  await db.exec(SUPABASE_STAND_IN_SQL);
-  await db.exec(readMigration('20260924000000_players.sql'));
-  await db.exec(readMigration('20260924010000_saved_progress.sql'));
+  await db.exec(readSqlFile('supabase', 'tests', 'local-supabase-stub.sql'));
+  await db.exec(readSqlFile('supabase', 'migrations', '20260924000000_players.sql'));
+  await db.exec(readSqlFile('supabase', 'migrations', '20260924010000_saved_progress.sql'));
   sharedDb = db;
   return db;
 }
@@ -71,25 +54,6 @@ afterAll(async () => {
   await sharedDb?.close();
   sharedDb = null;
 });
-
-const KNOWN_ERROR_CODES: readonly ProgressErrorCode[] = [
-  'not_authenticated',
-  'no_player',
-  'unknown_minigame',
-  'invalid_score',
-  'invalid_stats',
-  'round_too_soon',
-  'unknown_item',
-  'already_owned',
-  'insufficient_tokens',
-  'invalid_look',
-  'not_owned',
-  'invalid_slot',
-];
-
-function isProgressErrorCode(message: string): message is ProgressErrorCode {
-  return (KNOWN_ERROR_CODES as readonly string[]).includes(message);
-}
 
 interface PostgresError {
   message?: string;
@@ -100,16 +64,21 @@ interface PostgresError {
 /**
  * Maps a raw PGlite/Postgres error to the `ProgressStoreError` #27's
  * functions and constraints intend: a raised message that is already a
- * known code is that code; a `23503` (foreign key) on `igloo_slots` means
- * the item isn't owned; a `23514` (check) on `igloo_slots` means the slot
- * number is out of range; a `23514` on `players` means the look is invalid.
- * Anything else is rethrown as-is.
+ * known code is that code; `22P02` (a value that can't parse as its
+ * column's type, e.g. a non-integer `score`) means `invalid_score`; a
+ * `23503` (foreign key) on `igloo_slots` means the item isn't owned; a
+ * `23514` (check) on `igloo_slots` means the slot number is out of range;
+ * a `23514` on `players` means the look is invalid. Anything else is
+ * rethrown as-is.
  */
 function toProgressError(err: unknown): unknown {
   const pgErr = err as PostgresError;
   const message = pgErr?.message;
   if (message !== undefined && isProgressErrorCode(message)) {
     return new ProgressStoreError(message);
+  }
+  if (pgErr?.code === '22P02') {
+    return new ProgressStoreError('invalid_score');
   }
   if (pgErr?.code === '23503' && pgErr.table === 'igloo_slots') {
     return new ProgressStoreError('not_owned');
@@ -181,7 +150,8 @@ function createSqlProgressStore(db: PGliteInterface, playerId: string): Progress
       }
 
       const badgesRes = await tx.query<{ badge_id: BadgeId }>(
-        'select badge_id from public.player_badges where player_id = $1',
+        `select badge_id from public.player_badges where player_id = $1
+         order by earned_at, badge_id`,
         [playerId],
       );
       const bestsRes = await tx.query<{ minigame_id: MinigameId; best_score: number }>(
@@ -189,7 +159,8 @@ function createSqlProgressStore(db: PGliteInterface, playerId: string): Progress
         [playerId],
       );
       const itemsRes = await tx.query<{ item_id: string }>(
-        'select item_id from public.player_items where player_id = $1',
+        `select item_id from public.player_items where player_id = $1
+         order by acquired_at, item_id`,
         [playerId],
       );
       const slotsRes = await tx.query<{ slot: number; item_id: string }>(
@@ -202,16 +173,9 @@ function createSqlProgressStore(db: PGliteInterface, playerId: string): Progress
         name: string;
         price: number;
         art_key: string;
-      }>('select id, stall, name, price, art_key from public.shop_items');
+      }>('select id, stall, name, price, art_key from public.shop_items order by price, id');
 
-      const slots: Record<IglooSlot, string | null> = {
-        1: null,
-        2: null,
-        3: null,
-        4: null,
-        5: null,
-        6: null,
-      };
+      const slots: Record<IglooSlot, string | null> = emptySlots();
       for (const row of slotsRes.rows) {
         slots[row.slot as IglooSlot] = row.item_id;
       }
@@ -289,9 +253,6 @@ function createSqlProgressStore(db: PGliteInterface, playerId: string): Progress
   }
 
   async function setSlot(slot: IglooSlot, itemId: string | null): Promise<void> {
-    if (!isIglooSlot(slot)) {
-      throw new ProgressStoreError('invalid_slot');
-    }
     await runAsPlayer(async (tx) => {
       if (itemId === null) {
         await tx.query('delete from public.igloo_slots where player_id = $1 and slot = $2', [
@@ -301,14 +262,18 @@ function createSqlProgressStore(db: PGliteInterface, playerId: string): Progress
         return;
       }
       // Moving an owned item: drop it from wherever it currently sits, then
-      // place it in the requested slot, mirroring #27's migration comment.
+      // place it in the requested slot. The upsert mirrors the statement
+      // PostgREST issues for `igloo_slots`, setting every column its
+      // payload includes; the SQL check constraint (not a client-side
+      // pre-check) is what turns an out-of-range slot into `23514`.
       await tx.query('delete from public.igloo_slots where player_id = $1 and item_id = $2', [
         playerId,
         itemId,
       ]);
       await tx.query(
         `insert into public.igloo_slots (player_id, slot, item_id) values ($1, $2, $3)
-         on conflict (player_id, slot) do update set item_id = excluded.item_id`,
+         on conflict (player_id, slot) do update
+           set player_id = excluded.player_id, slot = excluded.slot, item_id = excluded.item_id`,
         [playerId, slot, itemId],
       );
     });
@@ -335,8 +300,14 @@ export async function createPgliteProgressStoreHarness(): Promise<ProgressStoreH
   return {
     store: createSqlProgressStore(db, playerId),
     async advanceSeconds(seconds: number): Promise<void> {
+      // Backdates relative to the database's own `now()` rather than each
+      // row's stored `finished_at`, so a boundary test's margin depends only
+      // on this single query's own round trip and not on how long earlier
+      // steps took: "interval minus 1 second" stays reliably below the
+      // interval, and "at the interval" is always at or above it, since
+      // real time can only move forward between this call and the next.
       await db.query(
-        `update public.minigame_rounds set finished_at = finished_at - make_interval(secs => $1)
+        `update public.minigame_rounds set finished_at = now() - make_interval(secs => $1)
          where player_id = $2`,
         [seconds, playerId],
       );

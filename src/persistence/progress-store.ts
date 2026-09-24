@@ -66,19 +66,27 @@ export interface PurchaseResult {
  * constraints, plus the look- and slot-shape errors the in-memory fake and
  * the real store both enforce client-side.
  */
-export type ProgressErrorCode =
-  | 'not_authenticated'
-  | 'no_player'
-  | 'unknown_minigame'
-  | 'invalid_score'
-  | 'invalid_stats'
-  | 'round_too_soon'
-  | 'unknown_item'
-  | 'already_owned'
-  | 'insufficient_tokens'
-  | 'invalid_look'
-  | 'not_owned'
-  | 'invalid_slot';
+export const PROGRESS_ERROR_CODES = [
+  'not_authenticated',
+  'no_player',
+  'unknown_minigame',
+  'invalid_score',
+  'invalid_stats',
+  'round_too_soon',
+  'unknown_item',
+  'already_owned',
+  'insufficient_tokens',
+  'invalid_look',
+  'not_owned',
+  'invalid_slot',
+] as const;
+
+export type ProgressErrorCode = (typeof PROGRESS_ERROR_CODES)[number];
+
+/** True when `message` is one of `ProgressErrorCode`'s known values. */
+export function isProgressErrorCode(message: string): message is ProgressErrorCode {
+  return (PROGRESS_ERROR_CODES as readonly string[]).includes(message);
+}
 
 /** Thrown by every `ProgressStore` method that rejects. */
 export class ProgressStoreError extends Error {
@@ -94,6 +102,14 @@ export class ProgressStoreError extends Error {
 /** True when `value` is one of the Igloo's six slot numbers. */
 export function isIglooSlot(value: number): value is IglooSlot {
   return Number.isInteger(value) && value >= 1 && value <= 6;
+}
+
+/** Every Igloo slot number, in order. */
+export const IGLOO_SLOTS: readonly IglooSlot[] = [1, 2, 3, 4, 5, 6];
+
+/** A fresh Igloo layout: every slot empty. */
+export function emptySlots(): Record<IglooSlot, string | null> {
+  return { 1: null, 2: null, 3: null, 4: null, 5: null, 6: null };
 }
 
 /**
@@ -114,14 +130,21 @@ export function isIglooSlot(value: number): value is IglooSlot {
  * Producer: #27. Consumers: #34, #35, #37, #40, #41, #42.
  */
 export interface ProgressStore {
+  /**
+   * `catalog` is ordered by price then id; `badges` and `ownedItems` are
+   * each ordered by when they were earned/acquired, then by id.
+   */
   loadAll(): Promise<ProgressSnapshot>;
 
   /**
    * Always completes the Penguin Creator: `look.name` must be trimmed and
-   * 1-16 characters, and every color/enum field must be one of the
-   * contract's allowed values, or this rejects with `invalid_look` and
-   * saves nothing. `profileCreatedAt` is set on the first successful save
-   * and never changes after that.
+   * 1-16 characters (counted in code points); every colour field
+   * (`body`/`cap`/`beak`/`feet`/`belly`) must be a 6-digit hex string,
+   * not necessarily one of the design's swatches; and every enum field
+   * (`hat`/`pattern`/`eyes`/`emote`) must be one of the contract's (#26)
+   * allowed values. Otherwise this rejects with `invalid_look` and saves
+   * nothing. `profileCreatedAt` is set on the first successful save and
+   * never changes after that.
    */
   saveLook(look: PenguinLook): Promise<void>;
 

@@ -7,8 +7,8 @@ import {
   PATTERNS,
   PENGUIN_NAME_MAX,
   isHexColor,
+  type PenguinLook,
 } from '../contracts/penguin';
-import type { PenguinLook } from '../contracts/penguin';
 import type { BadgeId, GameEventMap, MinigameId, MinigameStatsMap } from '../contracts/game-events';
 import {
   BADGE_BONUS,
@@ -19,10 +19,13 @@ import {
   STARTING_TOKENS,
   STAT_MAX,
   STAT_MIN,
+  STATS_MAX_KEY_LENGTH,
   STATS_MAX_KEYS,
 } from './minigame-rules';
 import {
+  IGLOO_SLOTS,
   ProgressStoreError,
+  emptySlots,
   isIglooSlot,
   type IglooSlot,
   type ProgressSnapshot,
@@ -31,24 +34,27 @@ import {
   type RoundResult,
 } from './progress-store';
 
-const IGLOO_SLOTS: readonly IglooSlot[] = [1, 2, 3, 4, 5, 6];
-
-function emptySlots(): Record<IglooSlot, string | null> {
-  return { 1: null, 2: null, 3: null, 4: null, 5: null, 6: null };
-}
-
 function defaultLook(): PenguinLook {
   return { ...DEFAULT_LOOK };
 }
 
+/** Orders map keys by their recorded time then by id, for `loadAll`. */
+function sortedByTimeThenId<T extends string>(entries: ReadonlyMap<T, number>): T[] {
+  return Array.from(entries.entries())
+    .sort(([aId, aAt], [bId, bAt]) => aAt - bAt || aId.localeCompare(bId))
+    .map(([id]) => id);
+}
+
 /**
  * `penguin_name`'s check constraints (#27's migration): trimmed and
- * 1-16 characters once the Creator is complete, plus every color/enum
- * field must be a value the contract (#26) allows.
+ * 1-16 characters (counted in code points, not UTF-16 units) once the
+ * Creator is complete, plus every color/enum field must be a value the
+ * contract (#26) allows.
  */
 function validateLook(look: PenguinLook): void {
+  const nameLength = [...look.name].length;
   const nameOk =
-    look.name.length >= 1 && look.name.length <= PENGUIN_NAME_MAX && look.name === look.name.trim();
+    nameLength >= 1 && nameLength <= PENGUIN_NAME_MAX && look.name === look.name.trim();
   if (
     !nameOk ||
     !isHexColor(look.body) ||
@@ -69,10 +75,12 @@ interface PlayerState {
   look: PenguinLook;
   profileCreatedAt: string | null;
   tokens: number;
-  badges: Set<BadgeId>;
+  /** Badge id to the time (ms) it was earned, for `loadAll`'s ordering. */
+  badges: Map<BadgeId, number>;
   bests: Partial<Record<MinigameId, number>>;
   lastRoundFinishedAtMs: Partial<Record<MinigameId, number>>;
-  ownedItems: Set<string>;
+  /** Item id to the time (ms) it was acquired, for `loadAll`'s ordering. */
+  ownedItems: Map<string, number>;
   slots: Record<IglooSlot, string | null>;
 }
 
@@ -98,10 +106,10 @@ export function createInMemoryProgressStore(
     look: defaultLook(),
     profileCreatedAt: null,
     tokens: STARTING_TOKENS,
-    badges: new Set(),
+    badges: new Map(),
     bests: {},
     lastRoundFinishedAtMs: {},
-    ownedItems: new Set(),
+    ownedItems: new Map(),
     slots: emptySlots(),
   };
 
@@ -110,11 +118,13 @@ export function createInMemoryProgressStore(
       look: { ...state.look },
       profileCreatedAt: state.profileCreatedAt,
       tokens: state.tokens,
-      badges: Array.from(state.badges),
+      badges: sortedByTimeThenId(state.badges),
       bests: { ...state.bests },
-      ownedItems: Array.from(state.ownedItems),
+      ownedItems: sortedByTimeThenId(state.ownedItems),
       slots: { ...state.slots },
-      catalog: IGLOO_GEAR_CATALOG.map((item) => ({ ...item })),
+      catalog: [...IGLOO_GEAR_CATALOG]
+        .sort((a, b) => a.price - b.price || a.id.localeCompare(b.id))
+        .map((item) => ({ ...item })),
     };
   }
 
@@ -131,13 +141,21 @@ export function createInMemoryProgressStore(
     score: number,
     stats: MinigameStatsMap[K],
   ): Promise<RoundResult> {
-    if (typeof score !== 'number' || score < SCORE_MIN || score > SCORE_MAX) {
+    if (!Number.isInteger(score) || score < SCORE_MIN || score > SCORE_MAX) {
       throw new ProgressStoreError('invalid_score');
     }
 
+    if (stats === null || typeof stats !== 'object' || Array.isArray(stats)) {
+      throw new ProgressStoreError('invalid_stats');
+    }
     const statsRecord = stats as unknown as Record<string, unknown>;
-    // The SQL also rejects stats over 2 kB; 16 numeric keys stay under that.
-    if (Object.keys(statsRecord).length > STATS_MAX_KEYS) {
+    const statsKeys = Object.keys(statsRecord);
+    // The SQL also rejects stats over 2 kB; 16 numeric keys of at most
+    // `STATS_MAX_KEY_LENGTH` characters stay under that.
+    if (
+      statsKeys.length > STATS_MAX_KEYS ||
+      statsKeys.some((key) => key.length > STATS_MAX_KEY_LENGTH)
+    ) {
       throw new ProgressStoreError('invalid_stats');
     }
     for (const value of Object.values(statsRecord)) {
@@ -152,7 +170,7 @@ export function createInMemoryProgressStore(
       }
     }
 
-    const rule = MINIGAME_RULES[minigameId as MinigameId];
+    const rule = MINIGAME_RULES[minigameId];
     if (!rule) {
       throw new ProgressStoreError('unknown_minigame');
     }
@@ -177,7 +195,7 @@ export function createInMemoryProgressStore(
     let badgeEarned = false;
     let bonus = 0;
     if (!state.badges.has(rule.badgeId) && rawBest >= rule.badgeThreshold) {
-      state.badges.add(rule.badgeId);
+      state.badges.set(rule.badgeId, nowMs);
       badgeEarned = true;
       bonus = BADGE_BONUS;
     }
@@ -206,7 +224,7 @@ export function createInMemoryProgressStore(
     }
 
     state.tokens -= item.price;
-    state.ownedItems.add(itemId);
+    state.ownedItems.set(itemId, now());
     emitter?.emit('tokens:changed', { balance: state.tokens });
 
     return { balance: state.tokens };

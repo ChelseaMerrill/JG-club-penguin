@@ -5,7 +5,7 @@ import { createInMemoryProgressStore } from './in-memory-progress-store';
 import {
   describeProgressStoreContract,
   type ProgressStoreHarness,
-} from './progress-store.contract';
+} from './testing/progress-store.contract';
 
 /** A controllable clock: `advanceSeconds` moves it forward without a real wait. */
 function makeHarness(): Promise<ProgressStoreHarness> {
@@ -59,7 +59,7 @@ describe('createInMemoryProgressStore event emission', () => {
     expect(badgeEvents).toEqual(['exterminator']);
   });
 
-  it('emits nothing when no emitter is given', async () => {
+  it('works without an emitter', async () => {
     const store = createInMemoryProgressStore();
 
     await expect(store.recordRound('bug-squash', 520, { squashed: 520 })).resolves.toBeDefined();
