@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+  <link rel="stylesheet" href="_ds/jahnel-group-design-system-019df630-6921-74f8-9d13-c9b8506c740c/colors_and_type.css">
+  <script src="_ds/jahnel-group-design-system-019df630-6921-74f8-9d13-c9b8506c740c/_ds_bundle.js"></script>
+  <style>
+    @font-face { font-family: "Bumbastika"; src: url("assets/bumbastika.ttf") format("truetype"); }
+    body { margin: 0; background: #0E1013; color: #F4F4F4; font-family: "Libre Franklin", sans-serif; }
+    a { color: #00BDFF; } a:hover { color: #F4F4F4; }
+    @keyframes waddle { 0%,100% { transform: translateX(-26px) rotate(-5deg);} 25% { transform: translateX(-12px) rotate(4deg) translateY(-6px);} 50% { transform: translateX(26px) rotate(5deg);} 75% { transform: translateX(12px) rotate(-4deg) translateY(-6px);} }
+    @keyframes wave { 0%,100% { transform: rotate(0);} 50% { transform: rotate(-40deg);} }
+    @keyframes dance { 0%,100% { transform: rotate(-8deg) translateY(0);} 50% { transform: rotate(8deg) translateY(-14px);} }
+    @keyframes throwb { 0%,40% { transform: translate(0,0) scale(1); opacity:1;} 100% { transform: translate(140px,-90px) scale(.6); opacity:0;} }
+    @keyframes laugh { 0%,100% { transform: rotate(0) translateY(0);} 30% { transform: rotate(-3deg) translateY(-4px);} 60% { transform: rotate(3deg) translateY(-4px);} }
+    @keyframes facepalm { 0%,100% { transform: rotate(0);} 50% { transform: rotate(-110deg);} }
+    @keyframes idle { 0%,100% { transform: translateY(0);} 50% { transform: translateY(-6px);} }
+  </style>
+</helmet>
+<section style="display:flex; flex-direction:column; gap:14px; padding:40px; align-items:flex-start;">
+  <div style="display:flex; align-items:center; gap:18px; font: 400 14px 'Anton', sans-serif; letter-spacing:.24em; color:#B3B6C9;"><a href="Club JenGuin Map.dc.html" style="color:#00BDFF; text-decoration:none;">← MAP</a><span>SCREEN · PENGUIN CREATOR</span></div>
+  <div data-screen-label="Penguin Creator" style="position:relative; width:1600px; height:900px; flex:none; overflow:hidden; background:linear-gradient(180deg,#0A0C0F 0%,#161719 45%,#0F3441 100%); box-shadow:0 0 0 6px #0C4B5F, 0 0 0 9px #00BDFF; display:grid; grid-template-columns:1fr 620px;">
+    <div style="position:relative; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; padding:60px 40px;">
+      <div style="position:absolute; top:36px; left:40px; display:flex; flex-direction:column; gap:6px;">
+        <div style="font-family:'Bumbastika','Anton',sans-serif; font-size:48px; line-height:1; color:#00BDFF; -webkit-text-stroke:5px #0C4B5F; paint-order:stroke fill; text-shadow:0 4px 0 #0C4B5F;">MAKE YOUR PENGUIN</div>
+        <div style="font: 400 13px 'Anton', sans-serif; letter-spacing:.22em; color:#F4F4F4;">EVERYTHING IS FREE · CHANGE IT LATER AT YOUR IGLOO</div>
+      </div>
+      <div style="position:relative; width:520px; height:470px; display:grid; place-items:center;">
+        <div style="position:absolute; inset:auto 0 26px 0; margin:auto; width:320px; height:60px; border-radius:50%; background:#000; opacity:.45;"></div>
+        <div style="position:absolute; inset:0; margin:auto; width:380px; height:420px; clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%); background:#0C4B5F; opacity:.35;"></div>
+        <div style="position:relative; animation:{{ bodyAnim }}; transform-origin:50% 100%;">
+        <svg viewBox="0 0 120 130" width="340" height="368" style="display:block; overflow:visible;">
+          <defs>
+            <clipPath id="belly"><path d="M60 40 C46 40 38 62 38 84 C38 102 48 112 60 112 C72 112 82 102 82 84 C82 62 74 40 60 40 Z"></path></clipPath>
+          </defs>
+          <path d="M60 14 C30 14 22 50 22 82 C22 106 40 118 60 118 C80 118 98 106 98 82 C98 50 90 14 60 14 Z" fill="{{ body }}" stroke="#0C4B5F" stroke-width="6"></path>
+          <path d="M60 40 C46 40 38 62 38 84 C38 102 48 112 60 112 C72 112 82 102 82 84 C82 62 74 40 60 40 Z" fill="{{ belly }}"></path>
+          <g clip-path="url(#belly)">
+            <sc-if value="{{ pHex }}" hint-placeholder-val="{{ false }}"><g fill="none" stroke="{{ body }}" stroke-width="1.5" opacity=".55"><polygon points="50,58 56,61 56,68 50,71 44,68 44,61"></polygon><polygon points="70,58 76,61 76,68 70,71 64,68 64,61"></polygon><polygon points="60,74 66,77 66,84 60,87 54,84 54,77"></polygon><polygon points="50,90 56,93 56,100 50,103 44,100 44,93"></polygon><polygon points="70,90 76,93 76,100 70,103 64,100 64,93"></polygon></g></sc-if>
+            <sc-if value="{{ pStripes }}" hint-placeholder-val="{{ false }}"><g fill="{{ body }}" opacity=".55"><rect x="30" y="56" width="60" height="5"></rect><rect x="30" y="68" width="60" height="5"></rect><rect x="30" y="80" width="60" height="5"></rect><rect x="30" y="92" width="60" height="5"></rect><rect x="30" y="104" width="60" height="5"></rect></g></sc-if>
+            <sc-if value="{{ pLogo }}" hint-placeholder-val="{{ false }}"><g><polygon points="60,64 74,72 74,88 60,96 46,88 46,72" fill="#0C4B5F"></polygon><text x="60" y="85" text-anchor="middle" font-family="Anton, Impact, sans-serif" font-size="13" fill="#00BDFF">JG</text></g></sc-if>
+            <sc-if value="{{ pHeart }}" hint-placeholder-val="{{ false }}"><g fill="#00BDFF"><rect x="50" y="68" width="6" height="6"></rect><rect x="64" y="68" width="6" height="6"></rect><rect x="44" y="74" width="32" height="6"></rect><rect x="47" y="80" width="26" height="6"></rect><rect x="51" y="86" width="18" height="6"></rect><rect x="57" y="92" width="6" height="6"></rect></g></sc-if>
+            <sc-if value="{{ pSnow }}" hint-placeholder-val="{{ false }}"><g stroke="#00BDFF" stroke-width="2.5" stroke-linecap="round"><line x1="60" y1="62" x2="60" y2="98"></line><line x1="44" y1="71" x2="76" y2="89"></line><line x1="76" y1="71" x2="44" y2="89"></line><path d="M56 68 L60 62 L64 68 M56 92 L60 98 L64 92"></path></g></sc-if>
+          </g>
+          <sc-if value="{{ eRound }}" hint-placeholder-val="{{ true }}"><g><circle cx="50" cy="34" r="4.5" fill="#F4F4F4"></circle><circle cx="70" cy="34" r="4.5" fill="#F4F4F4"></circle><circle cx="51" cy="34" r="2" fill="#161719"></circle><circle cx="71" cy="34" r="2" fill="#161719"></circle></g></sc-if>
+          <sc-if value="{{ eSleepy }}" hint-placeholder-val="{{ false }}"><g><path d="M45 35 Q50 30 55 35" fill="none" stroke="#F4F4F4" stroke-width="3" stroke-linecap="round"></path><path d="M65 35 Q70 30 75 35" fill="none" stroke="#F4F4F4" stroke-width="3" stroke-linecap="round"></path></g></sc-if>
+          <sc-if value="{{ eStar }}" hint-placeholder-val="{{ false }}"><g fill="#00BDFF"><polygon points="50,28 51.8,32.5 56.5,32.8 52.9,35.8 54,40.5 50,38 46,40.5 47.1,35.8 43.5,32.8 48.2,32.5"></polygon><polygon points="70,28 71.8,32.5 76.5,32.8 72.9,35.8 74,40.5 70,38 66,40.5 67.1,35.8 63.5,32.8 68.2,32.5"></polygon></g></sc-if>
+          <sc-if value="{{ eWink }}" hint-placeholder-val="{{ false }}"><g><circle cx="50" cy="34" r="4.5" fill="#F4F4F4"></circle><circle cx="51" cy="34" r="2" fill="#161719"></circle><path d="M65 34 L75 34" stroke="#F4F4F4" stroke-width="3" stroke-linecap="round"></path></g></sc-if>
+          <path d="M50 44 L70 44 L60 54 Z" fill="{{ beak }}"></path>
+          <path d="M40 116 L26 124 L52 122 Z" fill="{{ feet }}"></path><path d="M80 116 L94 124 L68 122 Z" fill="{{ feet }}"></path>
+          <g style="transform-origin:26px 62px; animation:{{ leftArmAnim }};"><path d="M24 60 C10 78 12 96 26 100 Z" fill="{{ body }}" stroke="#0C4B5F" stroke-width="4"></path></g>
+          <g style="transform-origin:94px 62px; animation:{{ rightArmAnim }};"><path d="M96 60 C110 78 108 96 94 100 Z" fill="{{ body }}" stroke="#0C4B5F" stroke-width="4"></path></g>
+          <sc-if value="{{ hCap }}" hint-placeholder-val="{{ true }}"><g><path d="M32 22 C38 4 82 4 88 22 L60 18 Z" fill="{{ cap }}" stroke="#0C4B5F" stroke-width="2"></path><path d="M30 22 L98 26 L96 30 L30 26 Z" fill="{{ cap }}" stroke="#0C4B5F" stroke-width="2"></path><polygon points="60,10 65,13 65,18 60,21 55,18 55,13" fill="#0C4B5F"></polygon></g></sc-if>
+          <sc-if value="{{ hSnorkel }}" hint-placeholder-val="{{ false }}"><g><rect x="38" y="26" width="44" height="16" rx="6" fill="none" stroke="#00BDFF" stroke-width="4"></rect><rect x="42" y="29" width="16" height="10" rx="2" fill="#BFE3F0" opacity=".8"></rect><rect x="62" y="29" width="16" height="10" rx="2" fill="#BFE3F0" opacity=".8"></rect><path d="M84 30 L92 30 L92 6" fill="none" stroke="#00BDFF" stroke-width="5" stroke-linecap="round"></path><path d="M20 22 C30 6 90 6 100 22 L60 14 Z" fill="#F2C12E" stroke="#0C4B5F" stroke-width="3"></path></g></sc-if>
+          <sc-if value="{{ hPhones }}" hint-placeholder-val="{{ false }}"><g><path d="M30 34 C30 10 90 10 90 34" fill="none" stroke="#0C4B5F" stroke-width="5"></path><rect x="24" y="28" width="10" height="16" rx="4" fill="{{ cap }}" stroke="#0C4B5F" stroke-width="2"></rect><rect x="86" y="28" width="10" height="16" rx="4" fill="{{ cap }}" stroke="#0C4B5F" stroke-width="2"></rect></g></sc-if>
+          <sc-if value="{{ hBand }}" hint-placeholder-val="{{ false }}"><g><path d="M28 26 L92 26 L92 34 L28 34 Z" fill="{{ cap }}" stroke="#0C4B5F" stroke-width="2"></path><path d="M88 26 L100 30 L98 60 L90 58 Z" fill="{{ cap }}" stroke="#0C4B5F" stroke-width="2"></path><text x="60" y="32.5" text-anchor="middle" font-family="Anton, Impact, sans-serif" font-size="7" fill="#161719" letter-spacing="1">WAR WEEK</text></g></sc-if>
+          <sc-if value="{{ showSnowball }}" hint-placeholder-val="{{ false }}"><circle cx="104" cy="80" r="9" fill="#F4F4F4" stroke="#BFE3F0" stroke-width="2" style="animation:throwb 1.4s ease-out infinite;"></circle></sc-if>
+          <sc-if value="{{ showHaha }}" hint-placeholder-val="{{ false }}"><text x="100" y="30" font-family="Bumbastika, Anton, sans-serif" font-size="14" fill="#00BDFF" style="animation:idle .6s ease-in-out infinite;">HA HA</text></sc-if>
+        </svg>
+        </div>
+        <sc-if value="{{ sitting }}" hint-placeholder-val="{{ false }}"><div style="position:absolute; left:50%; bottom:40px; width:200px; height:40px; margin-left:-100px; background:#3a4046; border:3px solid #0C4B5F; border-radius:6px;"></div></sc-if>
+      </div>
+      <div style="display:flex; flex-direction:column; align-items:center; gap:10px;">
+        <div style="padding:6px 16px; background:#00BDFF; border-radius:999px; font: 700 15px 'Libre Franklin', sans-serif; color:#161719;">{{ displayName }}</div>
+        <div style="display:flex; gap:6px; flex-wrap:wrap; justify-content:center;"><sc-for list="{{ emoteOpts }}" as="o" hint-placeholder-count="7"><div onClick="{{ o.pick }}" style="padding:8px 12px; background:{{ o.bg }}; color:{{ o.fg }}; border:2px solid #0C4B5F; font: 400 11px 'Anton', sans-serif; letter-spacing:.14em; cursor:pointer;">{{ o.label }}</div></sc-for></div>
+        <div style="font: 400 11px 'Anton', sans-serif; letter-spacing:.2em; color:#B3B6C9;">TRY AN EMOTE · WADDLE IS THE DEFAULT</div>
+      </div>
+    </div>
+    <div style="display:flex; flex-direction:column; gap:16px; padding:32px 36px 28px; background:rgba(22,23,25,.92); border-left:3px solid #0C4B5F; overflow:hidden;">
+      <div style="display:flex; gap:12px; align-items:flex-end;">
+        <div style="flex:1; display:flex; flex-direction:column; gap:6px;"><div style="font: 400 11px 'Anton', sans-serif; letter-spacing:.24em; color:#00BDFF;">NAME</div><input value="{{ name }}" onChange="{{ onName }}" placeholder="Your name" style="height:44px; padding:0 14px; background:#0A0C0F; border:2px solid #0C4B5F; color:#F4F4F4; font: 700 15px 'Libre Franklin', sans-serif; outline:none;"></div>
+        <div onClick="{{ randomize }}" style="display:flex; align-items:center; height:44px; padding:0 18px; background:#0C4B5F; clip-path:polygon(12px 0,calc(100% - 12px) 0,100% 50%,calc(100% - 12px) 100%,12px 100%,0 50%); box-shadow:inset 0 -4px 0 #06303D; font-family:'Bumbastika','Anton',sans-serif; font-size:16px; color:#F4F4F4; cursor:pointer;">SHUFFLE</div>
+      </div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:14px;">
+        <div style="display:flex; flex-direction:column; gap:6px;"><div style="font: 400 11px 'Anton', sans-serif; letter-spacing:.24em; color:#00BDFF;">BODY</div><div style="display:flex; gap:6px; align-items:center;"><sc-for list="{{ bodyOpts }}" as="o" hint-placeholder-count="4"><div onClick="{{ o.pick }}" style="width:34px; height:38px; clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%); background:{{ o.ring }}; display:grid; place-items:center; cursor:pointer;"><div style="width:26px; height:30px; clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%); background:{{ o.c }};"></div></div></sc-for><input type="color" value="{{ body }}" onChange="{{ onBody }}" style="width:34px; height:38px; padding:0; border:2px solid #0C4B5F; background:#0A0C0F; cursor:pointer;"></div></div>
+        <div style="display:flex; flex-direction:column; gap:6px;"><div style="font: 400 11px 'Anton', sans-serif; letter-spacing:.24em; color:#00BDFF;">HAT COLOR</div><div style="display:flex; gap:6px; align-items:center;"><sc-for list="{{ capOpts }}" as="o" hint-placeholder-count="4"><div onClick="{{ o.pick }}" style="width:34px; height:38px; clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%); background:{{ o.ring }}; display:grid; place-items:center; cursor:pointer;"><div style="width:26px; height:30px; clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%); background:{{ o.c }};"></div></div></sc-for><input type="color" value="{{ cap }}" onChange="{{ onCap }}" style="width:34px; height:38px; padding:0; border:2px solid #0C4B5F; background:#0A0C0F; cursor:pointer;"></div></div>
+        <div style="display:flex; flex-direction:column; gap:6px;"><div style="font: 400 11px 'Anton', sans-serif; letter-spacing:.24em; color:#00BDFF;">BEAK</div><div style="display:flex; gap:6px; align-items:center;"><sc-for list="{{ beakOpts }}" as="o" hint-placeholder-count="4"><div onClick="{{ o.pick }}" style="width:34px; height:38px; clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%); background:{{ o.ring }}; display:grid; place-items:center; cursor:pointer;"><div style="width:26px; height:30px; clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%); background:{{ o.c }};"></div></div></sc-for><input type="color" value="{{ beak }}" onChange="{{ onBeak }}" style="width:34px; height:38px; padding:0; border:2px solid #0C4B5F; background:#0A0C0F; cursor:pointer;"></div></div>
+        <div style="display:flex; flex-direction:column; gap:6px;"><div style="font: 400 11px 'Anton', sans-serif; letter-spacing:.24em; color:#00BDFF;">FEET</div><div style="display:flex; gap:6px; align-items:center;"><sc-for list="{{ feetOpts }}" as="o" hint-placeholder-count="4"><div onClick="{{ o.pick }}" style="width:34px; height:38px; clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%); background:{{ o.ring }}; display:grid; place-items:center; cursor:pointer;"><div style="width:26px; height:30px; clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%); background:{{ o.c }};"></div></div></sc-for><input type="color" value="{{ feet }}" onChange="{{ onFeet }}" style="width:34px; height:38px; padding:0; border:2px solid #0C4B5F; background:#0A0C0F; cursor:pointer;"></div></div>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:6px;"><div style="font: 400 11px 'Anton', sans-serif; letter-spacing:.24em; color:#00BDFF;">HAT</div><div style="display:flex; gap:6px; flex-wrap:wrap;"><sc-for list="{{ hatOpts }}" as="o" hint-placeholder-count="5"><div onClick="{{ o.pick }}" style="padding:8px 12px; background:{{ o.bg }}; color:{{ o.fg }}; border:2px solid #0C4B5F; font: 400 11px 'Anton', sans-serif; letter-spacing:.14em; cursor:pointer;">{{ o.label }}</div></sc-for></div></div>
+      <div style="display:flex; flex-direction:column; gap:6px;"><div style="font: 400 11px 'Anton', sans-serif; letter-spacing:.24em; color:#00BDFF;">BELLY PATTERN</div><div style="display:flex; gap:6px; flex-wrap:wrap;"><sc-for list="{{ bellyOpts }}" as="o" hint-placeholder-count="6"><div onClick="{{ o.pick }}" style="padding:8px 12px; background:{{ o.bg }}; color:{{ o.fg }}; border:2px solid #0C4B5F; font: 400 11px 'Anton', sans-serif; letter-spacing:.14em; cursor:pointer;">{{ o.label }}</div></sc-for></div></div>
+      <div style="display:flex; flex-direction:column; gap:6px;"><div style="font: 400 11px 'Anton', sans-serif; letter-spacing:.24em; color:#00BDFF;">EYES</div><div style="display:flex; gap:6px;"><sc-for list="{{ eyeOpts }}" as="o" hint-placeholder-count="4"><div onClick="{{ o.pick }}" style="flex:1; padding:8px 0; text-align:center; background:{{ o.bg }}; color:{{ o.fg }}; border:2px solid #0C4B5F; font: 400 11px 'Anton', sans-serif; letter-spacing:.14em; cursor:pointer;">{{ o.label }}</div></sc-for></div></div>
+      <div style="display:flex; flex-direction:column; gap:6px;"><div style="font: 400 11px 'Anton', sans-serif; letter-spacing:.24em; color:#00BDFF;">IGLOO STARTER KIT</div><div style="display:grid; grid-template-columns:repeat(3,1fr); gap:8px;"><sc-for list="{{ iglooOpts }}" as="o" hint-placeholder-count="3"><div onClick="{{ o.pick }}" style="display:flex; flex-direction:column; gap:6px; padding:10px; background:{{ o.bg }}; border:2px solid {{ o.border }}; cursor:pointer;"><div style="height:46px; display:flex; align-items:flex-end; justify-content:center; gap:4px;"><div style="width:26px; height:{{ o.h1 }}px; background:#3a4046; border:2px solid #0C4B5F;"></div><div style="width:18px; height:{{ o.h2 }}px; background:#00BDFF; border:2px solid #0C4B5F;"></div><div style="width:22px; height:{{ o.h3 }}px; background:#0C4B5F; border:2px solid #0C4B5F;"></div></div><div style="font: 700 12px 'Libre Franklin', sans-serif; color:#F4F4F4;">{{ o.label }}</div><div style="font: 400 10px 'Anton', sans-serif; letter-spacing:.12em; color:#B3B6C9;">{{ o.sub }}</div></div></sc-for></div></div>
+      <div style="margin-top:auto; display:flex; justify-content:flex-end; align-items:center; gap:14px;">
+        <div style="font: 400 11px 'Anton', sans-serif; letter-spacing:.16em; color:#B3B6C9;">{{ summary }}</div>
+        <a href="Room 01 Town Center.dc.html" style="display:flex; align-items:center; height:52px; padding:0 30px; background:#00BDFF; clip-path:polygon(14px 0,calc(100% - 14px) 0,100% 50%,calc(100% - 14px) 100%,14px 100%,0 50%); box-shadow:inset 0 -5px 0 #0C4B5F; font-family:'Bumbastika','Anton',sans-serif; font-size:22px; color:#161719; text-decoration:none;">WADDLE IN →</a>
+      </div>
+    </div>
+  </div>
+</section>
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = { name: '', body: '#161719', cap: '#00BDFF', beak: '#00BDFF', feet: '#00BDFF', belly: '#F4F4F4', hat: 'JG CAP', pattern: 'PLAIN', eyes: 'ROUND', igloo: 'DEV CAVE', emote: 'WADDLE' };
+  renderVals() {
+    const s = this.state, set = (k) => (v) => () => this.setState({ [k]: v });
+    const sw = (list, key) => list.map(c => ({ c, ring: s[key] === c ? '#F4F4F4' : '#0C4B5F', pick: set(key)(c) }));
+    const chip = (list, key) => list.map(v => ({ label: v, bg: s[key] === v ? '#00BDFF' : 'transparent', fg: s[key] === v ? '#161719' : '#F4F4F4', pick: set(key)(v) }));
+    const JG = ['#161719', '#0C4B5F', '#00BDFF', '#F4F4F4', '#BFE3F0', '#3a4046'];
+    const hats = ['JG CAP', 'SNORKEL', 'HEADPHONES', 'WAR WEEK BAND', 'NONE'], pats = ['PLAIN', 'HEX', 'STRIPES', 'JG LOGO', 'PIXEL HEART', 'SNOWFLAKE'], eyes = ['ROUND', 'SLEEPY', 'STAR', 'WINK'], emotes = ['WADDLE', 'WAVE', 'DANCE', 'SNOWBALL', 'LAUGH', 'FACEPALM', 'SIT'];
+    const igloos = [{ label: 'Dev Cave', sub: 'DESK · 2 MONITORS · RGB', h: [30, 40, 22] }, { label: 'Party', sub: 'DISCO BALL · SPEAKERS', h: [20, 44, 20] }, { label: 'Arcade', sub: 'CABINET · BEANBAG', h: [44, 18, 26] }];
+    const rnd = a => a[Math.floor(Math.random() * a.length)], rc = () => '#' + Math.floor(Math.random() * 0xffffff).toString(16).padStart(6, '0');
+    const e = s.emote;
+    const bodyAnim = e === 'WADDLE' ? 'waddle 2.4s ease-in-out infinite' : e === 'DANCE' ? 'dance .7s ease-in-out infinite' : e === 'LAUGH' ? 'laugh .5s ease-in-out infinite' : e === 'SIT' ? 'none' : 'idle 2.4s ease-in-out infinite';
+    return {
+      name: s.name, body: s.body, cap: s.cap, beak: s.beak, feet: s.feet, belly: s.belly,
+      displayName: s.name || 'Unnamed Penguin',
+      pHex: s.pattern === 'HEX', pStripes: s.pattern === 'STRIPES', pLogo: s.pattern === 'JG LOGO', pHeart: s.pattern === 'PIXEL HEART', pSnow: s.pattern === 'SNOWFLAKE',
+      eRound: s.eyes === 'ROUND' && e !== 'LAUGH', eSleepy: s.eyes === 'SLEEPY' || e === 'LAUGH', eStar: s.eyes === 'STAR' && e !== 'LAUGH', eWink: s.eyes === 'WINK' && e !== 'LAUGH',
+      hCap: s.hat === 'JG CAP', hSnorkel: s.hat === 'SNORKEL', hPhones: s.hat === 'HEADPHONES', hBand: s.hat === 'WAR WEEK BAND',
+      bodyAnim: s.emote === 'SIT' ? 'none' : bodyAnim,
+      leftArmAnim: e === 'FACEPALM' ? 'facepalm 1.6s ease-in-out infinite' : e === 'DANCE' ? 'wave .7s ease-in-out infinite' : 'none',
+      rightArmAnim: e === 'WAVE' ? 'wave .8s ease-in-out infinite' : e === 'DANCE' ? 'wave .7s ease-in-out .35s infinite' : 'none',
+      showSnowball: e === 'SNOWBALL', showHaha: e === 'LAUGH', sitting: e === 'SIT',
+      bodyOpts: sw(JG, 'body'), capOpts: sw(['#00BDFF', '#F4F4F4', '#0C4B5F', '#F2C12E', '#D63C3C'], 'cap'), beakOpts: sw(['#00BDFF', '#F2C12E', '#E07A2F', '#F4F4F4'], 'beak'), feetOpts: sw(['#00BDFF', '#F2C12E', '#E07A2F', '#0C4B5F'], 'feet'),
+      hatOpts: chip(hats, 'hat'), bellyOpts: chip(pats, 'pattern'), eyeOpts: chip(eyes, 'eyes'), emoteOpts: chip(emotes, 'emote'),
+      iglooOpts: igloos.map(g => ({ label: g.label, sub: g.sub, h1: g.h[0], h2: g.h[1], h3: g.h[2], bg: s.igloo === g.label.toUpperCase() ? 'rgba(12,75,95,.4)' : '#0A0C0F', border: s.igloo === g.label.toUpperCase() ? '#00BDFF' : '#0C4B5F', pick: set('igloo')(g.label.toUpperCase()) })),
+      summary: s.hat + ' · ' + s.pattern + ' · ' + s.eyes + ' · ' + s.igloo,
+      onName: ev => this.setState({ name: ev.target.value }), onBody: ev => this.setState({ body: ev.target.value }), onCap: ev => this.setState({ cap: ev.target.value }), onBeak: ev => this.setState({ beak: ev.target.value }), onFeet: ev => this.setState({ feet: ev.target.value }),
+      randomize: () => this.setState({ body: Math.random() < .6 ? rnd(JG) : rc(), cap: rc(), beak: rnd(['#00BDFF', '#F2C12E', '#E07A2F']), feet: rnd(['#00BDFF', '#F2C12E', '#E07A2F']), hat: rnd(hats), pattern: rnd(pats), eyes: rnd(eyes), igloo: rnd(['DEV CAVE', 'PARTY', 'ARCADE']) })
+    };
+  }
+}
+</script>
+</body>
+</html>

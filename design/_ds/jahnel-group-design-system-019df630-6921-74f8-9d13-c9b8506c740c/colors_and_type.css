@@ -1,0 +1,181 @@
+/* ============================================================
+   Jahnel Group Design System — Colors & Type
+   Source: jg-website-v2-2020-redesign/src/css/{styles,fonts,buttons}.css
+   ============================================================ */
+
+@import url("https://fonts.googleapis.com/css2?family=Anton&family=Libre+Franklin:wght@300;400;500;700;900&display=swap");
+
+:root {
+  /* ----- Brand colors ---------------------------------------- */
+  --jg-primary:        #00BDFF;        /* electric cyan-blue, brand spotlight */
+  --jg-primary-rgb:    0, 189, 255;    /* @kind other */
+  --jg-secondary:      #0C4B5F;        /* deep teal, used for heading bars + hex tabs */
+  --jg-secondary-rgb:  12, 75, 95;     /* @kind other */
+
+  /* ----- Neutrals ------------------------------------------- */
+  --jg-light:          #F4F4F4;        /* near-white, primary fg on dark bg */
+  --jg-light-rgb:      244, 244, 244;  /* @kind other */
+  --jg-dark:           #161719;        /* page bg — almost-black */
+  --jg-dark-rgb:       22, 23, 25;     /* @kind other */
+  --jg-dark-2:         #494949;        /* tab containers, secondary panels */
+  --jg-dark-inlay:     #202124;        /* inset/inlay sections */
+
+  /* ----- State / accent ------------------------------------- */
+  --jg-active:         #808080;        /* inactive label color */
+  --jg-inactive:       #B3B6C9;        /* faint grey */
+  --jg-orange-rgb:     252, 157, 3;    /* @kind other — legacy accent, unused */
+
+  /* ----- Semantic foreground / background tokens ------------ */
+  --bg-page:           var(--jg-dark);
+  --bg-inlay:          var(--jg-dark-inlay);
+  --bg-panel:          var(--jg-dark-2);
+  --bg-overlay:        rgba(var(--jg-dark-rgb), 0.6);
+  --bg-overlay-strong: rgba(var(--jg-dark-rgb), 0.9);
+
+  --fg-primary:        var(--jg-light);          /* body text on dark */
+  --fg-muted:          rgba(244, 244, 244, 0.7);
+  --fg-accent:         var(--jg-primary);        /* h3/h4, links */
+  --fg-on-primary:     var(--jg-dark);           /* dark text on cyan button */
+
+  --border-subtle:     var(--jg-light);
+  --line-secondary:    var(--jg-secondary);
+
+  /* ----- Spacing -------------------------------------------- */
+  --spacer-sm: 60px;          /* mobile section spacing */
+  --spacer-lg: 100px;         /* desktop section spacing */
+  --spacer-xs: 16px;
+  --spacer-md: 32px;
+
+  /* ----- Radii ---------------------------------------------- */
+  --std-border-rad: 4px;       /* form fields, cards */
+  --pill-rad: 999px;           /* full pill capsule */
+
+  /* ----- Animation ------------------------------------------ */
+  --jg-anim-duration: 250ms;           /* @kind other */
+  --jg-ease: ease;                     /* @kind other */
+
+  /* ----- Component tokens ----------------------------------- */
+  --btn-padding-y: 16px;
+  --hex-height: 65px;
+  --heading-line-thickness: 0.5vw;     /* the iconic teal stripe */
+
+  /* ----- Type families -------------------------------------- */
+  --font-display: "Anton", "Oswald", "Impact", sans-serif;        /* condensed display, all-caps */
+  --font-body:    "Libre Franklin", "Helvetica Neue", Arial, sans-serif;
+
+  --font-weight-light:  300;
+  --font-weight-regular: 400;
+  --font-weight-medium:  500;
+  --font-weight-bold:    700;
+  --font-weight-black:   900;
+}
+
+/* ============================================================
+   Type scale — fluid, mirroring jg-website fonts.css
+   Display headings (h1-h3, h6) use Anton, uppercase.
+   Body & sub-headings (h4, h5, p) use Libre Franklin.
+   ============================================================ */
+
+.jg-h1, h1.jg {
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  font-size: calc(28px + 3vw);          /* ~46–88px */
+  line-height: 1;
+  color: var(--fg-primary);
+  margin: 0 0 0.5em;
+}
+
+.jg-h2, h2.jg {
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  font-size: calc(18px + 3vw);
+  line-height: 1;
+  color: var(--fg-primary);
+}
+
+.jg-h3, h3.jg {
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  font-size: calc(16px + 2vw);
+  line-height: 1.05;
+  color: var(--fg-accent);              /* cyan by default */
+}
+
+.jg-h4, h4.jg {
+  font-family: var(--font-body);
+  font-weight: var(--font-weight-bold);
+  font-size: calc(16px + 1vw);
+  line-height: 1.2;
+  color: var(--fg-accent);              /* cyan */
+}
+
+.jg-h5, h5.jg {
+  font-family: var(--font-body);
+  font-weight: var(--font-weight-bold);
+  font-size: calc(16px + 1vw);
+  line-height: 1.2;
+  color: var(--fg-primary);
+}
+
+.jg-h6, h6.jg {
+  font-family: var(--font-display);
+  text-transform: uppercase;
+  font-size: calc(16px + 1vw);
+  color: var(--fg-primary);
+}
+
+.jg-p, p.jg {
+  font-family: var(--font-body);
+  font-weight: var(--font-weight-light);
+  font-size: calc(12px + 0.4vw);
+  line-height: 1.5;
+  color: var(--fg-primary);
+  text-align: justify;
+}
+
+.jg-p-small {
+  font-family: var(--font-body);
+  font-weight: var(--font-weight-light);
+  font-size: calc(10px + 0.3vw);
+  color: var(--fg-primary);
+}
+
+.jg-eyebrow {
+  font-family: var(--font-body);
+  font-weight: var(--font-weight-medium);
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--jg-primary);
+}
+
+.jg-nav-link {
+  font-family: var(--font-body);
+  font-weight: var(--font-weight-light);
+  font-size: 16px;
+  text-transform: uppercase;
+  color: var(--fg-primary);
+  line-height: 1;
+  text-decoration: none;
+}
+
+.jg-quote {
+  padding: 20px 24px;
+  font-size: calc(12px + 0.5vw);
+  background-color: rgba(var(--jg-secondary-rgb), 0.4);
+  border-left: 5px solid var(--jg-secondary);
+  color: var(--fg-primary);
+  font-family: var(--font-body);
+}
+
+/* ============================================================
+   Link defaults
+   ============================================================ */
+
+a.jg, .jg a {
+  color: var(--jg-primary);
+  font-weight: var(--font-weight-medium);
+  text-decoration: none;
+  transition: filter var(--jg-anim-duration) var(--jg-ease);
+}
+a.jg:hover, .jg a:hover { filter: brightness(0.9); }
