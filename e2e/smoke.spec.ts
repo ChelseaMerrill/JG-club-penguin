@@ -35,10 +35,16 @@ test('smoke-canvas-and-ui-layer', async ({ page }) => {
   });
   expect(Number(uiZ)).toBeGreaterThan(gameZ === 'auto' ? 0 : Number(gameZ));
 
-  // The top element 10px inside the canvas's top-left corner (off the
-  // centered login card) is the canvas itself (the #ui layer lets input through).
+  // The signed-out Landing page deliberately covers the whole Stage; hide it
+  // so this checks the #ui layer itself. The top element 10px inside the
+  // canvas's top-left corner is then the canvas (the #ui layer lets input
+  // through).
+  await expect(page.locator('#ui .landing')).toBeVisible();
   const hit = await page.evaluate(
-    ([x, y]) => document.elementFromPoint(x, y)?.tagName,
+    ([x, y]) => {
+      document.querySelector<HTMLElement>('#ui .landing')!.hidden = true;
+      return document.elementFromPoint(x, y)?.tagName;
+    },
     [canvasBox!.x + 10, canvasBox!.y + 10],
   );
   expect(hit).toBe('CANVAS');
