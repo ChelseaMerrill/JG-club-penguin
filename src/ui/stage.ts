@@ -1,5 +1,6 @@
 import type { Game } from 'phaser';
-import { GAME_HEIGHT, GAME_WIDTH } from '../game/config';
+import { GAME_HEIGHT, GAME_WIDTH } from '../game/stage-size';
+import { getUiLayer } from './ui-layer';
 
 /** Per-side gutter (px) around the fitted stage, so the design ring stays visible. */
 const GUTTER = 9;
@@ -14,8 +15,8 @@ export interface StageFit {
 
 /**
  * Fits the fixed 1600x900 stage into a viewport, preserving aspect ratio and
- * centring it with a `GUTTER`px margin on the constrained axis (the axis with
- * no leftover space). Pure: no DOM reads or writes.
+ * centering it with a `GUTTER`px margin on the constrained axis (the axis
+ * with no leftover space). Pure: no DOM reads or writes.
  */
 export function computeStageFit(viewportWidth: number, viewportHeight: number): StageFit {
   const scale = Math.min(
@@ -31,15 +32,19 @@ export function computeStageFit(viewportWidth: number, viewportHeight: number): 
 
 /**
  * Applies `computeStageFit` to `#stage` and `#ui` on load and on every
- * `resize`, then asks Phaser to re-measure the canvas against its now-resized
- * parent (`#stage`'s `Scale.FIT` fills it exactly).
+ * `resize`, then tells Phaser the new `#game` parent size directly.
+ * `game.scale.refresh()` alone isn't enough here: Phaser's own window-resize
+ * handling only marks its scale manager dirty and re-measures the parent on
+ * its next internal step, so it would use a stale parent size if we asked it
+ * to refresh synchronously right after resizing `#stage`. `setParentSize`
+ * sets the new size directly and refreshes off of it immediately.
  */
 export function mountStage(game: Game): void {
   const stage = document.getElementById('stage');
-  const ui = document.getElementById('ui');
-  if (!stage || !ui) {
-    throw new Error('Stage layer #stage or #ui is missing from index.html');
+  if (!stage) {
+    throw new Error('Stage layer #stage is missing from index.html');
   }
+  const ui = getUiLayer();
 
   const applyFit = (): void => {
     const fit = computeStageFit(window.innerWidth, window.innerHeight);
@@ -48,7 +53,7 @@ export function mountStage(game: Game): void {
     stage.style.left = `${fit.left}px`;
     stage.style.top = `${fit.top}px`;
     ui.style.transform = `scale(${fit.scale})`;
-    game.scale.refresh();
+    game.scale.setParentSize(fit.width, fit.height);
   };
 
   applyFit();

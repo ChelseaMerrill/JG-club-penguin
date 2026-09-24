@@ -5,8 +5,8 @@ import { getSupabaseClient } from './auth/supabase-client';
 import { startAuth, toAuthClient } from './auth/auth-session';
 import { bindPlayer } from './auth/player';
 import { createLoginOverlay } from './ui/login-overlay';
-import { getUiLayer } from './ui/ui-layer';
 import { mountStage } from './ui/stage';
+import { getUiLayer } from './ui/ui-layer';
 
 // Fail fast on a missing or malformed .env before anything boots.
 loadEnv();

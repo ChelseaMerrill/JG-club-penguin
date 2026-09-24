@@ -1,7 +1,10 @@
 /* JG design tokens (colors, type). Byte-exact mirror import: never copy or
    edit these rules here. Verified to hold only `:root` custom properties and
    class-scoped rules (no bare element selectors), so it's safe to import
-   wholesale. */
+   wholesale. The build depends on this exact mirror path
+   (design/_ds/jahnel-group-design-system-019df630-6921-74f8-9d13-c9b8506c740c/);
+   if a design resync renames the design-system folder, this import path
+   must be updated to match. */
 @import url('../design/_ds/jahnel-group-design-system-019df630-6921-74f8-9d13-c9b8506c740c/colors_and_type.css');
 
 @font-face {
@@ -92,6 +95,11 @@ body {
   font-family: var(--font-game-display);
   font-size: calc(18px + 2vw);
   z-index: 20;
+  /* Same two-tone ring as #stage, inset since this element fills the
+     viewport (an outer box-shadow would be clipped by the edge). */
+  box-shadow:
+    inset 0 0 0 6px var(--stage-ring-inner),
+    inset 0 0 0 15px var(--stage-ring-outer);
 }
 
 @media (max-width: 1023.98px), (max-height: 575.98px), (not (any-pointer: fine)) {
