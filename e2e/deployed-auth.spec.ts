@@ -49,7 +49,7 @@ test('deployed-auth-roundtrip', async ({ page, request }) => {
   await page.goto('/');
 
   const badge = page.locator('#ui .player-badge');
-  const card = page.locator('#ui .login-card');
+  const card = page.locator('#ui .landing');
   await expect(badge).toBeVisible();
   await expect(card).toBeHidden();
 
