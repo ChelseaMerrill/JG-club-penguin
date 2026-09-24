@@ -15,7 +15,8 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "build:penguin-text": "node --experimental-strip-types scripts/penguin-text-to-paths.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.1",
@@ -26,10 +27,12 @@
     "@eslint/js": "^10.0.1",
     "@playwright/test": "^1.63.0",
     "@types/node": "^22.20.4",
+    "@types/opentype.js": "^1.3.10",
     "eslint": "^10.11.0",
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.12.0",
     "jsdom": "^29.1.1",
+    "opentype.js": "^2.0.0",
     "prettier": "^3.9.9",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.70.1",
