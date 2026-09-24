@@ -17,6 +17,7 @@ interface ShownPenguin {
   depth: number;
   facing: Facing;
   destroyed: boolean;
+  bubble: string | null;
 }
 
 /** A fake rendering stage: records every Penguin placed on it and its current state. */
@@ -28,7 +29,7 @@ function createFakeStage() {
     depth: number,
     facing: Facing,
   ): PlacedPenguin => {
-    const shown: ShownPenguin = { look, point, depth, facing, destroyed: false };
+    const shown: ShownPenguin = { look, point, depth, facing, destroyed: false, bubble: null };
     placed.push(shown);
     return {
       setLook: (next) => {
@@ -40,6 +41,9 @@ function createFakeStage() {
       moveTo: (nextPoint, nextDepth) => {
         shown.point = nextPoint;
         shown.depth = nextDepth;
+      },
+      say: (text) => {
+        shown.bubble = text;
       },
       destroy: () => {
         shown.destroyed = true;
@@ -82,7 +86,14 @@ describe('RoomPenguinView', () => {
     // Tile {3,5}: north corner (800 + (3-5)*50, 250 + 8*25) = (700, 450),
     // centre 25px lower. Screen row 8, col 3 sorts at depth 8003.
     expect(stage.live()).toEqual([
-      { look: PEBBLE, point: { x: 700, y: 475 }, depth: 8003, facing: 'left', destroyed: false },
+      {
+        look: PEBBLE,
+        point: { x: 700, y: 475 },
+        depth: 8003,
+        facing: 'left',
+        destroyed: false,
+        bubble: null,
+      },
     ]);
   });
 
@@ -96,7 +107,14 @@ describe('RoomPenguinView', () => {
     // Tile {6,1}: north corner (800 + 5*50, 250 + 7*25) = (1050, 425).
     expect(stage.placed).toHaveLength(1);
     expect(stage.live()).toEqual([
-      { look: renamed, point: { x: 1050, y: 450 }, depth: 7006, facing: 'left', destroyed: false },
+      {
+        look: renamed,
+        point: { x: 1050, y: 450 },
+        depth: 7006,
+        facing: 'left',
+        destroyed: false,
+        bubble: null,
+      },
     ]);
   });
 
@@ -159,5 +177,38 @@ describe('RoomPenguinView', () => {
       { x: 700, y: 275 },
     ]);
     expect(stage.live().filter((p) => p.destroyed)).toEqual([]);
+  });
+
+  it('says (and clears) a chat bubble above a shown remote Penguin, ignoring a Player not shown (#44)', () => {
+    const { stage, view } = attachedView();
+    view.upsert(payload({ playerId: 'player-b' }));
+
+    view.say('player-b', 'hello there');
+    view.say('never-shown', 'ignored');
+
+    expect(stage.live()[0].bubble).toBe('hello there');
+
+    view.say('player-b', null);
+
+    expect(stage.live()[0].bubble).toBeNull();
+  });
+
+  it('says (and clears) a chat bubble above the local Penguin (#44)', () => {
+    const { stage, view } = attachedView();
+    view.showLocal(payload({ playerId: 'player-a' }));
+
+    view.sayLocal('hi');
+
+    expect(stage.live()[0].bubble).toBe('hi');
+
+    view.sayLocal(null);
+
+    expect(stage.live()[0].bubble).toBeNull();
+  });
+
+  it('sayLocal is a no-op while the local Penguin is not shown', () => {
+    const { view } = attachedView();
+
+    expect(() => view.sayLocal('hi')).not.toThrow();
   });
 });

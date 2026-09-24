@@ -22,6 +22,24 @@ const NAME_TAG_PADDING_Y = 6;
 // Small gap below the feet anchor before the name tag starts.
 const NAME_TAG_GAP = 8;
 
+// Chat speech bubble (#44): "white rounded pills with dark Libre Franklin
+// bold text" per design/design_handoff_club_jenguin/README.md's common room
+// anatomy notes.
+const BUBBLE_BG = 0xf4f4f4;
+const BUBBLE_TEXT_COLOR = '#161719';
+const BUBBLE_FONT_FAMILY = 'Libre Franklin, sans-serif';
+const BUBBLE_FONT_WEIGHT = '700';
+const BUBBLE_FONT_SIZE = '14px';
+const BUBBLE_PADDING_X = 14;
+const BUBBLE_PADDING_Y = 8;
+const BUBBLE_MAX_WIDTH = 260;
+// Gap above the sprite's own top edge (the sprite's top edge sits at
+// `-(PENGUIN_ORIGIN.y + PENGUIN_FRAME_PADDING)` in container space,
+// regardless of frame size, since that's exactly what the feet-anchor
+// origin fraction cancels out to).
+const BUBBLE_GAP = 10;
+const BUBBLE_ANCHOR_Y = -(PENGUIN_ORIGIN.y + PENGUIN_FRAME_PADDING) - BUBBLE_GAP;
+
 /** Phaser's always-present built-in placeholder texture. */
 const PLACEHOLDER_TEXTURE_KEY = '__DEFAULT';
 
@@ -31,6 +49,8 @@ export interface Penguin {
   walk(): void;
   setFacing(facing: Facing): void;
   setLook(look: PenguinLook): void;
+  /** Shows a chat speech bubble above the Penguin's head, or clears it (`null`) (#44). */
+  say(text: string | null): void;
   destroy(): void;
 }
 
@@ -92,7 +112,23 @@ export function createPenguin(
   });
   nameText.setOrigin(0.5, 0);
 
-  const container = scene.add.container(x, y, [sprite, pill, nameText]);
+  // Chat speech bubble (#44): hidden until the first `say(text)`. Phaser's
+  // `Text` never interprets its string as markup, so an unsafe message (e.g.
+  // `<script>...`) always renders as the literal characters.
+  const bubblePill = new GameObjects.Graphics(scene);
+  const bubbleText = new GameObjects.Text(scene, 0, BUBBLE_ANCHOR_Y - BUBBLE_PADDING_Y, '', {
+    fontFamily: BUBBLE_FONT_FAMILY,
+    fontStyle: BUBBLE_FONT_WEIGHT,
+    fontSize: BUBBLE_FONT_SIZE,
+    color: BUBBLE_TEXT_COLOR,
+    align: 'center',
+    wordWrap: { width: BUBBLE_MAX_WIDTH - BUBBLE_PADDING_X * 2 },
+  });
+  bubbleText.setOrigin(0.5, 1);
+  bubblePill.setVisible(false);
+  bubbleText.setVisible(false);
+
+  const container = scene.add.container(x, y, [sprite, pill, nameText, bubblePill, bubbleText]);
 
   function clearPendingListener(): void {
     if (pendingKey !== null && pendingListener !== null) {
@@ -125,6 +161,24 @@ export function createPenguin(
     pill.fillRoundedRect(-width / 2, NAME_TAG_GAP, width, height, height / 2);
   }
   redrawNameTag();
+
+  function redrawBubble(text: string | null): void {
+    if (text === null) {
+      bubblePill.setVisible(false);
+      bubbleText.setVisible(false);
+      bubbleText.setText('');
+      bubblePill.clear();
+      return;
+    }
+    bubbleText.setText(text);
+    bubbleText.setVisible(true);
+    bubblePill.setVisible(true);
+    const width = Math.min(bubbleText.width, BUBBLE_MAX_WIDTH) + BUBBLE_PADDING_X * 2;
+    const height = bubbleText.height + BUBBLE_PADDING_Y * 2;
+    bubblePill.clear();
+    bubblePill.fillStyle(BUBBLE_BG, 1);
+    bubblePill.fillRoundedRect(-width / 2, BUBBLE_ANCHOR_Y - height, width, height, height / 2);
+  }
 
   function applyFrame(): void {
     const key = penguinTextureKey(currentHash, currentAnim, currentFrame);
@@ -185,6 +239,9 @@ export function createPenguin(
       ensurePenguinTextures(scene, next);
       redrawNameTag();
       play(wasWalking ? 'WALK' : next.emote);
+    },
+    say(text: string | null) {
+      redrawBubble(text);
     },
     destroy() {
       destroyed = true;

@@ -1,4 +1,4 @@
-import { gameEvents, SPAWN_ROOM_ID, type RoomId } from '../../contracts';
+import { CHAT_TEXT_MAX, gameEvents, SPAWN_ROOM_ID, type RoomId } from '../../contracts';
 import { createOverlayManager, type OverlayManager } from './overlay-manager';
 import type { RoomTitle } from './room-titles';
 
@@ -14,6 +14,13 @@ export interface HudDeps {
   onSignOut: () => void;
   /** 0 until #34 loads the real Token balance. */
   initialBalance: number;
+  /**
+   * Sends a chat message (#44): the field itself does no trimming, cutting,
+   * or rate limiting; it awaits this to decide whether to clear. Resolves
+   * `true` only for an accepted, sent message; the field keeps its text on
+   * `false` (e.g. rate-limited).
+   */
+  onChatSend: (text: string) => Promise<boolean>;
 }
 
 export interface Hud {
@@ -110,14 +117,39 @@ export function createHud(layer: HTMLElement, deps: HudDeps): Hud {
     deps.onSignOut();
   });
 
-  // Bottom bar: chat slot (#44 fills this in), MAP and IGLOO. EMOTE,
-  // SNOWBALL and QUESTS stay hidden until their stretch tickets land.
+  // Bottom bar: chat field (#44), MAP and IGLOO. EMOTE, SNOWBALL and QUESTS
+  // stay hidden until their stretch tickets land.
   const bottomBar = document.createElement('div');
   bottomBar.className = 'hud__bottom-bar';
 
   const chatSlot = document.createElement('div');
   chatSlot.className = 'hud__chat-slot';
-  chatSlot.textContent = 'Say something...';
+
+  const chatInput = document.createElement('input');
+  chatInput.type = 'text';
+  chatInput.className = 'hud__chat-input';
+  chatInput.placeholder = 'Say something...';
+  chatInput.maxLength = CHAT_TEXT_MAX;
+
+  // Every keyboard event stops here: the field never lets a keystroke reach
+  // a `window` listener (the overlay manager's Escape, the Minigame shell's
+  // P), so typing never triggers game input or click-to-move (#44 D3).
+  function stopKeyPropagation(event: KeyboardEvent): void {
+    event.stopPropagation();
+  }
+  chatInput.addEventListener('keyup', stopKeyPropagation);
+  chatInput.addEventListener('keypress', stopKeyPropagation);
+  chatInput.addEventListener('keydown', (event) => {
+    event.stopPropagation();
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    const text = chatInput.value;
+    void deps.onChatSend(text).then((accepted) => {
+      if (accepted) chatInput.value = '';
+    });
+  });
+
+  chatSlot.append(chatInput);
 
   const emoteButton = document.createElement('button');
   emoteButton.type = 'button';

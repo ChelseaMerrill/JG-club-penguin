@@ -558,6 +558,26 @@ body {
   color: var(--jg-inactive);
 }
 
+/* The chat field (#44) fills its slot; only its own placeholder is styled,
+   never a bare element selector. */
+.hud__chat-input {
+  flex: 1;
+  height: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font: 400 16px var(--font-body);
+  color: var(--fg-primary);
+}
+
+.hud__chat-input::placeholder {
+  color: var(--jg-inactive);
+}
+
+.hud__chat-input:focus-visible {
+  outline: none;
+}
+
 /* The bottom bar's hexagon buttons (EMOTE, SNOWBALL, MAP, IGLOO, QUESTS)
    share their hexagon clip-path with `.minigame__button`. */
 .hud__button--bottom,

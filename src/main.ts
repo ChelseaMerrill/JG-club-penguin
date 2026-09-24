@@ -21,6 +21,12 @@ import {
   type RoomChannel,
 } from './realtime/room-channel';
 import { toRealtimeClient } from './realtime/supabase-realtime';
+import {
+  createChatController,
+  type ChatBubbleView,
+  type ChatController,
+} from './chat/chat-controller';
+import { exposeChatDebug } from './chat/dev-chat-hook';
 import { DEFAULT_FACING, SPAWN_ROOM_ID, type PenguinLook, type Tile } from './contracts';
 import { createInMemoryProgressStore } from './persistence/in-memory-progress-store';
 import { STARTING_TOKENS } from './persistence/minigame-rules';
@@ -51,6 +57,8 @@ const sceneReady = whenSceneReady(game).then((scene) => {
 /** The signed-in Player's Room channel, and the Player it belongs to. */
 let roomChannel: RoomChannel | null = null;
 let channelPlayerId: string | null = null;
+/** The signed-in Player's chat controller (#44), recreated alongside `roomChannel` each session. */
+let chatController: ChatController | null = null;
 /** The local Penguin's look, and the tile it entered the current Room at. */
 let localLook: PenguinLook | null = null;
 let localTile: Tile | null = null;
@@ -93,6 +101,34 @@ function showLocalPenguin(): void {
   });
 }
 
+/**
+ * Wraps `view` to also publish every bubble it shows/clears to
+ * `window.__chatDebug` (#44), keyed by Player id (`getPlayerId()` for the
+ * local Penguin's own bubble, since `RoomPenguinView.sayLocal` has no
+ * playerId to key by).
+ */
+function composeChatView(view: ChatBubbleView, getPlayerId: () => string | null): ChatBubbleView {
+  const bubbles: Record<string, string> = {};
+
+  function setBubble(playerId: string, text: string | null): void {
+    if (text === null) delete bubbles[playerId];
+    else bubbles[playerId] = text;
+    exposeChatDebug({ ...bubbles });
+  }
+
+  return {
+    say(playerId, text) {
+      view.say(playerId, text);
+      setBubble(playerId, text);
+    },
+    sayLocal(text) {
+      view.sayLocal(text);
+      const playerId = getPlayerId();
+      if (playerId) setBubble(playerId, text);
+    },
+  };
+}
+
 function composeView(view: RemotePenguinView): RemotePenguinView {
   if (!debugOverlay) return view;
   return {
@@ -132,6 +168,8 @@ function endSession(): RoomChannel | null {
   channelPlayerId = null;
   localLook = null;
   localTile = null;
+  chatController?.stop();
+  chatController = null;
   penguins?.clear();
   debugOverlay?.clear();
   debugOverlay?.setCurrentRoom(null);
@@ -161,6 +199,10 @@ async function startSession(player: Player, previous: RoomChannel | null): Promi
     view: composeView(view),
   });
   roomChannel = channel;
+  chatController = createChatController({
+    channel,
+    view: composeChatView(view, () => channelPlayerId),
+  });
   channel.onRoomChange((roomId) => {
     debugOverlay?.setCurrentRoom(roomId);
     if (roomId) showLocalPenguin();
@@ -190,6 +232,7 @@ const hud = createHud(getUiLayer(), {
   // Seeded from the fake store's own starting balance until #34 loads the
   // real Token balance.
   initialBalance: STARTING_TOKENS,
+  onChatSend: (text) => chatController?.send(text) ?? Promise.resolve(false),
 });
 
 // In-memory fake until #34's real ProgressStore lands; the HUD's Token

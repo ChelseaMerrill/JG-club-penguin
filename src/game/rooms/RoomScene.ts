@@ -270,6 +270,7 @@ function placePenguinsIn(scene: Scene): PlacePenguin {
         penguin.container.setPosition(next.x, next.y);
         penguin.container.setDepth(nextDepth);
       },
+      say: (text) => penguin.say(text),
       destroy: () => penguin.destroy(),
     };
   };

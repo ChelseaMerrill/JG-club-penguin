@@ -13,6 +13,8 @@ export interface PlacedPenguin {
   setLook(look: PenguinLook): void;
   setFacing(facing: Facing): void;
   moveTo(point: ScreenPoint, depth: number): void;
+  /** Shows a chat speech bubble above the Penguin, or clears it (`null`) (#44). */
+  say(text: string | null): void;
   destroy(): void;
 }
 
@@ -91,6 +93,16 @@ export class RoomPenguinView implements RemotePenguinView {
   /** Shows (or moves and restyles) the signed-in Player's own Penguin; not part of the remote roster. */
   showLocal(p: PresencePayload): void {
     this.show(LOCAL_KEY, p);
+  }
+
+  /** Shows (or clears, given `null`) a chat speech bubble above a remote Penguin (#44). No-op for a Player not currently shown. */
+  say(playerId: string, text: string | null): void {
+    this.placed.get(playerId)?.say(text);
+  }
+
+  /** Shows (or clears, given `null`) a chat speech bubble above the local Penguin (#44). No-op while it isn't shown. */
+  sayLocal(text: string | null): void {
+    this.placed.get(LOCAL_KEY)?.say(text);
   }
 
   private show(key: PenguinKey, p: PresencePayload): void {
