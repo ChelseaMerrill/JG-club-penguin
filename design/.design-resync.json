@@ -1,0 +1,23 @@
+{
+  "tool": "claude-design",
+  "source": "6050d967-ba2e-4edd-819f-f7dcf4ed9d61",
+  "source_url": "https://claude.ai/design/p/6050d967-ba2e-4edd-819f-f7dcf4ed9d61",
+  "dest": "design",
+  "include": [
+    "**"
+  ],
+  "exclude": [
+    "uploads/**",
+    "screenshots/**",
+    "archive/**",
+    "_x/**",
+    ".thumbnail*",
+    "**/.thumbnail*",
+    "*standalone*",
+    "**/*standalone*",
+    "*-print-*",
+    "**/*-print-*",
+    "re:.*-[0-9a-f]{8}\\.[A-Za-z0-9.]+$",
+    "re:design_handoff_club_jenguin/(?!README\\.md$|screenshots/).*"
+  ]
+}

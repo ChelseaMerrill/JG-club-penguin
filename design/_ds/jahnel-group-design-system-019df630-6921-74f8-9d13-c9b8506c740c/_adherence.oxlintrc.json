@@ -1,0 +1,155 @@
+{
+  "plugins": [
+    "react",
+    "import"
+  ],
+  "rules": {
+    "react/forbid-elements": [
+      "warn",
+      {
+        "forbid": []
+      }
+    ],
+    "no-restricted-imports": [
+      "warn",
+      {
+        "patterns": [
+          {
+            "group": [
+              "ui_kits/marketing-site/**"
+            ],
+            "message": "Import design-system components from 'index.js', not component internals."
+          }
+        ]
+      }
+    ],
+    "no-restricted-syntax": [
+      "warn",
+      {
+        "selector": "Literal[value=/#[0-9a-fA-F]{3,8}\\b/]",
+        "message": "Raw hex color — use a design-system color token via var()."
+      },
+      {
+        "selector": "Literal[value=/\\b\\d+px\\b/]",
+        "message": "Raw px value — use a design-system spacing token via var()."
+      },
+      {
+        "selector": "Literal[value=/font-family\\s*:\\s*(?!['\\\"]?(?:Anton|Libre Franklin))/i]",
+        "message": "Font not provided by the design system. Available: Anton, Libre Franklin."
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": [
+        "**/index.js"
+      ],
+      "rules": {
+        "no-restricted-imports": "off"
+      }
+    }
+  ],
+  "x-omelette": {
+    "components": {},
+    "tokens": [
+      "--bg-inlay",
+      "--bg-overlay",
+      "--bg-overlay-strong",
+      "--bg-page",
+      "--bg-panel",
+      "--border-subtle",
+      "--btn-padding-y",
+      "--fg-accent",
+      "--fg-muted",
+      "--fg-on-primary",
+      "--fg-primary",
+      "--font-body",
+      "--font-display",
+      "--font-weight-black",
+      "--font-weight-bold",
+      "--font-weight-light",
+      "--font-weight-medium",
+      "--font-weight-regular",
+      "--h",
+      "--heading-line-thickness",
+      "--hex-height",
+      "--jg-active",
+      "--jg-anim-duration",
+      "--jg-dark",
+      "--jg-dark-2",
+      "--jg-dark-inlay",
+      "--jg-dark-rgb",
+      "--jg-darker",
+      "--jg-ease",
+      "--jg-font-body",
+      "--jg-font-display",
+      "--jg-inactive",
+      "--jg-light",
+      "--jg-light-rgb",
+      "--jg-orange-rgb",
+      "--jg-primary",
+      "--jg-primary-rgb",
+      "--jg-secondary",
+      "--jg-secondary-rgb",
+      "--line-secondary",
+      "--pill-rad",
+      "--spacer-lg",
+      "--spacer-md",
+      "--spacer-sm",
+      "--spacer-xs",
+      "--std-border-rad"
+    ],
+    "tokenKinds": {
+      "--jg-primary": "color",
+      "--jg-primary-rgb": "other",
+      "--jg-secondary": "color",
+      "--jg-secondary-rgb": "other",
+      "--jg-light": "color",
+      "--jg-light-rgb": "other",
+      "--jg-dark": "color",
+      "--jg-dark-rgb": "other",
+      "--jg-dark-2": "color",
+      "--jg-dark-inlay": "color",
+      "--jg-active": "color",
+      "--jg-inactive": "color",
+      "--jg-orange-rgb": "other",
+      "--bg-page": "color",
+      "--bg-inlay": "color",
+      "--bg-panel": "color",
+      "--bg-overlay": "color",
+      "--bg-overlay-strong": "color",
+      "--fg-primary": "color",
+      "--fg-muted": "color",
+      "--fg-accent": "color",
+      "--fg-on-primary": "color",
+      "--border-subtle": "color",
+      "--line-secondary": "color",
+      "--spacer-sm": "spacing",
+      "--spacer-lg": "spacing",
+      "--spacer-xs": "spacing",
+      "--spacer-md": "spacing",
+      "--std-border-rad": "spacing",
+      "--pill-rad": "spacing",
+      "--jg-anim-duration": "other",
+      "--jg-ease": "other",
+      "--btn-padding-y": "spacing",
+      "--hex-height": "spacing",
+      "--heading-line-thickness": "spacing",
+      "--font-display": "font",
+      "--font-body": "font",
+      "--font-weight-light": "font",
+      "--font-weight-regular": "font",
+      "--font-weight-medium": "font",
+      "--font-weight-bold": "font",
+      "--font-weight-black": "font",
+      "--jg-darker": "color",
+      "--jg-font-display": "font",
+      "--jg-font-body": "font",
+      "--h": "spacing"
+    },
+    "fontFamilies": [
+      "Anton",
+      "Libre Franklin"
+    ]
+  }
+}

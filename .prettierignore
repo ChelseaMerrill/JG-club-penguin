@@ -6,6 +6,8 @@ test-results
 package-lock.json
 .claude
 .atlas
+# Byte-exact mirror of the Claude Design project; never reformatted.
+design
 # Existing hand-written docs are not reformatted by `npm run format`.
 docs
 CLAUDE.md

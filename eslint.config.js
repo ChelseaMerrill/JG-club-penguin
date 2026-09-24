@@ -13,6 +13,8 @@ export default tseslint.config(
       'test-results/**',
       '.claude/**',
       '.atlas/**',
+      // Byte-exact mirror of the Claude Design project; never linted or edited.
+      'design/**',
     ],
   },
   js.configs.recommended,

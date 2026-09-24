@@ -1,0 +1,323 @@
+{
+  "tool": "claude-design",
+  "source": "6050d967-ba2e-4edd-819f-f7dcf4ed9d61",
+  "source_url": "https://claude.ai/design/p/6050d967-ba2e-4edd-819f-f7dcf4ed9d61",
+  "synced": "2026-09-24",
+  "synced_by": "Millie Elliott",
+  "snapshot": "Club JenGuin logo directions.zip",
+  "plan_id": "e3cda7fbc769",
+  "files": {
+    "Characters.dc.html": {
+      "sha256": "6a357a2adf750ce56651c90ddbfa39fec7e3bfb085588638d0d3bb44fdcd1dff",
+      "bytes": 129060
+    },
+    "Club JenGuin HUD Menus.dc.html": {
+      "sha256": "999e57e9ebed139788bc64eede5c0372780fad75f7aed7420e76d29c49417c2d",
+      "bytes": 134912
+    },
+    "Club JenGuin Landing.dc.html": {
+      "sha256": "3dcf8cc99635dd31198c8c25a565704f044369d01528956377e2a8fddc2a8a54",
+      "bytes": 37969
+    },
+    "Club JenGuin Logo Final.dc.html": {
+      "sha256": "682eb172159ed8aec258891521eadbe36e7664e7184c84b023294b4268984a0a",
+      "bytes": 7336
+    },
+    "Club JenGuin Logo.dc.html": {
+      "sha256": "88b2e7cd7d4f6cc7e1941b2024b409cd85b389109cf8c54e209f327c8328e35d",
+      "bytes": 16937
+    },
+    "Club JenGuin Map.dc.html": {
+      "sha256": "5bf2237d0ab5ec4310a89e8890872aa30af7eccda2086621286ead9789c05507",
+      "bytes": 805088
+    },
+    "Club JenGuin Rooms.dc.html": {
+      "sha256": "8d390f900d8e33591cbfac205711753d251887e0fc9444be945bcebbc7d5126f",
+      "bytes": 117751
+    },
+    "Elevator.dc.html": {
+      "sha256": "3c2202dd61390f7c4e1389fd9f93077d1ded0da6fb5c0e8f538783bbb2932cc6",
+      "bytes": 30251
+    },
+    "Minigame Bug Squash.dc.html": {
+      "sha256": "44d236c3e25faedf4bd373d3cb77c308950a25b32f753f34b49e535fcee8d08e",
+      "bytes": 35051
+    },
+    "Minigame Coffee Rush.dc.html": {
+      "sha256": "c70a837f3685ec8e229dedd6e3109460c60ce57e05bc97a72b17b3fa1a53bdac",
+      "bytes": 38439
+    },
+    "Minigame Snow Cone Stand.dc.html": {
+      "sha256": "8d7bd61cd6dbcca9c7e82d805e2efa1e8e31a676a531363910a66d6c9719b462",
+      "bytes": 62515
+    },
+    "Penguin Creator.dc.html": {
+      "sha256": "b67c195b61e411de7f448952d20145112a701b6cb8010621e021eb4f0a2ccc4e",
+      "bytes": 22895
+    },
+    "Room 01 Town Center.dc.html": {
+      "sha256": "fe57def1efb74e6f9dad95e41c61c7c108963c493b8681590cbec1ac6b440ceb",
+      "bytes": 75215
+    },
+    "Room 02 Dev Pit.dc.html": {
+      "sha256": "fd07987e4c8988208bdf033ea1af8e08288e276df7890c5343e897c1062a5b59",
+      "bytes": 66452
+    },
+    "Room 03 The Icebox.dc.html": {
+      "sha256": "73d2bfab29c89f8357cfb73c6f4abd00714ba2b257530b47278fedbfb0e2fc66",
+      "bytes": 54107
+    },
+    "Room 04 Kitchen.dc.html": {
+      "sha256": "49f1d96263086efc2e35fbd1eb5b2724f9a66a49722e2b38c4d7d95faee9e391",
+      "bytes": 51094
+    },
+    "Room 05 Roof Deck.dc.html": {
+      "sha256": "e4e35e40bc0671db928ea29f1023bbd684be6e616177efd7e5f63cab936bf832",
+      "bytes": 151748
+    },
+    "Room 05b Roof Deck Day.dc.html": {
+      "sha256": "4c57d51f1386bd720ce364f0779f3194bc594de68295611e7b602df366ca32a6",
+      "bytes": 143166
+    },
+    "Room 06 Igloo.dc.html": {
+      "sha256": "a71da5d8a4c6b8afc44ca7e7a36b1ef0cae3527d538ad6930eb82f25f603d50f",
+      "bytes": 46118
+    },
+    "Room 11 Office Hallway.dc.html": {
+      "sha256": "3712c69d295d9f482eab307e8d99359e0c7a407f9a171e891a2c007fa84604aa",
+      "bytes": 31699
+    },
+    "Room 13 Bathroom.dc.html": {
+      "sha256": "a4ffc1c625baf468e5e67d16aedff2d965d06185321f0b7654a88b98d3fdf0c4",
+      "bytes": 21688
+    },
+    "Stairwell.dc.html": {
+      "sha256": "b3f9f0677a0e3f86c9141a618e2ff82718214d2718d58f6f79c429d17a39102d",
+      "bytes": 154158
+    },
+    "Team Room 1.dc.html": {
+      "sha256": "1bbda1e22488df3fb7d763db865635e91c3ddb321212506903d4bde545292959",
+      "bytes": 49474
+    },
+    "Team Room 2.dc.html": {
+      "sha256": "c72d46c476f06a0921657443e97e9ec06e06f54b2ab30d3c3452f15fb013c78c",
+      "bytes": 44051
+    },
+    "Team Room 3.dc.html": {
+      "sha256": "8368762e1d0d1ab5098d7b15db6db9d45f9e1cab5ea1fd5ca808ae721f5b966a",
+      "bytes": 43771
+    },
+    "Team Room 4.dc.html": {
+      "sha256": "d61589e2ef1461bee472bca38acac4786225c8fe21348a84af75f295b78a8a82",
+      "bytes": 51640
+    },
+    "The Mullet.dc.html": {
+      "sha256": "043e65b8dc52fbffdac86207142a2b5ec935b85c863eba412d37036b60d03058",
+      "bytes": 108809
+    },
+    "Trophy Case.dc.html": {
+      "sha256": "d0dfd5d8930fe8022c94b25f1ed61a33c03b67a7e77402e31ebfbeefb1fe95e8",
+      "bytes": 49409
+    },
+    "_ds/jahnel-group-design-system-019df630-6921-74f8-9d13-c9b8506c740c/README.md": {
+      "sha256": "cc7f54d6306db215659b5711d35eb6d268504df78a90becfc52feb039222d25a",
+      "bytes": 12044
+    },
+    "_ds/jahnel-group-design-system-019df630-6921-74f8-9d13-c9b8506c740c/_adherence.oxlintrc.json": {
+      "sha256": "1cfbf3ae56129452da3011cfc88dbe931d84b73dce721d0b0748f08800112460",
+      "bytes": 3930
+    },
+    "_ds/jahnel-group-design-system-019df630-6921-74f8-9d13-c9b8506c740c/_ds_bundle.js": {
+      "sha256": "4e8b31d616073434e912ca10effc7bcba30ec98b0bf0e8c2212dd57c38337d1f",
+      "bytes": 19958
+    },
+    "_ds/jahnel-group-design-system-019df630-6921-74f8-9d13-c9b8506c740c/_ds_manifest.json": {
+      "sha256": "c7d80adf48e1780772a8a163f6a8e09d76c056fec719bd5578d8f19174534850",
+      "bytes": 7915
+    },
+    "_ds/jahnel-group-design-system-019df630-6921-74f8-9d13-c9b8506c740c/colors_and_type.css": {
+      "sha256": "762ee0bafb79610baff0495188e825dbc9a84a2b205fd4cb6a8c2cba827369ca",
+      "bytes": 6041
+    },
+    "_ds/jahnel-group-design-system-019df630-6921-74f8-9d13-c9b8506c740c/styles.css": {
+      "sha256": "e16b9906d739e5f3e5f2e30572379ce25daa7f528ff5392254d9666f4c388c86",
+      "bytes": 150
+    },
+    "_ds/jahnel-group-design-system-019df630-6921-74f8-9d13-c9b8506c740c/ui_kits/marketing-site/kit.css": {
+      "sha256": "eb98c15ff20e254cbe5836d5f937ef1a360916694a4c9e003c9d26da0a06f80e",
+      "bytes": 11716
+    },
+    "assets/awards/bptw.svg": {
+      "sha256": "4ff52eb89b3d31daada57e27be4d1c8c9e826a6e6da15359d652ce34f159063b",
+      "bytes": 5603
+    },
+    "assets/awards/inc500.svg": {
+      "sha256": "d5f54eac626841f41f2fbca5dd2ce4e69516abd1d8c3796e18b69983b38848d7",
+      "bytes": 7059
+    },
+    "assets/awards/top-wp.svg": {
+      "sha256": "47b1aa0c3d7da1b2b1446bcb99b355218376393faab8fd7ef0daf289739904e6",
+      "bytes": 32753
+    },
+    "assets/bumbastika.ttf": {
+      "sha256": "bad89893bad8b20b714a5f84e2f622c12f81d7ab3fc86b35c661b71bafc74303",
+      "bytes": 14792
+    },
+    "assets/jg-logo-bars.svg": {
+      "sha256": "770ff422b0979675b266278fe7dcaf45591c1f2c25af4d3a8791964eddeee550",
+      "bytes": 4175
+    },
+    "assets/jg-logo-light.svg": {
+      "sha256": "c4ce214e693f9999c02a003289d323c994018a25b3c517ef8fcfebbf6df76885",
+      "bytes": 3838
+    },
+    "assets/jg-pin.png": {
+      "sha256": "993af4f628fa69ea550f646c413e81973d8c76e7f444dac741e19703fef82d22",
+      "bytes": 4091
+    },
+    "build/01-tr3.jpg": {
+      "sha256": "9162ea62f6c1c9b62a4c80069a468fb894f8530a2e250ec8bdc2a13140bd2dac",
+      "bytes": 28165
+    },
+    "build/01-tr3h.jpg": {
+      "sha256": "e89251e7cc416ce7b98b596de944234ca4f4fe984d7bbc4f6dd4241dd027e732",
+      "bytes": 27084
+    },
+    "build/02-tr3.jpg": {
+      "sha256": "b6ca04bc1884eef1a03d33040985d7c110317d66faf775ffd4e24cea5cd72b22",
+      "bytes": 31237
+    },
+    "build/02-tr3h.jpg": {
+      "sha256": "c810641a6d93ba3e0ca30ae5536d40e867c50eaaa9c5c0be235893f809129867",
+      "bytes": 25000
+    },
+    "build/humans.js": {
+      "sha256": "ee6772b470b524ec5b931c5fefb25b78c3ba394a35b1668ab351abc82c542338",
+      "bytes": 26178
+    },
+    "build/isolib.js": {
+      "sha256": "7aa92c5c9ebc0a02b5a4264590f72956a12b98f155c478a8b9c35860d88359df",
+      "bytes": 13533
+    },
+    "build/tr3.jpg": {
+      "sha256": "9aae9e9e34a3ec0326ed24880cb8557770c5ba6715be4fe6068d8e64d9d496e4",
+      "bytes": 33781
+    },
+    "design_handoff_club_jenguin/README.md": {
+      "sha256": "5c70e9bda379637124c2d6f5e5b8839fe82e2404b03a40dc797b19516ed23664",
+      "bytes": 7098
+    },
+    "design_handoff_club_jenguin/screenshots/Characters.jpg": {
+      "sha256": "d0937861c7a0a4dd42d6b9e0c00240d76f91aabe901850f402c83b5829ffcaf9",
+      "bytes": 29345
+    },
+    "design_handoff_club_jenguin/screenshots/Club JenGuin HUD Menus.jpg": {
+      "sha256": "663d19ced6762847aec44950985b02216982d45bd58d2857400adc837208695e",
+      "bytes": 30344
+    },
+    "design_handoff_club_jenguin/screenshots/Club JenGuin Landing.jpg": {
+      "sha256": "75aaf98e26eeb7eeccf278a7cd0a5f6a3bfeaad2c8b0fc45222262f1243b7220",
+      "bytes": 33170
+    },
+    "design_handoff_club_jenguin/screenshots/Club JenGuin Logo Final.jpg": {
+      "sha256": "3a2f4d8d46f1f6ec8541b16636a4f79ac744b666144de4827fd8a4f2545c0b1c",
+      "bytes": 22220
+    },
+    "design_handoff_club_jenguin/screenshots/Club JenGuin Logo.jpg": {
+      "sha256": "a18ee4dda964fac6a50dc5beac89e8cc3f1372c8bcc0414db61a0c1e54e56b65",
+      "bytes": 24165
+    },
+    "design_handoff_club_jenguin/screenshots/Club JenGuin Rooms.jpg": {
+      "sha256": "4973e04829382bf77bd06772df71aed68c2743ab9cd2f6d972d8548363b3da8a",
+      "bytes": 28964
+    },
+    "design_handoff_club_jenguin/screenshots/Elevator.jpg": {
+      "sha256": "0bca533b5d1ef5db384798ca560ca475fade33a3a165dabe0e93a9291a728341",
+      "bytes": 31201
+    },
+    "design_handoff_club_jenguin/screenshots/Minigame Bug Squash.jpg": {
+      "sha256": "fbe6b3cb3802ece66353b9cdbf1b7a9c2a0fa4928592facdf7b14ac5e69dc8ce",
+      "bytes": 26341
+    },
+    "design_handoff_club_jenguin/screenshots/Minigame Coffee Rush.jpg": {
+      "sha256": "2f1d36f2e2a993d4ba09e98a12fba7fe5841e3a6fffdf04328a5e7c3975a7b03",
+      "bytes": 34862
+    },
+    "design_handoff_club_jenguin/screenshots/Minigame Snow Cone Stand.jpg": {
+      "sha256": "535857f8c1c80eb2776f1bf69a9bfc7a837c572361797070478e3e86d3258d64",
+      "bytes": 29321
+    },
+    "design_handoff_club_jenguin/screenshots/Penguin Creator.jpg": {
+      "sha256": "c93646e29989a583cdc001f96047f9abee0801d02bf1e062b7de7b20378de5c8",
+      "bytes": 26760
+    },
+    "design_handoff_club_jenguin/screenshots/Room 01 Town Center.jpg": {
+      "sha256": "d8024af76b002579378543b585a24c4a8dd87a98d8eed8eaa7f72cddcef435ad",
+      "bytes": 30083
+    },
+    "design_handoff_club_jenguin/screenshots/Room 02 Dev Pit.jpg": {
+      "sha256": "52c20c21f382de00638e88cb3548f88dfdc4242f4affcbe7f9e3ce0ecc37dd85",
+      "bytes": 32635
+    },
+    "design_handoff_club_jenguin/screenshots/Room 03 The Icebox.jpg": {
+      "sha256": "2aac999b6e183018a46d4939ac7b0a4242809a6ba05f19abfe1e6b8aec6fae37",
+      "bytes": 31800
+    },
+    "design_handoff_club_jenguin/screenshots/Room 04 Kitchen.jpg": {
+      "sha256": "09faca3208012fee524abeea4af4f308ad7863080d8167bc4821f1162783bede",
+      "bytes": 32082
+    },
+    "design_handoff_club_jenguin/screenshots/Room 05 Roof Deck.jpg": {
+      "sha256": "30674c6b9d461f9d268015e65b7a5815223cddb47795282e406483b83fc6735e",
+      "bytes": 47425
+    },
+    "design_handoff_club_jenguin/screenshots/Room 05b Roof Deck Day.jpg": {
+      "sha256": "f8df8cb51ed822f9bbc1899355a93a88f6d005c5ce25b05a56b2b141ff23b1de",
+      "bytes": 47455
+    },
+    "design_handoff_club_jenguin/screenshots/Room 06 Igloo.jpg": {
+      "sha256": "cf9d97dd9f2bc1714efe7b191461a4e1b4ae3cfe83c4fc504298fa266d0a225e",
+      "bytes": 36169
+    },
+    "design_handoff_club_jenguin/screenshots/Room 07 Team Room 4.jpg": {
+      "sha256": "933fc25671cdb0a72cd70d03ad6c812d2538468aa285b368b3207be6da5effe1",
+      "bytes": 27745
+    },
+    "design_handoff_club_jenguin/screenshots/Room 11 Office Hallway.jpg": {
+      "sha256": "e7202f9366c36def64e348a4a4db45199e4179c99f0c18d1788a4f758c9e0482",
+      "bytes": 27527
+    },
+    "design_handoff_club_jenguin/screenshots/Room 13 Bathroom.jpg": {
+      "sha256": "090d2229cdd8ee0ca9e4a882bee992b21bd948d75af81ba5e7b7171f13e67e02",
+      "bytes": 31771
+    },
+    "design_handoff_club_jenguin/screenshots/Room 15 The Mullet.jpg": {
+      "sha256": "a15fca5c135cbea7881316e0fe4f7de69f2ea80bc0456dd926433c6b80179e57",
+      "bytes": 41971
+    },
+    "design_handoff_club_jenguin/screenshots/Stairwell.jpg": {
+      "sha256": "95fc445b8e63f50294707fd096c49aaa09628ce91cf430d84ef366ffa885f0a5",
+      "bytes": 29246
+    },
+    "design_handoff_club_jenguin/screenshots/Team Room 1.jpg": {
+      "sha256": "3519eff9bee47abd3edc366e7575aecfe70a09a77053e0c8be6f095bbddd79ec",
+      "bytes": 30003
+    },
+    "design_handoff_club_jenguin/screenshots/Team Room 2.jpg": {
+      "sha256": "7500aa89a92f1c184500a948c0f1eee0e6cc72bcbaf90d40fcb56fdac2fb43e4",
+      "bytes": 28523
+    },
+    "design_handoff_club_jenguin/screenshots/Team Room 3.jpg": {
+      "sha256": "2f0e1b831f689a8c461e4c6bc532533ef85290bc2e9cb290fa2510a066d03165",
+      "bytes": 28047
+    },
+    "design_handoff_club_jenguin/screenshots/Trophy Case.jpg": {
+      "sha256": "8accd5fc0ce60555dd7087bbfbaef8692c500f28e5087c1dd5e952c21492d5b3",
+      "bytes": 31574
+    },
+    "support.js": {
+      "sha256": "8fe7df74405f3c55f49b7249c74ea1397e65d07dea2b1bd3b4a489bec2e28cbe",
+      "bytes": 69150
+    }
+  }
+}
