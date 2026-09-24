@@ -161,11 +161,11 @@ class FakeClient implements RealtimeClientLike {
   removeChannelResults: Array<'ok' | 'timed out' | 'error'> = [];
   removeChannelImpl: ((ch: RoomChannelLike) => Promise<string>) | null = null;
 
-  channel(name: string, opts: { presenceKey: string }): FakeRoomChannel {
+  channel(name: string, opts: { presenceKey: string }): Promise<FakeRoomChannel> {
     this.log.push(`channel:${name}`);
     const ch = new FakeRoomChannel(name, opts.presenceKey, this.log);
     this.channels.push(ch);
-    return ch;
+    return Promise.resolve(ch);
   }
 
   removeChannel(ch: RoomChannelLike): Promise<string> {
@@ -227,6 +227,7 @@ function createChannel(
     now: () => number;
     setTimeout: typeof setTimeout;
     clearTimeout: typeof clearTimeout;
+    onError: (context: string, err: unknown) => void;
   }> = {},
 ) {
   return createRoomChannel({
@@ -618,9 +619,10 @@ describe('createRoomChannel', () => {
     ]);
   });
 
-  it('clears the view and resets state before removeChannel settles, and does not wedge the queue when it throws', async () => {
+  it('clears the view and resets state before removeChannel settles, and reports a throwing removeChannel via onError without wedging the queue', async () => {
     const { client, events, view } = setup();
-    const rc = createChannel(client, events, view);
+    const onError = vi.fn();
+    const rc = createChannel(client, events, view, 'me', DEFAULT_LOOK, { onError });
 
     events.emit('room:enter', { roomId: 'town-center', entryTile: { col: 0, row: 0 } });
     await flush();
@@ -630,8 +632,6 @@ describe('createRoomChannel', () => {
       new Promise((_resolve, reject) => {
         rejectRemove = reject;
       });
-    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
-
     events.emit('room:leave', { roomId: 'town-center' });
     await flush();
 
@@ -639,10 +639,10 @@ describe('createRoomChannel', () => {
     expect(view.clearCalls).toBeGreaterThan(0);
     expect(rc.currentRoom()).toBeNull();
 
-    rejectRemove(new Error('boom'));
+    const boom = new Error('boom');
+    rejectRemove(boom);
     await flush();
-    expect(consoleError).toHaveBeenCalled();
-    consoleError.mockRestore();
+    expect(onError).toHaveBeenCalledWith(expect.any(String), boom);
     client.removeChannelImpl = null;
 
     events.emit('room:enter', { roomId: 'dev-pit', entryTile: { col: 1, row: 1 } });
@@ -701,7 +701,7 @@ describe('createRoomChannel', () => {
     expect(ch2.trackCalls).toHaveLength(1);
   });
 
-  it('schedules a queued rejoin with 1s/2s/4s backoff capped at 10s on an unexpected CLOSED/CHANNEL_ERROR/TIMED_OUT, and resets on SUBSCRIBED', async () => {
+  it('schedules a queued rejoin with 1s/2s/4s backoff capped at 10s on an unexpected CLOSED/CHANNEL_ERROR/TIMED_OUT, and resets once tracked', async () => {
     const { client, events, view } = setup();
     const timer = createManualTimer();
     createChannel(client, events, view, 'me', DEFAULT_LOOK, {
@@ -821,6 +821,147 @@ describe('createRoomChannel', () => {
 
     ch.emitBroadcast('move', { playerId: 'other', target: { col: 1, row: 1 } });
     expect(moveCalls).toEqual([]);
+  });
+
+  it('a reconnect rebuilds the same Room channel without clearing the view or firing onRoomChange', async () => {
+    const { client, events, view } = setup();
+    const timer = createManualTimer();
+    const rc = createChannel(client, events, view, 'me', DEFAULT_LOOK, {
+      setTimeout: timer.setTimeout,
+      clearTimeout: timer.clearTimeout,
+    });
+    const roomChanges: Array<string | null> = [];
+    rc.onRoomChange((roomId) => roomChanges.push(roomId));
+
+    events.emit('room:enter', { roomId: 'town-center', entryTile: { col: 4, row: 6 } });
+    await flush();
+    const ch1 = client.channels[0];
+    ch1.emitStatus('SUBSCRIBED');
+    showOther(ch1, 'other');
+    await flush();
+    const clearsBefore = view.clearCalls;
+
+    ch1.emitStatus('CLOSED');
+    timer.fireNext();
+    await flush();
+
+    const ch2 = client.channels[1];
+    expect(ch2.name).toBe('room:town-center');
+    expect(view.clearCalls).toBe(clearsBefore);
+    expect(view.removeCalls).toEqual([]);
+    expect(roomChanges).toEqual(['town-center']);
+    expect(rc.currentRoom()).toBe('town-center');
+
+    // The rebuilt channel re-tracks at the same tile.
+    ch2.emitStatus('SUBSCRIBED');
+    await flush();
+    expect(ch2.trackCalls.map((p) => p.tile)).toEqual([{ col: 4, row: 6 }]);
+
+    // Remote Penguins shown before the reconnect still receive broadcasts...
+    const moves: unknown[] = [];
+    rc.on('move', (payload) => moves.push(payload));
+    ch2.emitBroadcast('move', { playerId: 'other', target: { col: 1, row: 2 } });
+    expect(moves).toEqual([{ playerId: 'other', target: { col: 1, row: 2 } }]);
+
+    // ...until the next sync reconciles them away.
+    ch2.setPresenceState({});
+    expect(view.removeCalls).toEqual(['other']);
+  });
+
+  it('a track() that does not resolve ok schedules a backoff rebuild of the same Room channel', async () => {
+    const { client, events, view } = setup();
+    const timer = createManualTimer();
+    const rc = createChannel(client, events, view, 'me', DEFAULT_LOOK, {
+      setTimeout: timer.setTimeout,
+      clearTimeout: timer.clearTimeout,
+    });
+    const roomChanges: Array<string | null> = [];
+    rc.onRoomChange((roomId) => roomChanges.push(roomId));
+
+    events.emit('room:enter', { roomId: 'dev-pit', entryTile: { col: 0, row: 0 } });
+    await flush();
+    const ch1 = client.channels[0];
+    ch1.trackResult = 'timed out';
+    ch1.emitStatus('SUBSCRIBED');
+    await flush();
+
+    expect(timer.scheduled.map((t) => t.delay)).toEqual([1000]);
+
+    timer.fireNext();
+    await flush();
+    expect(client.log).toContain('removeChannel:room:dev-pit');
+    expect(client.channels).toHaveLength(2);
+    expect(client.channels[1].name).toBe('room:dev-pit');
+    expect(roomChanges).toEqual(['dev-pit']);
+  });
+
+  it('a track() that rejects is reported via onError and also schedules a rebuild', async () => {
+    const { client, events, view } = setup();
+    const timer = createManualTimer();
+    const onError = vi.fn();
+    createChannel(client, events, view, 'me', DEFAULT_LOOK, {
+      setTimeout: timer.setTimeout,
+      clearTimeout: timer.clearTimeout,
+      onError,
+    });
+
+    events.emit('room:enter', { roomId: 'town-center', entryTile: { col: 0, row: 0 } });
+    await flush();
+    const ch = client.channels[0];
+    const failure = new Error('socket gone');
+    ch.track = () => Promise.reject(failure);
+    ch.emitStatus('SUBSCRIBED');
+    await flush();
+
+    expect(onError).toHaveBeenCalledWith(expect.any(String), failure);
+    expect(timer.scheduled).toHaveLength(1);
+  });
+
+  it('reports a throwing view via onError and keeps syncing', async () => {
+    const { client, events, view } = setup();
+    const onError = vi.fn();
+    createChannel(client, events, view, 'me', DEFAULT_LOOK, { onError });
+    const failure = new Error('render failed');
+    view.upsert = () => {
+      throw failure;
+    };
+
+    events.emit('room:enter', { roomId: 'town-center', entryTile: { col: 0, row: 0 } });
+    await flush();
+    showOther(client.channels[0], 'other');
+
+    expect(onError).toHaveBeenCalledWith(expect.any(String), failure);
+  });
+
+  it('isSubscribed and onSubscribedChange follow the channel status, and go false on leave', async () => {
+    const { client, events, view } = setup();
+    const timer = createManualTimer();
+    const rc = createChannel(client, events, view, 'me', DEFAULT_LOOK, {
+      setTimeout: timer.setTimeout,
+      clearTimeout: timer.clearTimeout,
+    });
+    const changes: boolean[] = [];
+    rc.onSubscribedChange((subscribed) => changes.push(subscribed));
+
+    expect(rc.isSubscribed()).toBe(false);
+    events.emit('room:enter', { roomId: 'town-center', entryTile: { col: 0, row: 0 } });
+    await flush();
+    expect(rc.isSubscribed()).toBe(false);
+
+    client.channels[0].emitStatus('SUBSCRIBED');
+    expect(rc.isSubscribed()).toBe(true);
+
+    client.channels[0].emitStatus('CHANNEL_ERROR');
+    expect(rc.isSubscribed()).toBe(false);
+    timer.fireNext();
+    await flush();
+    client.channels[1].emitStatus('SUBSCRIBED');
+    expect(rc.isSubscribed()).toBe(true);
+
+    events.emit('room:leave', { roomId: 'town-center' });
+    await flush();
+    expect(rc.isSubscribed()).toBe(false);
+    expect(changes).toEqual([true, false, true, false]);
   });
 });
 

@@ -67,6 +67,18 @@ describe('createDebugOverlay', () => {
     expect(overlayRoot(root).getAttribute('data-current-room')).toBe('');
   });
 
+  it('setSubscribed puts the Room channel status on the overlay root as data-subscribed, false until told', () => {
+    const root = document.createElement('div');
+    const overlay = createDebugOverlay(root, { onEnterRoom: vi.fn(), onSetLook: vi.fn() });
+    expect(overlayRoot(root).getAttribute('data-subscribed')).toBe('false');
+
+    overlay.setSubscribed(true);
+    expect(overlayRoot(root).getAttribute('data-subscribed')).toBe('true');
+
+    overlay.setSubscribed(false);
+    expect(overlayRoot(root).getAttribute('data-subscribed')).toBe('false');
+  });
+
   it('random-look picks a new body and a new short name, reports it via onSetLook and shows it as data-own-look', () => {
     const root = document.createElement('div');
     const onSetLook = vi.fn();

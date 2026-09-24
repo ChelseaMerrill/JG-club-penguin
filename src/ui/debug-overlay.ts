@@ -58,6 +58,8 @@ export interface DebugOverlay extends RemotePenguinView {
   /** Reflects the local Player's current look, e.g. after sign-in or a Creator change. */
   setOwnLook(look: PenguinLook): void;
   setCurrentRoom(roomId: RoomId | null): void;
+  /** Reflects whether the current Room channel is joined, as `data-subscribed`. */
+  setSubscribed(subscribed: boolean): void;
   destroy(): void;
 }
 
@@ -70,6 +72,7 @@ export function createDebugOverlay(
 
   const container = document.createElement('div');
   container.className = 'debug-overlay';
+  container.dataset.subscribed = 'false';
 
   const roomButtons = document.createElement('div');
   roomButtons.className = 'debug-rooms';
@@ -120,6 +123,9 @@ export function createDebugOverlay(
     setCurrentRoom(roomId: RoomId | null): void {
       container.dataset.currentRoom = roomId ?? '';
       currentRoomLabel.textContent = roomId ?? '';
+    },
+    setSubscribed(subscribed: boolean): void {
+      container.dataset.subscribed = String(subscribed);
     },
     upsert(p: PresencePayload): void {
       let li = rosterItems.get(p.playerId);

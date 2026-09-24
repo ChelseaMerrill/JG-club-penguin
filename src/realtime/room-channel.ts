@@ -4,6 +4,7 @@
  * Consumes the #26 contracts in `src/contracts/`.
  */
 import {
+  DEFAULT_FACING,
   EYES,
   HATS,
   IDLE_EMOTES,
@@ -50,7 +51,12 @@ export interface RoomChannelLike {
 
 /** The narrow slice of a Supabase Realtime client that `createRoomChannel` depends on. */
 export interface RealtimeClientLike {
-  channel(name: string, opts: { presenceKey: string }): RoomChannelLike;
+  /**
+   * Resolves a fresh, joinable channel for `name`. Async so the adapter can
+   * first evict a stale instance realtime-js still lists under the same
+   * topic (see `supabase-realtime.ts`).
+   */
+  channel(name: string, opts: { presenceKey: string }): Promise<RoomChannelLike>;
   /** Resolves the leave push status ('ok' | 'timed out' | 'error'). */
   removeChannel(ch: RoomChannelLike): Promise<string>;
 }
@@ -75,6 +81,8 @@ export interface RoomChannelOptions {
   setTimeout?: typeof setTimeout;
   /** Timer used to cancel a pending reconnect. Defaults to the global `clearTimeout`. */
   clearTimeout?: typeof clearTimeout;
+  /** Reports a caught failure (network, view or handler). Defaults to `console.error`. */
+  onError?: (context: string, err: unknown) => void;
 }
 
 /** Fields the Room channel stamps on every outgoing broadcast itself. */
@@ -104,6 +112,11 @@ export interface RoomChannel {
    * change. A reconnect is not a Room change and never fires it.
    */
   onRoomChange(handler: (roomId: RoomId | null) => void): () => void;
+  /** Whether the current Room channel is joined (its last status was SUBSCRIBED). */
+  isSubscribed(): boolean;
+  /** Fires on every change of `isSubscribed()`, including during a reconnect. */
+  onSubscribedChange(handler: (subscribed: boolean) => void): () => void;
+  /** Leaves the current Room channel and stops following Room events. */
   stop(): Promise<void>;
 }
 
@@ -260,31 +273,42 @@ function parseBroadcast<K extends RoomBroadcastEvent>(
 
 type AnyBroadcastHandler = (payload: RoomBroadcastMap[RoomBroadcastEvent]) => void;
 type RoomChangeHandler = (roomId: RoomId | null) => void;
+type SubscribedHandler = (subscribed: boolean) => void;
+
+function defaultOnError(context: string, err: unknown): void {
+  console.error(`[room-channel] ${context}`, err);
+}
 
 /**
  * Joins the Room channel for whichever Room is currently entered, tracking
  * the local look/tile/facing and mirroring remote Penguins into `view`. Also
  * carries the Room's typed broadcast bus. See issue #28 for the behavioral
  * contract.
+ *
+ * A Room change (`room:leave`, or a `room:enter` while a channel exists)
+ * clears the view and fires `onRoomChange`. A reconnect (CLOSED,
+ * CHANNEL_ERROR, TIMED_OUT, or a `track()` that is not acknowledged `'ok'`)
+ * only rebuilds the same Room's channel after a backoff: the view is kept
+ * and the next Presence sync reconciles it (`src/contracts/rooms.ts`).
  */
 export function createRoomChannel(options: RoomChannelOptions): RoomChannel {
   const { client, events, playerId, view } = options;
   const now = options.now ?? Date.now;
   const scheduleTimer = options.setTimeout ?? setTimeout;
   const cancelTimer = options.clearTimeout ?? clearTimeout;
+  const onError = options.onError ?? defaultOnError;
 
   let look = options.look;
   let tile: Tile = { col: 0, row: 0 };
-  let facing: Facing = 'right';
+  let facing: Facing = DEFAULT_FACING;
   let channel: RoomChannelLike | null = null;
   let subscribed = false;
   let currentRoomId: RoomId | null = null;
   let shownIds = new Set<string>();
 
-  // Bumped on every channel creation and teardown. Callbacks registered
+  // Bumped whenever a channel is opened or detached. Callbacks registered
   // against a channel capture the generation at registration time and no-op
-  // once it is stale, even if the underlying client hands back the same
-  // channel instance for a reused topic.
+  // once it is stale, so a detached channel's late callbacks are inert.
   let generation = 0;
 
   let rejoinAttempt = 0;
@@ -292,10 +316,12 @@ export function createRoomChannel(options: RoomChannelOptions): RoomChannel {
 
   const listeners = new Map<RoomBroadcastEvent, Set<AnyBroadcastHandler>>();
   const roomChangeListeners = new Set<RoomChangeHandler>();
+  const subscribedListeners = new Set<SubscribedHandler>();
 
-  // Every channel operation (leave's removeChannel, enter's channel
-  // creation) runs through this single queue so a leave always finishes
-  // before the next enter starts, even when both fire synchronously.
+  // Every channel operation (leave's removeChannel, enter's and rebuild's
+  // channel creation) runs through this single queue so a leave always
+  // finishes before the next channel is opened, even when both fire
+  // synchronously.
   let queue: Promise<unknown> = Promise.resolve();
   function enqueue<T>(fn: () => Promise<T> | T): Promise<T> {
     const result = queue.then(fn);
@@ -306,17 +332,29 @@ export function createRoomChannel(options: RoomChannelOptions): RoomChannel {
     return result;
   }
 
+  function guarded(context: string, fn: () => void): void {
+    try {
+      fn();
+    } catch (err) {
+      onError(context, err);
+    }
+  }
+
   function buildPayload(): PresencePayload {
     return { playerId, look, tile, facing };
   }
 
   function notifyRoomChange(roomId: RoomId | null): void {
     for (const handler of Array.from(roomChangeListeners)) {
-      try {
-        handler(roomId);
-      } catch (err) {
-        console.error('[room-channel] onRoomChange handler failed', err);
-      }
+      guarded('onRoomChange handler failed', () => handler(roomId));
+    }
+  }
+
+  function setSubscribed(next: boolean): void {
+    if (subscribed === next) return;
+    subscribed = next;
+    for (const handler of Array.from(subscribedListeners)) {
+      guarded('onSubscribedChange handler failed', () => handler(next));
     }
   }
 
@@ -336,18 +374,32 @@ export function createRoomChannel(options: RoomChannelOptions): RoomChannel {
     return delay;
   }
 
-  function scheduleRejoin(): void {
+  function scheduleRebuild(): void {
     if (rejoinTimer !== null) return;
-    const roomId = currentRoomId;
-    if (!roomId) return;
-    const delay = nextRejoinDelay();
+    if (!currentRoomId) return;
     rejoinTimer = scheduleTimer(() => {
       rejoinTimer = null;
-      void enqueue(async () => {
-        await doLeave();
-        doEnter(roomId, tile);
-      });
-    }, delay);
+      void enqueue(() => rebuildChannel());
+    }, nextRejoinDelay());
+  }
+
+  function track(ch: RoomChannelLike, gen: number): void {
+    ch.track(buildPayload()).then(
+      (status) => {
+        if (gen !== generation) return;
+        if (status === 'ok') {
+          rejoinAttempt = 0;
+          return;
+        }
+        onError('track was not acknowledged', status);
+        scheduleRebuild();
+      },
+      (err: unknown) => {
+        if (gen !== generation) return;
+        onError('track failed', err);
+        scheduleRebuild();
+      },
+    );
   }
 
   function handleSync(ch: RoomChannelLike): void {
@@ -369,28 +421,15 @@ export function createRoomChannel(options: RoomChannelOptions): RoomChannel {
     for (const key of selected) {
       const metas = state[key];
       if (!metas) continue;
-      const lastMeta = metas[metas.length - 1];
-      const parsed = parsePresencePayload(lastMeta);
+      const parsed = parsePresencePayload(metas[metas.length - 1]);
       if (!parsed) continue;
       if (parsed.playerId !== key) continue;
       nextIds.add(key);
-      if (!igloo) {
-        try {
-          view.upsert(parsed);
-        } catch (err) {
-          console.error('[room-channel] view.upsert failed', err);
-        }
-      }
+      if (!igloo) guarded('view.upsert failed', () => view.upsert(parsed));
     }
     for (const id of shownIds) {
       if (nextIds.has(id)) continue;
-      if (!igloo) {
-        try {
-          view.remove(id);
-        } catch (err) {
-          console.error('[room-channel] view.remove failed', err);
-        }
-      }
+      if (!igloo) guarded('view.remove failed', () => view.remove(id));
     }
     shownIds = nextIds;
   }
@@ -402,104 +441,126 @@ export function createRoomChannel(options: RoomChannelOptions): RoomChannel {
     if (payload.playerId === playerId) return;
     if (!shownIds.has(payload.playerId)) return;
     const handlers = listeners.get(type);
-    if (!handlers || handlers.size === 0) return;
+    if (!handlers) return;
     for (const handler of Array.from(handlers)) {
-      try {
-        handler(payload);
-      } catch (err) {
-        console.error('[room-channel] broadcast handler failed', err);
-      }
+      guarded('broadcast handler failed', () => handler(payload));
     }
   }
 
-  function handleStatus(ch: RoomChannelLike, status: RoomChannelStatus): void {
+  function handleStatus(ch: RoomChannelLike, gen: number, status: RoomChannelStatus): void {
     if (status === 'SUBSCRIBED') {
-      subscribed = true;
-      rejoinAttempt = 0;
+      setSubscribed(true);
       cancelRejoinTimer();
-      void ch.track(buildPayload());
+      track(ch, gen);
       return;
     }
-    subscribed = false;
-    scheduleRejoin();
+    setSubscribed(false);
+    scheduleRebuild();
   }
 
-  /** Synchronous reset first, network cleanup in try/catch so it never wedges the queue or leaves ghosts. */
-  async function doLeave(): Promise<void> {
+  /** Forgets the current channel synchronously, so its late callbacks are inert. */
+  function detachChannel(): RoomChannelLike | null {
     const ch = channel;
     channel = null;
-    subscribed = false;
-    currentRoomId = null;
-    shownIds = new Set();
     generation++;
-    cancelRejoinTimer();
-    view.clear();
-    notifyRoomChange(null);
-    if (!ch) return;
+    setSubscribed(false);
+    return ch;
+  }
+
+  /** Removes a detached channel, tearing it down client-side if the leave is not `'ok'`. */
+  async function releaseChannel(ch: RoomChannelLike): Promise<void> {
     try {
       const status = await client.removeChannel(ch);
-      if (status !== 'ok') {
-        ch.teardown();
-      }
+      if (status !== 'ok') ch.teardown();
     } catch (err) {
-      console.error('[room-channel] removeChannel failed', err);
+      onError('removeChannel failed', err);
       ch.teardown();
     }
   }
 
-  function doEnter(roomId: RoomId, entryTile: Tile): void {
-    tile = entryTile;
-    currentRoomId = roomId;
-    const ch = client.channel(roomChannelKey(roomId, playerId), { presenceKey: playerId });
+  async function openChannel(roomId: RoomId): Promise<void> {
+    let ch: RoomChannelLike;
+    try {
+      ch = await client.channel(roomChannelKey(roomId, playerId), { presenceKey: playerId });
+    } catch (err) {
+      onError('channel failed', err);
+      scheduleRebuild();
+      return;
+    }
     channel = ch;
-    subscribed = false;
     const gen = ++generation;
 
-    ch.onPresenceSync(() => {
-      if (gen !== generation) return;
-      handleSync(ch);
-    });
-    for (const type of BROADCAST_EVENTS) {
-      ch.onBroadcast(type, (raw) => {
+    try {
+      ch.onPresenceSync(() => {
         if (gen !== generation) return;
-        handleBroadcast(type, raw);
+        handleSync(ch);
       });
+      for (const type of BROADCAST_EVENTS) {
+        ch.onBroadcast(type, (raw) => {
+          if (gen !== generation) return;
+          handleBroadcast(type, raw);
+        });
+      }
+      ch.subscribe((status) => {
+        if (gen !== generation) return;
+        handleStatus(ch, gen, status);
+      });
+    } catch (err) {
+      onError('subscribe failed', err);
+      scheduleRebuild();
     }
-    ch.subscribe((status) => {
-      if (gen !== generation) return;
-      handleStatus(ch, status);
-    });
+  }
 
-    notifyRoomChange(currentRoomId);
+  /** A Room change: clear the view and notify, then release the channel. */
+  async function leaveRoom(): Promise<void> {
+    const ch = detachChannel();
+    currentRoomId = null;
+    shownIds = new Set();
+    cancelRejoinTimer();
+    guarded('view.clear failed', () => view.clear());
+    notifyRoomChange(null);
+    if (ch) await releaseChannel(ch);
+  }
+
+  async function enterRoom(roomId: RoomId, entryTile: Tile): Promise<void> {
+    if (channel || currentRoomId) await leaveRoom();
+    rejoinAttempt = 0;
+    cancelRejoinTimer();
+    tile = entryTile;
+    currentRoomId = roomId;
+    await openChannel(roomId);
+    notifyRoomChange(roomId);
+  }
+
+  /**
+   * A reconnect, not a Room change: tears down and re-creates the same
+   * Room's channel. Keeps `currentRoomId` and `shownIds` and never touches
+   * the view or `onRoomChange`; the next sync reconciles remote Penguins.
+   */
+  async function rebuildChannel(): Promise<void> {
+    const roomId = currentRoomId;
+    if (!roomId) return;
+    const ch = detachChannel();
+    if (ch) await releaseChannel(ch);
+    await openChannel(roomId);
   }
 
   const unsubscribeLeave = events.on('room:leave', () => {
-    void enqueue(() => doLeave());
+    void enqueue(() => leaveRoom());
   });
   const unsubscribeEnter = events.on('room:enter', ({ roomId, entryTile }) => {
-    void enqueue(async () => {
-      if (channel) {
-        await doLeave();
-      }
-      rejoinAttempt = 0;
-      cancelRejoinTimer();
-      doEnter(roomId, entryTile);
-    });
+    void enqueue(() => enterRoom(roomId, entryTile));
   });
 
   return {
     setLook(newLook: PenguinLook): void {
       look = newLook;
-      if (channel && subscribed) {
-        void channel.track(buildPayload());
-      }
+      if (channel && subscribed) track(channel, generation);
     },
     setTile(newTile: Tile, newFacing?: Facing): void {
       tile = newTile;
       if (newFacing) facing = newFacing;
-      if (channel && subscribed) {
-        void channel.track(buildPayload());
-      }
+      if (channel && subscribed) track(channel, generation);
     },
     async send<K extends RoomBroadcastEvent>(
       type: K,
@@ -534,11 +595,20 @@ export function createRoomChannel(options: RoomChannelOptions): RoomChannel {
         roomChangeListeners.delete(handler);
       };
     },
+    isSubscribed(): boolean {
+      return subscribed;
+    },
+    onSubscribedChange(handler: SubscribedHandler): () => void {
+      subscribedListeners.add(handler);
+      return () => {
+        subscribedListeners.delete(handler);
+      };
+    },
     async stop(): Promise<void> {
       unsubscribeEnter();
       unsubscribeLeave();
       cancelRejoinTimer();
-      await enqueue(() => doLeave());
+      await enqueue(() => leaveRoom());
     },
   };
 }

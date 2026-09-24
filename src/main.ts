@@ -1,6 +1,8 @@
 import './style.css';
 import { loadEnv } from './env';
 import { startGame, whenSceneReady } from './game/main';
+import type { PenguinSpriteView } from './game/penguin-sprites';
+import { createStubRoomDriver } from './game/stub-rooms';
 import { getSupabaseClient } from './auth/supabase-client';
 import { startAuth, toAuthClient } from './auth/auth-session';
 import { bindPlayer, type Player } from './auth/player';
@@ -13,85 +15,147 @@ import {
   type RoomChannel,
 } from './realtime/room-channel';
 import { toRealtimeClient } from './realtime/supabase-realtime';
-import { createStubRoomDriver, ENTRY_TILE } from './game/stub-rooms';
-import { DEFAULT_FACING, gameEvents, SPAWN_ROOM_ID } from './contracts';
+import {
+  DEFAULT_FACING,
+  gameEvents,
+  SPAWN_ROOM_ID,
+  type PenguinLook,
+  type Tile,
+} from './contracts';
 
 // Fail fast on a missing or malformed .env before anything boots.
 loadEnv();
 
 const game = startGame();
 const client = getSupabaseClient();
+const realtime = toRealtimeClient(client);
 const rooms = createStubRoomDriver(gameEvents);
-const sceneReady = whenSceneReady(game);
 const uiLayer = getUiLayer();
+
+/** The scene's Penguin view, once `MainScene.create()` has run. */
+let penguins: PenguinSpriteView | null = null;
+const sceneReady = whenSceneReady(game).then((view) => {
+  penguins = view;
+  return view;
+});
+
+/** The signed-in Player's Room channel, and the Player it belongs to. */
+let roomChannel: RoomChannel | null = null;
+let channelPlayerId: string | null = null;
+/** The local Penguin's look, and the tile it entered the current Room at. */
+let localLook: PenguinLook | null = null;
+let localTile: Tile | null = null;
+// Bumped on every sign-in and sign-out, so an in-flight sign-in that loses a
+// race with a later sign-out (or a newer sign-in) never creates a stray
+// Room channel.
+let signInGeneration = 0;
 
 const debugOverlay = isDebugEnabled()
   ? createDebugOverlay(uiLayer, {
-      onEnterRoom: (roomId) => rooms.enter(roomId),
-      onSetLook: (look) => roomChannel?.setLook(look),
+      onEnterRoom: (roomId) => {
+        if (channelPlayerId) rooms.enter(roomId, channelPlayerId);
+      },
+      onSetLook: (look) => {
+        localLook = look;
+        roomChannel?.setLook(look);
+        showLocalPenguin();
+      },
     })
   : null;
 
-gameEvents.on('room:enter', ({ roomId }) => debugOverlay?.setCurrentRoom(roomId));
-gameEvents.on('room:leave', () => debugOverlay?.setCurrentRoom(null));
+// `room:enter` is emitted synchronously, before the Room channel's own
+// (queued) `onRoomChange` for that Room, so the tile is known by then.
+gameEvents.on('room:enter', ({ entryTile }) => {
+  localTile = entryTile;
+});
 
-function composeView(penguins: RemotePenguinView): RemotePenguinView {
-  if (!debugOverlay) return penguins;
+/** Shows the local Penguin at its entry tile, only while signed in and in a Room. */
+function showLocalPenguin(): void {
+  if (!penguins || !channelPlayerId || !localLook || !localTile) return;
+  if (!roomChannel?.currentRoom()) return;
+  penguins.showLocal({
+    playerId: channelPlayerId,
+    look: localLook,
+    tile: localTile,
+    facing: DEFAULT_FACING,
+  });
+}
+
+function composeView(view: RemotePenguinView): RemotePenguinView {
+  if (!debugOverlay) return view;
   return {
     upsert(p) {
-      penguins.upsert(p);
+      view.upsert(p);
       debugOverlay.upsert(p);
     },
     remove(playerId) {
-      penguins.remove(playerId);
+      view.remove(playerId);
       debugOverlay.remove(playerId);
     },
     clear() {
-      penguins.clear();
+      view.clear();
       debugOverlay.clear();
     },
   };
 }
 
-let roomChannel: RoomChannel | null = null;
-// Bumped on every sign-in/out so an in-flight sign-in that loses a race with
-// a later sign-out (or a duplicate sign-in) never creates a stray channel.
-let signInToken = 0;
-
-async function handleSignedIn(player: Player): Promise<void> {
-  if (roomChannel) return;
-  const token = ++signInToken;
-
-  const penguins = await sceneReady;
-  if (roomChannel || token !== signInToken) return;
-
-  const { look } = player;
-  penguins.showLocal({ playerId: player.id, look, tile: ENTRY_TILE, facing: DEFAULT_FACING });
-  debugOverlay?.setOwnLook(look);
-
-  roomChannel = createRoomChannel({
-    client: toRealtimeClient(client),
-    events: gameEvents,
-    playerId: player.id,
-    look,
-    view: composeView(penguins),
-  });
-  rooms.enter(SPAWN_ROOM_ID);
+async function stopChannel(channel: RoomChannel): Promise<void> {
+  try {
+    await channel.stop();
+  } catch (err) {
+    console.error('[main] Room channel stop failed', err);
+  }
 }
 
-async function handleSignedOut(): Promise<void> {
-  signInToken += 1;
+/**
+ * The synchronous half of leaving a Session (sign-out, or a sign-in as a
+ * different Player): emits `room:leave` via `rooms.reset()` and clears every
+ * view, including the local Penguin. Returns the Room channel still to stop.
+ */
+function endSession(): RoomChannel | null {
+  signInGeneration += 1;
   const channel = roomChannel;
+  rooms.reset();
   roomChannel = null;
-  if (channel) {
-    await channel.stop();
-  }
-
-  const penguins = await sceneReady;
-  penguins.clear();
+  channelPlayerId = null;
+  localLook = null;
+  localTile = null;
+  penguins?.clear();
   debugOverlay?.clear();
   debugOverlay?.setCurrentRoom(null);
-  rooms.reset();
+  debugOverlay?.setSubscribed(false);
+  return channel;
+}
+
+async function startSession(player: Player, previous: RoomChannel | null): Promise<void> {
+  const generation = ++signInGeneration;
+  if (previous) {
+    await stopChannel(previous);
+    if (generation !== signInGeneration) return;
+  }
+
+  const view = await sceneReady;
+  if (generation !== signInGeneration) return;
+
+  channelPlayerId = player.id;
+  localLook = player.look;
+  debugOverlay?.setOwnLook(player.look);
+
+  const channel = createRoomChannel({
+    client: realtime,
+    events: gameEvents,
+    playerId: player.id,
+    look: player.look,
+    view: composeView(view),
+  });
+  roomChannel = channel;
+  channel.onRoomChange((roomId) => {
+    debugOverlay?.setCurrentRoom(roomId);
+    if (roomId) showLocalPenguin();
+  });
+  channel.onSubscribedChange((subscribed) => debugOverlay?.setSubscribed(subscribed));
+
+  rooms.enter(SPAWN_ROOM_ID, player.id);
 }
 
 const overlay = createLoginOverlay(uiLayer, {
@@ -106,14 +170,20 @@ const overlay = createLoginOverlay(uiLayer, {
 const auth = startAuth({
   client: toAuthClient(client),
   onSignedIn: (player) => {
+    const samePlayer = roomChannel !== null && channelPlayerId === player.id;
+    // A different Player while a Room channel exists: leave it first.
+    const previous = !samePlayer && roomChannel ? endSession() : null;
+    // `room:enter` fires only after `registry.player` is set.
     bindPlayer(game.registry, player);
     overlay.showSignedIn(player);
-    void handleSignedIn(player);
+    if (!samePlayer) void startSession(player, previous);
   },
   onSignedOut: () => {
+    // Per `src/contracts/rooms.ts`, `room:leave` comes before `bindPlayer(null)`.
+    const channel = endSession();
     bindPlayer(game.registry, null);
     overlay.showSignedOut();
-    void handleSignedOut();
+    if (channel) void stopChannel(channel);
   },
   onError: (message) => {
     overlay.showError(message);
