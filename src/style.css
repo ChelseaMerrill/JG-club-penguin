@@ -436,6 +436,14 @@ body {
   background: transparent;
   cursor: pointer;
   pointer-events: auto;
+  /* #77 review round 1 nit 6: the poster's own backing plate is a
+     parallelogram (the wall's isometric shear), not the axis-aligned
+     rectangle `rect` gives its bounding box -- this clips the hit target
+     down to that exact parallelogram, traced from the same four backing-plate
+     corners `HEADING_MAX_WIDTH`'s derivation comment in
+     `definitions/town-center.ts` uses, expressed as fractions of this
+     button's own box. */
+  clip-path: polygon(0 50%, 100% 100%, 100% 50%, 0 0);
 }
 
 .wall-text__poster:focus-visible {
@@ -478,13 +486,20 @@ body {
     0 12px 0 var(--jg-secondary);
 }
 
+/* #77 review round 1 nit 9: a 44x44 Stage-px minimum touch/click target
+   (WCAG 2.5.5-style sizing) with real padding, and "CLOSE" (Anton has no ×
+   glyph -- see `core-values-card.ts`'s own comment) rather than an icon. */
 .core-values-card__close {
   position: absolute;
   top: 12px;
   right: 16px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px 16px;
   border: none;
   background: transparent;
-  font: 400 28px var(--font-display);
+  font: 400 16px var(--font-display);
+  letter-spacing: 0.08em;
   line-height: 1;
   color: var(--fg-primary);
   cursor: pointer;

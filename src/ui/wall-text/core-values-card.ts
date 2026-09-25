@@ -1,25 +1,8 @@
-import type { HexColor } from '../../contracts';
+import { CORE_VALUE_WORDS } from '../../game/rooms/definitions/town-center';
 import type { OverlayManager } from '../hud/overlay-manager';
 
 /** The HUD `OverlayManager` id this card registers under (#77 D7). */
 export const CORE_VALUES_OVERLAY_ID = 'core-values';
-
-interface CoreValueBadge {
-  word: string;
-  colour: HexColor;
-}
-
-// The same four words/colours as Town Center's wall poster
-// (`src/game/rooms/definitions/town-center.ts`'s `CORE_VALUES_WALL_TEXT`),
-// duplicated rather than imported: this card is a standalone UI component,
-// not tied to any one `RoomDefinition`. Keep the two in sync if the poster's
-// words or colours ever change.
-const CORE_VALUE_BADGES: readonly CoreValueBadge[] = [
-  { word: 'SERVE', colour: '#F4F4F4' },
-  { word: 'GRIND', colour: '#00BDFF' },
-  { word: 'GROW', colour: '#F4F4F4' },
-  { word: 'INSPIRE', colour: '#00BDFF' },
-];
 
 export interface CoreValuesCard {
   open(): void;
@@ -32,12 +15,19 @@ export interface CoreValuesCard {
  * hexagons (D1-D4), so clicking the poster
  * (`src/ui/wall-text/wall-text.ts`'s `.wall-text__poster` button, D6) opens
  * this card instead -- the heading and all four words at Anton 32px+ on the
- * 1600x900 Stage, legible at any window size down to 1024x576.
+ * 1600x900 Stage, legible at any window size down to 1024x576. Its four
+ * words/colours come from `CORE_VALUE_WORDS`
+ * (`src/game/rooms/definitions/town-center.ts`), the same array the wall
+ * poster itself builds from (#77 review round 1 nit 10), so the two can never
+ * drift apart.
  *
  * Registers with the shared HUD `OverlayManager` (`overlays`) under
  * `CORE_VALUES_OVERLAY_ID` (D7) so Escape, opening another HUD overlay (e.g.
  * MENU), and this card's own close button/backdrop click all close it the
- * same way.
+ * same way. Moves focus to its own close button on open, and restores focus
+ * to whatever had it before on close (#77 review round 1 fix 3), the same
+ * modal-focus discipline `src/ui/penguin-creator.ts` and the minigame shell
+ * already follow.
  */
 export function createCoreValuesCard(layer: HTMLElement, overlays: OverlayManager): CoreValuesCard {
   const root = document.createElement('div');
@@ -54,7 +44,11 @@ export function createCoreValuesCard(layer: HTMLElement, overlays: OverlayManage
   closeButton.type = 'button';
   closeButton.className = 'core-values-card__close';
   closeButton.setAttribute('aria-label', 'Close');
-  closeButton.textContent = '×';
+  // #77 review round 1 nit 9: "CLOSE" (Anton, always present -- unlike the
+  // '×' multiplication sign this replaces, which Anton doesn't ship a glyph
+  // for) rather than an icon font/SVG, matching how every other text button
+  // in this app (MENU, IGLOO, EMOTE, ...) already reads.
+  closeButton.textContent = 'CLOSE';
 
   const heading = document.createElement('h2');
   heading.className = 'core-values-card__heading';
@@ -62,7 +56,7 @@ export function createCoreValuesCard(layer: HTMLElement, overlays: OverlayManage
 
   const badgeRow = document.createElement('div');
   badgeRow.className = 'core-values-card__badges';
-  for (const { word, colour } of CORE_VALUE_BADGES) {
+  for (const { word, colour } of CORE_VALUE_WORDS) {
     const badge = document.createElement('div');
     badge.className = 'core-values-card__badge';
     badge.style.background = colour;
@@ -77,8 +71,15 @@ export function createCoreValuesCard(layer: HTMLElement, overlays: OverlayManage
   root.append(panel);
   layer.append(root);
 
+  // #77 review round 1 fix 3: whatever had focus right before `open()`, so
+  // `hide()` can put it back regardless of which of the four close paths
+  // (Escape, close button, backdrop click, another overlay opening) fired.
+  let previouslyFocused: HTMLElement | null = null;
+
   function hide(): void {
     root.hidden = true;
+    previouslyFocused?.focus();
+    previouslyFocused = null;
   }
 
   closeButton.addEventListener('click', () => {
@@ -97,8 +98,11 @@ export function createCoreValuesCard(layer: HTMLElement, overlays: OverlayManage
 
   return {
     open() {
+      previouslyFocused =
+        document.activeElement instanceof HTMLElement ? document.activeElement : null;
       root.hidden = false;
       overlays.open(CORE_VALUES_OVERLAY_ID, hide);
+      closeButton.focus();
     },
     destroy() {
       overlays.close(CORE_VALUES_OVERLAY_ID);

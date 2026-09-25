@@ -10,10 +10,12 @@ import { townCenter } from '../../game/rooms/definitions/town-center';
 import type { RoomHotspot, RoomWallText } from '../../game/rooms/room-definition';
 import {
   createWallText,
+  HEADING_BLOCK_ID,
   HEADING_FONT_SIZE_PX,
   HEADING_LETTER_SPACING_PX,
   LABEL_FONT_SIZE_PX,
   LABEL_LETTER_SPACING_PX,
+  VALUE_LABEL_VERTICAL_CENTER_OFFSET_PX,
   type WallText,
   type WallTextDeps,
 } from './wall-text';
@@ -54,7 +56,7 @@ describe("Town Center's Core Values poster fits its hexagons (#77)", () => {
     expect(blocks.length).toBeGreaterThan(0);
 
     for (const block of blocks) {
-      const isHeading = block.id === 'heading';
+      const isHeading = block.id === HEADING_BLOCK_ID;
       const fontSize = isHeading ? HEADING_FONT_SIZE_PX : LABEL_FONT_SIZE_PX;
       const letterSpacing = isHeading ? HEADING_LETTER_SPACING_PX : LABEL_LETTER_SPACING_PX;
       const width = measureWidth(font, block.text, fontSize, letterSpacing);
@@ -107,16 +109,17 @@ describe('createWallText', () => {
     };
   }
 
-  /** Fills in `resolvePosterHotspot`/`onPosterClick` defaults (#77 D5/D6) so each test only overrides what it cares about. */
+  /** Fills in `resolvePosterHotspot`/`onPosterClick`/`initialRoomId` defaults (#77 D5/D6, review round 1 fix 1) so each test only overrides what it cares about. */
   function deps(overrides: Partial<WallTextDeps> & Pick<WallTextDeps, 'resolve'>): WallTextDeps {
     return {
       resolvePosterHotspot: () => undefined,
       onPosterClick: vi.fn(),
+      initialRoomId: 'town-center',
       ...overrides,
     };
   }
 
-  it("renders the current Room's labels at boot (SPAWN_ROOM_ID, town-center)", () => {
+  it("renders deps.initialRoomId's labels at boot", () => {
     const resolve = (roomId: RoomId): readonly RoomWallText[] =>
       roomId === 'town-center' ? [fixture('serve', 'SERVE')] : [];
     instance = createWallText(root, deps({ resolve }));
@@ -124,6 +127,18 @@ describe('createWallText', () => {
     const labels = root.querySelectorAll('.wall-text__label');
     expect(labels).toHaveLength(1);
     expect(labels[0].textContent).toBe('SERVE');
+  });
+
+  it("uses deps.initialRoomId, not always town-center (#77 review round 1 fix 1: matches whatever Room RoomScene's own ?room= hook boots into)", () => {
+    const resolve = (roomId: RoomId): readonly RoomWallText[] =>
+      roomId === 'dev-pit' ? [fixture('a', 'A'), fixture('b', 'B')] : [fixture('serve', 'SERVE')];
+    instance = createWallText(root, deps({ resolve, initialRoomId: 'dev-pit' }));
+
+    // Dev Pit's labels show immediately, with no room:enter emitted -- Town
+    // Center's poster text never briefly (or permanently, without a later
+    // room:enter) renders over the wrong Room.
+    const labels = Array.from(root.querySelectorAll('.wall-text__label'));
+    expect(labels.map((el) => el.textContent)).toEqual(['A', 'B']);
   });
 
   it("switches to the new Room's labels on room:enter", () => {
@@ -137,19 +152,30 @@ describe('createWallText', () => {
     expect(labels.map((el) => el.textContent)).toEqual(['A', 'B']);
   });
 
-  it("positions a label with the design's own skew/anchor transform", () => {
+  it("positions a value label with the design's own skew/anchor transform, recentred 3.5px into its hexagon (#77 review round 1 nit 7)", () => {
     const resolve = (): readonly RoomWallText[] => [fixture('serve', 'SERVE')];
     instance = createWallText(root, deps({ resolve }));
 
     const span = root.querySelector('.wall-text__label') as HTMLElement;
     expect(span.style.transform).toContain('matrix(1, 0.5, 0, 1, 100, 50)');
+    expect(span.style.transform).toContain(
+      `translate(0, ${VALUE_LABEL_VERTICAL_CENTER_OFFSET_PX}px)`,
+    );
     expect(span.style.transform).toContain('translate(-50%, -50%)');
     expect(span.dataset.wallTextId).toBe('serve');
   });
 
+  it('positions the heading with no vertical recentring offset (it has no hexagon of its own)', () => {
+    const resolve = (): readonly RoomWallText[] => [fixture(HEADING_BLOCK_ID, 'CORE VALUES')];
+    instance = createWallText(root, deps({ resolve }));
+
+    const span = root.querySelector('.wall-text__label') as HTMLElement;
+    expect(span.style.transform).toContain('translate(0, 0px)');
+  });
+
   it('gives only the heading block the heading font-size/letter-spacing', () => {
     const resolve = (): readonly RoomWallText[] => [
-      fixture('heading', 'CORE VALUES'),
+      fixture(HEADING_BLOCK_ID, 'CORE VALUES'),
       fixture('serve', 'SERVE'),
     ];
     instance = createWallText(root, deps({ resolve }));
@@ -208,6 +234,48 @@ describe('createWallText', () => {
       (root.querySelector('.wall-text__poster') as HTMLButtonElement).click();
 
       expect(onPosterClick).toHaveBeenCalledTimes(1);
+    });
+
+    it('is untabbable and inert until setSessionActive(true) (#77 review round 1 fix 2)', () => {
+      instance = createWallText(
+        root,
+        deps({ resolve: () => [], resolvePosterHotspot: () => hotspotFixture() }),
+      );
+      const button = () => root.querySelector('.wall-text__poster') as HTMLButtonElement;
+
+      expect(button().tabIndex).toBe(-1);
+      expect(button().inert).toBe(true);
+
+      instance.setSessionActive(true);
+      expect(button().tabIndex).toBe(0);
+      expect(button().inert).toBe(false);
+
+      instance.setSessionActive(false);
+      expect(button().tabIndex).toBe(-1);
+      expect(button().inert).toBe(true);
+    });
+
+    it('applies a still-active session to a button created by a later render (e.g. a room:enter after setSessionActive)', () => {
+      const resolvePosterHotspot = (roomId: RoomId): RoomHotspot | undefined =>
+        roomId === 'dev-pit' ? hotspotFixture() : undefined;
+      instance = createWallText(
+        root,
+        deps({ resolve: () => [], resolvePosterHotspot, initialRoomId: 'town-center' }),
+      );
+      instance.setSessionActive(true);
+      expect(root.querySelector('.wall-text__poster')).toBeNull();
+
+      gameEvents.emit('room:enter', { roomId: 'dev-pit', entryTile: { col: 0, row: 0 } });
+
+      const button = root.querySelector('.wall-text__poster') as HTMLButtonElement;
+      expect(button.tabIndex).toBe(0);
+      expect(button.inert).toBe(false);
+    });
+
+    it('setSessionActive never throws when no poster button exists', () => {
+      instance = createWallText(root, deps({ resolve: () => [] }));
+
+      expect(() => instance!.setSessionActive(true)).not.toThrow();
     });
   });
 });

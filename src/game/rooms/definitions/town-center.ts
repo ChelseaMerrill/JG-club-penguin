@@ -1,3 +1,4 @@
+import type { HexColor } from '../../../contracts';
 import type { RoomDefinition, RoomHotspot, RoomWallText } from '../room-definition';
 import { createStandardRoomGrid } from '../grid';
 import { roofDeck } from './roof-deck';
@@ -92,8 +93,43 @@ export const HEADING_ABOVE_ANCHOR = 30;
 export const HEADING_BELOW_ANCHOR = 30;
 const POSTER_WALL_SKEW_Y = 0.5;
 
+/** One of the four value words the wall poster and the Core Values card both show. */
+export interface CoreValueWord {
+  id: string;
+  word: string;
+  colour: HexColor;
+}
+
+/**
+ * Single-sourced (#77 review round 1 nit 10) so the wall poster
+ * (`CORE_VALUES_WALL_TEXT` below) and the Core Values card
+ * (`src/ui/wall-text/core-values-card.ts`, which imports this same array)
+ * can never drift apart on word or colour. Anchors/`maxWidth`/`skewY` are
+ * poster-specific and stay in `CORE_VALUES_WALL_TEXT`, built from this array
+ * below.
+ */
+export const CORE_VALUE_WORDS: readonly CoreValueWord[] = [
+  { id: 'serve', word: 'SERVE', colour: '#F4F4F4' },
+  { id: 'grind', word: 'GRIND', colour: '#00BDFF' },
+  { id: 'grow', word: 'GROW', colour: '#F4F4F4' },
+  { id: 'inspire', word: 'INSPIRE', colour: '#00BDFF' },
+];
+
+/** Each value word's own poster anchor (Stage px), traced from the design -- see the module comment above. */
+const VALUE_LABEL_ANCHORS: Record<string, { x: number; y: number }> = {
+  serve: { x: 995, y: 224 },
+  grind: { x: 1028.5, y: 240.8 },
+  grow: { x: 1062, y: 257.5 },
+  inspire: { x: 1095.5, y: 274.3 },
+};
+
 const CORE_VALUES_WALL_TEXT: readonly RoomWallText[] = [
   {
+    // Matches `src/ui/wall-text/wall-text.ts`'s exported `HEADING_BLOCK_ID`
+    // ('heading') by convention -- kept as a literal here rather than
+    // imported, so this Room's own domain data doesn't depend on a UI
+    // module; `wall-text.test.ts`/the e2e spec import and compare against
+    // that constant instead of repeating the literal.
     id: 'heading',
     text: 'CORE VALUES',
     x: 1045,
@@ -102,49 +138,27 @@ const CORE_VALUES_WALL_TEXT: readonly RoomWallText[] = [
     maxWidth: HEADING_MAX_WIDTH,
     skewY: POSTER_WALL_SKEW_Y,
   },
-  {
-    id: 'serve',
-    text: 'SERVE',
-    x: 995,
-    y: 224,
-    colour: '#F4F4F4',
+  ...CORE_VALUE_WORDS.map((value): RoomWallText => ({
+    id: value.id,
+    text: value.word,
+    ...VALUE_LABEL_ANCHORS[value.id],
+    colour: value.colour,
     maxWidth: VALUE_LABEL_MAX_WIDTH,
     skewY: POSTER_WALL_SKEW_Y,
-  },
-  {
-    id: 'grind',
-    text: 'GRIND',
-    x: 1028.5,
-    y: 240.8,
-    colour: '#00BDFF',
-    maxWidth: VALUE_LABEL_MAX_WIDTH,
-    skewY: POSTER_WALL_SKEW_Y,
-  },
-  {
-    id: 'grow',
-    text: 'GROW',
-    x: 1062,
-    y: 257.5,
-    colour: '#F4F4F4',
-    maxWidth: VALUE_LABEL_MAX_WIDTH,
-    skewY: POSTER_WALL_SKEW_Y,
-  },
-  {
-    id: 'inspire',
-    text: 'INSPIRE',
-    x: 1095.5,
-    y: 274.3,
-    colour: '#00BDFF',
-    maxWidth: VALUE_LABEL_MAX_WIDTH,
-    skewY: POSTER_WALL_SKEW_Y,
-  },
+  })),
 ];
 
 /**
- * The id `src/ui/wall-text/wall-text.ts` looks for (#77 D5/D6): when a Room's
- * `hotspots` has an entry with this id, the wall-text overlay draws a
- * clickable `<button>` over its `rect` that opens the Core Values card
- * (`src/ui/wall-text/core-values-card.ts`), wired in `src/main.ts`.
+ * This Room's poster hotspot id (#77 D5/D6). `wall-text.ts` itself never
+ * hardcodes this id -- its `resolvePosterHotspot` dep is generic, so any
+ * Room's own `RoomDefinition.hotspots` can grow a poster button this same
+ * way. `src/main.ts` is what actually keys off this exact constant, twice
+ * (#77 review round 1 nit 10, replacing two literal `'core-values-poster'`
+ * strings that had drifted out of sync with this one): once in its own
+ * `resolvePosterHotspot` resolver (finds this hotspot to draw the button
+ * from), and once in its `hotspot:click` listener (opens the Core Values
+ * card if `RoomScene`'s own Phaser-side hit-area for this same hotspot ever
+ * fires instead of the DOM button, e.g. if the button is hidden -- nit 5).
  */
 export const CORE_VALUES_POSTER_HOTSPOT_ID = 'core-values-poster';
 

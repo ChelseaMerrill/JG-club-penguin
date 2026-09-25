@@ -43,6 +43,14 @@ describe('createCoreValuesCard', () => {
     }
   });
 
+  it('the close button reads CLOSE (#77 review round 1 nit 9: Anton has no × glyph)', () => {
+    card = createCoreValuesCard(root, overlays);
+
+    expect((root.querySelector('.core-values-card__close') as HTMLElement).textContent).toBe(
+      'CLOSE',
+    );
+  });
+
   it('registers with the shared OverlayManager under CORE_VALUES_OVERLAY_ID', () => {
     card = createCoreValuesCard(root, overlays);
 
@@ -100,5 +108,56 @@ describe('createCoreValuesCard', () => {
     overlays.open('menu', () => {});
 
     expect(panel().hidden).toBe(true);
+  });
+
+  describe('focus handling (#77 review round 1 fix 3)', () => {
+    it('focuses the close button on open', () => {
+      card = createCoreValuesCard(root, overlays);
+
+      card.open();
+
+      expect(document.activeElement).toBe(root.querySelector('.core-values-card__close'));
+    });
+
+    it('restores focus to whatever had it before open() when the close button is clicked', () => {
+      const trigger = document.createElement('button');
+      document.body.append(trigger);
+      trigger.focus();
+      expect(document.activeElement).toBe(trigger);
+
+      card = createCoreValuesCard(root, overlays);
+      card.open();
+      expect(document.activeElement).not.toBe(trigger);
+
+      (root.querySelector('.core-values-card__close') as HTMLButtonElement).click();
+
+      expect(document.activeElement).toBe(trigger);
+    });
+
+    it('restores focus on Escape', () => {
+      const trigger = document.createElement('button');
+      document.body.append(trigger);
+      trigger.focus();
+
+      card = createCoreValuesCard(root, overlays);
+      card.open();
+
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+
+      expect(document.activeElement).toBe(trigger);
+    });
+
+    it('restores focus on a backdrop click', () => {
+      const trigger = document.createElement('button');
+      document.body.append(trigger);
+      trigger.focus();
+
+      card = createCoreValuesCard(root, overlays);
+      card.open();
+
+      panel().dispatchEvent(new MouseEvent('click', { bubbles: true }));
+
+      expect(document.activeElement).toBe(trigger);
+    });
   });
 });
