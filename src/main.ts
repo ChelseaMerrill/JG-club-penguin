@@ -357,9 +357,6 @@ const hud = createHud(getUiLayer(), {
   onIgloo: () => {
     void roomNavigator?.changeRoom('igloo');
   },
-  onReturnToTownCenter: () => {
-    void roomNavigator?.changeRoom('town-center');
-  },
   onSignOut: () => {
     void auth.signOut();
   },

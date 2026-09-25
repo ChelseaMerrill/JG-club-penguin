@@ -123,20 +123,19 @@ test('room transitions: doors, changeRoom, HUD, reload (#15)', async ({ page }) 
     .toEqual(roofDeck.spawnTile);
   await page.screenshot({ path: 'test-results/room-transitions/roof-deck.png' });
 
-  // --- MENU -> RETURN TO TOWN CENTER: visible outside Town Center, sends the
-  // Player back to Town Center's own spawnTile.
-  await expect(page.locator('.hud__menu-return-to-town-center')).toBeHidden();
-  await page.locator('.hud__button--menu').click();
-  await expect(page.locator('.hud__menu-return-to-town-center')).toBeVisible();
-  await page.locator('.hud__menu-return-to-town-center').click();
-  await expect(page.locator('.hud__menu-panel')).toBeHidden();
+  // --- MAP -> the Town Center tile (#33): sends the Player back to Town
+  // Center's own spawnTile, replacing #15's temporary RETURN TO TOWN CENTER
+  // (removed by #33 D7 now that the Map covers every dead end).
+  await page.locator('.hud__button--map').click();
+  await expect(page.locator('.map-screen')).toBeVisible();
+  await page.locator('[data-map-room="town-center"]').click();
+  await expect(page.locator('.map-screen')).toBeHidden();
   await expect
     .poll(async () => (await debugInfo(page))?.roomId, { timeout: WALK_TIMEOUT })
     .toBe('town-center');
   await expect
     .poll(async () => (await debugInfo(page))?.localPenguin?.tile)
     .toEqual(townCenter.spawnTile);
-  await expect(page.locator('.hud__menu-return-to-town-center')).toBeHidden();
 
   // --- The HUD's IGLOO button lands on the Igloo's own spawnTile.
   await page.locator('.hud__button--igloo').click();
