@@ -171,6 +171,26 @@ describe('createNpcDialog', () => {
     expect(panel(root).hidden).toBe(true);
   });
 
+  it('emits npc:dialog-closed with the NPC once its dialog closes, however it closes (#113)', () => {
+    const { root } = setup();
+    const closed = vi.fn();
+    const unsubscribe = gameEvents.on('npc:dialog-closed', closed);
+
+    gameEvents.emit('npc:arrived', { npcId: 'brandon' });
+    expect(closed).not.toHaveBeenCalled();
+
+    (root.querySelector('.npc-dialog__close') as HTMLButtonElement).click();
+    expect(closed).toHaveBeenCalledTimes(1);
+    expect(closed).toHaveBeenCalledWith({ npcId: 'brandon' });
+
+    gameEvents.emit('npc:arrived', { npcId: 'jon' });
+    gameEvents.emit('room:leave', { roomId: 'roof-deck' });
+    expect(closed).toHaveBeenCalledTimes(2);
+    expect(closed).toHaveBeenLastCalledWith({ npcId: 'jon' });
+
+    unsubscribe();
+  });
+
   it('Escape closes the dialog', () => {
     const { root } = setup();
     gameEvents.emit('npc:arrived', { npcId: 'jon' });

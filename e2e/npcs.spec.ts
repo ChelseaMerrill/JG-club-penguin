@@ -1,11 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
 import type { RoomId } from '../src/contracts';
-import { devPit } from '../src/game/rooms/definitions/dev-pit';
 import { roofDeck } from '../src/game/rooms/definitions/roof-deck';
 import { theMelt } from '../src/game/rooms/definitions/the-melt';
 import { tileToScreen } from '../src/game/rooms/iso';
 import { GAME_HEIGHT, GAME_WIDTH } from '../src/game/stage-size';
-import type { RoomDebugInfo } from './support/room-debug-types';
+import type { NpcMotionDebugInfo, RoomDebugInfo } from './support/room-debug-types';
 
 const BOOT_TIMEOUT = 15_000;
 const LONG_WALK_TIMEOUT = 15_000;
@@ -28,6 +27,17 @@ async function hideLandingPage(page: Page): Promise<void> {
 
 async function debugInfo(page: Page): Promise<RoomDebugInfo | undefined> {
   return page.evaluate(() => window.__roomDebug);
+}
+
+/**
+ * Ian now roams the Dev Pit (owner request, 2026-09-25, Track D): his click
+ * target follows him, so a click needs his *current* position (`__roomDebug
+ * .npcs.ian`, #113), not his static slot tile.
+ */
+async function npc(page: Page, npcId: string): Promise<NpcMotionDebugInfo> {
+  const info = (await debugInfo(page))?.npcs?.[npcId];
+  if (!info) throw new Error(`no __roomDebug.npcs entry for ${npcId}`);
+  return info;
 }
 
 async function clickStagePoint(page: Page, point: { x: number; y: number }): Promise<void> {
@@ -69,11 +79,8 @@ test('Dev Pit: clicking Ian arrives, opens his dialog, and GRAB THE HAMMER opens
 }) => {
   const errors = await bootRoom(page, 'dev-pit');
 
-  const ian = devPit.npcSlots.find((slot) => slot.npcId === 'ian');
-  if (!ian) throw new Error('expected dev-pit to have an "ian" NPC slot');
-  const point = tileToScreen(ian.tile, devPit.grid.origin);
-
-  await clickStagePoint(page, point);
+  const ian = await npc(page, 'ian');
+  await clickStagePoint(page, { x: ian.x, y: ian.y });
 
   await expect
     .poll(async () => (await debugInfo(page))?.npcArrivedLog, { timeout: LONG_WALK_TIMEOUT })
@@ -107,12 +114,10 @@ test("Dev Pit: clicking near Ian's head (not just his feet) still opens his dial
 }) => {
   const errors = await bootRoom(page, 'dev-pit');
 
-  const ian = devPit.npcSlots.find((slot) => slot.npcId === 'ian');
-  if (!ian) throw new Error('expected dev-pit to have an "ian" NPC slot');
-  const feetPoint = tileToScreen(ian.tile, devPit.grid.origin);
+  const ian = await npc(page, 'ian');
   // Comfortably inside the hit zone's feet-105..feet+5 vertical range,
   // clearly above the tile centre (toward the head, not the feet).
-  const headPoint = { x: feetPoint.x, y: feetPoint.y - 70 };
+  const headPoint = { x: ian.x, y: ian.y - 70 };
 
   await clickStagePoint(page, headPoint);
 

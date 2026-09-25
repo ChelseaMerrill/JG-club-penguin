@@ -34,11 +34,20 @@ export function npcTextureKey(npc: NpcDefinition): string {
  * caller that needs the decoded texture right away should listen for
  * `Textures.Events.ADD_KEY` the way `npc-sprite.ts` does.
  */
-export function ensureNpcTexture(scene: NpcTextureScene, npc: NpcDefinition): string {
-  const key = npcTextureKey(npc);
+export function ensureNpcTexture(
+  scene: NpcTextureScene,
+  npc: NpcDefinition,
+  options: { omitProp?: boolean } = {},
+): string {
+  // #113: a designed motion can draw its own version of what a Human NPC
+  // holds (Anthony's rod for his laptop), so that variant omits `prop`.
+  const omitProp = options.omitProp === true && npc.kind === 'human';
+  const key = omitProp ? `${npcTextureKey(npc)}:no-prop` : npcTextureKey(npc);
   ensureSvgTexture(scene.textures, key, () =>
     npc.kind === 'human'
-      ? renderNpcSvg(npc.figure, { idPrefix: npc.id })
+      ? renderNpcSvg(omitProp ? { ...npc.figure, prop: undefined } : npc.figure, {
+          idPrefix: npc.id,
+        })
       : renderPenguinSvg(npc.look, { anim: npc.look.emote, frame: 0 }, { idPrefix: npc.id }),
   );
   return key;

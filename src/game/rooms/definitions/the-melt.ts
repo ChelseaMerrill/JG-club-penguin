@@ -75,10 +75,12 @@ export const theMelt: RoomDefinition = {
   npcSlots: [
     // #92 D3 resync: the design now names a single "Chelsea" (the pancake
     // cook) instead of the pre-resync "Chef Chelsea"/"Chelsea Merrill" pair,
-    // and adds "Tom" (a walking, coffee-obsessed NPC); Tonya keeps her tile.
+    // and adds "Tom" (a walking, coffee-obsessed NPC). The design's Tonya and
+    // Jesse are Penguins, so they aren't placed.
+    // Penguin-kind NPCs are left out of every Room: only Players appear as
+    // Penguins (owner decision, 2026-09-25). Their `NpcDefinition`s stay in
+    // `src/npcs/npcs.ts`.
     { npcId: 'chelsea', tile: { col: 3, row: 2 } },
     { npcId: 'tom', tile: { col: 7, row: 2 } },
-    { npcId: 'jesse', tile: { col: 10, row: 2 } },
-    { npcId: 'tonya', tile: { col: 8, row: 7 } },
   ],
 };
