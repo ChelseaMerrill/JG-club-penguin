@@ -36,7 +36,7 @@ import {
   TILE_WIDTH,
 } from './iso';
 import { getRoomDefinition, hasRoomDefinition } from './registry';
-import type { RoomDefinition, RoomDoor, RoomNpcSlot } from './room-definition';
+import type { RoomDefinition, RoomDoor, RoomHotspot, RoomNpcSlot } from './room-definition';
 import { RoomPenguinView, type PlacePenguin } from './room-penguin-view';
 
 export const ROOM_SCENE_KEY = 'RoomScene';
@@ -83,6 +83,16 @@ const WALL_DEPTH = -1;
 const FLOOR_DEPTH = -1;
 const DOOR_DEPTH = 0;
 const DOOR_LABEL_DEPTH = 1;
+
+// A hotspot (e.g. the Igloo's Trophy Case) shares the door's depth tier and
+// procedural fallback styling (#16 D5/#42): both are non-walking clickable
+// targets over the Room art.
+const HOTSPOT_COLOR = 0x0a0b0d;
+const HOTSPOT_BORDER_COLOR = 0x00bdff;
+const HOTSPOT_BORDER_WIDTH = 2;
+const HOTSPOT_DEPTH = 0;
+const HOTSPOT_LABEL_DEPTH = 1;
+const HOTSPOT_LABEL_FONT_SIZE = '14px';
 
 const LABEL_FONT_FAMILY = 'sans-serif';
 const LABEL_TEXT_COLOR = '#F4F4F4';
@@ -185,6 +195,7 @@ export class RoomScene extends Scene {
   private queuedMove: QueuedMove | null = null;
   private npcHitAreas: HitArea<RoomNpcSlot>[] = [];
   private doorHitAreas: HitArea<RoomDoor>[] = [];
+  private hotspotHitAreas: HitArea<RoomHotspot>[] = [];
   private npcArrivedLog: string[] = [];
   private doorReachedLog: string[] = [];
   private localPenguinMoveLog: Tile[] = [];
@@ -256,6 +267,7 @@ export class RoomScene extends Scene {
     this.queuedMove = null;
     this.npcHitAreas = [];
     this.doorHitAreas = [];
+    this.hotspotHitAreas = [];
     this.npcArrivedLog = [];
     this.doorReachedLog = [];
     this.localPenguinMoveLog = [];
@@ -308,6 +320,7 @@ export class RoomScene extends Scene {
     }
     this.drawBackground(room);
     this.drawDoors(room);
+    this.drawHotspots(room);
     this.drawProps(room);
     this.drawFurniture(room);
     this.drawNpcs(room);
@@ -478,6 +491,12 @@ export class RoomScene extends Scene {
       return;
     }
 
+    const hotspotHit = this.hotspotHitAreas.find((hit) => currentlyOver.includes(hit.object));
+    if (hotspotHit) {
+      this.handleHotspotClick(hotspotHit.data, room);
+      return;
+    }
+
     const tile = screenToTile({ x: pointer.x, y: pointer.y }, room.grid.origin);
     this.handleTileClick(tile, room);
   }
@@ -501,6 +520,17 @@ export class RoomScene extends Scene {
       const event: DoorReachedEvent = { door };
       this.events.emit(DOOR_REACHED_EVENT, event);
     });
+  }
+
+  /**
+   * A non-door clickable target (#16 D5's `hotspots`, e.g. the Igloo's
+   * `trophy-case`): opens immediately on click, on the shared `gameEvents`
+   * contract rather than the scene-local events doors/NPCs use, since #42's
+   * consumer (`main.ts`) lives outside this Scene. Unlike a door or NPC, the
+   * Penguin does not walk there first (#42 resolved decision).
+   */
+  private handleHotspotClick(hotspot: RoomHotspot, room: RoomDefinition): void {
+    gameEvents.emit('hotspot:click', { roomId: room.id, hotspotId: hotspot.id });
   }
 
   /**
@@ -737,6 +767,49 @@ export class RoomScene extends Scene {
         })
         .setOrigin(0.5)
         .setDepth(DOOR_LABEL_DEPTH);
+    }
+  }
+
+  /**
+   * A non-door clickable target (#16 D5/#42, e.g. the Igloo's `trophy-case`
+   * shelf). Over exported design art the art already draws the fixture, so
+   * (like `drawDoors`) this only needs an invisible interactive `Zone`; the
+   * `procedural` fallback still gets an outlined rectangle and label.
+   */
+  private drawHotspots(room: RoomDefinition): void {
+    const isImageBackground = room.background.kind === 'image';
+    for (const hotspot of room.hotspots ?? []) {
+      const centerX = hotspot.rect.x + hotspot.rect.width / 2;
+      const centerY = hotspot.rect.y + hotspot.rect.height / 2;
+
+      if (isImageBackground) {
+        const zone = this.add
+          .zone(centerX, centerY, hotspot.rect.width, hotspot.rect.height)
+          .setDepth(HOTSPOT_DEPTH)
+          .setInteractive({ useHandCursor: true });
+        this.hotspotHitAreas.push({ object: zone, data: hotspot });
+        continue;
+      }
+
+      const rect = this.add.rectangle(
+        centerX,
+        centerY,
+        hotspot.rect.width,
+        hotspot.rect.height,
+        HOTSPOT_COLOR,
+      );
+      rect.setDepth(HOTSPOT_DEPTH);
+      rect.setInteractive({ useHandCursor: true });
+      this.hotspotHitAreas.push({ object: rect, data: hotspot });
+      rect.setStrokeStyle(HOTSPOT_BORDER_WIDTH, HOTSPOT_BORDER_COLOR);
+      this.add
+        .text(centerX, centerY, hotspot.label, {
+          fontFamily: LABEL_FONT_FAMILY,
+          fontSize: HOTSPOT_LABEL_FONT_SIZE,
+          color: LABEL_TEXT_COLOR,
+        })
+        .setOrigin(0.5)
+        .setDepth(HOTSPOT_LABEL_DEPTH);
     }
   }
 

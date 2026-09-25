@@ -21,7 +21,7 @@ describe('contract type-level guarantees', () => {
     const completed: MinigameCompleted = {
       minigameId: 'bug-squash',
       score: 10,
-      // @ts-expect-error bug-squash stats are { squashed }, not the pancake-flip shape.
+      // @ts-expect-error bug-squash stats are { score, squashed, bestCombo, escaped }, not the pancake-flip shape.
       stats: { golden: 1, flipNow: 1, raw: 1, burnt: 1, stacked: 1 },
     };
 
