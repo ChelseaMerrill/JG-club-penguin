@@ -21,6 +21,7 @@ const NEUTRAL_PANCAKE_STATS: MinigameStatsMap['pancake-flip'] = {
   raw: 0,
   burnt: 0,
   stacked: 0,
+  bestStreak: 0,
 };
 
 /**

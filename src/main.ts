@@ -1,6 +1,7 @@
 import './style.css';
 import { loadEnv } from './env';
 import { startGame, whenSceneReady } from './game/main';
+import type { RoomScene } from './game/rooms/RoomScene';
 import type { RoomPenguinView } from './game/rooms/room-penguin-view';
 import { createRoomNavigator, type RoomNavigator } from './game/rooms/room-navigator';
 import {
@@ -25,9 +26,20 @@ import {
   type RoomChannel,
 } from './realtime/room-channel';
 import { toRealtimeClient } from './realtime/supabase-realtime';
+import {
+  createChatController,
+  type ChatBubbleView,
+  type ChatController,
+} from './chat/chat-controller';
+import { exposeChatDebug } from './chat/dev-chat-hook';
 import { DEFAULT_LOOK, type PenguinLook } from './contracts';
 import { createInMemoryProgressStore } from './persistence/in-memory-progress-store';
-import { STARTING_TOKENS } from './persistence/minigame-rules';
+import type { ProgressStore } from './persistence/progress-store';
+import { createActiveProgressStore, createProgressSession } from './persistence/progress-session';
+import {
+  createSupabaseProgressStore,
+  toProgressClient,
+} from './persistence/supabase-progress-store';
 import { createMinigameLauncher } from './minigames/minigame-launcher';
 import { createDefaultMinigameRegistry } from './minigames/minigame-registry';
 import { initDevMinigameHook } from './minigames/dev-minigame-hook';
@@ -53,6 +65,7 @@ const uiLayer = getUiLayer();
  * the Room channel's remote Penguins only, so there is exactly one local
  * Penguin on screen.
  */
+let roomScene: RoomScene | null = null;
 let penguins: RoomPenguinView | null = null;
 /**
  * The one producer of `room:leave`/`room:enter` (#15 A1, replacing #28's
@@ -64,6 +77,7 @@ let penguins: RoomPenguinView | null = null;
  */
 let roomNavigator: RoomNavigator | null = null;
 const sceneReady = whenSceneReady(game).then((scene) => {
+  roomScene = scene;
   penguins = scene.penguins;
   roomNavigator = createRoomNavigator({
     scene: {
@@ -101,6 +115,8 @@ const sceneReady = whenSceneReady(game).then((scene) => {
 /** The signed-in Player's Room channel, and the Player it belongs to. */
 let roomChannel: RoomChannel | null = null;
 let channelPlayerId: string | null = null;
+/** The signed-in Player's chat controller (#44), recreated alongside `roomChannel` each session. */
+let chatController: ChatController | null = null;
 // Bumped on every sign-in and sign-out, so an in-flight sign-in that loses a
 // race with a later sign-out (or a newer sign-in) never creates a stray
 // Room channel.
@@ -145,6 +161,47 @@ function applyLocalLook(look: PenguinLook): void {
   debugOverlay?.setOwnLook(look);
 }
 
+/**
+ * Wraps `view` to also publish every bubble it *actually shows* (never merely
+ * requests) to `window.__chatDebug` (#44), keyed by Player id (`getPlayerId()`
+ * for the local Penguin's own bubble, since `RoomScene.sayLocal` has no
+ * playerId to key by).
+ *
+ * `say`/`sayLocal` publish only off `view`'s own return value (#44 review fix
+ * F1): a placed Penguin that never received the call (already gone, or not
+ * yet placed) never gets a stale debug entry. A remote Penguin removed,
+ * cleared, or re-placed on a Room-change `attach` outside `say`/`sayLocal`
+ * altogether is instead covered by `view.onBubbleChange`, which the concrete
+ * `RoomPenguinView` (`src/game/rooms/room-penguin-view.ts`) fires for exactly
+ * those cases; wiring it here (rather than requiring it in `ChatBubbleView`)
+ * keeps the chat controller's own seam narrow.
+ */
+function composeChatView(view: RoomPenguinView, getPlayerId: () => string | null): ChatBubbleView {
+  const bubbles: Record<string, string> = {};
+
+  function setBubble(playerId: string, text: string | null): void {
+    if (text === null) delete bubbles[playerId];
+    else bubbles[playerId] = text;
+    exposeChatDebug({ ...bubbles });
+  }
+
+  view.onBubbleChange = (playerId, text) => setBubble(playerId, text);
+
+  return {
+    say(playerId, text) {
+      const shown = view.say(playerId, text);
+      if (shown) setBubble(playerId, text);
+      return shown;
+    },
+    sayLocal(text) {
+      const shown = roomScene?.sayLocal(text) ?? false;
+      const playerId = getPlayerId();
+      if (shown && playerId) setBubble(playerId, text);
+      return shown;
+    },
+  };
+}
+
 function composeView(view: RemotePenguinView): RemotePenguinView {
   if (!debugOverlay) return view;
   return {
@@ -182,6 +239,8 @@ function endSession(): RoomChannel | null {
   roomNavigator?.leaveForSignOut();
   roomChannel = null;
   channelPlayerId = null;
+  chatController?.stop();
+  chatController = null;
   penguins?.clear();
   debugOverlay?.clear();
   debugOverlay?.setCurrentRoom(null);
@@ -210,6 +269,10 @@ async function startSession(player: Player, previous: RoomChannel | null): Promi
     view: composeView(view),
   });
   roomChannel = channel;
+  chatController = createChatController({
+    channel,
+    view: composeChatView(view, () => channelPlayerId),
+  });
   channel.onRoomChange((roomId) => debugOverlay?.setCurrentRoom(roomId));
   channel.onSubscribedChange((subscribed) => debugOverlay?.setSubscribed(subscribed));
 
@@ -274,15 +337,28 @@ const hud = createHud(getUiLayer(), {
   onSignOut: () => {
     void auth.signOut();
   },
-  // Seeded from the fake store's own starting balance until #34 loads the
-  // real Token balance.
-  initialBalance: STARTING_TOKENS,
+  // The saved balance arrives via `tokens:changed` once the progress
+  // session's sign-in load finishes (#34).
+  initialBalance: 0,
+  onChatSend: (text) => chatController?.send(text) ?? Promise.resolve(false),
 });
 
-// In-memory fake until #34's real ProgressStore lands; the HUD's Token
-// balance updates via `tokens:changed`, which this store emits on every
-// `recordRound`.
-const progressStore = createInMemoryProgressStore({ emitter: gameEvents });
+const progress = createProgressSession({ registry: game.registry, emitter: gameEvents });
+
+// The dev/e2e hooks (below) run without signing in, and the Creator hook
+// loads through the store while it initialises, so the in-memory fake is
+// decided up front from the same build-time flag the hooks read. Vite
+// replaces it with a literal `false` in a production build, so a real
+// deployment never falls back to the fake: signed out, the store rejects
+// with `not_authenticated`.
+const e2eHooksEnabled = import.meta.env.DEV || import.meta.env.VITE_E2E_HOOKS === 'true';
+const devFallbackStore: ProgressStore | null = e2eHooksEnabled
+  ? createInMemoryProgressStore({ emitter: gameEvents })
+  : null;
+
+// Built once at boot for the long-lived consumers below; every call forwards
+// to the signed-in Player's Supabase store (#34), or to the dev fallback.
+const progressStore = createActiveProgressStore(game.registry, () => devFallbackStore);
 const minigameLauncher = createMinigameLauncher({
   layer: getUiLayer(),
   store: progressStore,
@@ -344,6 +420,16 @@ const auth = startAuth({
     currentPlayer = player;
     // `room:enter` fires only after `registry.player` is set.
     bindPlayer(game.registry, player);
+    // Registers this Player's store before the Penguin Creator loads through
+    // it, so that load shares the session's sign-in load (#34).
+    void progress.start(
+      player,
+      createSupabaseProgressStore({
+        client: toProgressClient(client),
+        playerId: player.id,
+        emitter: gameEvents,
+      }),
+    );
     if (devHookActive) {
       void startSession(player, previous);
       return;
@@ -366,6 +452,7 @@ const auth = startAuth({
     // Per `src/contracts/rooms.ts`, `room:leave` comes before `bindPlayer(null)`.
     const channel = endSession();
     bindPlayer(game.registry, null);
+    progress.stop();
     if (channel) void stopChannel(channel);
     if (pendingPrevious) void stopChannel(pendingPrevious);
     pendingPrevious = null;

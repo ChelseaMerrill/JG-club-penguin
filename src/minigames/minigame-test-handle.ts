@@ -11,4 +11,10 @@ export interface MinigameTestHandle {
   setStubScore(score: number): void;
   /** Ends the round now, as if the shell's timer reached 0. */
   finishNow(): void;
+  /** Ends a Pancake Flip round now, as if the shell's timer reached 0: its
+   *  90s round is too long to play out for real (or to simulate
+   *  minute-by-minute with a faked clock) in e2e. A no-op when Pancake Flip
+   *  isn't the loaded Minigame. Additive alongside `finishNow`, which stays
+   *  `bug-squash`-only. */
+  finishPancakeFlipNow(): void;
 }

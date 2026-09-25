@@ -129,3 +129,26 @@ test('hud-clicks-stay-in-hud', async ({ page }) => {
 
   expect(errors).toEqual([]);
 });
+
+test('hud-chat-field-stays-in-hud', async ({ page }) => {
+  const errors = collectErrors(page);
+
+  await page.goto('/?hud');
+  await expect(page.locator('.hud')).toBeVisible();
+  await page.evaluate(() => window.__hudTest!.emitRoomEnter('town-center'));
+
+  await page.evaluate(() => {
+    window.canvasPointerDowns = 0;
+    document.querySelector('#game canvas')?.addEventListener('pointerdown', () => {
+      window.canvasPointerDowns += 1;
+    });
+  });
+
+  const input = page.locator('.hud__chat-input');
+  await input.click();
+  await input.pressSequentially('hello there', { delay: 10 });
+
+  expect(await page.evaluate(() => window.canvasPointerDowns)).toBe(0);
+
+  expect(errors).toEqual([]);
+});

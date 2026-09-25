@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { gameEvents, type RoomId } from '../../contracts';
+import { CHAT_TEXT_MAX, gameEvents, type RoomId } from '../../contracts';
 import { createHud, type Hud, type HudDeps, type RoomTitle } from './hud';
 
 let currentHud: Hud | undefined;
@@ -15,17 +15,19 @@ function setup(overrides: Partial<HudDeps> = {}) {
     title: roomId.toUpperCase(),
     subtitle: `subtitle-${roomId}`,
   }));
+  const onChatSend = vi.fn(() => Promise.resolve(true));
   const deps: HudDeps = {
     resolveRoomTitle,
     onIgloo,
     onReturnToTownCenter,
     onSignOut,
     initialBalance: 0,
+    onChatSend,
     ...overrides,
   };
   const hud = createHud(root, deps);
   currentHud = hud;
-  return { root, hud, onIgloo, onReturnToTownCenter, onSignOut, resolveRoomTitle };
+  return { root, hud, onIgloo, onReturnToTownCenter, onSignOut, resolveRoomTitle, onChatSend };
 }
 
 beforeEach(() => {
@@ -195,6 +197,133 @@ describe('createHud', () => {
     expect((root.querySelector('.hud__button--emote') as HTMLElement).hidden).toBe(true);
     expect((root.querySelector('.hud__button--snowball') as HTMLElement).hidden).toBe(true);
     expect((root.querySelector('.hud__button--quests') as HTMLElement).hidden).toBe(true);
+  });
+
+  it('renders the chat field with the shared 120 maxlength and its placeholder', () => {
+    const { root } = setup();
+    const input = root.querySelector('.hud__chat-input') as HTMLInputElement;
+
+    expect(input.maxLength).toBe(CHAT_TEXT_MAX);
+    expect(input.placeholder).toBe('Say something...');
+  });
+
+  it('Enter calls onChatSend with the field text and clears it once accepted', async () => {
+    const onChatSend = vi.fn(() => Promise.resolve(true));
+    const { root } = setup({ onChatSend });
+    const input = root.querySelector('.hud__chat-input') as HTMLInputElement;
+
+    input.value = 'hello there';
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    expect(onChatSend).toHaveBeenCalledWith('hello there');
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(input.value).toBe('');
+  });
+
+  it('a refused send keeps the typed text in the field', async () => {
+    const onChatSend = vi.fn(() => Promise.resolve(false));
+    const { root } = setup({ onChatSend });
+    const input = root.querySelector('.hud__chat-input') as HTMLInputElement;
+
+    input.value = 'too fast';
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(input.value).toBe('too fast');
+  });
+
+  it('a rejected send is treated as not accepted and keeps the typed text (#44 review fix F7)', async () => {
+    const onChatSend = vi.fn(() => Promise.reject(new Error('network down')));
+    const { root } = setup({ onChatSend });
+    const input = root.querySelector('.hud__chat-input') as HTMLInputElement;
+
+    input.value = 'still here';
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(input.value).toBe('still here');
+  });
+
+  it('text typed while a send is pending survives an accepted ack for the older text (#44 review fix F7)', async () => {
+    let resolveSend!: (accepted: boolean) => void;
+    const onChatSend = vi.fn(() => new Promise<boolean>((resolve) => (resolveSend = resolve)));
+    const { root } = setup({ onChatSend });
+    const input = root.querySelector('.hud__chat-input') as HTMLInputElement;
+
+    input.value = 'first message';
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+
+    // The Player keeps typing while the first send is still pending.
+    input.value = 'a second, newer message';
+    resolveSend(true);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(input.value).toBe('a second, newer message');
+  });
+
+  it('Enter during IME composition does not submit (isComposing)', () => {
+    const onChatSend = vi.fn(() => Promise.resolve(true));
+    const { root } = setup({ onChatSend });
+    const input = root.querySelector('.hud__chat-input') as HTMLInputElement;
+
+    input.value = 'still composing';
+    input.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, isComposing: true }),
+    );
+
+    expect(onChatSend).not.toHaveBeenCalled();
+  });
+
+  it('Enter during IME composition does not submit (legacy keyCode 229)', () => {
+    const onChatSend = vi.fn(() => Promise.resolve(true));
+    const { root } = setup({ onChatSend });
+    const input = root.querySelector('.hud__chat-input') as HTMLInputElement;
+
+    input.value = 'still composing';
+    input.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, keyCode: 229 }),
+    );
+
+    expect(onChatSend).not.toHaveBeenCalled();
+  });
+
+  it('a non-Enter keydown in the chat field never reaches a window keydown listener', () => {
+    const { root } = setup();
+    const input = root.querySelector('.hud__chat-input') as HTMLInputElement;
+    const windowSpy = vi.fn();
+    window.addEventListener('keydown', windowSpy);
+
+    try {
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true }));
+      input.dispatchEvent(new KeyboardEvent('keyup', { key: 'a', bubbles: true }));
+      input.dispatchEvent(new KeyboardEvent('keypress', { key: 'a', bubbles: true }));
+
+      expect(windowSpy).not.toHaveBeenCalled();
+    } finally {
+      window.removeEventListener('keydown', windowSpy);
+    }
+  });
+
+  it('Enter in the chat field never reaches a window keydown listener (e.g. Escape-closes-overlay)', () => {
+    const { root } = setup();
+    const input = root.querySelector('.hud__chat-input') as HTMLInputElement;
+    const windowSpy = vi.fn();
+    window.addEventListener('keydown', windowSpy);
+
+    try {
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+      expect(windowSpy).not.toHaveBeenCalled();
+    } finally {
+      window.removeEventListener('keydown', windowSpy);
+    }
   });
 
   it('show() and hide() toggle the HUD root', () => {
