@@ -19,10 +19,13 @@ const DEFAULT_DURATION_SEC = MINIGAME_RULES['bug-squash'].durationSeconds;
 const POINTS_PER_CLICK = 10;
 
 /**
- * Bug Squash's placeholder implementation: a single click-to-score button,
- * `stats: { squashed }`. Registered under `bug-squash` in the default
- * Minigame registry (`minigame-registry.ts`) until #38 replaces it with the
- * real grid-of-bugs game from `design/Minigame Bug Squash.dc.html`.
+ * Bug Squash's original placeholder implementation: a single click-to-score
+ * button. #38 replaced it in the default Minigame registry
+ * (`minigame-registry.ts`) with the real grid-of-bugs game from
+ * `design/Minigame Bug Squash.dc.html`; kept here for any framework test
+ * that still wants a minimal `Minigame<'bug-squash'>` double. `bestCombo`
+ * and `escaped` are always `1`/`0`: this stub has no combo or escape
+ * mechanic, just a running `squashed` count.
  *
  * Producer: #37.
  */
@@ -38,7 +41,7 @@ export function createStubMinigame(
 
   function report(): void {
     context?.setScore(score);
-    context?.setStats({ squashed });
+    context?.setStats({ score, squashed, bestCombo: 1, escaped: 0 });
   }
 
   return {
@@ -79,7 +82,7 @@ export function createStubMinigame(
 
     end() {
       if (button) button.disabled = true;
-      return { score, stats: { squashed } };
+      return { score, stats: { score, squashed, bestCombo: 1, escaped: 0 } };
     },
 
     debugSetScore(nextScore) {

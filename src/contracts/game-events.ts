@@ -1,5 +1,5 @@
 import { createEmitter, type TypedEmitter } from './emitter';
-import type { RoomEventMap } from './rooms';
+import type { RoomEventMap, RoomId } from './rooms';
 
 /**
  * Producers: #37 (played), #27 `record_round`. Consumers: #27, #34, #42.
@@ -18,13 +18,20 @@ export type BadgeId = 'exterminator' | 'breakfast-club' | 'barista' | 'brain-fre
  * until they're built.
  */
 export interface MinigameStatsMap {
-  'bug-squash': { squashed: number };
+  /** #38's done-screen fields: `score` duplicates `MinigameCompleted.score`
+   *  (and `end()`'s own `score` return) so a `stats`-only consumer (e.g. a
+   *  future leaderboard) never needs the sibling field to make sense of a
+   *  round. `bestCombo` is the best combo multiplier reached (1-4). */
+  'bug-squash': { score: number; squashed: number; bestCombo: number; escaped: number };
   'pancake-flip': {
     golden: number;
     flipNow: number;
     raw: number;
     burnt: number;
     stacked: number;
+    /** Longest run of consecutive Golden/Flip Now flips in the round;
+     *  producer: #39. Additive to the original #26 shape. */
+    bestStreak: number;
   };
   'coffee-rush': Record<string, number>;
   'snow-cone-stand': Record<string, number>;
@@ -67,6 +74,12 @@ export interface GameEventMap extends RoomEventMap {
   'ui:toast': { message: string };
   /** Producer: #14. Consumer: #36. */
   'npc:arrived': { npcId: string };
+  /**
+   * A `RoomHotspot` was clicked (e.g. the Igloo's `trophy-case`). Producer:
+   * `RoomScene` (#16 D5's `hotspots`, wired by #42). Consumer: `main.ts`
+   * (#42), which opens the matching overlay for a known `hotspotId`.
+   */
+  'hotspot:click': { roomId: RoomId; hotspotId: string };
 }
 
 /** The one shared emitter instance every Phaser scene and DOM overlay uses. */
