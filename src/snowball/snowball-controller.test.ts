@@ -281,6 +281,30 @@ describe('createSnowballController: throwAt', () => {
     expect(fakeView.calls.drawArc).toHaveLength(0);
   });
 
+  it('treats a rejected send like a false one: resolves false, refunds ammo, draws no arc', async () => {
+    const base = createFakeChannel();
+    const fakeChannel = {
+      ...base,
+      channel: {
+        ...base.channel,
+        send: () => Promise.reject(new Error('realtime send failed')),
+      },
+    };
+    const fakeView = createFakeView();
+    const timer = createManualTimer();
+    const controller = createController(fakeChannel, fakeView, {
+      setTimeout: timer.setTimeout,
+      clearTimeout: timer.clearTimeout,
+    });
+    const before = controller.ammo();
+
+    const result = await controller.throwAt({ col: 1, row: 1 });
+
+    expect(result).toBe(false);
+    expect(controller.ammo().count).toBe(before.count);
+    expect(fakeView.calls.drawArc).toHaveLength(0);
+  });
+
   it('A1: with 1 ammo, a second click while the first send is pending sends nothing; a false resolution refunds it', async () => {
     const deferred = createDeferredChannel();
     const fakeView = createFakeView();

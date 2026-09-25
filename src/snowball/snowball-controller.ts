@@ -196,7 +196,9 @@ export function createSnowballController(options: SnowballControllerOptions): Sn
     if (hitId === null) return; // No hit (including O3: no shown remote Penguins) -> splat only.
 
     applyHat(hitId, false, now());
-    void channel.send('snowball:hit', { throwId, targetId: hitId });
+    // Best effort: a failed hit broadcast leaves the hat on the thrower's
+    // screen only; swallow the rejection so it is not unhandled.
+    void channel.send('snowball:hit', { throwId, targetId: hitId }).catch(() => undefined);
   }
 
   function handleIncomingThrow(payload: { playerId: string; throwId: string; target: Tile }): void {
@@ -251,7 +253,9 @@ export function createSnowballController(options: SnowballControllerOptions): Sn
       const from = view.localPoint();
       const to = view.tileToPoint(target);
 
-      const ok = await channel.send('snowball:throw', { throwId, target });
+      // A rejected send (realtime-js can reject) counts as not sent, so the
+      // reserved ammo is refunded rather than leaked.
+      const ok = await channel.send('snowball:throw', { throwId, target }).catch(() => false);
 
       if (!ok) {
         ammo.refund(now());
