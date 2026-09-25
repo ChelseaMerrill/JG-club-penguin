@@ -54,6 +54,7 @@ import { createPenguinCreator } from './ui/penguin-creator';
 import { createPenguinEditor } from './penguin/penguin-editor';
 import { initDevCreatorHook } from './penguin/dev-creator-hook';
 import { createTrophyCase, TROPHY_CASE_OVERLAY_ID } from './ui/trophy-case';
+import { createMapScreen } from './ui/map-screen';
 import { createMarket, MARKET_OVERLAY_ID } from './ui/market';
 import { wireBadgeToast } from './ui/badge-toast';
 
@@ -366,6 +367,16 @@ const hud = createHud(getUiLayer(), {
   // session's sign-in load finishes (#34).
   initialBalance: 0,
   onChatSend: (text) => chatController?.send(text) ?? Promise.resolve(false),
+});
+
+// The Map (#33): reproduces design/Club JenGuin Map.dc.html, self-wiring the
+// HUD's MAP button (`ui:open-map`) and `hud.overlays` internally.
+createMapScreen(uiLayer, {
+  overlays: hud.overlays,
+  changeRoom: (roomId) => {
+    void roomNavigator?.changeRoom(roomId);
+  },
+  currentRoomId: () => roomNavigator?.currentRoomId() ?? null,
 });
 
 const progress = createProgressSession({ registry: game.registry, emitter: gameEvents });
