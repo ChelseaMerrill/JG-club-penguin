@@ -92,3 +92,17 @@ export function depthForTile(tile: Tile): number {
   const screenRow = tile.col + tile.row;
   return screenRow * DEPTH_ROW_SCALE + tile.col;
 }
+
+/**
+ * Shared dedicated top-layer depths, both far above any `depthForTile` result
+ * (tile depths top out near 10^4): every NPC's idle speech bubble
+ * (`npc-sprite.ts`) sorts into `NPC_BUBBLE_LAYER + depth`, and every Snowball
+ * effect (`RoomScene`'s reticle, preview arc and thrown/landed snowballs)
+ * sorts into `SNOWBALL_LAYER`, one whole layer above it -- so a Snowball
+ * effect always draws over an NPC's speech bubble, never under it (#36
+ * round-2 review item 3: previously each was its own module-local
+ * `1_000_000` constant, coincidentally equal and impossible to reorder on
+ * purpose).
+ */
+export const NPC_BUBBLE_LAYER = 1_000_000;
+export const SNOWBALL_LAYER = 2_000_000;

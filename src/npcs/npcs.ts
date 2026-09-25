@@ -45,16 +45,19 @@ export type NpcId =
   | 'darrin-icebox';
 
 /**
- * Ian's Bug Squash / Chelsea's Pancake Flip trigger dialog (#36 D4; round-1
- * review item 4 adds `triggerLine`/`subtitle`, the minigame design's own
- * trigger-phase quote and "ROOM · ROLE"/"ROOM · GAME" badge next to the
- * NPC's name, verbatim from `design/Minigame Bug Squash.dc.html` /
- * `design/Minigame Pancake Flip.dc.html`).
+ * A minigame-launching NPC's trigger dialog (#36 D4; round-1 review item 4
+ * adds `triggerLine`/`subtitle`, the minigame design's own trigger-phase
+ * quote and "ROOM · ROLE"/"ROOM · GAME" badge next to the NPC's name,
+ * verbatim from that minigame's own design file: Ian/Bug Squash
+ * (`design/Minigame Bug Squash.dc.html`), Chelsea/Pancake Flip
+ * (`design/Minigame Pancake Flip.dc.html`), Josh/Snow Cone Stand
+ * (`design/Minigame Snow Cone Stand.dc.html`) and Tom/Coffee Rush
+ * (`design/Minigame Coffee Rush.dc.html`) (#36 round-2 review item 1).
  */
 export interface NpcMinigameDialog {
   kind: 'minigame';
   minigameId: MinigameId;
-  /** `design/Minigame Bug Squash.dc.html` / `design/Minigame Pancake Flip.dc.html`'s own button copy. */
+  /** The minigame design's own trigger-screen button copy. */
   actionLabel: string;
   declineLabel: string;
   /** The minigame design's own trigger-phase paragraph. */
@@ -191,6 +194,28 @@ const PANCAKE_FLIP_DIALOG: NpcMinigameDialog = {
   triggerLine:
     'Batter is mixed, griddle is hot, and Tom keeps eating the burnt ones. Watch the color and flip on GOLDEN. Twenty on the stack and you are in the Breakfast Club.',
   subtitle: 'THE MELT · PANCAKE FLIP',
+};
+
+/** Josh's Snow Cone Stand trigger dialog (#36 round-2 review item 1a; #49's own design, verbatim from `design/Minigame Snow Cone Stand.dc.html`). */
+const SNOW_CONE_DIALOG: NpcMinigameDialog = {
+  kind: 'minigame',
+  minigameId: 'snow-cone-stand',
+  actionLabel: 'WORK A SHIFT',
+  declineLabel: 'MAYBE LATER',
+  triggerLine:
+    "Line's getting long and I've got a pumpkin spice to finish. Work a shift at the stand? Tokens are yours. 200 in one shift and I'll throw in a badge.",
+  subtitle: 'SNACKS · SENIOR PROJECT MANAGER',
+};
+
+/** Tom's Coffee Rush trigger dialog (#36 round-2 review item 1b; #50's own design, verbatim from `design/Minigame Coffee Rush.dc.html`). */
+const COFFEE_RUSH_DIALOG: NpcMinigameDialog = {
+  kind: 'minigame',
+  minigameId: 'coffee-rush',
+  actionLabel: 'GRAB THE POT',
+  declineLabel: 'JUST HERE FOR COFFEE',
+  triggerLine:
+    'Fresh pot is on and the line is out the door. You pour, I supervise. Fifteen good cups before the pot runs dry and the Barista badge is yours.',
+  subtitle: 'THE MELT · COFFEE RUSH',
 };
 
 const IGLOO_GEAR_STALL_DIALOG: NpcStallDialog = { kind: 'stall', stallId: 'igloo-gear' };
@@ -353,8 +378,12 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     ],
     // #92 D3 round 2 moved Ian to (1,5) and Dom to (2,5), one tile apart
     // (confirmed via an e2e screenshot to overlap at their derived screen
-    // position): nudged apart horizontally, opposite Dom's own +70 below.
-    bubbleOffsetX: -70,
+    // position): nudged apart horizontally, opposite Dom's own +80 below.
+    // 80, not 70 (#36 round-2 review item 4): the minimum that clears their
+    // bubble rects at the shared bubble-width ceiling (`npc-sprite.ts`'s own
+    // `MAX_BUBBLE_WIDTH`) while still spanning Ian's own tile x, confirmed by
+    // `npcs.test.ts`'s geometric bubble-rect check.
+    bubbleOffsetX: -80,
     dialog: BUG_SQUASH_DIALOG,
     figure: {
       style: 'bald',
@@ -407,7 +436,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: 'Do not tell facilities.', periodS: 18, delayS: -13 },
     ],
     // See Ian's own bubbleOffsetX note above -- the two are one tile apart.
-    bubbleOffsetX: 70,
+    bubbleOffsetX: 80,
     dialog: LINE_DIALOG,
     figure: {
       style: 'short',
@@ -434,8 +463,13 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     ],
     // #92 D3 round 2's row-1 trio (Ryan, Steven, Sam) sit only 2 tiles apart
     // each (confirmed via an e2e screenshot to overlap): Ryan and Sam nudged
-    // apart from Steven in the middle, opposite Sam's own +110 below.
-    bubbleOffsetX: -110,
+    // apart from Steven in the middle, opposite Sam's own +100 below.
+    // 100, not 110 (#36 round-2 review item 4): 110 pushed the bubble rect
+    // (at `npc-sprite.ts`'s own `MAX_BUBBLE_WIDTH` ceiling) fully past Ryan's
+    // own tile x, so its rect no longer spanned him; 100 is the exact value
+    // both constraints allow here, confirmed by `npcs.test.ts`'s geometric
+    // bubble-rect check.
+    bubbleOffsetX: -100,
     dialog: LINE_DIALOG,
     figure: {
       style: 'short',
@@ -462,7 +496,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: 'Ship it Friday. What could go wrong.', periodS: 20, delayS: -17 },
     ],
     // See Ryan's own bubbleOffsetX note above -- the row-1 trio sit close together.
-    bubbleOffsetX: 110,
+    bubbleOffsetX: 100,
     dialog: LINE_DIALOG,
     figure: {
       style: 'spiky',
@@ -547,7 +581,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: 'Pumpkin spice, obviously.', periodS: 11, delayS: -8.5 },
     ],
     bubbleOffsetX: -90,
-    dialog: LINE_DIALOG,
+    dialog: SNOW_CONE_DIALOG,
     figure: {
       style: 'bald',
       hair: 'dark',
@@ -676,10 +710,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: 'Coffee run?', periodS: 16, delayS: -6 },
       { text: 'This is my fourth. Fifth. Whatever.', periodS: 16, delayS: -11 },
     ],
-    // No 'coffee-rush' factory exists in createDefaultMinigameRegistry() yet
-    // (#50, Coffee Rush, isn't merged), so this stays a plain line dialog
-    // rather than an NpcMinigameDialog; revisit once #50 lands.
-    dialog: LINE_DIALOG,
+    dialog: COFFEE_RUSH_DIALOG,
     figure: {
       style: 'sideSwept',
       hair: 'sandy',

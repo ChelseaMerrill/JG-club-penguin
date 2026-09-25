@@ -439,7 +439,8 @@ describe('ROOM_DEFINITIONS registry', () => {
       'town-center': ['dev-pit', 'roof-deck', 'the-icebox'],
       'dev-pit': ['the-icebox', 'town-center'],
       'the-melt': ['roof-deck', 'town-center'],
-      'roof-deck': [],
+      // #100: the Roof Deck's new KITCHEN floor-arrow door, its first exit.
+      'roof-deck': ['the-melt'],
       igloo: ['town-center'],
       'the-icebox': ['dev-pit', 'town-center'],
     });

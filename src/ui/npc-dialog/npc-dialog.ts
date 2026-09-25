@@ -61,6 +61,16 @@ function actionButton(className: string, label: string, onClick: () => void): HT
  * interaction tile, #14's own already-arrived case), it does not emit again;
  * closing and reopening (even for the same NPC) does.
  *
+ * An `npc:arrived` while some *other* HUD overlay is already open (MENU, the
+ * Map, the Penguin Creator, a Minigame, ...) is ignored outright rather than
+ * opening the dialog over it (#36 round-2 review item 2b): clicking an NPC
+ * queues a walk, and the Player pressing SNOWBALL/EMOTE/MAP/PENGUIN/MENU
+ * before the Penguin arrives shouldn't have the dialog steal focus and close
+ * that overlay out from under them on arrival (e.g. losing unsaved Penguin
+ * Creator edits). `RoomScene.setAiming(true)` separately drops the pending
+ * arrival callback outright for the Snowball case, which isn't a tracked HUD
+ * overlay at all (#36 round-2 review item 2a).
+ *
  * Accessibility (#36 round-1 review item 9): the panel is `role="dialog"`
  * with `aria-modal="true"` and `aria-labelledby` pointing at the name
  * element; opening moves focus to its first button (an action button when
@@ -159,6 +169,9 @@ export function createNpcDialog(root: HTMLElement, deps: NpcDialogDeps): NpcDial
   }
 
   const unsubscribeArrived = gameEvents.on('npc:arrived', ({ npcId }) => {
+    const current = deps.overlays.current();
+    if (current !== null && current !== NPC_DIALOG_OVERLAY_ID) return;
+
     const npc = getNpcDefinition(npcId);
     if (!npc) return;
 

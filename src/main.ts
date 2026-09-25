@@ -676,11 +676,10 @@ gameEvents.on('hotspot:click', ({ hotspotId }) => {
   void trophyCase.open();
 });
 
-// The Roof Deck Market's Igloo Gear stall (#40): Casey's own NPC dialog
-// (#36) isn't merged yet, so this hotspot opens the Market panel directly;
-// `market.open()` is public so #36 can later open the same panel from
-// Casey's dialog instead. Reloads `store.loadAll()` on every open, same as
-// the Trophy Case.
+// The Roof Deck Market's Igloo Gear stall (#40): this hotspot opens the
+// Market panel directly, the same real panel Casey's own NPC dialog (#36,
+// below) opens through `market.open()`. Reloads `store.loadAll()` on every
+// open, same as the Trophy Case.
 const market = createMarket(uiLayer, {
   store: progressStore,
   onClose: () => hud.overlays.close(MARKET_OVERLAY_ID),

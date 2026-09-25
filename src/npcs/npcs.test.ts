@@ -1,4 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import { MAX_BUBBLE_WIDTH } from '../game/npcs/bubble-geometry';
+import { devPit } from '../game/rooms/definitions/dev-pit';
+import { tileToScreen } from '../game/rooms/iso';
 import { ROOM_DEFINITIONS } from '../game/rooms/registry';
 import { getNpcDefinition, NPCS, type NpcId } from './npcs';
 
@@ -94,14 +97,48 @@ describe('NPCS', () => {
     expect(NPCS.millie.bubbleOffsetY).toBeUndefined();
   });
 
-  it('spreads Ian/Dom and Ryan/Steven/Sam apart after #92 moved them close together (confirmed overlapping via an e2e screenshot)', () => {
-    expect(NPCS.ian.bubbleOffsetX).toBe(-70);
-    expect(NPCS.dom.bubbleOffsetX).toBe(70);
-    expect(NPCS.ryan.bubbleOffsetX).toBe(-110);
-    expect(NPCS.steven.bubbleOffsetX).toBeUndefined();
-    expect(NPCS.sam.bubbleOffsetX).toBe(110);
-    expect(NPCS.ashley.bubbleOffsetX).toBeUndefined();
-  });
+  it(
+    "keeps Ian/Dom's and Ryan/Steven/Sam's bubble rects from intersecting at the shared " +
+      "max bubble width, each rect still spanning its own NPC's tile x (#36 round-2 review " +
+      'item 4: replaces a constants-only assertion after #92 moved them close together, ' +
+      'confirmed overlapping via an e2e screenshot)',
+    () => {
+      const halfWidth = MAX_BUBBLE_WIDTH / 2;
+
+      function npcX(id: NpcId): number {
+        const slot = devPit.npcSlots.find((s) => s.npcId === id);
+        if (!slot) throw new Error(`expected dev-pit to have a "${id}" npcSlot`);
+        return tileToScreen(slot.tile, devPit.grid.origin).x;
+      }
+
+      function bubbleRect(id: NpcId): { min: number; max: number; npcTileX: number } {
+        const tileX = npcX(id);
+        const center = tileX + (NPCS[id].bubbleOffsetX ?? 0);
+        return { min: center - halfWidth, max: center + halfWidth, npcTileX: tileX };
+      }
+
+      const ids: NpcId[] = ['ian', 'dom', 'ryan', 'steven', 'sam'];
+      const rects = new Map(ids.map((id) => [id, bubbleRect(id)]));
+
+      for (const id of ids) {
+        const rect = rects.get(id)!;
+        expect(rect.npcTileX, `${id}'s bubble rect`).toBeGreaterThanOrEqual(rect.min);
+        expect(rect.npcTileX, `${id}'s bubble rect`).toBeLessThanOrEqual(rect.max);
+      }
+
+      const adjacentPairs: [NpcId, NpcId][] = [
+        ['ian', 'dom'],
+        ['ryan', 'steven'],
+        ['steven', 'sam'],
+      ];
+      for (const [a, b] of adjacentPairs) {
+        const rectA = rects.get(a)!;
+        const rectB = rects.get(b)!;
+        const noOverlap = rectA.max <= rectB.min || rectB.max <= rectA.min;
+        expect(noOverlap, `${a}'s and ${b}'s bubble rects overlap`).toBe(true);
+      }
+    },
+  );
 
   it("matches design/Room 02 Dev Pit.dc.html's own say-cycle timing for Ian, Steven and Ryan", () => {
     // Traced directly from the (post-#91-resync) design's `<g style=
@@ -239,7 +276,40 @@ describe('NPCS', () => {
     expect(tom.title).toBeNull();
     expect(tom.roomId).toBe('the-melt');
     expect(tom.kind).toBe('human');
-    expect(tom.dialog).toMatchObject({ kind: 'line' });
+  });
+
+  it("includes Josh Cantor-Stone in Roof Deck with a Snow Cone Stand dialog and the trigger design's own quote/subtitle", () => {
+    // #36 round-2 review item 1a: Josh wasn't reachable from #49's own
+    // Snow Cone Stand until now.
+    const josh = NPCS.josh;
+    expect(josh.name).toBe('Josh Cantor-Stone');
+    expect(josh.title).toBe('Senior Project Manager');
+    expect(josh.roomId).toBe('roof-deck');
+    expect(josh.kind).toBe('human');
+    expect(josh.dialog).toMatchObject({
+      kind: 'minigame',
+      minigameId: 'snow-cone-stand',
+      actionLabel: 'WORK A SHIFT',
+      declineLabel: 'MAYBE LATER',
+      triggerLine:
+        "Line's getting long and I've got a pumpkin spice to finish. Work a shift at the stand? Tokens are yours. 200 in one shift and I'll throw in a badge.",
+      subtitle: 'SNACKS · SENIOR PROJECT MANAGER',
+    });
+  });
+
+  it("includes Tom O'Neill in The Melt with a Coffee Rush dialog and the trigger design's own quote/subtitle", () => {
+    // #36 round-2 review item 1b: Tom wasn't reachable from #50's own
+    // Coffee Rush until now.
+    const tom = NPCS.tom;
+    expect(tom.dialog).toMatchObject({
+      kind: 'minigame',
+      minigameId: 'coffee-rush',
+      actionLabel: 'GRAB THE POT',
+      declineLabel: 'JUST HERE FOR COFFEE',
+      triggerLine:
+        'Fresh pot is on and the line is out the door. You pour, I supervise. Fifteen good cups before the pot runs dry and the Barista badge is yours.',
+      subtitle: 'THE MELT · COFFEE RUSH',
+    });
   });
 
   it("includes Ian Ballard in Dev Pit with a Bug Squash dialog and the trigger design's own quote/subtitle", () => {
@@ -283,7 +353,7 @@ describe('NPCS', () => {
   });
 
   it('every other NPC has a plain line dialog', () => {
-    const talkers: NpcId[] = ['ian', 'chelsea', 'casey'];
+    const talkers: NpcId[] = ['ian', 'chelsea', 'casey', 'josh', 'tom'];
     for (const npc of Object.values(NPCS)) {
       if (talkers.includes(npc.id)) continue;
       expect(npc.dialog).toMatchObject({ kind: 'line' });

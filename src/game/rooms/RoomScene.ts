@@ -34,6 +34,7 @@ import {
 import {
   depthForTile,
   screenToTile,
+  SNOWBALL_LAYER,
   tileCornerToScreen,
   tileToScreen,
   TILE_HEIGHT,
@@ -161,9 +162,10 @@ export const DOOR_HINT_DURATION_MS = 2000;
 // Snowball mode (#53), after `design/Club JenGuin HUD Menus.dc.html`'s
 // HUD-SNOWBALL screen: cyan reticle ellipse + ticks on the aimed Tile, a
 // dashed white preview arc from the local Penguin, and the cursor hint under
-// the reticle. Drawn above every Room object and Penguin (tile depths top
-// out near 10^4).
-const SNOWBALL_DEPTH = 1_000_000;
+// the reticle. Drawn above every Room object and Penguin, and above every
+// NPC's speech bubble (`iso.ts`'s shared `SNOWBALL_LAYER`, one whole layer
+// above `NPC_BUBBLE_LAYER` -- #36 round-2 review item 3).
+const SNOWBALL_DEPTH = SNOWBALL_LAYER;
 const SNOWBALL_CYAN = 0x00bdff;
 const SNOWBALL_WHITE = 0xf4f4f4;
 const SNOWBALL_OUTLINE = 0x0c4b5f;
@@ -676,9 +678,21 @@ export class RoomScene extends Scene {
    * moving; the reticle appears on the next pointer move. Off hides the
    * reticle, preview arc and cursor hint. `init()` resets it to off, so a
    * Room change always starts outside the mode.
+   *
+   * Turning aiming *on* also drops any pending NPC-arrival callback (#36
+   * round-2 review item 2a): an NPC click queues a walk whose `onArrive`
+   * opens its dialog once the Penguin reaches the interaction tile, and
+   * SNOWBALL/EMOTE/MAP/PENGUIN/MENU firing mid-walk must not let that dialog
+   * open later and steal focus from (and close) whatever overlay the Player
+   * just opened -- the Penguin still finishes walking there, it just no
+   * longer opens the dialog on arrival.
    */
   setAiming(on: boolean): void {
     this.aiming = on;
+    if (on) {
+      this.pendingArrival = null;
+      if (this.queuedMove) this.queuedMove.onArrive = undefined;
+    }
     if (!on) this.cancelAim();
   }
 

@@ -202,6 +202,32 @@ describe('createNpcDialog', () => {
     expect(() => gameEvents.emit('room:leave', { roomId: 'town-center' })).not.toThrow();
   });
 
+  it('ignores npc:arrived while another HUD overlay is already open, instead of stealing focus and closing it (#36 round-2 review item 2b)', () => {
+    const { root } = setup();
+    const onClose = vi.fn();
+    overlays!.open('penguin-creator', onClose);
+
+    gameEvents.emit('npc:arrived', { npcId: 'jon' });
+
+    expect(panel(root).hidden).toBe(true);
+    expect(overlays!.current()).toBe('penguin-creator');
+    expect(onClose).not.toHaveBeenCalled();
+  });
+
+  it('still opens on npc:arrived once that other overlay has closed', () => {
+    const { root } = setup();
+    const onClose = vi.fn();
+    overlays!.open('penguin-creator', onClose);
+    gameEvents.emit('npc:arrived', { npcId: 'jon' });
+    expect(panel(root).hidden).toBe(true);
+
+    overlays!.close('penguin-creator');
+    gameEvents.emit('npc:arrived', { npcId: 'jon' });
+
+    expect(panel(root).hidden).toBe(false);
+    expect(overlays!.current()).toBe(NPC_DIALOG_OVERLAY_ID);
+  });
+
   it('registers as one overlay at a time with the HUD overlay manager', () => {
     const { root } = setup();
     gameEvents.emit('npc:arrived', { npcId: 'jon' });

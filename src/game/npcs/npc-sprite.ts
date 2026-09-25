@@ -1,6 +1,8 @@
 import { GameObjects, Textures, type Scene, type Time, type Tweens } from 'phaser';
 import type { NpcBubbleLine, NpcDefinition } from '../../npcs/npcs';
 import { penguinFeetOrigin } from '../penguin/render-svg';
+import { NPC_BUBBLE_LAYER } from '../rooms/iso';
+import { SPEECH_BUBBLE_MAX_TEXT_WIDTH, SPEECH_BUBBLE_PADDING_X } from './bubble-geometry';
 import { ensureNpcTexture } from './texture';
 
 /** Phaser's always-present built-in placeholder texture (matches #31's own sprite). */
@@ -35,14 +37,11 @@ const SPEECH_BUBBLE_TEXT_COLOR = '#161719';
 const SPEECH_BUBBLE_FONT_FAMILY = 'Libre Franklin, sans-serif';
 const SPEECH_BUBBLE_FONT_WEIGHT = '700';
 const SPEECH_BUBBLE_FONT_SIZE = '13px';
-const SPEECH_BUBBLE_PADDING_X = 10;
 const SPEECH_BUBBLE_PADDING_Y = 8;
 const SPEECH_BUBBLE_RADIUS = 8;
 const SPEECH_BUBBLE_POINTER_HALF_WIDTH = 6;
 const SPEECH_BUBBLE_POINTER_HEIGHT = 8;
 const SPEECH_BUBBLE_GAP = 14;
-/** #36 round-1 review item 3d (down from 200). */
-const SPEECH_BUBBLE_MAX_TEXT_WIDTH = 180;
 const SPEECH_BUBBLE_FADE_MS = 250;
 
 /**
@@ -90,9 +89,11 @@ function prefersReducedMotion(): boolean {
  *
  * The idle speech bubble (#36 round-1 review item 3) is a *separate* pair of
  * Phaser objects added directly to `scene`, not to this container, at depth
- * `1_000_000 + depth` -- a dedicated top layer so no NPC's own figure (nor
- * any other NPC's, however it sorts by tile) ever paints over a bubble, while
- * bubbles themselves still sort nearer-over-farther by depth. It cycles
+ * `NPC_BUBBLE_LAYER + depth` (`iso.ts`'s shared top-layer constant, also used
+ * by `RoomScene`'s own Snowball layer -- #36 round-2 review item 3) -- a
+ * dedicated top layer so no NPC's own figure (nor any other NPC's, however it
+ * sorts by tile) ever paints over a bubble, while bubbles themselves still
+ * sort nearer-over-farther by depth. It cycles
  * through `npc.idleLines` with a per-line alpha fade, timed from each line's
  * own `periodS`/`delayS` (`npcs.ts`'s doc comment); `periodS: 0` (or
  * reduced motion) shows `idleLines[0]` statically instead of cycling.
@@ -182,8 +183,8 @@ export function createNpcSprite(
     }),
   );
   bubbleText.setOrigin(0.5, 0);
-  bubbleGraphics.setDepth(1_000_000 + depth);
-  bubbleText.setDepth(1_000_000 + depth);
+  bubbleGraphics.setDepth(NPC_BUBBLE_LAYER + depth);
+  bubbleText.setDepth(NPC_BUBBLE_LAYER + depth);
   bubbleGraphics.setAlpha(0);
   bubbleText.setAlpha(0);
 
@@ -196,6 +197,16 @@ export function createNpcSprite(
     const bubbleHeight = bubbleText.height + SPEECH_BUBBLE_PADDING_Y * 2;
     const bubbleTopY = bubbleBottomY - bubbleHeight;
 
+    // The tail points at the NPC's own x (`x`, unshifted by `bubbleOffsetX`),
+    // not the bubble's own (possibly nudged) centre `bubbleX` (#36 round-2
+    // review item 4): a Roof Deck vendor's or Dev Pit's nudged-apart bubble
+    // otherwise drew its tail off in empty space rather than at its speaker.
+    // Clamped inside the bubble's own bottom edge so the tail's base never
+    // pokes out past a heavily-offset bubble's rounded corners.
+    const tailMin = bubbleX - bubbleWidth / 2 + SPEECH_BUBBLE_POINTER_HALF_WIDTH;
+    const tailMax = bubbleX + bubbleWidth / 2 - SPEECH_BUBBLE_POINTER_HALF_WIDTH;
+    const tailX = Math.min(Math.max(x, tailMin), tailMax);
+
     bubbleGraphics.clear();
     bubbleGraphics.fillStyle(SPEECH_BUBBLE_BG, 1);
     bubbleGraphics.fillRoundedRect(
@@ -206,11 +217,11 @@ export function createNpcSprite(
       SPEECH_BUBBLE_RADIUS,
     );
     bubbleGraphics.fillTriangle(
-      bubbleX - SPEECH_BUBBLE_POINTER_HALF_WIDTH,
+      tailX - SPEECH_BUBBLE_POINTER_HALF_WIDTH,
       bubbleBottomY,
-      bubbleX + SPEECH_BUBBLE_POINTER_HALF_WIDTH,
+      tailX + SPEECH_BUBBLE_POINTER_HALF_WIDTH,
       bubbleBottomY,
-      bubbleX,
+      tailX,
       bubbleBottomY + SPEECH_BUBBLE_POINTER_HEIGHT,
     );
     bubbleText.setPosition(bubbleX, bubbleTopY + SPEECH_BUBBLE_PADDING_Y);

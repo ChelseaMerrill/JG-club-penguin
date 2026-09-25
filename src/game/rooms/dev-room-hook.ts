@@ -90,7 +90,7 @@ export interface RoomDebugInfo {
   npcArrivedLog?: string[];
   /** `npcId` per `npc:talked` emission, oldest first (#36). */
   npcTalkedLog?: string[];
-  /** `stallId` per `actions.openStall` call, oldest first (#36; a logged no-op until #40). */
+  /** `stallId` per `actions.openStall` call, oldest first (#36; #40 is on `main`, so this now accompanies a real Market panel open, not just a logged no-op). */
   openStallLog?: string[];
   /** Door label per `door:reached` emission, oldest first. */
   doorReachedLog?: string[];
