@@ -104,3 +104,26 @@ It also checks `security definer`/`search_path = ''`/one overload each and the
    rolled back) and prints only booleans, counts and Token amounts.
 3. Save the result table to `test-results/46-quests-proof-supabase/output.txt`,
    and paste the same table on #46.
+
+## In-game feedback
+
+`feedback_proof.sql` proves `20260925010000_feedback.sql` against the same #9
+H1 fixture Player, in `46_quests_proof.sql`'s style: as the fixture signed in,
+`submit_feedback()` stores a trimmed issue or suggestion with its Room and
+returns `{ id }`; refuses bad input with `invalid_feedback` and the 6th
+submission in 10 minutes with `feedback_rate_limited` (storing nothing either
+way); refuses a caller with no Player row (`no_player`) or no `auth.uid()`
+(`not_authenticated`); and direct select/insert/update/delete on
+`public.feedback` are denied (`42501`) for `authenticated` and `anon`. It also
+checks RLS on with no policies, `security definer`/`search_path = ''`/one
+overload and the `authenticated`-only grant.
+
+1. Local: covered automatically by `sql-feedback.test.ts`'s PGlite run in
+   `npm test` (not by `run-local.sh`).
+2. Real Supabase: apply `supabase/migrations/20260925010000_feedback.sql` in
+   the SQL editor first, then open `feedback_proof.sql`, replace every
+   occurrence of `00000000-0000-0000-0000-00000000f1f0` with the real #9 H1
+   fixture Player's id, and run it. Expect every row's `pass` column to read
+   `true`, including the final `ALL` row. It changes nothing (everything is
+   rolled back, so no webhook fires) and prints only booleans, counts and
+   error codes.

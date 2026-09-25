@@ -67,6 +67,8 @@ export interface Hud {
   questSlot: HTMLElement;
   /** Shows the QUESTS button as active while the Quests panel is open (#46). */
   setQuestsActive(on: boolean): void;
+  /** Bottom-right container, above the bottom bar, that the feedback button renders into. */
+  feedbackSlot: HTMLElement;
 }
 
 const MENU_OVERLAY_ID = 'menu';
@@ -309,6 +311,11 @@ export function createHud(layer: HTMLElement, deps: HudDeps): Hud {
   const questSlot = document.createElement('div');
   questSlot.className = 'hud__quest-slot';
 
+  // The feedback button's slot (bottom right, above the bottom bar). Before
+  // the emote picker in DOM order so an open picker paints over it.
+  const feedbackSlot = document.createElement('div');
+  feedbackSlot.className = 'hud__feedback-slot';
+
   bottomBar.append(chatSlot, emoteButton, snowballButton, mapButton, iglooButton, questsButton);
 
   // The toast layer (`ui:toast`, #42): shown wherever the Player is, since
@@ -385,7 +392,16 @@ export function createHud(layer: HTMLElement, deps: HudDeps): Hud {
     updateSnowballButtonDisabled();
   }
 
-  root.append(titleBlock, topRight, questSlot, menuPanel, snowballPanel, bottomBar, toastEl);
+  root.append(
+    titleBlock,
+    topRight,
+    questSlot,
+    feedbackSlot,
+    menuPanel,
+    snowballPanel,
+    bottomBar,
+    toastEl,
+  );
   layer.append(root);
 
   const emotePicker = createEmotePicker(root, {
@@ -420,6 +436,7 @@ export function createHud(layer: HTMLElement, deps: HudDeps): Hud {
     setSnowballMode,
     setSnowballAmmo,
     questSlot,
+    feedbackSlot,
     setQuestsActive(on) {
       questsButton.classList.toggle('hud__button--active', on);
     },
