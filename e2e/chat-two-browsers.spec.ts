@@ -1,7 +1,14 @@
+/**
+ * Runs against the real shared Supabase project (#81): other Players can be
+ * in Town Center at the same time, so this only asserts on the specific
+ * test-user Player id (`idA`), never on a roster's total count. See
+ * "Running the two-browser e2e specs" in the README.
+ */
 import { mkdirSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 import { hasTestUsers, passwordSessionState } from './support/password-session';
+import { assertTestUsersAbsent, playerIdFromStorageState } from './support/presence-guard';
 
 const AUTH_STATE_A = process.env.AUTH_STATE_A;
 const AUTH_STATE_B = process.env.AUTH_STATE_B;
@@ -109,6 +116,13 @@ test('chat-two-browsers', async ({ browser, baseURL }) => {
   const origin = new URL(baseURL ?? 'http://localhost:4173').origin;
   const stateA = haveStateFiles ? AUTH_STATE_A : await passwordSessionState('A', origin);
   const stateB = haveStateFiles ? AUTH_STATE_B : await passwordSessionState('B', origin);
+
+  // #81: fail fast if another session is still running this pair of test
+  // users through Town Center, before opening any browser context.
+  await assertTestUsersAbsent([
+    { label: 'A', playerId: playerIdFromStorageState(stateA) },
+    { label: 'B', playerId: playerIdFromStorageState(stateB) },
+  ]);
 
   rmSync(BUBBLE_OUTPUT_DIR, { recursive: true, force: true });
   mkdirSync(BUBBLE_OUTPUT_DIR, { recursive: true });
