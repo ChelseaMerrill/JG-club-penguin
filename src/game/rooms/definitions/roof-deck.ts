@@ -35,14 +35,18 @@ const WALKABLE: readonly (readonly boolean[])[] = [
 
 /**
  * Traced from `design/Room 05 Roof Deck.dc.html`. Unlike the other four
- * Rooms, this design draws no door or elevator graphic in-scene at all — its
- * only exit indicator is a "↙ ELEVATOR · STAIRS · KITCHEN" HUD nav pill, with
- * no in-world hotspot to place. Per #16 D3 ("doors placed on the design's
- * door signs/doorways"), there is nothing to place here, so this Room has no
- * doors; it's still reachable via Town Center's and the Kitchen's elevator/
- * stairs doors, whose `entryTile` points at this Room's own `spawnTile`. This
- * is reported as a deviation on the #16 execution plan. `spawnTile` isn't any
- * NPC's own interaction tile (#16 fix 4; see `reachability.test.ts`).
+ * Rooms, this design draws no *door()*-framed sign or elevator graphic in
+ * this Room -- its HUD nav pill ("↙ ELEVATOR · STAIRS · KITCHEN") still names
+ * no in-world hotspot for the elevator/stairs legs, so this Room is still
+ * reachable via Town Center's and the Kitchen's elevator/stairs doors, whose
+ * `entryTile` points at this Room's own `spawnTile` (#16 D3 deviation).
+ * `spawnTile` isn't any NPC's own interaction tile (#16 fix 4; see
+ * `reachability.test.ts`).
+ *
+ * #100: the 2026-09-25 design resync (PR #101) adds a real in-world hotspot
+ * after all -- a blinking floor arrow + "KITCHEN" label linking to
+ * `Kitchen.dc.html` -- so this Room now has exactly one door, to the Kitchen
+ * (`the-melt`), the first exit this Room has ever had.
  */
 export const roofDeck: RoomDefinition = {
   id: 'roof-deck',
@@ -52,7 +56,29 @@ export const roofDeck: RoomDefinition = {
   grid: createStandardRoomGrid(),
   walkable: WALKABLE,
   spawnTile: { col: 6, row: 2 },
-  doors: [],
+  doors: [
+    {
+      label: 'KITCHEN',
+      // Traced from `design/Room 05 Roof Deck.dc.html`'s new `<a
+      // href="Kitchen.dc.html">` group (#100): its `<g transform=
+      // "translate(125,122)">` wraps the arrow's two polygons (the #00BDFF
+      // arrow and its #0C4B5F drop-shadow, points 480-585 x 467.5-524 in
+      // local design px) and the "KITCHEN" label. This `rect` is the
+      // translated arrow+shadow bounding box only (480+125=605 .. 585+125=
+      // 710 x, 467.5+122=589.5 .. 524+122=646 y in Stage px, floored/ceiled
+      // outward to whole pixels), not the label -- matching this ticket's
+      // own execution-plan estimate ("roughly Stage 605-710 x 589-646").
+      hotspot: { x: 605, y: 589, width: 105, height: 57 },
+      targetRoomId: 'the-melt',
+      // The Kitchen tile next to its own "ROOF DECK" door (#100, the same
+      // rule `reachability.test.ts` uses for a door's approach tile): the
+      // nearest walkable tile, in the Kitchen's own grid, to that door's
+      // hotspot centre ({ x: 1290, y: 365, width: 70, height: 165 }, `the-
+      // melt.ts`) -- which floors/BFS-walks out to { col: 10, row: 0 }, a
+      // tile just off the Kitchen's own back counter.
+      entryTile: { col: 10, row: 0 },
+    },
+  ],
   npcSlots: [
     { npcId: 'kevin', tile: { col: 7, row: 2 } },
     // "Ann Marie": a first-plus-middle given name, kept in full (kebab-cased)
