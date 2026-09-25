@@ -69,6 +69,16 @@ export interface RoomDebugInfo {
   npcTalkedLog?: string[];
   /** `stallId` per `actions.openStall` call, oldest first (#36). */
   openStallLog?: string[];
+  /** Every NPC in the Room by npcId: where its feet are now, and whether it is walking its designed path (#113). */
+  npcs?: Record<string, NpcMotionDebugInfo>;
+}
+
+/** One NPC's motion state (#113). */
+export interface NpcMotionDebugInfo {
+  x: number;
+  y: number;
+  moving: boolean;
+  paused: boolean;
 }
 
 declare global {

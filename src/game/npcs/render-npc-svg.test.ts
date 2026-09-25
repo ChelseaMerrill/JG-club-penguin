@@ -7,7 +7,8 @@ import {
   PENGUIN_FRAME_WIDTH,
 } from '../penguin/render-svg';
 import { NPCS } from '../../npcs/npcs';
-import { renderNpcSvg, type HumanFigureSpec } from './render-npc-svg';
+import { getNpcMotion } from '../../npcs/npc-motions';
+import { renderNpcPropSvg, renderNpcSvg, type HumanFigureSpec } from './render-npc-svg';
 
 function assertValidSvg(svg: string): Document {
   const doc = new DOMParser().parseFromString(svg, 'image/svg+xml');
@@ -115,5 +116,19 @@ describe('renderNpcSvg', () => {
     for (const figure of humanFigures) {
       expect(renderNpcSvg(figure)).not.toContain('<text');
     }
+  });
+});
+
+describe('renderNpcPropSvg (#113)', () => {
+  it("draws a design prop layer in the figure's own padded frame, so it lines up with the figure", () => {
+    const rod = getNpcMotion('anthony')?.props?.[0];
+    if (!rod) throw new Error('expected Anthony to have a rod prop layer');
+    const doc = assertValidSvg(renderNpcPropSvg(rod.svg));
+    const svg = doc.querySelector('svg')!;
+    const figureSvg = assertValidSvg(renderNpcSvg(humanFigures[0])).querySelector('svg')!;
+    expect(svg.getAttribute('viewBox')).toBe(figureSvg.getAttribute('viewBox'));
+    expect(svg.getAttribute('width')).toBe(String(PENGUIN_FRAME_WIDTH));
+    expect(svg.getAttribute('height')).toBe(String(PENGUIN_FRAME_HEIGHT));
+    expect(doc.querySelector('path')?.getAttribute('d')).toBe('M92 96 L118 10');
   });
 });
