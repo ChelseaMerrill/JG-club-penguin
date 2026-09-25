@@ -182,4 +182,103 @@ describe('createMapScreen', () => {
     // No throw when a stale ui:open-map arrives after destroy.
     expect(() => openMap()).not.toThrow();
   });
+
+  describe('focus handling (aria-modal="true", #33 review round 1 fix 1)', () => {
+    it('focuses the current-Room tile on open', () => {
+      const { q } = setup('dev-pit');
+
+      openMap();
+
+      expect(document.activeElement).toBe(q('[data-map-room="dev-pit"]'));
+    });
+
+    it('focuses the close button on open when there is no current-Room tile', () => {
+      // Defensive branch: every real RoomId currently has a Map tile, so this
+      // forces the "no match" case with a value the type system would
+      // otherwise never let through.
+      const { q } = setup('not-a-real-room' as RoomId);
+
+      openMap();
+
+      expect(document.activeElement).toBe(q('.map-screen__close'));
+    });
+
+    it('restores focus to whatever had it before open(), if still connected, on every close path', () => {
+      const trigger = document.createElement('button');
+      document.body.append(trigger);
+      trigger.focus();
+
+      const { q } = setup();
+      openMap();
+      expect(document.activeElement).not.toBe(trigger);
+
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+      expect(document.activeElement).toBe(trigger);
+
+      trigger.focus();
+      openMap();
+      q<HTMLButtonElement>('.map-screen__close').click();
+      expect(document.activeElement).toBe(trigger);
+    });
+
+    it('does not try to refocus a previously-focused element that is no longer in the document', () => {
+      const trigger = document.createElement('button');
+      document.body.append(trigger);
+      trigger.focus();
+
+      setup();
+      openMap();
+      trigger.remove();
+
+      expect(() => {
+        window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+      }).not.toThrow();
+      expect(document.activeElement).not.toBe(trigger);
+    });
+
+    it('traps Tab inside the frame: Tab on the last focusable element wraps to the first (the close button)', () => {
+      const { root, q } = setup('dev-pit');
+      openMap();
+
+      const focusable = [...root.querySelectorAll<HTMLButtonElement>('.map-screen__frame button')];
+      const last = focusable[focusable.length - 1]!;
+      last.focus();
+
+      last.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true }),
+      );
+
+      expect(document.activeElement).toBe(q('.map-screen__close'));
+    });
+
+    it('traps Shift+Tab inside the frame: Shift+Tab on the close button wraps to the last tile', () => {
+      const { root, q } = setup('dev-pit');
+      openMap();
+
+      const closeButton = q<HTMLButtonElement>('.map-screen__close');
+      closeButton.focus();
+
+      closeButton.dispatchEvent(
+        new KeyboardEvent('keydown', {
+          key: 'Tab',
+          shiftKey: true,
+          bubbles: true,
+          cancelable: true,
+        }),
+      );
+
+      const focusable = [...root.querySelectorAll<HTMLButtonElement>('.map-screen__frame button')];
+      expect(document.activeElement).toBe(focusable[focusable.length - 1]);
+    });
+  });
+
+  it('after destroy(), a stale ui:open-map never opens the shared OverlayManager', () => {
+    const { mapScreen, overlays } = setup();
+
+    mapScreen.destroy();
+    currentMapScreen = undefined;
+    openMap();
+
+    expect(overlays.current()).toBeNull();
+  });
 });

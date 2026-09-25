@@ -126,15 +126,60 @@ export function createMapScreen(root: HTMLElement, options: MapScreenOptions): M
     }
   }
 
+  /** Whatever had focus right before `open()`, so `hide()` can put it back
+   *  regardless of which close path (Escape, close button, another overlay
+   *  opening, room:leave, or a tile click) fired -- following
+   *  `core-values-card.ts`'s modal-focus pattern (#77). */
+  let previouslyFocused: HTMLElement | null = null;
+
   function hide(): void {
     overlay.hidden = true;
+    // Only refocus an element still attached to the document: one removed
+    // (or replaced) while the Map was open would otherwise throw nothing,
+    // but `.focus()` on a detached element is also simply a no-op, so this
+    // guard exists to make that explicit rather than to avoid an error.
+    if (previouslyFocused?.isConnected) previouslyFocused.focus();
+    previouslyFocused = null;
   }
 
   function open(): void {
+    previouslyFocused =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
     overlay.hidden = false;
     const current = options.currentRoomId();
     if (current !== null) applyCurrent(current);
+    // Moves focus into the dialog (`aria-modal="true"` requires it): the
+    // current Room's own tile when there is one, or the close button
+    // otherwise (defensive -- every real RoomId currently has a tile).
+    const currentEntry = entries.find((entry) => entry.clickable && entry.tile.roomId === current);
+    (currentEntry?.tileButton ?? closeButton).focus();
   }
+
+  /** Every focusable element inside the dialog frame, in DOM/tab order (the close button, then each tile). */
+  function focusableElements(): HTMLElement[] {
+    return Array.from(frame.querySelectorAll<HTMLButtonElement>('button'));
+  }
+
+  /** Keeps Tab/Shift+Tab cycling inside the dialog frame while it's open (`aria-modal="true"`'s focus-trap requirement). */
+  function trapTab(event: KeyboardEvent): void {
+    if (event.key !== 'Tab') return;
+    const focusable = focusableElements();
+    if (focusable.length === 0) return;
+    const first = focusable[0]!;
+    const last = focusable[focusable.length - 1]!;
+    const active = document.activeElement;
+    if (event.shiftKey) {
+      if (active === first || !frame.contains(active)) {
+        event.preventDefault();
+        last.focus();
+      }
+    } else if (active === last || !frame.contains(active)) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
+  overlay.addEventListener('keydown', trapTab);
 
   const unsubscribeOpen = gameEvents.on('ui:open-map', () => {
     // D4: ignored while no Session is active yet (before the first `room:enter`).
@@ -154,6 +199,7 @@ export function createMapScreen(root: HTMLElement, options: MapScreenOptions): M
     destroy() {
       unsubscribeOpen();
       unsubscribeLeave();
+      overlay.removeEventListener('keydown', trapTab);
       overlay.remove();
     },
   };
