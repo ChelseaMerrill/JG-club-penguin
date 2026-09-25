@@ -1,5 +1,5 @@
 import { GameObjects, Textures, type Scene, type Time } from 'phaser';
-import { DEFAULT_FACING, UNNAMED_PENGUIN, type Facing, type PenguinLook } from '../../contracts';
+import { DEFAULT_FACING, type Facing, type PenguinLook } from '../../contracts';
 import { penguinLookHash } from './look-hash';
 import { PENGUIN_FRAME_MS, PENGUIN_FRAMES, type PenguinAnim } from './poses';
 import {
@@ -70,9 +70,21 @@ export interface PenguinInitialState {
 }
 
 /**
+ * The Penguin's name-tag text, or `null` to hide the tag (text and pill)
+ * entirely. An empty name is never shown as a placeholder in the World: it
+ * hides the tag rather than falling back to `UNNAMED_PENGUIN` (#75). Pure
+ * and exported so it's unit-testable without booting a Phaser scene.
+ */
+export function nameTagText(look: Pick<PenguinLook, 'name'>): string | null {
+  return look.name === '' ? null : look.name;
+}
+
+/**
  * Builds a Phaser container for `look` at world position `(x, y)`: the
  * animated figure sprite, anchored at its feet, plus a Libre Franklin
- * name-tag pill below it showing `look.name || UNNAMED_PENGUIN` (#31 D7).
+ * name-tag pill below it showing `look.name` (#31 D7). The tag is hidden
+ * entirely when the name is empty (`nameTagText` returns `null`): an unnamed
+ * Penguin never shows a placeholder in the World (#75).
  *
  * Registers `look`'s textures via `ensurePenguinTextures` and starts on
  * `PLACEHOLDER_TEXTURE_KEY` (Phaser's built-in placeholder texture, always
@@ -165,10 +177,19 @@ export function createPenguin(
   });
 
   function redrawNameTag(): void {
-    nameText.setText(currentLook.name || UNNAMED_PENGUIN);
+    const text = nameTagText(currentLook);
+    pill.clear();
+    if (text === null) {
+      nameText.setText('');
+      nameText.setVisible(false);
+      pill.setVisible(false);
+      return;
+    }
+    nameText.setVisible(true);
+    pill.setVisible(true);
+    nameText.setText(text);
     const width = nameText.width + NAME_TAG_PADDING_X * 2;
     const height = nameText.height + NAME_TAG_PADDING_Y * 2;
-    pill.clear();
     pill.fillStyle(NAME_TAG_BG, 1);
     pill.fillRoundedRect(-width / 2, NAME_TAG_GAP, width, height, height / 2);
   }

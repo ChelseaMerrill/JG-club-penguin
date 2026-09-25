@@ -15,7 +15,9 @@ import {
   sameColor,
   shuffleLook,
   toHexColor,
+  validatePenguinName,
   type ColorPart,
+  type PenguinNameValidation,
 } from '../penguin/look';
 import './penguin-creator.css';
 
@@ -72,6 +74,14 @@ function label(text: string, input?: HTMLInputElement): HTMLElement {
   const node = el('label', 'penguin-creator__label', text);
   node.htmlFor = input.id;
   return node;
+}
+
+/** The inline hint under the name field while the draft name is invalid; empty once it's valid (#75). */
+function nameHintMessage(validation: PenguinNameValidation): string {
+  if (validation.ok) return '';
+  return validation.reason === 'empty'
+    ? 'Give your Penguin a name to waddle in'
+    : 'Names are 1–16 characters';
 }
 
 function prefersReducedMotion(): boolean {
@@ -161,10 +171,15 @@ export function createPenguinCreator(
   nameInput.addEventListener('input', () => {
     if (!draft) return;
     draft = { ...draft, name: nameInput.value };
-    if (normalizeName(draft.name)) showError('');
     render();
   });
-  nameField.append(label('NAME', nameInput), nameInput);
+  nameInput.addEventListener('keydown', (event) => {
+    if (event.key !== 'Enter') return;
+    event.preventDefault();
+    submit();
+  });
+  const nameHintEl = el('p', 'penguin-creator__name-hint');
+  nameField.append(label('NAME', nameInput), nameInput, nameHintEl);
   const shuffleButton = button('penguin-creator__shuffle', 'SHUFFLE');
   shuffleButton.addEventListener('click', () => {
     if (!draft) return;
@@ -258,16 +273,16 @@ export function createPenguinCreator(
     render();
   }
 
+  /**
+   * WADDLE IN / Save (also reached via Enter in the name field): refuses an
+   * invalid name rather than relying on the button's `disabled` state alone,
+   * so Enter can never bypass the name gate (#75).
+   */
   function submit(): void {
     if (!draft || saving) return;
-    const name = normalizeName(draft.name);
-    if (!name) {
-      showError('Your Penguin needs a name.');
-      nameInput.focus();
-      return;
-    }
-    showError('');
-    callbacks.onSubmit({ ...draft, name });
+    const validation = validatePenguinName(draft.name);
+    if (!validation.ok) return;
+    callbacks.onSubmit({ ...draft, name: validation.name });
   }
 
   function markPressed(buttons: HTMLButtonElement[], selected: string): void {
@@ -305,6 +320,20 @@ export function createPenguinCreator(
 
   let animatedEmote: PenguinLook['emote'] | null = null;
 
+  /**
+   * WADDLE IN / Save stays disabled while the draft name is invalid, in both
+   * dismissible and non-dismissible mode: a HUD edit can't clear the name
+   * this way either (#75). Re-applied on every render and by `setSaving`, so
+   * `setSaving(false)` restores this rule instead of always re-enabling.
+   */
+  function applyNameValidity(): void {
+    const validation = draft
+      ? validatePenguinName(draft.name)
+      : ({ ok: false, reason: 'empty' } as const);
+    nameHintEl.textContent = nameHintMessage(validation);
+    submitButton.disabled = saving || !validation.ok;
+  }
+
   function render(): void {
     if (!draft) return;
     if (draft.emote !== animatedEmote) {
@@ -315,6 +344,7 @@ export function createPenguinCreator(
     renderFigure();
     nameplate.textContent = normalizeName(draft.name) || UNNAMED_PENGUIN;
     if (nameInput.value !== draft.name) nameInput.value = draft.name;
+    applyNameValidity();
 
     for (const { part, swatches, custom } of colorControls) {
       const current = draft[part];
@@ -337,9 +367,10 @@ export function createPenguinCreator(
 
   function setSaving(value: boolean): void {
     saving = value;
-    submitButton.disabled = value;
     cancelButton.disabled = value;
     submitButton.textContent = value ? 'SAVING…' : 'WADDLE IN →';
+    // Restores `disabled = !valid` rather than always clearing it (#75).
+    applyNameValidity();
   }
 
   function close(): void {
