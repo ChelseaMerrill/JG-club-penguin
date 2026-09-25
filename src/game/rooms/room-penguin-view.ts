@@ -1,10 +1,4 @@
-import {
-  UNNAMED_PENGUIN,
-  type Facing,
-  type PenguinLook,
-  type PresencePayload,
-  type Tile,
-} from '../../contracts';
+import { type Facing, type PenguinLook, type PresencePayload, type Tile } from '../../contracts';
 import type { RemotePenguinView } from '../../realtime/room-channel';
 import { maskName } from '../../ui/mask-names';
 import { facingForStep } from '../movement/controller';
@@ -30,6 +24,8 @@ export interface PlacedPenguin {
    * `step`, or a `moveTo`.
    */
   step(point: ScreenPoint, durationMs: number, depthAt: (t: number) => number): Promise<void>;
+  /** Shows a chat speech bubble above the Penguin, or clears it (`null`) (#44). */
+  say(text: string | null): void;
   destroy(): void;
 }
 
@@ -124,7 +120,11 @@ function lerpTile(from: Tile, to: Tile, t: number): Tile {
  * Penguin against the entered Room's grid origin. Calls made in between are
  * remembered and drawn on the next `attach()`.
  *
- * Name tags show `look.name || UNNAMED_PENGUIN`, masked under `?masknames`.
+ * A Penguin whose payload has an empty name is not drawn at all: an unnamed
+ * Penguin is never shown in the World (#75), not even with a placeholder.
+ * One that was already shown and goes nameless is removed the same way a
+ * `remove()` would. Name tags otherwise show `look.name`, masked under
+ * `?masknames`.
  *
  * #43: `walkTo(playerId, target)` walks a remote Penguin there tile by tile,
  * along the same path/pace #14's local walk uses, rather than snapping it
@@ -162,6 +162,17 @@ export class RoomPenguinView implements RemotePenguinView {
   private readonly settleTimers = new Map<string, number>();
   private readonly firstPlacedTile = new Map<string, Tile>();
   private readonly walkStartedAt = new Map<string, number>();
+
+  /**
+   * Notified with the real playerId whenever a Penguin that might have been
+   * showing a chat bubble is removed or re-placed *outside* `say`/`sayLocal`
+   * (`remove`/`clear`/a Room-change `detach`) (#44 review fix F1). Fired
+   * unconditionally on removal — harmless if that Penguin never had a bubble
+   * showing, since callers treat it as an idempotent clear — so a debug
+   * snapshot keyed off `say`/`sayLocal`'s own return value never lingers
+   * stale for a Penguin that's since gone.
+   */
+  onBubbleChange: ((playerId: string, text: string | null) => void) | null = null;
 
   constructor(options: RoomPenguinViewOptions = {}) {
     this.search = options.search ?? window.location.search;
@@ -209,6 +220,7 @@ export class RoomPenguinView implements RemotePenguinView {
     this.walks.clear();
     for (const playerId of [...this.settleTimers.keys()]) this.clearSettleTimer(playerId);
     this.attachment = null;
+    for (const key of this.placed.keys()) this.notifyBubbleCleared(key);
     this.placed.clear();
     this.firstPlacedTile.clear();
   }
@@ -216,6 +228,11 @@ export class RoomPenguinView implements RemotePenguinView {
   /** Adds or, for an already-shown `playerId`, updates in place (never a second Penguin). */
   upsert(p: PresencePayload): void {
     const key = p.playerId;
+    // An unnamed Penguin is never drawn (#75), exactly as `show()` rules.
+    if (!p.look.name) {
+      this.hide(key);
+      return;
+    }
     const known = this.payloads.has(key);
     this.payloads.set(key, p);
     if (!known) {
@@ -458,7 +475,35 @@ export class RoomPenguinView implements RemotePenguinView {
     return false;
   }
 
+  /**
+   * Shows (or clears, given `null`) a chat speech bubble above a remote
+   * Penguin (#44). No-op for a Player not currently shown. Returns whether a
+   * placed Penguin actually received the call (#44 review fix F1): the
+   * source of truth for a debug snapshot of bubbles actually rendered,
+   * rather than merely requested.
+   */
+  say(playerId: string, text: string | null): boolean {
+    return this.sayAt(playerId, text);
+  }
+
+  /** Shows (or clears, given `null`) a chat speech bubble above the local Penguin (#44). No-op (returns `false`) while it isn't shown. */
+  sayLocal(text: string | null): boolean {
+    return this.sayAt(LOCAL_KEY, text);
+  }
+
+  private sayAt(key: PenguinKey, text: string | null): boolean {
+    const placed = this.placed.get(key);
+    if (!placed) return false;
+    placed.say(text);
+    return true;
+  }
+
+  /** The raw, unmasked name decides whether to draw at all (#75); masking only affects the tag text. */
   private show(key: PenguinKey, p: PresencePayload): void {
+    if (!p.look.name) {
+      this.hide(key);
+      return;
+    }
     this.payloads.set(key, p);
     this.render(key);
   }
@@ -491,12 +536,13 @@ export class RoomPenguinView implements RemotePenguinView {
     }
   }
 
-  /** #31's name tag shows `look.name || UNNAMED_PENGUIN`; mask at its input. */
+  /** #31's name tag shows `look.name` (never drawn empty; see `show()`); mask at its input. */
   private tagged(look: PenguinLook): PenguinLook {
-    return { ...look, name: maskName(look.name || UNNAMED_PENGUIN, this.search) };
+    return { ...look, name: maskName(look.name, this.search) };
   }
 
   private hide(key: PenguinKey): void {
+    this.notifyBubbleCleared(key);
     if (isPlayerKey(key)) {
       this.walks.delete(key);
       this.shownTile.delete(key);
@@ -529,5 +575,11 @@ export class RoomPenguinView implements RemotePenguinView {
       });
     }
     return result;
+  }
+
+  /** Calls `onBubbleChange(playerId, null)` for `key`, if it has a real playerId and is currently placed. */
+  private notifyBubbleCleared(key: PenguinKey): void {
+    const playerId = this.payloads.get(key)?.playerId;
+    if (playerId) this.onBubbleChange?.(playerId, null);
   }
 }

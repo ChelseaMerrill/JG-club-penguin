@@ -1,0 +1,103 @@
+/* Bug Squash's play-area content (#38): the build-light row and the 16-cell
+   grid, reproducing design/Minigame Bug Squash.dc.html's `cells`/`lights`
+   inside the shared minigame shell's `.minigame__play-area` (#37). Sizes are
+   Stage pixels (the #ui layer is 1600x900 and already scaled). Uses the JG
+   design tokens from src/style.css; never redeclares them. */
+
+.bug-squash {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  width: 100%;
+  height: 100%;
+}
+
+.bug-squash__lights {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.bug-squash__light {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--jg-dark-inlay);
+  border: 2px solid var(--jg-secondary);
+}
+
+.bug-squash__light--lit {
+  background: var(--jg-primary);
+}
+
+.bug-squash__grid {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  grid-auto-rows: 1fr;
+  gap: 10px;
+}
+
+.bug-squash__cell {
+  position: relative;
+  min-height: 90px;
+  padding: 0;
+  background: var(--bg-page);
+  border: 2px solid var(--jg-secondary);
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.bug-squash__cell--cyan {
+  border-color: var(--jg-primary);
+}
+
+.bug-squash__cell--flaky {
+  border-color: var(--jg-light);
+}
+
+.bug-squash__cell:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 3px var(--jg-light);
+}
+
+.bug-squash__cell-key {
+  position: absolute;
+  top: 8px;
+  left: 10px;
+  font: 400 11px var(--font-display);
+  letter-spacing: 0.1em;
+  color: var(--jg-dark-2);
+}
+
+.bug-squash__cell-line {
+  position: absolute;
+  bottom: 8px;
+  left: 10px;
+  right: 10px;
+  font:
+    400 12px ui-monospace,
+    monospace;
+  color: var(--fg-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bug-squash__bug {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--jg-primary);
+  border: 2px solid var(--jg-secondary);
+}
+
+.bug-squash__cell--flaky .bug-squash__bug {
+  background: var(--jg-light);
+}
+
+.bug-squash__bug[hidden] {
+  display: none;
+}

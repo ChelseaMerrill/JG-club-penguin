@@ -65,10 +65,11 @@ function toDisplayName(user: AuthUserLike): string {
 }
 
 /**
- * Until #27 adds the other look columns, only `penguin_color` exists in
- * `public.players`; every other `PenguinLook` field falls back to
- * `DEFAULT_LOOK`, including `name` (never seeded from the Google display
- * name: `players` must not duplicate Google identity).
+ * Only `penguin_color` is read here; every other `PenguinLook` field falls
+ * back to `DEFAULT_LOOK`, including `name` (never seeded from the Google
+ * display name: `players` must not duplicate Google identity). The full
+ * saved look (name and every other field) is loaded by #34's progress
+ * session right after sign-in.
  */
 function toLook(row: PlayerRow): PenguinLook {
   return {
