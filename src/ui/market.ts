@@ -80,7 +80,12 @@ const ITEM_ICON_BUILDERS: Record<string, (icon: HTMLElement) => void> = {
   'arcade-cabinet': (icon) => icon.append(el('div', 'market__icon-cabinet')),
 };
 
-function buildIcon(artKey: string): HTMLElement {
+/**
+ * Exported so the Igloo's slot picker (#41) can list owned items with the
+ * same flat DOM art the Market itself uses, rather than inventing a second
+ * icon set; this function's own behaviour is unchanged.
+ */
+export function buildIcon(artKey: string): HTMLElement {
   const icon = el('div', 'market__item-icon');
   icon.dataset.artKey = artKey;
   const buildParts = ITEM_ICON_BUILDERS[artKey];

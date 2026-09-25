@@ -9,7 +9,12 @@ import {
 } from '../../contracts';
 import { getRoomDefinition } from './registry';
 import type { RoomDoor } from './room-definition';
-import { createRoomNavigator, type RoomNavigator, type RoomNavigatorScene } from './room-navigator';
+import {
+  createRoomNavigator,
+  type RoomNavigator,
+  type RoomNavigatorScene,
+  type RoomTransitionScreen,
+} from './room-navigator';
 
 type LoggedEvent =
   { type: 'leave'; roomId: RoomId } | { type: 'enter'; roomId: RoomId; entryTile: Tile };
@@ -339,6 +344,229 @@ describe('createRoomNavigator', () => {
         { type: 'leave', roomId: 'dev-pit' }, // leaveForSignOut's leave (current was optimistically 'dev-pit')
       ]);
       expect(navigator.currentRoomId()).toBeNull();
+    });
+  });
+
+  describe('transitionScreen (#52)', () => {
+    type TransitionCall =
+      { type: 'begin'; from: RoomId; to: RoomId } | { type: 'ready' } | { type: 'cancel' };
+
+    function createFakeTransitionScreen(): RoomTransitionScreen & { calls: TransitionCall[] } {
+      const calls: TransitionCall[] = [];
+      return {
+        calls,
+        begin: (from, to) => calls.push({ type: 'begin', from, to }),
+        ready: () => calls.push({ type: 'ready' }),
+        cancel: () => calls.push({ type: 'cancel' }),
+      };
+    }
+
+    function beginCalls(calls: TransitionCall[]): TransitionCall[] {
+      return calls.filter((call) => call.type === 'begin');
+    }
+
+    it('never calls begin for a same-floor changeRoom (town-center -> dev-pit, both floor 5)', async () => {
+      const transitionScreen = createFakeTransitionScreen();
+      const events = createEmitter<RoomEventMap>();
+      const scene = createFakeScene();
+      const navigator = createRoomNavigator({
+        scene,
+        events,
+        hasPlayer: () => true,
+        transitionScreen,
+      });
+      await boot(scene, navigator);
+
+      const p = navigator.changeRoom('dev-pit', { col: 1, row: 2 });
+      scene.fireCreate();
+      await p;
+
+      expect(beginCalls(transitionScreen.calls)).toEqual([]);
+    });
+
+    it('never calls begin toward or from a Room with no floor (the Igloo)', async () => {
+      const transitionScreen = createFakeTransitionScreen();
+      const events = createEmitter<RoomEventMap>();
+      const scene = createFakeScene();
+      const navigator = createRoomNavigator({
+        scene,
+        events,
+        hasPlayer: () => true,
+        transitionScreen,
+      });
+      await boot(scene, navigator);
+
+      const p = navigator.changeRoom('igloo');
+      scene.fireCreate();
+      await p;
+
+      expect(beginCalls(transitionScreen.calls)).toEqual([]);
+    });
+
+    it('never calls begin for enterSpawnRoom (no "from" floor to leave)', async () => {
+      const transitionScreen = createFakeTransitionScreen();
+      const events = createEmitter<RoomEventMap>();
+      const scene = createFakeScene();
+      const navigator = createRoomNavigator({
+        scene,
+        events,
+        hasPlayer: () => true,
+        transitionScreen,
+      });
+
+      await boot(scene, navigator);
+
+      expect(beginCalls(transitionScreen.calls)).toEqual([]);
+    });
+
+    it('never calls begin for a dropped changeRoom (a transition already in flight)', async () => {
+      const transitionScreen = createFakeTransitionScreen();
+      const events = createEmitter<RoomEventMap>();
+      const scene = createFakeScene();
+      const navigator = createRoomNavigator({
+        scene,
+        events,
+        hasPlayer: () => true,
+        transitionScreen,
+      });
+      await boot(scene, navigator);
+
+      const p1 = navigator.changeRoom('dev-pit', { col: 1, row: 2 });
+      // Dropped outright (transitionInFlight): a real floor crossing that,
+      // if it ran at all, would otherwise call begin.
+      const p2 = navigator.changeRoom('roof-deck');
+      scene.fireCreate();
+      await Promise.all([p1, p2]);
+
+      expect(beginCalls(transitionScreen.calls)).toEqual([]);
+    });
+
+    it('calls begin after room:leave and before showRoom for a floor-crossing changeRoom, then ready() once the restart resolves', async () => {
+      const order: string[] = [];
+      const events = createEmitter<RoomEventMap>();
+      events.on('room:leave', () => order.push('room:leave'));
+      events.on('room:enter', () => order.push('room:enter'));
+      const scene = createFakeScene();
+      const realShowRoom = scene.showRoom;
+      scene.showRoom = vi.fn((roomId: RoomId, entryTile?: Tile, force?: boolean) => {
+        order.push('showRoom');
+        return realShowRoom(roomId, entryTile, force);
+      });
+      const transitionScreen: RoomTransitionScreen = {
+        begin: (from, to) => order.push(`begin:${from}->${to}`),
+        ready: () => order.push('ready'),
+        cancel: () => order.push('cancel'),
+      };
+      const navigator = createRoomNavigator({
+        scene,
+        events,
+        hasPlayer: () => true,
+        transitionScreen,
+      });
+      await boot(scene, navigator);
+      order.length = 0;
+
+      const p = navigator.changeRoom('roof-deck');
+      scene.fireCreate();
+      await p;
+
+      expect(order).toEqual([
+        'room:leave',
+        'begin:town-center->roof-deck',
+        'showRoom',
+        'ready',
+        'room:enter',
+      ]);
+    });
+
+    it('enterSpawnRoom calls cancel() first, so a stale transition can never leave the overlay stuck (#52 review MINOR)', async () => {
+      const transitionScreen = createFakeTransitionScreen();
+      const events = createEmitter<RoomEventMap>();
+      const scene = createFakeScene();
+      const navigator = createRoomNavigator({
+        scene,
+        events,
+        hasPlayer: () => true,
+        transitionScreen,
+      });
+
+      await boot(scene, navigator);
+
+      expect(transitionScreen.calls[0]).toEqual({ type: 'cancel' });
+    });
+
+    it('when showRoom returns false, ready() fires immediately, before room:enter, without waiting for whenNextReady (#52 review)', async () => {
+      const order: string[] = [];
+      const events = createEmitter<RoomEventMap>();
+      events.on('room:leave', () => order.push('room:leave'));
+      events.on('room:enter', () => order.push('room:enter'));
+      const transitionScreen: RoomTransitionScreen = {
+        begin: (from, to) => order.push(`begin:${from}->${to}`),
+        ready: () => order.push('ready'),
+        cancel: () => order.push('cancel'),
+      };
+      const scene: RoomNavigatorScene = {
+        showRoom: () => false,
+        // Never resolves: proves `enterRoom` never awaits it when `showRoom`
+        // reports `switched: false`.
+        whenNextReady: () => new Promise<void>(() => {}),
+        onDoorReached: () => {},
+        showComingSoonHint: () => {},
+      };
+      const navigator = createRoomNavigator({
+        scene,
+        events,
+        hasPlayer: () => true,
+        transitionScreen,
+      });
+      await navigator.enterSpawnRoom(); // showRoom() false here too, so this also resolves at once
+      order.length = 0;
+
+      await navigator.changeRoom('roof-deck');
+
+      expect(order).toEqual(['room:leave', 'begin:town-center->roof-deck', 'ready', 'room:enter']);
+    });
+
+    it('leaveForSignOut calls cancel()', async () => {
+      const transitionScreen = createFakeTransitionScreen();
+      const events = createEmitter<RoomEventMap>();
+      const scene = createFakeScene();
+      const navigator = createRoomNavigator({
+        scene,
+        events,
+        hasPlayer: () => true,
+        transitionScreen,
+      });
+      await boot(scene, navigator);
+
+      navigator.leaveForSignOut();
+
+      expect(transitionScreen.calls).toContainEqual({ type: 'cancel' });
+    });
+
+    it('a stale token (sign-out mid-transition) skips ready()', async () => {
+      const transitionScreen = createFakeTransitionScreen();
+      const events = createEmitter<RoomEventMap>();
+      const scene = createFakeScene();
+      const navigator = createRoomNavigator({
+        scene,
+        events,
+        hasPlayer: () => true,
+        transitionScreen,
+      });
+      await boot(scene, navigator);
+      transitionScreen.calls.length = 0;
+
+      const p = navigator.changeRoom('roof-deck'); // begins the screen; restart still pending
+      navigator.leaveForSignOut(); // interrupts before the restart's ready signal fires
+
+      scene.fireCreate(); // the pending restart finally "completes"
+      await p;
+
+      expect(transitionScreen.calls).toEqual([
+        { type: 'begin', from: 'town-center', to: 'roof-deck' },
+        { type: 'cancel' },
+      ]);
     });
   });
 });

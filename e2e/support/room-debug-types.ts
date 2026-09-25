@@ -63,6 +63,8 @@ export interface RoomDebugInfo {
   comingSoonHint?: string | null;
   changeRoom?: (roomId: RoomId) => void;
   roomEventLog?: RoomDebugEventLogEntry[];
+  /** The Igloo's current Furniture layout (#41): item id per slot id, `null` when empty; `undefined` for a Room with no `furnitureSlots`. */
+  furniture?: Record<string, string | null>;
   /** `npcId` per `npc:talked` emission, oldest first (#36). */
   npcTalkedLog?: string[];
   /** `stallId` per `actions.openStall` call, oldest first (#36). */

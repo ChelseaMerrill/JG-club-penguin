@@ -31,7 +31,7 @@ describe('NPCS', () => {
     }
   });
 
-  it('covers every npcSlot exactly once across the five prototype Rooms (no duplicate npcId)', () => {
+  it('covers every npcSlot exactly once across every Room (no duplicate npcId)', () => {
     const allSlotIds = ROOM_DEFINITIONS.flatMap((room) => room.npcSlots.map((slot) => slot.npcId));
     const uniqueSlotIds = new Set(allSlotIds);
     expect(allSlotIds).toHaveLength(uniqueSlotIds.size);
@@ -183,6 +183,78 @@ describe('NPCS', () => {
       { text: 'Is this decaf? Be honest.', periodS: 15, delayS: -2 },
       { text: 'Snack drawer is a lie.', periodS: 15, delayS: -9 },
     ]);
+  });
+
+  it("gives the Icebox's five NPCs the sheet's names/titles, first-name tags and the design's own say-cycles (#51)", () => {
+    // Names/titles from design/Characters.dc.html's cards (Millie is on its
+    // TITLE TBD list); tags, lines and timing from design/Room 03 The
+    // Icebox.dc.html's own nameplates and `animation:say` bubbles. Millie and
+    // Darrin already have a slot in another Room, so their Icebox appearance
+    // is its own suffixed NpcId (an NPC lives in exactly one Room); Jason has
+    // no slot elsewhere, so the Icebox gets his bare id, `jason` (see
+    // `npcs.ts`'s own `NpcId` union comment).
+    expect(NPCS['millie-icebox']).toMatchObject({
+      name: 'Millie Elliott',
+      title: null,
+      roomId: 'the-icebox',
+      tagName: 'Millie',
+      idleLines: [
+        { text: 'Team lead question: who owns this?', periodS: 26, delayS: -3 },
+        { text: 'Standup was 4 minutes. Record.', periodS: 26, delayS: -12 },
+        { text: 'Trivia time. Door stays shut.', periodS: 26, delayS: -20 },
+      ],
+    });
+    expect(NPCS.nicole).toMatchObject({
+      name: 'Nicole Roberts',
+      title: 'Account Manager',
+      roomId: 'the-icebox',
+      tagName: 'Nicole',
+      dialogLine: "The client loved it. Next one's at 2.",
+      idleLines: [
+        { text: 'Client call in 5. Shh.', periodS: 15, delayS: -2 },
+        { text: 'Account manager mode: on.', periodS: 15, delayS: -7 },
+        { text: 'Nope, that is billable.', periodS: 15, delayS: -12 },
+      ],
+    });
+    expect(NPCS.jason).toMatchObject({
+      name: 'Jason Jahnel',
+      title: 'COO',
+      roomId: 'the-icebox',
+      tagName: 'Jason',
+      dialogLine: 'Answer three and you may pass.',
+      idleLines: [
+        { text: 'Stairs challenge. You are behind.', periodS: 26, delayS: -1 },
+        { text: 'Three questions and you may pass.', periodS: 26, delayS: -10 },
+        { text: 'Kickoff in 4:32. Sit.', periodS: 26, delayS: -18 },
+      ],
+    });
+    expect(NPCS.jethro).toMatchObject({
+      name: 'Jethro Breuer',
+      title: 'Director of Digital Media',
+      roomId: 'the-icebox',
+      tagName: 'Jethro',
+      dialogLine: "Act natural. Camera's rolling.",
+      idleLines: [
+        { text: 'Act natural. Camera is rolling.', periodS: 21, delayS: -2 },
+        { text: 'One more for the recap.', periodS: 21, delayS: -9 },
+        { text: 'Say hackathon!', periodS: 21, delayS: -16 },
+      ],
+    });
+    expect(NPCS['darrin-icebox']).toMatchObject({
+      name: 'Darrin Jahnel',
+      title: 'Founder & CEO',
+      roomId: 'the-icebox',
+      tagName: 'Darrin',
+      dialogLine: 'Show me energy.',
+      idleLines: [
+        { text: 'Show me energy.', periodS: 15, delayS: -1 },
+        { text: 'Serve. Grind. Grow. Inspire.', periodS: 15, delayS: -6 },
+        { text: 'Who is demoing first?', periodS: 15, delayS: -11 },
+      ],
+    });
+    for (const id of ['millie-icebox', 'nicole', 'jason', 'jethro', 'darrin-icebox'] as const) {
+      expect(NPCS[id].dialog, `${id}'s dialog`).toEqual({ kind: 'line' });
+    }
   });
 
   it('gives Front Desk a single static (periodS: 0) idle line', () => {

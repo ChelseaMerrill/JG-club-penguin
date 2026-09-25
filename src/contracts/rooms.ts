@@ -1,7 +1,14 @@
 /**
  * Defined here. Consumers: #13 (Room data), #15, #28, #33.
  */
-export const ROOM_IDS = ['town-center', 'dev-pit', 'the-melt', 'roof-deck', 'igloo'] as const;
+export const ROOM_IDS = [
+  'town-center',
+  'dev-pit',
+  'the-melt',
+  'roof-deck',
+  'igloo',
+  'the-icebox',
+] as const;
 
 /**
  * Defined here. Consumers: #13 (Room data), #15, #28, #33.
