@@ -2,8 +2,8 @@ import { ACCENT, EYE_PUPIL, EYE_WHITE, STROKE } from './palette';
 
 /**
  * WCAG 1.4.11 non-text contrast threshold (#79 D1). Every rule in
- * `resolvePenguinColors` (`colors.ts`) fixes a part when its ratio against
- * the surface it sits on falls below this.
+ * `resolvePenguinColors` (`render-svg.ts`) fixes a part when its ratio
+ * against the surface it sits on falls below this.
  */
 export const MIN_CONTRAST = 3;
 
@@ -15,6 +15,15 @@ function hexToChannels(hex: string): [number, number, number] {
     parseInt(clean.slice(2, 4), 16),
     parseInt(clean.slice(4, 6), 16),
   ];
+}
+
+/** Encodes 0-255 channels (rounded, clamped) back to a `#rrggbb` string. */
+function channelsToHex(r: number, g: number, b: number): string {
+  const toByte = (n: number) =>
+    Math.max(0, Math.min(255, Math.round(n)))
+      .toString(16)
+      .padStart(2, '0');
+  return `#${toByte(r)}${toByte(g)}${toByte(b)}`;
 }
 
 /** WCAG 2.x sRGB -> linear-light channel transform, 0.03928 threshold. */
@@ -43,7 +52,14 @@ export function contrastRatio(a: string, b: string): number {
   return (lighter + 0.05) / (darker + 0.05);
 }
 
-function reachesMinContrastAgainstAll(color: string, surfaces: readonly string[]): boolean {
+/**
+ * Whether `color` reaches `MIN_CONTRAST` against every surface in
+ * `surfaces`. The single helper every #79 rule (and `pickContrasting`
+ * itself) uses to decide whether a part needs fixing -- exported so
+ * `resolvePenguinColors` doesn't keep its own duplicate (#79 review round 1
+ * nit 6).
+ */
+export function reachesMinContrast(color: string, surfaces: readonly string[]): boolean {
   return surfaces.every((surface) => contrastRatio(color, surface) >= MIN_CONTRAST);
 }
 
@@ -58,14 +74,62 @@ export function pickContrasting(
   surfaces: readonly string[],
   candidates: readonly string[] = [STROKE, ACCENT, EYE_WHITE, EYE_PUPIL],
 ): string {
-  if (reachesMinContrastAgainstAll(preferred, surfaces)) return preferred;
+  if (reachesMinContrast(preferred, surfaces)) return preferred;
 
   for (const candidate of candidates) {
-    if (reachesMinContrastAgainstAll(candidate, surfaces)) return candidate;
+    if (reachesMinContrast(candidate, surfaces)) return candidate;
   }
 
   const worstCase = (color: string): number =>
     Math.min(...surfaces.map((surface) => contrastRatio(color, surface)));
+
+  return candidates.reduce((best, candidate) =>
+    worstCase(candidate) > worstCase(best) ? candidate : best,
+  );
+}
+
+/**
+ * Standard sRGB-space alpha compositing of `fg` over `bg` at `alpha`
+ * (0-1) -- the same maths a browser uses to paint an SVG element with
+ * `opacity` over whatever sits behind it. Used to check the *on-screen*
+ * colour of a part painted at reduced opacity, not its raw attribute value
+ * (#79 review round 1 nit 1: the HEX/STRIPES belly pattern is drawn at
+ * `opacity=".55"`, so its drawn colour is this blend, not the ink itself).
+ */
+export function blend(fg: string, bg: string, alpha: number): string {
+  const [fr, fg2, fb] = hexToChannels(fg);
+  const [br, bg2, bb] = hexToChannels(bg);
+  return channelsToHex(
+    fr * alpha + br * (1 - alpha),
+    fg2 * alpha + bg2 * (1 - alpha),
+    fb * alpha + bb * (1 - alpha),
+  );
+}
+
+/**
+ * Like `pickContrasting`, but for a colour that will be painted at `alpha`
+ * opacity over a single `surface`: the pass/fail check uses the *blended*,
+ * on-screen colour (`blend(candidate, surface, alpha)`) against `surface`,
+ * but the function returns the unblended candidate itself, so the caller
+ * still paints the raw colour at `alpha` and lets the renderer's own
+ * compositing reproduce the checked blend (#79 review round 1 nit 1).
+ */
+export function pickContrastingOverlay(
+  preferred: string,
+  surface: string,
+  alpha: number,
+  candidates: readonly string[] = [STROKE, ACCENT, EYE_WHITE, EYE_PUPIL],
+): string {
+  const passes = (color: string): boolean =>
+    contrastRatio(blend(color, surface, alpha), surface) >= MIN_CONTRAST;
+
+  if (passes(preferred)) return preferred;
+
+  for (const candidate of candidates) {
+    if (passes(candidate)) return candidate;
+  }
+
+  const worstCase = (color: string): number => contrastRatio(blend(color, surface, alpha), surface);
 
   return candidates.reduce((best, candidate) =>
     worstCase(candidate) > worstCase(best) ? candidate : best,

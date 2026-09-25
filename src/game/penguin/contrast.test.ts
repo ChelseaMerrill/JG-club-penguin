@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { contrastRatio, MIN_CONTRAST, pickContrasting, relativeLuminance } from './contrast';
+import {
+  blend,
+  contrastRatio,
+  MIN_CONTRAST,
+  pickContrasting,
+  pickContrastingOverlay,
+  reachesMinContrast,
+  relativeLuminance,
+} from './contrast';
 import { ACCENT, EYE_PUPIL, EYE_WHITE, STROKE } from './palette';
 
 describe('relativeLuminance / contrastRatio (WCAG 2.x, #79 D1)', () => {
@@ -26,6 +34,10 @@ describe('relativeLuminance / contrastRatio (WCAG 2.x, #79 D1)', () => {
     // linear with the 0.03928 threshold, luminance-weighted 0.2126/0.7152/
     // 0.0722, ratio (lighter+0.05)/(darker+0.05).
     expect(contrastRatio('#0C4B5F', '#F4F4F4')).toBeCloseTo(8.7, 1);
+  });
+
+  it('a second published WCAG pair: #767676 vs #FFFFFF is about 4.54 (a commonly cited "passes AA-large, fails AA-normal" example)', () => {
+    expect(contrastRatio('#767676', '#FFFFFF')).toBeCloseTo(4.54, 2);
   });
 
   it('accepts lower-case and upper-case hex input identically', () => {
@@ -84,5 +96,47 @@ describe('pickContrasting', () => {
     const bestPossible = Math.max(...candidates.map((candidate) => worstCase(candidate)));
 
     expect(worstCase(result)).toBeCloseTo(bestPossible, 10);
+  });
+});
+
+describe('reachesMinContrast', () => {
+  it('is true only when every surface clears MIN_CONTRAST', () => {
+    expect(reachesMinContrast('#000000', ['#FFFFFF'])).toBe(true);
+    expect(reachesMinContrast('#000000', ['#FFFFFF', '#0C4B5F'])).toBe(false);
+  });
+});
+
+describe('blend (#79 review round 1 nit 1)', () => {
+  it('returns the background unchanged at alpha 0, and the foreground unchanged at alpha 1', () => {
+    expect(blend('#0C4B5F', '#F4F4F4', 0)).toBe('#f4f4f4');
+    expect(blend('#0C4B5F', '#F4F4F4', 1)).toBe('#0c4b5f');
+  });
+
+  it('is the midpoint of each channel at alpha 0.5', () => {
+    // #000000 over #FFFFFF at 50% is a mid-grey, independently computed
+    // per channel: round((0*0.5) + (255*0.5)) = 128 = 0x80.
+    expect(blend('#000000', '#FFFFFF', 0.5)).toBe('#808080');
+  });
+});
+
+describe('pickContrastingOverlay (#79 review round 1 nit 1)', () => {
+  it('keeps the preferred colour when its blended, on-screen colour already reaches 3:1', () => {
+    // A near-black preferred colour painted at .55 over a light surface is
+    // still dark enough on screen to clear 3:1 against that surface.
+    expect(pickContrastingOverlay('#161719', '#F4F4F4', 0.55)).toBe('#161719');
+  });
+
+  it('falls back when the blended colour does not reach 3:1, even though the raw colour would', () => {
+    // #0C4B5F (STROKE) reaches ~8.7:1 raw against #F4F4F4, but blended at
+    // .55 (the HEX/STRIPES belly pattern's own opacity) it only reaches
+    // ~2.85:1 -- below MIN_CONTRAST -- so this must not return the preferred
+    // colour unmodified.
+    const belly = '#F4F4F4';
+    const result = pickContrastingOverlay('#0C4B5F', belly, 0.55);
+
+    expect(contrastRatio('#0C4B5F', belly)).toBeGreaterThanOrEqual(MIN_CONTRAST);
+    expect(contrastRatio(blend('#0C4B5F', belly, 0.55), belly)).toBeLessThan(MIN_CONTRAST);
+    expect(result).not.toBe('#0C4B5F');
+    expect(contrastRatio(blend(result, belly, 0.55), belly)).toBeGreaterThanOrEqual(MIN_CONTRAST);
   });
 });
