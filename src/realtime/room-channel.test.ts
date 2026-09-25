@@ -1050,6 +1050,12 @@ describe('parsePresencePayload', () => {
     expect(result?.look.name).toBe('Ada');
   });
 
+  it('counts code points rather than UTF-16 units, so 9 penguin emoji survive (review round 1)', () => {
+    const name = '\uD83D\uDC27'.repeat(9);
+    const result = parsePresencePayload(meta('other', { look: { ...DEFAULT_LOOK, name } }));
+    expect(result?.look.name).toBe(name);
+  });
+
   it('rejects a facing that is not left or right', () => {
     expect(parsePresencePayload(meta('other', { facing: 's' }))).toBeNull();
     expect(parsePresencePayload(meta('other', { facing: 'right' }))).not.toBeNull();

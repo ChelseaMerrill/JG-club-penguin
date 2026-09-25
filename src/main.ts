@@ -368,7 +368,7 @@ const penguinEditor = createPenguinEditor({
 });
 
 // After `penguinEditor` exists; see the note on `devHudActive` above.
-const devCreatorActive = initDevCreatorHook(penguinEditor);
+const devCreatorActive = initDevCreatorHook(penguinEditor, progressStore);
 const devHookActive = devHudActive || devMinigameActive || devCreatorActive;
 
 gameEvents.on('ui:open-creator', () => {
@@ -381,8 +381,15 @@ const auth = startAuth({
     // A repeat sign-in event for the same Player keeps the Session and the
     // look already loaded for it.
     if (currentPlayer?.id === player.id) return;
-    // A different Player while a Session exists: leave it first.
-    const previous = currentPlayer ? endSession() : null;
+    // A different Player while a Session exists: leave it first, and take
+    // down the previous Player's HUD rather than leaving it showing over the
+    // next Player's sign-in gate (#75 review round 1).
+    const isAccountSwitch = currentPlayer !== null;
+    const previous = isAccountSwitch ? endSession() : null;
+    if (isAccountSwitch) {
+      hud.overlays.close(MINIGAME_OVERLAY_ID);
+      hud.hide();
+    }
     currentPlayer = player;
     // `room:enter` fires only after `registry.player` is set.
     bindPlayer(game.registry, player);
@@ -397,7 +404,13 @@ const auth = startAuth({
       }),
     );
     if (devHookActive) {
-      void startSession(player, previous);
+      // #75 review round 1: `player.look.name` is always '' here (a real
+      // sign-in's look only ever gains a name later, once progress loads
+      // through `penguinEditor`), so a Session can never legitimately start
+      // on this path for a real sign-in. Hook mode (`?hud`, `?minigame`,
+      // `?creator`) never exercises real auth in e2e, so this is a no-op in
+      // practice; it's kept only so a real `SIGNED_IN` doesn't slip an
+      // unnamed Player into a Session.
       return;
     }
     overlay.showSignedIn();
