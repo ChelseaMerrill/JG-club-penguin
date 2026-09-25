@@ -10,6 +10,7 @@ import { ProgressStoreError, type ProgressStore } from '../persistence/progress-
 import type { OverlayManager } from '../ui/hud/overlay-manager';
 import { badgeDisplayName } from './badge-names';
 import { setMinigameOpen } from './is-minigame-open';
+import { mountMinigameLeaderboard } from './minigame-leaderboard';
 import type { Minigame, MinigameContext } from './minigame';
 
 /** The id `createMinigameShell` registers with `hud.overlays`, so only one
@@ -257,12 +258,27 @@ export function createMinigameShell<K extends MinigameId>(deps: MinigameShellDep
   doneError.className = 'minigame__done-error';
   doneError.hidden = true;
 
+  // #70: the leaderboard panel mounts into this container, between the
+  // Badge/error rows and the actions row (D7). Empty until `finishRound`
+  // mounts it, after the save try/catch below settles (R4).
+  const doneLeaderboard = document.createElement('div');
+  doneLeaderboard.className = 'minigame__done-leaderboard';
+
   const doneActions = document.createElement('div');
   doneActions.className = 'minigame__done-actions';
   const doneQuitButton = hexagonButton('quit', `QUIT TO ${deps.roomTitle}`);
   doneActions.append(doneQuitButton);
 
-  doneEl.append(doneKicker, doneTitle, doneStats, doneSavingEl, doneBadge, doneError, doneActions);
+  doneEl.append(
+    doneKicker,
+    doneTitle,
+    doneStats,
+    doneSavingEl,
+    doneBadge,
+    doneError,
+    doneLeaderboard,
+    doneActions,
+  );
 
   root.append(howtoEl, playEl, doneEl);
   deps.layer.append(root);
@@ -472,6 +488,13 @@ export function createMinigameShell<K extends MinigameId>(deps: MinigameShellDep
         pending: false,
       });
     }
+
+    // #70 R4: mounted after the save try/catch above settles either way
+    // (success or failure), never before -- and, since `finishRound` only
+    // ever reaches this point once per round (the `roundEnded` guard at the
+    // top), mounted at most once. Its own internal `Promise.resolve().then`
+    // wrapping means a broken `leaderboard()` can't throw back in here.
+    mountMinigameLeaderboard(doneLeaderboard, { store: deps.store, minigameId: minigame.id });
   }
 
   function startRound(): void {

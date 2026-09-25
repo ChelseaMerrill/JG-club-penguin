@@ -633,3 +633,74 @@ describe('minigame shell: done screen', () => {
     expect((layer.querySelector('.minigame__done-error') as HTMLElement).textContent).toBeTruthy();
   });
 });
+
+describe('minigame shell: leaderboard panel (R4)', () => {
+  it('mounts the panel once the done screen appears, after a successful save', async () => {
+    const leaderboard = vi.fn(async () => []);
+    const { layer, gameHandle, launcher } = setup({ store: createFakeStore({ leaderboard }) });
+    startPlaying(layer, launcher);
+    gameHandle.setScoreAndStats(80, { squashed: 8, score: 0, bestCombo: 0, escaped: 0 });
+    gameHandle.finishNow();
+
+    await vi.waitFor(() => expect(leaderboard).toHaveBeenCalledTimes(1));
+    expect(leaderboard).toHaveBeenCalledWith('bug-squash', expect.any(Number));
+    expect(layer.querySelector('.minigame__done-leaderboard .minigame-leaderboard')).toBeTruthy();
+  });
+
+  it('a rejected recordRound still mounts the panel exactly once', async () => {
+    const leaderboard = vi.fn(async () => []);
+    const { layer, gameHandle, launcher } = setup({
+      store: createFakeStore({
+        leaderboard,
+        recordRound: vi.fn(async () => {
+          throw new ProgressStoreError('round_too_soon');
+        }),
+      }),
+    });
+    startPlaying(layer, launcher);
+    gameHandle.setScoreAndStats(60, { squashed: 6, score: 0, bestCombo: 0, escaped: 0 });
+    gameHandle.finishNow();
+
+    await vi.waitFor(() => expect(isHidden(layer, '.minigame__done-error')).toBe(false));
+    await vi.waitFor(() => expect(leaderboard).toHaveBeenCalledTimes(1));
+  });
+
+  it('a synchronous throw from store.leaderboard leaves the save rows intact', async () => {
+    const { layer, gameHandle, launcher } = setup({
+      store: createFakeStore({
+        leaderboard: vi.fn(() => {
+          throw new Error('boom, synchronously');
+        }),
+      }),
+    });
+    startPlaying(layer, launcher);
+    gameHandle.setScoreAndStats(80, { squashed: 8, score: 0, bestCombo: 0, escaped: 0 });
+
+    expect(() => gameHandle.finishNow()).not.toThrow();
+
+    await vi.waitFor(() => expect(isHidden(layer, '[data-done-stat="tokens"]')).toBe(false));
+    expect(
+      layer.querySelector('[data-done-stat="tokens"] .minigame__done-stat-value')?.textContent,
+    ).toBe('+25');
+    await vi.waitFor(() =>
+      expect(layer.querySelector('.minigame-leaderboard')?.getAttribute('data-state')).toBe(
+        'error',
+      ),
+    );
+  });
+
+  it('a throwing minigame.end() shows no panel', async () => {
+    const throwingGame = createFakeGame(5, { endThrows: true });
+    const leaderboard = vi.fn(async () => []);
+    const { layer, launcher } = setup({
+      game: throwingGame,
+      store: createFakeStore({ leaderboard }),
+    });
+    startPlaying(layer, launcher);
+    throwingGame.finishNow();
+
+    await vi.waitFor(() => expect(isHidden(layer, '.minigame__done')).toBe(false));
+    expect(layer.querySelector('.minigame-leaderboard')).toBeNull();
+    expect(leaderboard).not.toHaveBeenCalled();
+  });
+});
