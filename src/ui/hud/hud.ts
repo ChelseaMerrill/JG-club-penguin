@@ -45,6 +45,9 @@ export interface Hud {
 
 const MENU_OVERLAY_ID = 'menu';
 
+/** How long a toast (`ui:toast`) stays up before it auto-hides. */
+const TOAST_DURATION_MS = 4000;
+
 /**
  * The HUD every Room shares: Room title (top left), Token balance / PENGUIN /
  * MENU (top right), and the chat slot / MAP / IGLOO bar (bottom), reproducing
@@ -224,7 +227,26 @@ export function createHud(layer: HTMLElement, deps: HudDeps): Hud {
 
   bottomBar.append(chatSlot, emoteButton, snowballButton, mapButton, iglooButton, questsButton);
 
-  root.append(titleBlock, topRight, menuPanel, bottomBar);
+  // The toast layer (`ui:toast`, #42): shown wherever the Player is, since
+  // the HUD is mounted across every Room. Producers: #34 (a save error) and
+  // #42 (a Badge earned via `badge:earned`, translated in `main.ts`).
+  const toastEl = document.createElement('div');
+  toastEl.className = 'hud__toast';
+  toastEl.hidden = true;
+  toastEl.setAttribute('role', 'status');
+  let toastTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function showToast(message: string): void {
+    if (toastTimer !== null) clearTimeout(toastTimer);
+    toastEl.textContent = message;
+    toastEl.hidden = false;
+    toastTimer = setTimeout(() => {
+      toastEl.hidden = true;
+      toastTimer = null;
+    }, TOAST_DURATION_MS);
+  }
+
+  root.append(titleBlock, topRight, menuPanel, bottomBar, toastEl);
   layer.append(root);
 
   function setBalance(balance: number): void {
@@ -246,6 +268,7 @@ export function createHud(layer: HTMLElement, deps: HudDeps): Hud {
 
   const unsubscribeRoomEnter = gameEvents.on('room:enter', ({ roomId }) => setRoom(roomId));
   const unsubscribeTokens = gameEvents.on('tokens:changed', ({ balance }) => setBalance(balance));
+  const unsubscribeToast = gameEvents.on('ui:toast', ({ message }) => showToast(message));
 
   return {
     overlays,
@@ -260,6 +283,8 @@ export function createHud(layer: HTMLElement, deps: HudDeps): Hud {
     destroy() {
       unsubscribeRoomEnter();
       unsubscribeTokens();
+      unsubscribeToast();
+      if (toastTimer !== null) clearTimeout(toastTimer);
       overlays.destroy();
       root.remove();
     },
