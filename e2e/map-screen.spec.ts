@@ -144,10 +144,11 @@ test('Clicking a disabled Room (THE ICEBOX) does nothing: the Map stays open, lo
   await expect(iceboxTile.locator('.map-screen__pill')).toHaveText('COMING SOON');
 
   // `aria-disabled="true"` makes Playwright's actionability check refuse a
-  // plain `.click()` (it treats the tile as disabled); `force: true` bypasses
-  // that check so this test still exercises the click handler's own no-op,
-  // matching #33 D3 (the tile is not natively `disabled`, only inert).
-  await iceboxTile.click({ force: true });
+  // plain `.click()` (it treats the tile as disabled), but the tile is not
+  // natively `disabled` -- only inert (#33 D3) -- so `dispatchEvent` fires a
+  // real click event without going through that actionability gate,
+  // exercising the click handler's own no-op.
+  await iceboxTile.dispatchEvent('click');
 
   await expect(page.locator('.map-screen')).toBeVisible();
   expect((await debugInfo(page))?.roomEventLog).toEqual(logBefore);
@@ -167,6 +168,9 @@ test('Clicking the current Room only closes the Map', async ({ page }) => {
   await page.locator('.hud__button--map').click();
   await expect(page.locator('.map-screen')).toBeVisible();
 
+  // The "no changeRoom call" half of this guard is unit-tested directly in
+  // map-screen.test.ts; this end-to-end pass only needs to confirm the Room
+  // is unchanged and the Map closes.
   await page.locator('[data-map-room="town-center"]').click();
 
   await expect(page.locator('.map-screen')).toBeHidden();
@@ -245,6 +249,10 @@ test('with no Session, the HUD MAP button does not open the Map', async ({ page 
 
   await page.goto('/?hud');
   await expect(page.locator('.hud')).toBeVisible();
+
+  // The overlay is always mounted (createMapScreen runs unconditionally in
+  // main.ts); confirms this is "mounted but hidden", not "never rendered".
+  await expect(page.locator('.map-screen')).toHaveCount(1);
 
   await page.locator('.hud__button--map').click();
   await expect(page.locator('.map-screen')).toBeHidden();
