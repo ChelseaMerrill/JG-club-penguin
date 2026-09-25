@@ -121,6 +121,14 @@ type HideRule =
   // that moves a label harmlessly stops matching, rather than silently
   // hiding the wrong node.
   | { kind: 'text-only'; entries: { text: string; transform: string }[]; comment: string }
+  // Exact CSS selectors (#132), each of which must match exactly one element
+  // (the export fails otherwise). Used for a static, unlabelled floor-arrow
+  // decal the design bakes next to a Room's real exit signage: it isn't
+  // wrapped in an animated group and carries no text a `labels`/`cluster`
+  // rule could anchor on, so it's pinned by its own `points` attribute --
+  // a design resync that moves or reshapes it stops the export instead of
+  // silently leaving a non-working arrow in the art.
+  | { kind: 'selector'; selectors: string[]; comment: string }
   // HTML/DIV HUD chrome. `anchor` is a literal text string known to be
   // unique on the page; `companions` (which includes the anchor) is the
   // full set of literal strings that must all appear somewhere in the
@@ -202,6 +210,14 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
       ],
       comment:
         'The Core Values poster\'s heading and four hexagon labels (#77): redrawn live by src/ui/wall-text/wall-text.ts, since the design bakes them at a font-size/letter-spacing that overflows their hexagons. The hexagon/banner backing shapes themselves are kept (only the exact-matching <text> is hidden, not preceding siblings) -- see the "text-only" HideRule kind above.',
+    },
+    {
+      kind: 'selector',
+      selectors: [
+        'polygon[points="940,740 970,755 935,772.5 945,777.5 890,780 895,752.5 905,757.5"]',
+      ],
+      comment:
+        "#132: an unlabelled floor-arrow decal near the Front Desk that isn't a working door -- Town Center's real exits (The Icebox, Dev Pit, the elevator/stairwell) are the labelled wall signage, not this arrow.",
     },
     {
       kind: 'cluster',
@@ -333,6 +349,14 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
       texts: ['Chelsea', 'Tonya', 'Jesse', 'You'],
       comment:
         'Stationary NPCs/Penguins and their nameplates: the Chelsea and Tonya/Jesse penguin NPCs, and the local player.',
+    },
+    {
+      kind: 'selector',
+      selectors: [
+        'polygon[points="395,467.5 330,500 395,532.5 420,520 385,502.5 445,502.5 445,482.5 400,495"]',
+      ],
+      comment:
+        "#132: an unlabelled floor-arrow decal near the Town Center elevator that isn't a working door -- the real exits (Town Center, Roof Deck) are the labelled wall signage/elevators, not this arrow.",
     },
     {
       kind: 'cluster',
@@ -498,6 +522,14 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
       comment: "Blinking '↙ TOWN CENTER' room-exit nav pill (HUD).",
     },
     {
+      kind: 'selector',
+      selectors: [
+        'polygon[points="395,467.5 330,500 395,532.5 420,520 385,502.5 445,502.5 445,482.5 400,495"]',
+      ],
+      comment:
+        "#132: an unlabelled floor-arrow decal by the left wall that isn't a working door -- the Icebox's only real exit (Town Center) is the labelled elevator, not this arrow.",
+    },
+    {
       kind: 'cluster',
       anchor: '← MAP',
       companions: ['← MAP', '03 · THE ICEBOX (CONFERENCE)'],
@@ -540,6 +572,14 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
       texts: ['home sweet ice', 'You', 'Hexle · Bit'],
       comment:
         'The local player\'s stationary figure/nameplate and speech bubble, and the pet Hexle "Bit" -- a live pet, not fixed furniture (compare Gil the fish in Town Center).',
+    },
+    {
+      kind: 'selector',
+      selectors: [
+        'polygon[points="395,467.5 330,500 395,532.5 420,520 385,502.5 445,502.5 445,482.5 400,495"]',
+      ],
+      comment:
+        "#132: an unlabelled floor-arrow decal by the left wall that isn't a working door -- the Igloo's only real exit (Town Center) is the labelled elevator, not this arrow.",
     },
     {
       kind: 'cluster',
@@ -873,6 +913,24 @@ function hideLiveElements(rules: HideRule[]): void {
     }
   }
 
+  // #132: hides the exact element(s) matched by each CSS selector, failing
+  // loudly if a selector matches zero or more than one element -- unlike the
+  // text-anchored rules above, a selector can silently start matching the
+  // wrong (or an extra) element after a design resync, so this never hides
+  // more or less than intended.
+  function hideSelectors(selectors: string[]): void {
+    for (const selector of selectors) {
+      const matches = document.querySelectorAll(selector);
+      const only = matches[0];
+      if (matches.length !== 1 || !only) {
+        throw new Error(
+          `selector hide rule expected exactly one element for "${selector}", found ${matches.length}`,
+        );
+      }
+      hide(only);
+    }
+  }
+
   function hideCluster(anchor: string, companions: string[]): void {
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
     let node: Node | null;
@@ -907,6 +965,7 @@ function hideLiveElements(rules: HideRule[]): void {
     else if (rule.kind === 'labels') hideLabels(rule.texts);
     else if (rule.kind === 'label-group') hideLabelGroups(rule.texts);
     else if (rule.kind === 'text-only') hideTextOnly(rule.entries);
+    else if (rule.kind === 'selector') hideSelectors(rule.selectors);
     else hideCluster(rule.anchor, rule.companions);
   }
 }
