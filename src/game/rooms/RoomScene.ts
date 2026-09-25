@@ -387,6 +387,18 @@ export class RoomScene extends Scene {
 
   // --- Local Penguin & click-to-move --------------------------------------
 
+  /**
+   * Shows (or clears, given `null`) a chat speech bubble above the local
+   * Penguin (#44). The local Penguin lives here (#14), not in `penguins`, so
+   * this replaces `RoomPenguinView.sayLocal`. Returns `false` while no local
+   * Penguin is spawned.
+   */
+  sayLocal(text: string | null): boolean {
+    if (!this.penguin) return false;
+    this.penguin.say(text);
+    return true;
+  }
+
   private spawnLocalPenguin(room: RoomDefinition): void {
     const registered = this.registry.get(PLAYER_REGISTRY_KEY) as RegisteredPlayer | undefined;
     const look = resolveRegisteredLook(registered);
@@ -752,6 +764,7 @@ function placePenguinsIn(scene: Scene): PlacePenguin {
         penguin.container.setPosition(next.x, next.y);
         penguin.container.setDepth(nextDepth);
       },
+      say: (text) => penguin.say(text),
       destroy: () => penguin.destroy(),
     };
   };

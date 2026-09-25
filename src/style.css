@@ -558,6 +558,34 @@ body {
   color: var(--jg-inactive);
 }
 
+/* The chat field (#44) fills its slot; only its own placeholder is styled,
+   never a bare element selector. */
+.hud__chat-input {
+  flex: 1;
+  height: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font: 400 16px var(--font-body);
+  color: var(--fg-primary);
+}
+
+.hud__chat-input::placeholder {
+  color: var(--jg-inactive);
+}
+
+/* The outline would sit flush against `.hud__chat-slot`'s own border with
+   nothing to show through it, so focus shows on the slot itself instead
+   (#44 review fix S5): a visible ring using the same `--jg-light` token as
+   `.landing__play`/`.minigame__button`'s own focus rings. */
+.hud__chat-input:focus-visible {
+  outline: none;
+}
+
+.hud__chat-slot:focus-within {
+  box-shadow: inset 0 0 0 2px var(--jg-light);
+}
+
 /* The bottom bar's hexagon buttons (EMOTE, SNOWBALL, MAP, IGLOO, QUESTS)
    share their hexagon clip-path with `.minigame__button`. */
 .hud__button--bottom,

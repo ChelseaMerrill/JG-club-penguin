@@ -47,6 +47,7 @@ describe('HUD balance', () => {
       resolveRoomTitle: () => ({ title: '', subtitle: '' }),
       onIgloo: () => {},
       onSignOut: () => {},
+      onChatSend: () => Promise.resolve(true),
       initialBalance: 0,
     });
     currentHud = hud;
