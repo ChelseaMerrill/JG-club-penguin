@@ -9,6 +9,7 @@ import { bindPlayer, type Player } from '../auth/player';
 import { MINIGAME_RULES } from './minigame-rules';
 import {
   IGLOO_SLOTS,
+  ProgressStoreError,
   type IglooSlot,
   type ProgressSnapshot,
   type ProgressStore,
@@ -44,11 +45,14 @@ export interface CreateProgressSessionOptions {
 
 export interface ProgressSession {
   /**
-   * Loads the Player's saved progress and puts it (plus a tracking wrapper
-   * of `store`) into the registry. Never rejects: a `loadAll` failure is
-   * swallowed (the store already emitted `ui:toast`) and resolves to `null`.
-   * A load that resolves after `stop()`, or after a newer `start()`, is
-   * dropped and also resolves to `null`.
+   * Registers a tracking wrapper of `store` under `PROGRESS_STORE_KEY`
+   * straight away, then loads the Player's saved progress into
+   * `PROGRESS_KEY`. A consumer calling the wrapper's `loadAll()` while this
+   * initial load is in flight shares it rather than fetching twice. Never
+   * rejects: a `loadAll` failure is swallowed (the store emits `ui:toast`)
+   * and resolves to `null`, leaving the wrapper registered so a later
+   * `loadAll()` can retry. A load that resolves after `stop()`, or after a
+   * newer `start()`, is dropped and also resolves to `null`.
    */
   start(player: Player, store: ProgressStore): Promise<ProgressSnapshot | null>;
   /** Removes both registry keys and invalidates any in-flight `start()`. */
@@ -75,8 +79,38 @@ function wrapStore(
   registry: ProgressSessionRegistry,
   initialPlayer: Player,
   isCurrent: () => boolean,
-): ProgressStore {
+  emitter: TypedEmitter<GameEventMap>,
+): { wrapper: ProgressStore; loadInitial(): Promise<ProgressSnapshot> } {
   let currentPlayer = initialPlayer;
+  let pendingLoad: Promise<ProgressSnapshot> | null = null;
+
+  /** Puts a fresh snapshot in the registry, rebinds `player.look` and updates the HUD. */
+  function applySnapshot(snapshot: ProgressSnapshot): void {
+    if (!isCurrent()) return;
+    currentPlayer = { ...currentPlayer, look: snapshot.look };
+    registry.set(PROGRESS_KEY, snapshot);
+    bindPlayer(registry, currentPlayer);
+    emitter.emit('tokens:changed', { balance: snapshot.tokens });
+  }
+
+  /**
+   * One network load at a time: a `loadAll()` while another is in flight
+   * (the sign-in load, or the Penguin Creator's own load on sign-in) shares
+   * that promise, so its rejection reaches every caller.
+   */
+  function loadAll(): Promise<ProgressSnapshot> {
+    if (pendingLoad) return pendingLoad;
+    const load = store.loadAll().then((snapshot) => {
+      applySnapshot(snapshot);
+      return snapshot;
+    });
+    pendingLoad = load;
+    const clear = () => {
+      if (pendingLoad === load) pendingLoad = null;
+    };
+    load.then(clear, clear);
+    return load;
+  }
 
   function currentSnapshot(): ProgressSnapshot | undefined {
     return registry.get(PROGRESS_KEY) as ProgressSnapshot | undefined;
@@ -160,11 +194,8 @@ function wrapStore(
   }
 
   return {
-    loadAll: () => store.loadAll(),
-    saveLook,
-    recordRound,
-    purchase,
-    setSlot,
+    wrapper: { loadAll, saveLook, recordRound, purchase, setSlot },
+    loadInitial: loadAll,
   };
 }
 
@@ -181,27 +212,19 @@ export function createProgressSession(options: CreateProgressSessionOptions): Pr
     const myGeneration = generation;
     const isCurrent = () => generation === myGeneration;
 
-    let snapshot: ProgressSnapshot;
+    const { wrapper, loadInitial } = wrapStore(store, registry, player, isCurrent, emitter);
+    registry.set(PROGRESS_STORE_KEY, wrapper);
+
     try {
-      snapshot = await store.loadAll();
+      const snapshot = await loadInitial();
+      // Superseded by `stop()` or a newer `start()` while this load was in
+      // flight: the wrapper already skipped every registry write.
+      return isCurrent() ? snapshot : null;
     } catch {
       // The store itself emits `ui:toast` when it was built with an emitter
       // (main.ts always passes `gameEvents`); never throw into Phaser.
       return null;
     }
-
-    if (!isCurrent()) {
-      // Superseded by `stop()` or a newer `start()` while this load was in
-      // flight; drop it.
-      return null;
-    }
-
-    const boundPlayer: Player = { ...player, look: snapshot.look };
-    registry.set(PROGRESS_KEY, snapshot);
-    registry.set(PROGRESS_STORE_KEY, wrapStore(store, registry, boundPlayer, isCurrent));
-    bindPlayer(registry, boundPlayer);
-    emitter.emit('tokens:changed', { balance: snapshot.tokens });
-    return snapshot;
   }
 
   function stop(): void {
@@ -214,4 +237,32 @@ export function createProgressSession(options: CreateProgressSessionOptions): Pr
   }
 
   return { start, stop };
+}
+
+/**
+ * The one `ProgressStore` the app hands to long-lived consumers built at
+ * boot (the Minigame launcher, the Penguin Creator editor). Every call
+ * forwards to the signed-in Player's store under `PROGRESS_STORE_KEY`; with
+ * nobody signed in it forwards to `fallback()` when that returns a store
+ * (the dev/e2e hooks' in-memory fake), and otherwise rejects with
+ * `not_authenticated`. Producer: #34. Consumer: `main.ts`.
+ */
+export function createActiveProgressStore(
+  registry: Pick<ProgressSessionRegistry, 'get'>,
+  fallback: () => ProgressStore | null = () => null,
+): ProgressStore {
+  function current(): ProgressStore {
+    const store = (registry.get(PROGRESS_STORE_KEY) as ProgressStore | undefined) ?? fallback();
+    if (!store) throw new ProgressStoreError('not_authenticated');
+    return store;
+  }
+
+  return {
+    loadAll: async () => current().loadAll(),
+    saveLook: async (look) => current().saveLook(look),
+    recordRound: async (minigameId, score, stats) =>
+      current().recordRound(minigameId, score, stats),
+    purchase: async (itemId) => current().purchase(itemId),
+    setSlot: async (slot, itemId) => current().setSlot(slot, itemId),
+  };
 }

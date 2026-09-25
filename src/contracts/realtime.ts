@@ -28,6 +28,19 @@ export interface RoomBroadcastMap {
   move: { playerId: string; target: Tile };
   /** Producer/consumer: #44. `sentAt` is epoch milliseconds. */
   chat: { playerId: string; text: string; sentAt: number };
+  /**
+   * Producer/consumer: #28, internal to the Room channel. Sent after every
+   * acknowledged `track()` outside the Igloo, and once in reply to a hello
+   * from a Penguin not yet shown, so a Penguin appears before Presence
+   * propagates. A hint only: Presence stays the source of truth.
+   */
+  'presence:hello': PresencePayload;
+  /**
+   * Producer/consumer: #28, internal to the Room channel. Sent on a Room
+   * leave or `stop()` while joined (never on a reconnect), so the Penguin
+   * disappears before Presence propagates the leave.
+   */
+  'presence:bye': { playerId: string };
 }
 
 /**

@@ -6,6 +6,7 @@ import { DEFAULT_LOOK } from '../contracts/penguin';
 import { createInMemoryProgressStore } from './in-memory-progress-store';
 import { emptySlots, type ProgressSnapshot, type ProgressStore } from './progress-store';
 import {
+  createActiveProgressStore,
   createProgressSession,
   PROGRESS_KEY,
   PROGRESS_STORE_KEY,
@@ -87,16 +88,53 @@ describe('createProgressSession', () => {
       expect(balances).toEqual([snapshot?.tokens]);
     });
 
-    it('returns null and leaves the keys unset when loadAll fails, without rejecting', async () => {
+    it('returns null without rejecting when loadAll fails, leaving the store registered for a retry', async () => {
       const registry = createFakeRegistry();
       const emitter = createEmitter<GameEventMap>();
       const session = createProgressSession({ registry, emitter });
+      let calls = 0;
+      const store: ProgressStore = {
+        ...failingStore(),
+        loadAll: () => {
+          calls += 1;
+          return calls === 1
+            ? Promise.reject(new Error('network down'))
+            : Promise.resolve(makeSnapshot({ tokens: 42 }));
+        },
+      };
 
-      const result = await session.start(PLAYER, failingStore());
+      const result = await session.start(PLAYER, store);
 
       expect(result).toBeNull();
       expect(registry.get(PROGRESS_KEY)).toBeUndefined();
-      expect(registry.get(PROGRESS_STORE_KEY)).toBeUndefined();
+      const wrapped = registry.get(PROGRESS_STORE_KEY) as ProgressStore;
+      await expect(wrapped.loadAll()).resolves.toMatchObject({ tokens: 42 });
+      expect((registry.get(PROGRESS_KEY) as ProgressSnapshot).tokens).toBe(42);
+    });
+
+    it('registers the store at once, and a loadAll during the sign-in load shares it', async () => {
+      const registry = createFakeRegistry();
+      const emitter = createEmitter<GameEventMap>();
+      const session = createProgressSession({ registry, emitter });
+      const deferred = deferredStore();
+      let calls = 0;
+      const store: ProgressStore = {
+        ...deferred.store,
+        loadAll: () => {
+          calls += 1;
+          return deferred.store.loadAll();
+        },
+      };
+
+      const started = session.start(PLAYER, store);
+      const wrapped = registry.get(PROGRESS_STORE_KEY) as ProgressStore;
+      expect(wrapped).toBeDefined();
+      const consumerLoad = wrapped.loadAll();
+      deferred.resolve(makeSnapshot({ tokens: 7 }));
+
+      await expect(consumerLoad).resolves.toMatchObject({ tokens: 7 });
+      await expect(started).resolves.toMatchObject({ tokens: 7 });
+      expect(calls).toBe(1);
     });
 
     it('drops a load that resolves after stop()', async () => {
@@ -289,5 +327,30 @@ describe('createProgressSession', () => {
 
       expect(balances[balances.length - 1]).toBe(0);
     });
+  });
+});
+
+describe('createActiveProgressStore', () => {
+  it('forwards to the signed-in store under PROGRESS_STORE_KEY', async () => {
+    const registry = createFakeRegistry();
+    registry.set(PROGRESS_STORE_KEY, createInMemoryProgressStore());
+    const active = createActiveProgressStore(registry);
+
+    await expect(active.purchase('beanbag')).resolves.toEqual({ balance: 50 });
+  });
+
+  it('uses the fallback when nobody is signed in', async () => {
+    const registry = createFakeRegistry();
+    const fallback = createInMemoryProgressStore();
+    const active = createActiveProgressStore(registry, () => fallback);
+
+    await expect(active.loadAll()).resolves.toMatchObject({ tokens: 100 });
+  });
+
+  it('rejects with not_authenticated when nobody is signed in and there is no fallback', async () => {
+    const active = createActiveProgressStore(createFakeRegistry());
+
+    await expect(active.loadAll()).rejects.toMatchObject({ code: 'not_authenticated' });
+    await expect(active.setSlot(1, null)).rejects.toMatchObject({ code: 'not_authenticated' });
   });
 });

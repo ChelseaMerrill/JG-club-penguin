@@ -1,12 +1,16 @@
 import { gameEvents, SPAWN_ROOM_ID, type RoomId } from '../../contracts';
 import { createOverlayManager, type OverlayManager } from './overlay-manager';
-import type { RoomTitle } from './room-titles';
+
+/** A Room's HUD header text: the big title and the small subtitle beneath it. */
+export interface RoomTitle {
+  title: string;
+  subtitle: string;
+}
 
 /** Dependencies injected so the HUD stays decoupled from parallel tickets. */
 export interface HudDeps {
   /** Room title/subtitle for the HUD header (#32 D3). Wired from
-   *  `src/ui/hud/room-titles.ts` in `src/main.ts` until #13's
-   *  `getRoomDefinition` replaces it. */
+   *  `getRoomDefinition(id).title/subtitle` in `src/main.ts` (#16 D7). */
   resolveRoomTitle: (roomId: RoomId) => RoomTitle;
   /** #15 `changeRoom('igloo')` once it lands; a no-op until then. */
   onIgloo: () => void;

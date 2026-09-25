@@ -25,8 +25,7 @@
   --stage-letterbox: #0a0b0d;
   --font-game-display: 'Bumbastika', var(--font-display);
   /* Repeated HUD edge insets (design/Room 01 Town Center.dc.html and
-     siblings), shared with `.player-badge` so it can sit clear of the HUD's
-     top-right cluster without duplicating the literal. */
+     siblings). */
   --hud-inset-x: 36px;
   --hud-inset-y: 28px;
 }
@@ -384,43 +383,10 @@ body {
   }
 }
 
-/* Signed-in: a badge (name, color swatch, sign out) below the HUD's MENU
-   panel's full open height (top: 76px + ~64px of padding/border/button), so
-   opening MENU never covers it -- `e2e/deployed-auth.spec.ts` depends on the
-   badge's own sign-out staying visible and clickable. */
-.player-badge {
-  position: absolute;
-  top: 152px;
-  right: var(--hud-inset-x);
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 0.75rem;
-  background: rgba(255, 255, 255, 0.9);
-  border-radius: 0.5rem;
-  font-family: system-ui, sans-serif;
-}
-
-.player-badge__swatch {
-  display: inline-block;
-  width: 1rem;
-  height: 1rem;
-  border-radius: 50%;
-  border: 1px solid rgba(0, 0, 0, 0.2);
-}
-
-.player-badge__signout {
-  padding: 0.25rem 0.5rem;
-  border: none;
-  border-radius: 0.25rem;
-  cursor: pointer;
-}
-
 /* The `display: flex` above beats the UA `[hidden] { display: none }` rule
    (author origin wins over user-agent origin at equal specificity), so the
    hidden state needs its own explicit override. */
-.landing[hidden],
-.player-badge[hidden] {
+.landing[hidden] {
   display: none;
 }
 
@@ -592,10 +558,10 @@ body {
   color: var(--jg-inactive);
 }
 
-/* The bottom bar's hexagon buttons (EMOTE, SNOWBALL, MAP, IGLOO, QUESTS). */
-.hud__button--bottom {
-  height: 52px;
-  padding: 0 26px;
+/* The bottom bar's hexagon buttons (EMOTE, SNOWBALL, MAP, IGLOO, QUESTS)
+   share their hexagon clip-path with `.minigame__button`. */
+.hud__button--bottom,
+.minigame__button {
   clip-path: polygon(
     14px 0,
     calc(100% - 14px) 0,
@@ -604,6 +570,11 @@ body {
     14px 100%,
     0 50%
   );
+}
+
+.hud__button--bottom {
+  height: 52px;
+  padding: 0 26px;
   font-family: var(--font-game-display);
   font-size: 20px;
   letter-spacing: 0.04em;
@@ -611,4 +582,374 @@ body {
      token (same exception `.landing__login`'s inset shadow makes). */
   box-shadow: inset 0 -5px 0 #06303d;
   color: var(--fg-primary);
+}
+
+/* Debug overlay (stand-in for #15/#33/#35), mounted only under `?debug`.
+   Stage pixels: on the left, below the HUD's Room title block and above its
+   bottom bar (which starts at 900 - 28 - 52 = 820px), so it never sits under
+   a HUD widget; `z-index` keeps it painted over the full-Stage `.hud`. */
+.debug-overlay {
+  position: absolute;
+  top: 140px;
+  left: var(--hud-inset-x);
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-width: 420px;
+  max-height: 640px;
+  padding: 0.75rem 1rem;
+  overflow-y: auto;
+  background: rgba(0, 0, 0, 0.55);
+  border-radius: 0.5rem;
+  color: #ffffff;
+  font-family: system-ui, sans-serif;
+  font-size: 0.8rem;
+}
+
+.debug-rooms {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.debug-rooms button,
+.debug-random-look {
+  padding: 0.2rem 0.5rem;
+  border: none;
+  border-radius: 0.25rem;
+  cursor: pointer;
+}
+
+.debug-roster {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+/* Minigame shell (#37): a full-Stage overlay above the HUD, reproducing
+   `design/Minigame Bug Squash.dc.html` and `design/Minigame Pancake
+   Flip.dc.html`'s shared how-to-play/play/done chrome. Unlike `.hud`, the
+   whole overlay is `pointer-events: auto` so a click here never reaches the
+   canvas underneath (the Penguin can't move while a Minigame is open).
+   `z-index: 1` guarantees it paints above `.hud` (both are `#ui` siblings)
+   regardless of DOM append order. */
+.minigame {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: auto;
+  /* Reuses the mirror's own "strong overlay" token instead of a bespoke rgba
+     value, matching the rule the HUD's own panels already follow. */
+  background: var(--bg-overlay-strong);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.minigame__button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 48px;
+  padding: 0 24px;
+  border: none;
+  background: var(--jg-secondary);
+  font-family: var(--font-game-display);
+  font-size: 18px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--fg-primary);
+  cursor: pointer;
+  /* #06303d is a manual-darkened shade with no equivalent named design
+     token (same exception `.landing__login`'s inset shadow makes). */
+  box-shadow: inset 0 -5px 0 #06303d;
+}
+
+.minigame__button--start {
+  background: var(--jg-primary);
+  box-shadow: inset 0 -5px 0 var(--jg-secondary);
+  color: var(--jg-dark);
+}
+
+/* clip-path would hide an outline (same reasoning as `.landing__play` and
+   `.landing__login` above), so focus shows as an inset ring instead. */
+.minigame__button:focus-visible {
+  outline: none;
+  filter: brightness(1.12);
+  box-shadow:
+    inset 0 -5px 0 var(--jg-secondary),
+    inset 0 0 0 3px var(--jg-light);
+}
+
+.minigame__howto {
+  position: absolute;
+  left: 160px;
+  right: 160px;
+  top: 110px;
+  bottom: 110px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 30px 34px;
+  background: rgba(var(--jg-dark-rgb), 0.96);
+  border: 3px solid var(--jg-secondary);
+  box-shadow: 0 10px 0 var(--jg-secondary);
+}
+
+.minigame__howto[hidden],
+.minigame__play[hidden],
+.minigame__done[hidden] {
+  display: none;
+}
+
+.minigame__howto-title {
+  font-family: var(--font-game-display);
+  font-size: 40px;
+  line-height: 1;
+  color: var(--jg-primary);
+  -webkit-text-stroke: 5px var(--jg-secondary);
+  paint-order: stroke fill;
+  text-shadow: 0 4px 0 var(--jg-secondary);
+}
+
+.minigame__howto-subtitle {
+  font: 400 12px var(--font-display);
+  letter-spacing: 0.22em;
+  color: var(--fg-primary);
+}
+
+.minigame__howto-list {
+  flex: 1;
+  margin: 0;
+  padding-left: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font: 700 15px/1.4 var(--font-body);
+  color: var(--fg-primary);
+}
+
+.minigame__howto-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  border-top: 2px solid var(--jg-secondary);
+  padding-top: 16px;
+}
+
+.minigame__play {
+  position: absolute;
+  left: 120px;
+  right: 120px;
+  top: 60px;
+  bottom: 60px;
+  display: grid;
+  grid-template-rows: auto 1fr auto;
+  gap: 18px;
+  padding: 26px 30px;
+  background: rgba(var(--jg-dark-rgb), 0.96);
+  border: 3px solid var(--jg-secondary);
+  box-shadow: 0 10px 0 var(--jg-secondary);
+}
+
+.minigame__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+.minigame__title {
+  font-family: var(--font-game-display);
+  font-size: 36px;
+  line-height: 1;
+  color: var(--jg-primary);
+  -webkit-text-stroke: 4px var(--jg-secondary);
+  paint-order: stroke fill;
+  text-shadow: 0 4px 0 var(--jg-secondary);
+}
+
+.minigame__counters {
+  display: flex;
+  gap: 28px;
+}
+
+.minigame__counter {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.minigame__counter-label {
+  font: 400 11px var(--font-display);
+  letter-spacing: 0.2em;
+  color: var(--fg-muted);
+}
+
+.minigame__counter-value {
+  font-family: var(--font-game-display);
+  font-size: 28px;
+  line-height: 1;
+  color: var(--fg-primary);
+}
+
+.minigame__play-area {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.minigame__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  border-top: 2px solid var(--jg-secondary);
+  padding-top: 14px;
+}
+
+.minigame__done {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 22px;
+  width: 720px;
+  padding: 34px 38px;
+  background: rgba(var(--jg-dark-rgb), 0.97);
+  border: 3px solid var(--jg-primary);
+  box-shadow:
+    0 0 0 3px var(--jg-secondary),
+    0 12px 0 var(--jg-secondary);
+  text-align: center;
+}
+
+.minigame__done-kicker {
+  font: 400 12px var(--font-display);
+  letter-spacing: 0.24em;
+  color: var(--fg-muted);
+}
+
+.minigame__done-title {
+  font-family: var(--font-game-display);
+  font-size: 48px;
+  line-height: 1;
+  color: var(--jg-primary);
+  -webkit-text-stroke: 6px var(--jg-secondary);
+  paint-order: stroke fill;
+  text-shadow: 0 5px 0 var(--jg-secondary);
+}
+
+.minigame__done-stats {
+  display: flex;
+  gap: 36px;
+}
+
+.minigame__done-stat {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+/* The `display: flex` above beats the UA `[hidden] { display: none }` rule
+   the same way `.landing[hidden]`'s own comment explains: this row is
+   toggled hidden per-round (no payout shown, no personal best yet, etc.). */
+.minigame__done-stat[hidden] {
+  display: none;
+}
+
+.minigame__done-stat-label {
+  font: 400 11px var(--font-display);
+  letter-spacing: 0.2em;
+  color: var(--fg-muted);
+}
+
+.minigame__done-stat-value {
+  font-family: var(--font-game-display);
+  font-size: 30px;
+  line-height: 1;
+  color: var(--fg-primary);
+}
+
+.minigame__done-newbest {
+  position: absolute;
+  top: -14px;
+  right: 0;
+  padding: 2px 8px;
+  background: var(--jg-primary);
+  font: 400 10px var(--font-display);
+  letter-spacing: 0.1em;
+  color: var(--jg-dark);
+}
+
+.minigame__done-newbest[hidden] {
+  display: none;
+}
+
+.minigame__done-saving {
+  font: 400 12px var(--font-display);
+  letter-spacing: 0.16em;
+  color: var(--fg-muted);
+}
+
+.minigame__done-badge {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 18px;
+  background: rgba(var(--jg-secondary-rgb), 0.4);
+  border: 2px solid var(--jg-primary);
+  text-align: left;
+}
+
+.minigame__done-badge[hidden] {
+  display: none;
+}
+
+.minigame__done-badge-name {
+  font: 700 14px var(--font-body);
+  color: var(--fg-primary);
+}
+
+.minigame__done-badge-caption {
+  font: 400 11px var(--font-display);
+  letter-spacing: 0.16em;
+  color: var(--fg-muted);
+}
+
+.minigame__done-error {
+  font: 700 14px var(--font-body);
+  color: var(--fg-primary);
+}
+
+.minigame__done-error[hidden] {
+  display: none;
+}
+
+.minigame__done-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.stub-minigame__squash-button {
+  height: 72px;
+  padding: 0 40px;
+  border: none;
+  background: var(--jg-primary);
+  box-shadow: inset 0 -6px 0 var(--jg-secondary);
+  font-family: var(--font-game-display);
+  font-size: 26px;
+  letter-spacing: 0.06em;
+  color: var(--jg-dark);
+  cursor: pointer;
+}
+
+.stub-minigame__squash-button:disabled {
+  opacity: 0.5;
+  cursor: default;
 }

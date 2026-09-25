@@ -15,7 +15,9 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "test": "vitest run",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "export:room-art": "node --experimental-strip-types scripts/export-room-art.ts",
+    "build:penguin-text": "node --experimental-strip-types scripts/penguin-text-to-paths.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.117.1",
@@ -30,6 +32,7 @@
     "eslint-config-prettier": "^10.1.8",
     "globals": "^17.12.0",
     "jsdom": "^29.1.1",
+    "opentype.js": "^2.0.0",
     "prettier": "^3.9.9",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.70.1",
