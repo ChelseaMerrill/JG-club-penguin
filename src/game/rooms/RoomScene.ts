@@ -21,6 +21,7 @@ import {
 } from '../movement/registered-player';
 import { doorApproachTile, npcInteractionTile } from '../movement/targets';
 import { getNpcDefinition } from '../../npcs/npcs';
+import { npcLayout } from '../npcs/npc-layout';
 import { createNpcSprite, type NpcSprite } from '../npcs/npc-sprite';
 import { createPenguin, type Penguin, type PenguinAnim } from '../penguin';
 import { GAME_HEIGHT, GAME_WIDTH } from '../stage-size';
@@ -156,21 +157,6 @@ const HOTSPOT_LABEL_FONT_SIZE = '14px';
 const LABEL_FONT_FAMILY = 'sans-serif';
 const LABEL_TEXT_COLOR = '#F4F4F4';
 const DOOR_LABEL_FONT_SIZE = '14px';
-/**
- * The invisible click zone over each NPC sprite (#36 D3/A4, sized per #36
- * round-1 review item 6): centred above the sprite's feet-anchor point,
- * covering roughly feet-105 to feet+5 -- the figure's own body/head, not just
- * its feet -- not an alpha-0 shape, which Phaser drops from input
- * hit-testing the same way `drawDoors`'s own image-background `Zone` avoids
- * that trap. Confirmed against Town Center's actual NPC/click tile geometry
- * (`e2e/click-to-move.spec.ts` clicks tiles as close as one column/two rows
- * from an NPC slot) to still exclude every one of that spec's own click
- * points.
- */
-const NPC_HIT_ZONE_WIDTH = 64;
-const NPC_HIT_ZONE_HEIGHT = 110;
-const NPC_HIT_ZONE_OFFSET_Y = -50;
-
 // #15 D3/A4: a disabled door's (`targetRoomId: null`) "COMING SOON" hint, in
 // the Stage's own display font (`--font-game-display`, `style.css`).
 const DOOR_HINT_FONT_FAMILY = "'Bumbastika', sans-serif";
@@ -1470,7 +1456,10 @@ export class RoomScene extends Scene {
    * The click target stays a separate invisible `Zone` (#14's own
    * `npcHitAreas`/`handleNpcClick` path is unchanged): an alpha-0 shape is
    * excluded from Phaser's input hit-testing, the same trap #16 already
-   * worked around for a door drawn over image art.
+   * worked around for a door drawn over image art. Its rect comes from
+   * `npc-layout.ts` (#113): about 48 px wide, from the top of the nameplate
+   * (now above the head) down to just below the feet, so it follows the
+   * NPC's design scale.
    */
   private drawNpcs(room: RoomDefinition): void {
     for (const slot of room.npcSlots) {
@@ -1484,8 +1473,9 @@ export class RoomScene extends Scene {
       npcSprite.container.setName(NPC_CONTAINER_NAME);
       this.npcSprites.push(npcSprite);
 
+      const { hitArea } = npcLayout(npc);
       const zone = this.add
-        .zone(point.x, point.y + NPC_HIT_ZONE_OFFSET_Y, NPC_HIT_ZONE_WIDTH, NPC_HIT_ZONE_HEIGHT)
+        .zone(point.x + hitArea.centerX, point.y + hitArea.centerY, hitArea.width, hitArea.height)
         .setDepth(depth)
         .setInteractive({ useHandCursor: true });
       this.npcHitAreas.push({ object: zone, data: slot });

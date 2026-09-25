@@ -248,16 +248,12 @@ export const townCenter: RoomDefinition = {
     // on the (unwalkable) counter itself, same as any NPC standing behind a
     // fixed fixture (#16 D6).
     { npcId: 'front-desk', tile: { col: 6, row: 1 } },
-    // Jory Hutchins has her own nameplate and speech bubble (`sayJory`), like
-    // Darrin/Sydney/Jon, but her `jump` bounce animation and "SURVIVOR" badge
-    // are nested *inside* Sydney's own `walkSyd` group in the design markup,
-    // not a standalone figure with its own fixed position -- she rides along
-    // with wherever Sydney's walk cycle currently places her, so there's no
-    // single tile that's "hers" to place an NPC slot on the way Darrin's,
-    // Sydney's and Jon's own patrol-start tiles are approximated. #16 fix 5
-    // decision: no NPC slot for Jory, for a different reason than Matt's
-    // exclusion in Dev Pit (Matt is a Penguin/Player, never a static NPC
-    // slot at all; Jory is a designed NPC, just one without an independent
-    // position in this design). Reviewable if #36 finds otherwise.
+    // Jory Hutchins (#113): her `jump` group is a sibling of Sydney's
+    // `walkSyd` group in the design markup, not nested in it, so she has a
+    // fixed position of her own, on the couch with her feet at about Stage
+    // (590, 462). (2, 6) is the tile whose centre is nearest that point; it
+    // sits on the unwalkable stairwell platform, like Sydney's and Front
+    // Desk's tiles sit on fixtures.
+    { npcId: 'jory', tile: { col: 2, row: 6 } },
   ],
 };
