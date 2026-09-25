@@ -81,7 +81,7 @@ describe('PENGUIN_TEXT_PATHS', () => {
     expect(PENGUIN_TEXT_PATHS.warWeek.fill).toBe(WAR_WEEK_FILL);
   });
 
-  it('has a non-empty path and the design fill for the JG CAP crown\'s "JG" (#92 D4)', () => {
+  it('has a non-empty path and the design fill for the JG CAP crown "JG" (#92 D4)', () => {
     expect(PENGUIN_TEXT_PATHS.jgCap.d.length).toBeGreaterThan(0);
     expect(PENGUIN_TEXT_PATHS.jgCap.fill).toBe(JG_CAP_FILL);
   });
