@@ -67,6 +67,10 @@ export interface FakeResponses {
   recordRound?: FakeResult<unknown>;
   purchaseItem?: FakeResult<unknown>;
   leaderboard?: FakeResult<unknown>;
+  /** #46 */
+  questProgress?: FakeResult<unknown>;
+  markDevPitVisited?: FakeResult<unknown>;
+  completeQuest?: FakeResult<unknown>;
 }
 
 export type LoggedCall = [op: string, ...args: unknown[]];
@@ -118,6 +122,20 @@ export function makeFakeClient(responses: FakeResponses = {}): {
     ({ data: { balance: 100 }, error: null } satisfies FakeResult<unknown>);
   const leaderboard =
     responses.leaderboard ?? ({ data: [], error: null } satisfies FakeResult<unknown>);
+  const questProgress =
+    responses.questProgress ??
+    ({
+      data: { devPitVisited: false, roundsFinished: [], completedQuests: [] },
+      error: null,
+    } satisfies FakeResult<unknown>);
+  const markDevPitVisited =
+    responses.markDevPitVisited ?? ({ data: null, error: null } satisfies FakeResult<unknown>);
+  const completeQuest =
+    responses.completeQuest ??
+    ({
+      data: { tokensAwarded: 0, balance: 100, alreadyCompleted: true },
+      error: null,
+    } satisfies FakeResult<unknown>);
 
   const client: ProgressClient = {
     from(table) {
@@ -248,6 +266,15 @@ export function makeFakeClient(responses: FakeResponses = {}): {
       }
       if (fn === 'leaderboard') {
         return Promise.resolve(leaderboard);
+      }
+      if (fn === 'quest_progress') {
+        return Promise.resolve(questProgress);
+      }
+      if (fn === 'mark_dev_pit_visited') {
+        return Promise.resolve(markDevPitVisited);
+      }
+      if (fn === 'complete_quest') {
+        return Promise.resolve(completeQuest);
       }
       throw new Error(`unexpected rpc ${fn}`);
     },

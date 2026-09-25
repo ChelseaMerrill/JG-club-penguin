@@ -74,6 +74,13 @@ import { createTrophyCase, TROPHY_CASE_OVERLAY_ID } from './ui/trophy-case';
 import { createMapScreen } from './ui/map-screen';
 import { createMarket, MARKET_OVERLAY_ID } from './ui/market';
 import { wireBadgeToast } from './ui/badge-toast';
+import { createQuestController } from './quests/quest-controller';
+import { QUEST_DEFINITIONS, questsInBuild } from './quests/quest-definitions';
+import { createQuestsPanel, QUESTS_OVERLAY_ID, type QuestsTab } from './ui/quests-panel';
+import { createQuestWidget } from './ui/quest-widget';
+import { createQuestBanner } from './ui/quest-banner';
+import type { QuestsTestHandle } from './quests/quests-test-handle';
+import type { MinigameId } from './contracts';
 
 // Fail fast on a missing or malformed .env before anything boots.
 loadEnv();
@@ -391,6 +398,10 @@ function endSession(): RoomChannel | null {
   debugOverlay?.clear();
   debugOverlay?.setCurrentRoom(null);
   debugOverlay?.setSubscribed(false);
+  // #46: Quest tracking lives and dies with the Session.
+  quests.stop();
+  questWidget.render(null);
+  hud.overlays.close(QUESTS_OVERLAY_ID);
   return channel;
 }
 
@@ -448,6 +459,8 @@ async function startSession(player: Player, previous: RoomChannel | null): Promi
   // After the Room channel exists (#15 A2), so it sees the first `room:enter`
   // and joins Presence.
   void roomNavigator?.enterSpawnRoom();
+  // #46: loads Quest progress from saved data (steps already done aren't toasted).
+  void quests.start();
 }
 
 /**
@@ -507,6 +520,8 @@ const hud = createHud(getUiLayer(), {
   initialBalance: 0,
   onChatSend: (text) => chatController?.send(text) ?? Promise.resolve(false),
   onSnowballToggle: (on) => setSnowballMode(on),
+  // #46: toggles the Quests panel (defined further down, read on click).
+  onQuests: () => toggleQuestsPanel(),
 });
 
 // #53 D8/N8: any HUD overlay opening (Creator, Minigame, Trophy Case,
@@ -570,9 +585,44 @@ if (e2eHooksEnabled) {
 // Built once at boot for the long-lived consumers below; every call forwards
 // to the signed-in Player's Supabase store (#34), or to the dev fallback.
 const progressStore = createActiveProgressStore(game.registry, () => devFallbackStore);
+
+/** `window.localStorage`, or `null` where reading it throws (private mode, sandboxed frames). */
+function safeLocalStorage(): Storage | null {
+  try {
+    return window.localStorage;
+  } catch {
+    return null;
+  }
+}
+
+// #46: the quest engine. Reads through the same store every consumer uses;
+// `room:enter` (the Dev Pit visit) it hears itself, and a finished round or
+// a purchase re-reads progress through `questAwareStore` below.
+const quests = createQuestController({
+  store: progressStore,
+  quests: questsInBuild(QUEST_DEFINITIONS, createDefaultMinigameRegistry()),
+  events: gameEvents,
+  storage: safeLocalStorage(),
+});
+
+function refreshQuestsAfter<T>(pending: Promise<T>): Promise<T> {
+  return pending.then((result) => {
+    void quests.refresh();
+    return result;
+  });
+}
+
+/** `progressStore`, plus a Quest refresh after every successful round or purchase (#46). */
+const questAwareStore: ProgressStore = {
+  ...progressStore,
+  recordRound: (minigameId, score, stats) =>
+    refreshQuestsAfter(progressStore.recordRound(minigameId, score, stats)),
+  purchase: (itemId) => refreshQuestsAfter(progressStore.purchase(itemId)),
+};
+
 const minigameLauncher = createMinigameLauncher({
   layer: getUiLayer(),
-  store: progressStore,
+  store: questAwareStore,
   overlays: hud.overlays,
   resolveRoomTitle,
   registry: createDefaultMinigameRegistry(),
@@ -598,7 +648,7 @@ gameEvents.on('hotspot:click', ({ hotspotId }) => {
 // Casey's dialog instead. Reloads `store.loadAll()` on every open, same as
 // the Trophy Case.
 const market = createMarket(uiLayer, {
-  store: progressStore,
+  store: questAwareStore,
   onClose: () => hud.overlays.close(MARKET_OVERLAY_ID),
 });
 
@@ -607,6 +657,65 @@ gameEvents.on('hotspot:click', ({ hotspotId }) => {
   hud.overlays.open(MARKET_OVERLAY_ID, () => market.close());
   void market.open();
 });
+
+// #46: the Quests panel (registered with `hud.overlays` like the Trophy
+// Case and the Market), the HUD quest widget and the QUEST COMPLETE banner.
+const questsPanel = createQuestsPanel(uiLayer, {
+  onTrack: (questId) => quests.track(questId),
+  onBadges: () => {
+    hud.overlays.open(TROPHY_CASE_OVERLAY_ID, () => trophyCase.close());
+    void trophyCase.open();
+  },
+  onClose: () => hud.overlays.close(QUESTS_OVERLAY_ID),
+});
+const questWidget = createQuestWidget(hud.questSlot, {
+  onOpen: (tab) => openQuestsPanel(tab),
+});
+const questBanner = createQuestBanner(uiLayer);
+
+function openQuestsPanel(tab: QuestsTab): void {
+  hud.overlays.open(QUESTS_OVERLAY_ID, () => {
+    questsPanel.close();
+    questWidget.setSuppressed(false);
+    hud.setQuestsActive(false);
+  });
+  questsPanel.open(tab);
+  questWidget.setSuppressed(true);
+  hud.setQuestsActive(true);
+}
+
+function toggleQuestsPanel(): void {
+  if (hud.overlays.current() === QUESTS_OVERLAY_ID) {
+    hud.overlays.close(QUESTS_OVERLAY_ID);
+    return;
+  }
+  openQuestsPanel('active');
+}
+
+quests.onChange((view) => {
+  questWidget.render(view);
+  questsPanel.render(view);
+});
+quests.onQuestComplete((quest, tokensAwarded) => questBanner.show(quest.title, tokensAwarded));
+
+declare global {
+  interface Window {
+    /** Test-only (#46); see `src/quests/quests-test-handle.ts`. */
+    __questsTest?: QuestsTestHandle;
+  }
+}
+
+// Test-only (#46), gated exactly like `__wallTextTest` above.
+if (e2eHooksEnabled) {
+  window.__questsTest = {
+    async recordRound(minigameId, score, stats) {
+      await questAwareStore.recordRound(minigameId as MinigameId, score, stats as never);
+    },
+    async purchase(itemId) {
+      await questAwareStore.purchase(itemId);
+    },
+  };
+}
 
 // #77 review round 1 nit 5: RoomScene builds a Phaser-side hit-area for
 // every `RoomDefinition.hotspots` entry, including this one, the same way it
@@ -661,6 +770,9 @@ const penguinEditor = createPenguinEditor({
 const devCreatorActive = initDevCreatorHook(penguinEditor, progressStore);
 const devAsPlayerActive = initDevAsPlayerHook();
 const devHookActive = devHudActive || devMinigameActive || devCreatorActive || devAsPlayerActive;
+// #46: the dev/e2e hooks never start a real Session, so Quest tracking
+// starts here instead, against the in-memory fallback store.
+if (devHookActive) void quests.start();
 
 gameEvents.on('ui:open-creator', () => {
   penguinEditor.edit();
@@ -742,6 +854,7 @@ const auth = startAuth({
     hud.overlays.close(TROPHY_CASE_OVERLAY_ID);
     hud.overlays.close(MARKET_OVERLAY_ID);
     hud.overlays.close(CORE_VALUES_OVERLAY_ID);
+    hud.overlays.close(QUESTS_OVERLAY_ID);
     overlay.showSignedOut();
     hud.hide();
   },

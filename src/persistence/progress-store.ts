@@ -83,6 +83,38 @@ export interface LeaderboardEntry {
   isMe: boolean;
 }
 
+/**
+ * The saved state Quest progress needs beyond `ProgressSnapshot` (#46):
+ * the Dev Pit visit flag, which Minigames have at least one finished round
+ * (`minigame_rounds`; a quit never records one), and which Quests the server
+ * has already paid. Producer: #46's `quest_progress`. Consumer:
+ * `src/quests/quest-controller.ts`.
+ */
+export interface QuestProgress {
+  devPitVisited: boolean;
+  /** Ordered by Minigame id. */
+  roundsFinished: MinigameId[];
+  /** Ordered by Quest id. */
+  completedQuests: string[];
+}
+
+/**
+ * The result of `complete_quest` (#46). `tokensAwarded` is 0 and
+ * `alreadyCompleted` true on every call after the first successful one;
+ * `balance` is always the server's own balance after the call.
+ */
+export interface CompleteQuestResult {
+  tokensAwarded: number;
+  balance: number;
+  alreadyCompleted: boolean;
+}
+
+/** The Quest ids `completeQuest` accepts: only the main Quest is server-paid (#46). */
+export const SERVER_QUEST_IDS = ['main'] as const;
+
+/** The main Quest's reward, paid once by `complete_quest` (#46). */
+export const MAIN_QUEST_REWARD = 150;
+
 /** `ProgressStore.leaderboard`'s row count when `maxRows` is omitted. */
 export const LEADERBOARD_DEFAULT_ROWS = 10;
 
@@ -119,6 +151,10 @@ export const PROGRESS_ERROR_CODES = [
   'invalid_look',
   'not_owned',
   'invalid_slot',
+  // #46: `complete_quest` with an id other than 'main', or before every
+  // main-Quest step is met.
+  'unknown_quest',
+  'quest_incomplete',
 ] as const;
 
 export type ProgressErrorCode = (typeof PROGRESS_ERROR_CODES)[number];
@@ -248,4 +284,25 @@ export interface ProgressStore {
    * `Error` (e.g. a network failure) for anything else.
    */
   leaderboard(minigameId: MinigameId, maxRows?: number): Promise<LeaderboardEntry[]>;
+
+  /**
+   * The saved state behind Quest progress (#46). Read-only: a failure never
+   * emits `ui:toast`.
+   */
+  questProgress(): Promise<QuestProgress>;
+
+  /**
+   * Records the Player's first Dev Pit visit (#46). Idempotent: the first
+   * visit's time is kept.
+   */
+  markDevPitVisited(): Promise<void>;
+
+  /**
+   * Asks the server to pay `questId` (only 'main'). The server checks every
+   * main-Quest step against saved records and pays `MAIN_QUEST_REWARD` once;
+   * a repeat call resolves `alreadyCompleted: true` and pays nothing.
+   * Rejects with `unknown_quest` or `quest_incomplete`. Emits
+   * `tokens:changed` with the server's balance on success, as `purchase` does.
+   */
+  completeQuest(questId: string): Promise<CompleteQuestResult>;
 }

@@ -87,8 +87,11 @@ export interface GameEventMap extends RoomEventMap {
   'ui:open-creator': void;
   /** Producer: #32. Consumer: #33. */
   'ui:open-map': void;
-  /** Producers: #34 and any overlay. Consumer: the toast layer. */
-  'ui:toast': { message: string };
+  /**
+   * Producers: #34 and any overlay. Consumer: the toast layer. `durationMs`
+   * (#46's 3 s Quest step toast) defaults to the HUD's own 4 s when omitted.
+   */
+  'ui:toast': { message: string; durationMs?: number };
   /** Producer: #14. Consumer: #36. */
   'npc:arrived': { npcId: string };
   /**

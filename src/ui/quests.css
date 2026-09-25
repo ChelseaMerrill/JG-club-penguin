@@ -1,0 +1,373 @@
+/* Quests (#46): the Quests panel, the HUD quest widget and the QUEST COMPLETE
+   banner, from design/Club JenGuin HUD Menus.dc.html (HUD-QUESTS for the
+   panel, HUD-TOWN's top-right box for the widget). Stage pixels throughout;
+   its own file so style.css, shared with parallel work, stays untouched. */
+
+/* ---- Quests panel (HUD-QUESTS) ---- */
+
+.quests {
+  position: absolute;
+  top: 96px;
+  right: var(--hud-inset-x);
+  bottom: 100px;
+  width: 520px;
+  z-index: 15;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px 22px 16px;
+  background: rgba(22, 23, 25, 0.95);
+  border: 3px solid var(--jg-secondary);
+  box-shadow: 0 8px 0 var(--jg-secondary);
+  color: var(--fg-primary);
+  font-family: var(--font-body);
+}
+
+.quests[hidden] {
+  display: none;
+}
+
+.quests__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.quests__title {
+  font-family: var(--font-game-display);
+  font-size: 30px;
+  line-height: 1;
+  color: var(--jg-primary);
+  -webkit-text-stroke: 4px var(--jg-secondary);
+  paint-order: stroke fill;
+}
+
+.quests__close {
+  width: 32px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: none;
+  background: var(--jg-secondary);
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  font: 400 14px var(--font-display);
+  color: var(--fg-primary);
+  cursor: pointer;
+}
+
+.quests__tabs {
+  display: flex;
+  border-bottom: 2px solid var(--jg-secondary);
+}
+
+.quests__tab {
+  padding: 8px 16px;
+  border: none;
+  background: transparent;
+  font: 400 13px var(--font-display);
+  letter-spacing: 0.18em;
+  color: var(--fg-primary);
+  cursor: pointer;
+}
+
+.quests__tab[aria-pressed='true'] {
+  background: var(--jg-primary);
+  color: var(--jg-dark);
+}
+
+.quests__list {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.quests__row {
+  display: grid;
+  grid-template-columns: 44px 1fr auto;
+  gap: 14px;
+  align-items: center;
+  width: 100%;
+  padding: 12px 16px;
+  background: transparent;
+  border: 2px solid var(--jg-secondary);
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.quests__row--selected {
+  background: rgba(12, 75, 95, 0.35);
+  border-color: var(--jg-primary);
+}
+
+.quests__row-number {
+  width: 40px;
+  height: 46px;
+  display: grid;
+  place-items: center;
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  background: var(--jg-primary);
+  font: 400 18px var(--font-display);
+  color: var(--jg-dark);
+}
+
+.quests__row-middle {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.quests__row-title {
+  font: 700 15px var(--font-body);
+  color: var(--fg-primary);
+}
+
+.quests__row-location {
+  font: 400 11px var(--font-display);
+  letter-spacing: 0.16em;
+  color: var(--fg-muted);
+}
+
+.quests__row-bar,
+.quest-widget__bar {
+  position: relative;
+  background: #0a0c0f;
+  border: 2px solid var(--jg-secondary);
+}
+
+.quests__row-bar {
+  height: 8px;
+}
+
+.quests__row-bar-fill,
+.quest-widget__bar-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: repeating-linear-gradient(-45deg, var(--jg-primary) 0 8px, #33cbff 8px 16px);
+}
+
+.quests__row-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+.quests__row-progress {
+  font: 400 14px var(--font-display);
+  color: var(--fg-primary);
+}
+
+.quests__row-reward-line {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font: 400 12px var(--font-display);
+  color: var(--jg-primary);
+}
+
+.quests__token-icon {
+  width: 12px;
+  height: 14px;
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  background: var(--jg-primary);
+}
+
+.quests__row-status {
+  font: 400 10px var(--font-display);
+  letter-spacing: 0.16em;
+  color: var(--jg-primary);
+}
+
+.quests__empty {
+  padding: 18px 4px;
+  font: 700 13px var(--font-body);
+  color: var(--fg-muted);
+}
+
+.quests__footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  min-height: 52px;
+  padding-top: 12px;
+  border-top: 2px solid var(--jg-secondary);
+}
+
+.quests__footer-text {
+  font: 700 13px var(--font-body);
+  color: var(--fg-primary);
+}
+
+.quests__track {
+  display: flex;
+  align-items: center;
+  flex: none;
+  height: 40px;
+  padding: 0 20px;
+  border: none;
+  background: var(--jg-primary);
+  clip-path: polygon(
+    12px 0,
+    calc(100% - 12px) 0,
+    100% 50%,
+    calc(100% - 12px) 100%,
+    12px 100%,
+    0 50%
+  );
+  box-shadow: inset 0 -4px 0 var(--jg-secondary);
+  font-family: var(--font-game-display);
+  font-size: 17px;
+  color: var(--jg-dark);
+  cursor: pointer;
+}
+
+.quests__track[hidden] {
+  display: none;
+}
+
+.quests__track:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.quests__tab:focus-visible,
+.quests__row:focus-visible,
+.quests__track:focus-visible,
+.quests__close:focus-visible,
+.quest-widget:focus-visible {
+  outline: 3px solid var(--fg-primary);
+  outline-offset: 2px;
+}
+
+/* QUESTS (#46): white while the panel is open, as SNOWBALL does. */
+.hud__button--quests.hud__button--active {
+  background: var(--jg-light);
+  color: var(--jg-dark);
+}
+
+/* ---- HUD quest widget (HUD-TOWN top-right box) ---- */
+
+.hud__quest-slot {
+  position: absolute;
+  /* The top-right row's 40px height plus the design's 12px gap. */
+  top: calc(var(--hud-inset-y) + 52px);
+  right: var(--hud-inset-x);
+  pointer-events: auto;
+}
+
+.quest-widget {
+  width: 300px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  background: rgba(22, 23, 25, 0.88);
+  border: 2px solid var(--jg-secondary);
+  color: var(--fg-primary);
+  text-align: left;
+  cursor: pointer;
+}
+
+.quest-widget[hidden] {
+  display: none;
+}
+
+.quest-widget__head {
+  display: flex;
+  justify-content: space-between;
+  font: 400 12px var(--font-display);
+  letter-spacing: 0.2em;
+  color: var(--jg-primary);
+}
+
+.quest-widget__count {
+  color: var(--fg-primary);
+}
+
+.quest-widget__count[hidden],
+.quest-widget__bar[hidden],
+.quest-widget__hint[hidden] {
+  display: none;
+}
+
+.quest-widget__title {
+  font: 700 14px var(--font-body);
+  color: var(--fg-primary);
+}
+
+.quest-widget__bar {
+  height: 10px;
+}
+
+.quest-widget__hint {
+  font: 400 13px var(--font-display);
+  letter-spacing: 0.16em;
+  color: var(--jg-primary);
+}
+
+/* ---- QUEST COMPLETE banner (the done screen's Badge-unlock panel) ---- */
+
+#ui > .quest-banner {
+  pointer-events: none;
+}
+
+.quest-banner {
+  position: absolute;
+  top: 150px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 22px;
+  background: rgba(var(--jg-dark-rgb), 0.94);
+  border: 2px solid var(--jg-primary);
+  box-shadow: 0 6px 0 var(--jg-secondary);
+  text-align: left;
+}
+
+.quest-banner[hidden] {
+  display: none;
+}
+
+.quest-banner__icon {
+  width: 40px;
+  height: 46px;
+  flex: none;
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  background: var(--jg-primary);
+}
+
+.quest-banner__text {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.quest-banner__heading {
+  font-family: var(--font-game-display);
+  font-size: 24px;
+  line-height: 1;
+  color: var(--jg-primary);
+  -webkit-text-stroke: 3px var(--jg-secondary);
+  paint-order: stroke fill;
+}
+
+.quest-banner__title {
+  font: 700 14px var(--font-body);
+  color: var(--fg-primary);
+}
+
+.quest-banner__reward {
+  font: 400 12px var(--font-display);
+  letter-spacing: 0.16em;
+  color: var(--jg-primary);
+}
