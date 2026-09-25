@@ -1,11 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  DEFAULT_LOOK,
-  UNNAMED_PENGUIN,
-  type Facing,
-  type PenguinLook,
-  type PresencePayload,
-} from '../../contracts';
+import { DEFAULT_LOOK, type Facing, type PenguinLook, type PresencePayload } from '../../contracts';
 import { MASKED_NAME } from '../../ui/mask-names';
 import type { ScreenPoint } from './iso';
 import { RoomPenguinView, type PlacedPenguin } from './room-penguin-view';
@@ -122,12 +116,30 @@ describe('RoomPenguinView', () => {
     expect(stage.live()).toEqual([]);
   });
 
-  it('name-tags an unnamed Penguin as UNNAMED_PENGUIN', () => {
+  it('does not draw a remote Penguin whose payload has an empty name (#75)', () => {
     const { stage, view } = attachedView();
 
     view.upsert(payload({ look: { ...PEBBLE, name: '' } }));
 
-    expect(stage.live()[0].look.name).toBe(UNNAMED_PENGUIN);
+    expect(stage.placed).toHaveLength(0);
+  });
+
+  it('hides an already-shown Penguin that goes nameless, rather than showing it blank (#75)', () => {
+    const { stage, view } = attachedView();
+    view.upsert(payload());
+
+    view.upsert(payload({ look: { ...PEBBLE, name: '' } }));
+
+    expect(stage.live()).toEqual([]);
+    expect(stage.placed).toHaveLength(1);
+  });
+
+  it('never draws a nameless local Penguin either (#75)', () => {
+    const { stage, view } = attachedView();
+
+    view.showLocal(payload({ playerId: 'player-a', look: { ...PEBBLE, name: '' } }));
+
+    expect(stage.placed).toHaveLength(0);
   });
 
   it('masks every name tag, including on an update, under ?masknames', () => {
@@ -135,7 +147,7 @@ describe('RoomPenguinView', () => {
 
     view.upsert(payload());
     view.upsert(payload({ look: { ...PEBBLE, name: 'Waddles' } }));
-    view.showLocal(payload({ playerId: 'player-a', look: { ...PEBBLE, name: '' } }));
+    view.showLocal(payload({ playerId: 'player-a', look: { ...PEBBLE, name: 'Ada' } }));
 
     expect(stage.live().map((p) => p.look.name)).toEqual([MASKED_NAME, MASKED_NAME]);
     expect(stage.live()[0].look.body).toBe(PEBBLE.body);

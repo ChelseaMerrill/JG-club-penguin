@@ -1,9 +1,4 @@
-import {
-  UNNAMED_PENGUIN,
-  type Facing,
-  type PenguinLook,
-  type PresencePayload,
-} from '../../contracts';
+import { type Facing, type PenguinLook, type PresencePayload } from '../../contracts';
 import type { RemotePenguinView } from '../../realtime/room-channel';
 import { maskName } from '../../ui/mask-names';
 import { depthForTile, tileToScreen, type GridOrigin, type ScreenPoint } from './iso';
@@ -49,7 +44,11 @@ type PenguinKey = string | typeof LOCAL_KEY;
  * Penguin against the entered Room's grid origin. Calls made in between are
  * remembered and drawn on the next `attach()`.
  *
- * Name tags show `look.name || UNNAMED_PENGUIN`, masked under `?masknames`.
+ * A Penguin whose payload has an empty name is not drawn at all: an unnamed
+ * Penguin is never shown in the World (#75), not even with a placeholder.
+ * One that was already shown and goes nameless is removed the same way a
+ * `remove()` would. Name tags otherwise show `look.name`, masked under
+ * `?masknames`.
  */
 export class RoomPenguinView implements RemotePenguinView {
   private readonly search: string;
@@ -93,7 +92,12 @@ export class RoomPenguinView implements RemotePenguinView {
     this.show(LOCAL_KEY, p);
   }
 
+  /** The raw, unmasked name decides whether to draw at all (#75); masking only affects the tag text. */
   private show(key: PenguinKey, p: PresencePayload): void {
+    if (!p.look.name) {
+      this.hide(key);
+      return;
+    }
     this.payloads.set(key, p);
     this.render(key);
   }
@@ -115,9 +119,9 @@ export class RoomPenguinView implements RemotePenguinView {
     this.placed.set(key, place(look, point, depth, p.facing));
   }
 
-  /** #31's name tag shows `look.name || UNNAMED_PENGUIN`; mask at its input. */
+  /** #31's name tag shows `look.name` (never drawn empty; see `show()`); mask at its input. */
   private tagged(look: PenguinLook): PenguinLook {
-    return { ...look, name: maskName(look.name || UNNAMED_PENGUIN, this.search) };
+    return { ...look, name: maskName(look.name, this.search) };
   }
 
   private hide(key: PenguinKey): void {
