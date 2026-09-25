@@ -9,7 +9,14 @@ import {
   isHexColor,
   type PenguinLook,
 } from '../contracts';
-import { normalizeName, sameColor, shuffleLook, toHexColor } from './look';
+import {
+  isNamedLook,
+  normalizeName,
+  sameColor,
+  shuffleLook,
+  toHexColor,
+  validatePenguinName,
+} from './look';
 
 const look: PenguinLook = {
   ...DEFAULT_LOOK,
@@ -47,6 +54,66 @@ describe('normalizeName', () => {
 
   it('never leaves trailing whitespace after capping', () => {
     expect(normalizeName('abcdefghijklmno pqr')).toBe('abcdefghijklmno');
+  });
+
+  it('strips zero-width and bidi-override characters, leaving nothing but whitespace', () => {
+    expect(normalizeName('​')).toBe('');
+    expect(normalizeName(' ‮ ')).toBe('');
+  });
+});
+
+describe('validatePenguinName', () => {
+  it('accepts a trimmed name and cleans it the same way normalizeName does', () => {
+    expect(validatePenguinName('  Ada   Lovelace \n')).toEqual({
+      ok: true,
+      name: 'Ada Lovelace',
+    });
+  });
+
+  it('rejects an empty name', () => {
+    expect(validatePenguinName('')).toEqual({ ok: false, reason: 'empty' });
+  });
+
+  it('rejects a whitespace-only name', () => {
+    expect(validatePenguinName('   ')).toEqual({ ok: false, reason: 'empty' });
+  });
+
+  it('rejects a name made only of invisible characters as empty', () => {
+    expect(validatePenguinName('​')).toEqual({ ok: false, reason: 'empty' });
+    expect(validatePenguinName(' ‮ ')).toEqual({ ok: false, reason: 'empty' });
+  });
+
+  it(`accepts exactly ${PENGUIN_NAME_MAX} code points`, () => {
+    const name = 'x'.repeat(PENGUIN_NAME_MAX);
+    expect(validatePenguinName(name)).toEqual({ ok: true, name });
+  });
+
+  it(`rejects ${PENGUIN_NAME_MAX + 1} code points as too-long, without truncating`, () => {
+    expect(validatePenguinName('x'.repeat(PENGUIN_NAME_MAX + 1))).toEqual({
+      ok: false,
+      reason: 'too-long',
+    });
+  });
+
+  it('counts an emoji as one code point', () => {
+    const name = '🐧'.repeat(PENGUIN_NAME_MAX);
+    expect(validatePenguinName(name)).toEqual({ ok: true, name });
+    expect(validatePenguinName(name + '🐧')).toEqual({ ok: false, reason: 'too-long' });
+  });
+});
+
+describe('isNamedLook', () => {
+  it('is true for a validly named look', () => {
+    expect(isNamedLook({ ...DEFAULT_LOOK, name: 'Waddles' })).toBe(true);
+  });
+
+  it('is false for an empty or invisible-only name', () => {
+    expect(isNamedLook({ ...DEFAULT_LOOK, name: '' })).toBe(false);
+    expect(isNamedLook({ ...DEFAULT_LOOK, name: '​' })).toBe(false);
+  });
+
+  it('is false for a name over the limit', () => {
+    expect(isNamedLook({ ...DEFAULT_LOOK, name: 'x'.repeat(PENGUIN_NAME_MAX + 1) })).toBe(false);
   });
 });
 

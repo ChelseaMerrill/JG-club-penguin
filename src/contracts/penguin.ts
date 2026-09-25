@@ -58,16 +58,29 @@ export const IDLE_EMOTES = ['WADDLE', 'WAVE', 'DANCE', 'LAUGH', 'SIT'] as const;
 export type IdleEmote = (typeof IDLE_EMOTES)[number];
 
 export const PENGUIN_NAME_MAX = 16;
+/** Creator placeholder only; never shown in the World (#75). */
 export const UNNAMED_PENGUIN = 'Unnamed Penguin';
+
+/**
+ * Control, bidi and zero-width characters stripped from a name before it is
+ * validated or shown: C0 controls, DEL/C1 controls, zero-width space through
+ * right-to-left mark, bidi embedding/override controls, isolates, and BOM.
+ * Shared by `src/penguin/look.ts` (`normalizeName`, `validatePenguinName`)
+ * and `src/realtime/room-channel.ts` (`sanitizeName`), so a name made only of
+ * invisible characters can never validate as non-empty (#75 red-team R2-1).
+ */
+export const UNSAFE_NAME_CHARS_RE =
+  // eslint-disable-next-line no-control-regex
+  /[\u0000-\u001F\u007F-\u009F\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g;
 
 /**
  * Producer: #35 Creator (saved via #34). Consumers: #31 renderer, #28
  * Presence payload, #32 HUD.
  *
  * `name` is trimmed, 1-16 characters once saved; it is `''` only before the
- * Creator has been completed, and is never seeded from the Google display
- * name. Display it as `name || UNNAMED_PENGUIN`. The Igloo Starter Kit is
- * not part of the look.
+ * Creator has been completed. It is never seeded from the Google display
+ * name, and `UNNAMED_PENGUIN` is a Creator placeholder only: never shown in
+ * the World (#75). A nameless Penguin is not drawn there at all.
  */
 export interface PenguinLook {
   name: string;
