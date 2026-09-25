@@ -5,6 +5,22 @@ import { PENGUIN_FRAME_MS, PENGUIN_FRAMES, type PenguinAnim } from './poses';
 import { PENGUIN_FRAME_PADDING_Y, PENGUIN_ORIGIN, penguinFeetOrigin } from './render-svg';
 import { ensurePenguinTextures, penguinTextureKey } from './texture';
 
+// #131: in-Room Player Penguins (this file's own `createPenguin` sprite --
+// yours, the debug Penguin and every remote Penguin `RoomScene.ts` builds
+// with it) draw at the design's own scale rather than 1:1 of the 120x130
+// design box. `design/Room 01 Town Center.dc.html`'s "You" figure is
+// `<svg width="69.6" ... viewBox="0 0 120 130">`: `69.6 / 120 = 0.58`.
+// Applied with `sprite.setScale` around the sprite's own feet-anchor origin,
+// which keeps the feet pinned to the same Stage point (Phaser scales a
+// GameObject's display size around its fractional origin, not its top-left).
+// Everything else positioned off the sprite's own frame size -- the chat
+// bubble anchor and the snow hat's position/drawn size below -- scales by
+// this same constant so it still sits correctly against the smaller figure;
+// the name tag (anchored under the feet, not off the frame) does not. The
+// Penguin Creator preview, the landing-page crowd and NPCs (#113, a separate
+// branch) are untouched -- none of them call this `createPenguin`.
+export const PLAYER_PENGUIN_SCALE = 0.58;
+
 const NAME_TAG_BG = 0x00bdff;
 const NAME_TAG_TEXT_COLOR = '#161719';
 // design/Penguin Creator.dc.html line 70: `font: 700 15px 'Libre Franklin', sans-serif`.
@@ -41,7 +57,11 @@ const BUBBLE_MAX_WIDTH = 260;
 // regardless of frame size, since that's exactly what the feet-anchor
 // origin fraction cancels out to).
 const BUBBLE_GAP = 10;
-const BUBBLE_ANCHOR_Y = -(PENGUIN_ORIGIN.y + PENGUIN_FRAME_PADDING_Y) - BUBBLE_GAP;
+// Scaled by PLAYER_PENGUIN_SCALE (#131): this whole offset is measured off
+// the sprite's own (unscaled) frame size, so it must shrink with the sprite
+// to stay the same visual gap above the smaller figure's head.
+const BUBBLE_ANCHOR_Y =
+  (-(PENGUIN_ORIGIN.y + PENGUIN_FRAME_PADDING_Y) - BUBBLE_GAP) * PLAYER_PENGUIN_SCALE;
 
 // Snow hat (#53 D4): a transient 10 s effect on a hit Penguin, never a `Hat`
 // of the Penguin look. Drawn as the design's HUD-SNOWBALL splat mound (a
@@ -49,7 +69,22 @@ const BUBBLE_ANCHOR_Y = -(PENGUIN_ORIGIN.y + PENGUIN_FRAME_PADDING_Y) - BUBBLE_G
 // frame's unpadded top edge, `PENGUIN_ORIGIN.y` above the feet anchor.
 const SNOW_HAT_COLOR = 0xf4f4f4;
 const SNOW_HAT_OUTLINE = 0x0c4b5f;
-const SNOW_HAT_Y = -PENGUIN_ORIGIN.y + 14;
+// Scaled by PLAYER_PENGUIN_SCALE (#131), same reasoning as BUBBLE_ANCHOR_Y:
+// measured off the sprite's own frame size, so it shrinks with the head.
+const SNOW_HAT_Y = (-PENGUIN_ORIGIN.y + 14) * PLAYER_PENGUIN_SCALE;
+// The mound's own drawn size (ellipse + three lumps), sized to the head, so
+// it scales by the same factor (#131) rather than staying full head-sized on
+// a shrunk head.
+const SNOW_HAT_WIDTH = 60 * PLAYER_PENGUIN_SCALE;
+const SNOW_HAT_HEIGHT = 24 * PLAYER_PENGUIN_SCALE;
+const SNOW_HAT_LUMP_LEFT_X = -20 * PLAYER_PENGUIN_SCALE;
+const SNOW_HAT_LUMP_LEFT_Y = 8 * PLAYER_PENGUIN_SCALE;
+const SNOW_HAT_LUMP_LEFT_R = 6 * PLAYER_PENGUIN_SCALE;
+const SNOW_HAT_LUMP_RIGHT_X = 18 * PLAYER_PENGUIN_SCALE;
+const SNOW_HAT_LUMP_RIGHT_Y = 9 * PLAYER_PENGUIN_SCALE;
+const SNOW_HAT_LUMP_RIGHT_R = 7 * PLAYER_PENGUIN_SCALE;
+const SNOW_HAT_LUMP_CENTER_Y = 14 * PLAYER_PENGUIN_SCALE;
+const SNOW_HAT_LUMP_CENTER_R = 5 * PLAYER_PENGUIN_SCALE;
 
 /** Phaser's always-present built-in placeholder texture. */
 const PLACEHOLDER_TEXTURE_KEY = '__DEFAULT';
@@ -135,6 +170,10 @@ export function createPenguin(
 
   const sprite = new GameObjects.Sprite(scene, 0, 0, PLACEHOLDER_TEXTURE_KEY);
   sprite.setOrigin(origin.x, origin.y);
+  // #131: shrinks the sprite to the design's own scale, around its
+  // feet-anchor origin above -- Phaser scales a GameObject's display size
+  // around its fractional origin, so the feet stay pinned at (x, y).
+  sprite.setScale(PLAYER_PENGUIN_SCALE);
   sprite.setFlipX(facing === 'left');
 
   const pill = new GameObjects.Graphics(scene);
@@ -168,11 +207,15 @@ export function createPenguin(
   const snowHat = new GameObjects.Graphics(scene);
   snowHat.lineStyle(2, SNOW_HAT_OUTLINE, 1);
   snowHat.fillStyle(SNOW_HAT_COLOR, 1);
-  snowHat.fillEllipse(0, SNOW_HAT_Y, 60, 24);
-  snowHat.strokeEllipse(0, SNOW_HAT_Y, 60, 24);
-  snowHat.fillCircle(-20, SNOW_HAT_Y - 8, 6);
-  snowHat.fillCircle(18, SNOW_HAT_Y - 9, 7);
-  snowHat.fillCircle(0, SNOW_HAT_Y - 14, 5);
+  snowHat.fillEllipse(0, SNOW_HAT_Y, SNOW_HAT_WIDTH, SNOW_HAT_HEIGHT);
+  snowHat.strokeEllipse(0, SNOW_HAT_Y, SNOW_HAT_WIDTH, SNOW_HAT_HEIGHT);
+  snowHat.fillCircle(SNOW_HAT_LUMP_LEFT_X, SNOW_HAT_Y - SNOW_HAT_LUMP_LEFT_Y, SNOW_HAT_LUMP_LEFT_R);
+  snowHat.fillCircle(
+    SNOW_HAT_LUMP_RIGHT_X,
+    SNOW_HAT_Y - SNOW_HAT_LUMP_RIGHT_Y,
+    SNOW_HAT_LUMP_RIGHT_R,
+  );
+  snowHat.fillCircle(0, SNOW_HAT_Y - SNOW_HAT_LUMP_CENTER_Y, SNOW_HAT_LUMP_CENTER_R);
   snowHat.setVisible(false);
 
   const container = scene.add.container(x, y, [

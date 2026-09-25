@@ -22,7 +22,7 @@ import {
 import { doorApproachTile, npcInteractionTile } from '../movement/targets';
 import { getNpcDefinition } from '../../npcs/npcs';
 import { createNpcSprite, type NpcSprite } from '../npcs/npc-sprite';
-import { createPenguin, type Penguin, type PenguinAnim } from '../penguin';
+import { createPenguin, PLAYER_PENGUIN_SCALE, type Penguin, type PenguinAnim } from '../penguin';
 import { GAME_HEIGHT, GAME_WIDTH } from '../stage-size';
 import { planBackgroundDraw } from './background';
 import {
@@ -191,8 +191,13 @@ const SNOWBALL_DEPTH = SNOWBALL_LAYER;
 const SNOWBALL_CYAN = 0x00bdff;
 const SNOWBALL_WHITE = 0xf4f4f4;
 const SNOWBALL_OUTLINE = 0x0c4b5f;
-/** Arcs start at chest height, this far above the feet point every `SnowballView` point is. */
-const SNOWBALL_CHEST_OFFSET_Y = 60;
+/**
+ * Arcs start at chest height, this far above the feet point every
+ * `SnowballView` point is. Scaled by `PLAYER_PENGUIN_SCALE` (#131): chest
+ * height is measured off the Penguin sprite's own size, so it shrinks with
+ * the sprite (≈ 60 × 0.58).
+ */
+const SNOWBALL_CHEST_OFFSET_Y = 60 * PLAYER_PENGUIN_SCALE;
 const SNOWBALL_PREVIEW_SEGMENTS = 28;
 /** How long a splat stays up before it has faded out (#53 D2: ~400 ms). */
 const SNOWBALL_SPLAT_MS = 400;

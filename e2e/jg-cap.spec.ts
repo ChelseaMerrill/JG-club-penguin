@@ -10,9 +10,12 @@ const BOOT_TIMEOUT = 15_000;
 // arm) and its cap with room to spare, without depending on the renderer's
 // own offscreen frame size (`PENGUIN_FRAME_WIDTH`/`HEIGHT`), which is a
 // different coordinate space from the in-Room sprite's Stage pixels.
-const PENGUIN_CROP_HALF_WIDTH = 90;
-const PENGUIN_CROP_ABOVE = 160;
-const PENGUIN_CROP_BELOW = 40;
+// Scaled by `PLAYER_PENGUIN_SCALE` (#131: in-Room Player Penguins now draw
+// at the design's 0.58 scale), so the crop stays tight enough for the cap to
+// still be legible in the screenshot rather than dominated by empty space.
+const PENGUIN_CROP_HALF_WIDTH = 52; // 90 * 0.58
+const PENGUIN_CROP_ABOVE = 93; // 160 * 0.58
+const PENGUIN_CROP_BELOW = 23; // 40 * 0.58
 
 /** Fails the test on any uncaught page error or console error. */
 function collectErrors(page: Page): string[] {
