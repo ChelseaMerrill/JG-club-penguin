@@ -42,6 +42,8 @@ export const DEV_PIT_MOTIONS: Partial<Record<NpcId, NpcMotionSpec>> = {
         '@keyframes idle { 0%,100% { transform: translateY(0);} 50% { transform: translateY(-3px);} }',
       animation: 'idle 3s ease-in-out -1s infinite',
     },
+    // The scribbling arm is the moving version of his `npcs.ts` `marker`.
+    replaceFigureRestPose: true,
     props: [
       {
         svg: '<path d="M92 78 L112 56" stroke="#2B3557" stroke-width="6" stroke-linecap="round"/><circle cx="113" cy="54" r="5.5" fill="#E4B896" stroke="#0C4B5F" stroke-width="2"/><rect x="110" y="44" width="6" height="14" rx="2" fill="#D63C3C" stroke="#0C4B5F" stroke-width="1.5"/>',
@@ -92,6 +94,7 @@ export const DEV_PIT_MOTIONS: Partial<Record<NpcId, NpcMotionSpec>> = {
       animation: 'ryanDance 20s ease-in-out infinite',
       transformOrigin: '60px 120px',
     },
+    replaceFigureRestPose: true,
     props: [
       {
         svg: '<path d="M92 78 L112 56" stroke="#1f2a4a" stroke-width="6" stroke-linecap="round"/><circle cx="113" cy="54" r="5.5" fill="#F3D3B8" stroke="#0C4B5F" stroke-width="2"/><rect x="110" y="44" width="6" height="14" rx="2" fill="#00BDFF" stroke="#0C4B5F" stroke-width="1.5"/>',
@@ -119,6 +122,7 @@ export const DEV_PIT_MOTIONS: Partial<Record<NpcId, NpcMotionSpec>> = {
       animation: 'samSpin 20s ease-in-out -4s infinite',
       transformOrigin: '60px 120px',
     },
+    replaceFigureRestPose: true,
     props: [
       {
         svg: '<path d="M92 78 L112 56" stroke="#1f2a4a" stroke-width="6" stroke-linecap="round"/><circle cx="113" cy="54" r="5.5" fill="#F3D3B8" stroke="#0C4B5F" stroke-width="2"/><rect x="110" y="44" width="6" height="14" rx="2" fill="#00BDFF" stroke="#0C4B5F" stroke-width="1.5"/>',

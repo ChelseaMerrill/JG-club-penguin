@@ -64,7 +64,9 @@ export type NpcId =
   | 'sydney-team-room-3'
   | 'michael'
   | 'sam-team-room-4'
-  | 'ryan-team-room-4';
+  | 'ryan-team-room-4'
+  // #113: Town Center's Jory Hutchins, on the couch. Her first Room.
+  | 'jory';
 
 /**
  * A minigame-launching NPC's trigger dialog (#36 D4; round-1 review item 4
@@ -106,20 +108,21 @@ export type NpcDialog = NpcMinigameDialog | NpcStallDialog | NpcLineDialog;
  * own `say`-style CSS animation (`design/Room 01 Town Center.dc.html` and
  * siblings) (#36 round-1 review item 2/3b): `periodS` is the animation's own
  * duration, and `delayS` is its CSS `animation-delay` (typically negative,
- * "already elapsed at load"), both normalized onto the shared 7%-26%-of-
- * period visible window Dev Pit's and Roof Deck's generic `@keyframes say`
- * use (Town Center's own per-NPC keyframes -- `sayDarrin`, `saySyd`, `sayJon`
- * -- are converted to an equivalent delay under that same window, so every
- * NPC's cycle uses one shared render-side timing model).
+ * "already elapsed at load"). `window` is the fraction of the period the line
+ * is fully shown, from the design's own keyframes; it defaults to the shared
+ * 7%-26% of the generic `@keyframes say` most Rooms use, and only Town
+ * Center's per-NPC keyframes (`sayDarrin`, `saySyd`, `sayJon`, `sayJory`) set
+ * their own (#113). `bubbleSchedule()` turns all three into show times.
  *
  * `periodS: 0` means the design shows this line statically, with no cycling
- * at all (Front Desk, and every The Melt NPC -- `design/Room 04
- * Kitchen.dc.html` has zero `animation:say` occurrences).
+ * at all (Front Desk, and the static bubbles in the #51 Rooms). The Kitchen
+ * cycles its lines with the generic `say` like the other Rooms (#91).
  */
 export interface NpcBubbleLine {
   text: string;
   periodS: number;
   delayS: number;
+  window?: readonly [start: number, end: number];
 }
 
 interface NpcDefinitionBase {
@@ -164,24 +167,29 @@ interface NpcDefinitionBase {
    * (Kevin, Ann Marie, Josh, Casey) float their speech bubble left of their
    * own nameplate/figure centre by exactly -90px (#36 round-1 review item
    * 3c; traced directly from the Room design's own bubble-vs-nameplate x
-   * offset). Dev Pit's row-1/row-5 NPCs sat close enough after #92's D3
-   * round 2 resync (Ian/Dom one tile apart; Ryan/Steven/Sam two tiles apart
-   * each) that their bubbles visibly overlapped -- confirmed via an e2e
-   * screenshot -- so those are spread apart by a nudge instead (`ian`/`dom`
-   * and `ryan`/`sam`'s own doc comments).
+   * offset), and Dev Pit's Dom, one tile right of Ian, shifts his bubble
+   * clear of Ian's nameplate (see `dom`).
    */
   bubbleOffsetX?: number;
   /**
    * A per-NPC vertical nudge (more negative floats the bubble higher),
-   * layered on top of the shared head-top offset every NPC otherwise uses.
-   * Only set where deriving a screen position from `npcs.ts`'s own tile
-   * grid (rather than the design's exact, hand-placed pixel layout) pushed
-   * two NPCs' Room elements close enough to visually collide: e.g. Tristin's
-   * bubble and Millie's nameplate, confirmed via an e2e screenshot to
-   * overlap (#36 round-1 review item 3's overlap check) even though the
-   * source design's own pixel coordinates for the two don't.
+   * layered on top of the layout's bubble position just above the nameplate
+   * (`npc-layout.ts`). Only set where deriving a screen position from the
+   * Room's tile grid (rather than the design's exact, hand-placed pixel
+   * layout) puts two NPCs' bubbles on top of each other while both are
+   * shown: `npcs.test.ts`'s time-aware bubble check (#113) guards it.
    */
   bubbleOffsetY?: number;
+  /**
+   * `true` for an NPC its Room design draws without the shared `idle` bob
+   * (#113: Dev Pit's Ian, Chelsea). Every other NPC bobs.
+   */
+  still?: boolean;
+  /**
+   * The idle bob's cycle in seconds, when the Room design's differs from the
+   * shared 3 s (#113: the Icebox's `idle 1.1s`).
+   */
+  bobPeriodS?: number;
 }
 
 /** A Human NPC (`design/build/humans.js`'s figures), rendered by `render-npc-svg.ts`. */
@@ -197,6 +205,30 @@ export interface PenguinNpcDefinition extends NpcDefinitionBase {
 }
 
 export type NpcDefinition = HumanNpcDefinition | PenguinNpcDefinition;
+
+/**
+ * Dev Pit's whiteboard markers (#113), verbatim from the design's raised-arm
+ * `scribble` markup: Ryan's and Sam's cyan, Steven's red, each with its own
+ * sleeve and hand colour as drawn.
+ */
+const DEV_PIT_CYAN_MARKER: HumanFigureSpec['marker'] = {
+  arm: '#1f2a4a',
+  hand: '#F3D3B8',
+  color: '#00BDFF',
+};
+const DEV_PIT_RED_MARKER: HumanFigureSpec['marker'] = {
+  arm: '#2B3557',
+  hand: '#E4B896',
+  color: '#D63C3C',
+};
+
+/**
+ * The Icebox design's faster shared bob (`animation:idle 1.1s`) for all five
+ * of its NPCs (#113). While their roams run, `motions/the-icebox.ts`'s own
+ * port of that same `idle` plays instead (a designed motion replaces the
+ * idle bob), so this cycle only applies to an Icebox NPC without one.
+ */
+const ICEBOX_BOB_PERIOD_S = 1.1;
 
 const BUG_SQUASH_DIALOG: NpcMinigameDialog = {
   kind: 'minigame',
@@ -305,7 +337,9 @@ const IAN_FIGURE: HumanFigureSpec = {
   skin: 'fair',
   top: '#161719',
   collar: 'polo',
-  beard: 'full',
+  // Both his Rooms' designs (Dev Pit, Team Room 2) draw light dotted stubble,
+  // not humans.js's full beard (#113).
+  beard: 'dotStubble',
   teeth: true,
   prop: 'laptop',
 };
@@ -451,10 +485,14 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     kind: 'human',
     tagName: 'Darrin Jahnel',
     dialogLine: 'Show me energy.',
+    // `sayDarrin` (9%-28%) and `sayDarrin2` (55%-76%), 11 s, no delay.
     idleLines: [
-      { text: "LET'S GO! Who's shipping today?!", periodS: 11, delayS: -0.22 },
-      { text: 'YOU. ARE. CRUSHING IT.', periodS: 11, delayS: -5.28 },
+      { text: "LET'S GO! Who's shipping today?!", periodS: 11, delayS: 0, window: [0.09, 0.28] },
+      { text: 'YOU. ARE. CRUSHING IT.', periodS: 11, delayS: 0, window: [0.55, 0.76] },
     ],
+    // His tile sits one screen row above Sydney's and Jory's, so his bubble
+    // would overlap the top 5 px of theirs: lifted 8 px to clear them.
+    bubbleOffsetY: -8,
     dialog: LINE_DIALOG,
     figure: DARRIN_FIGURE,
   },
@@ -466,7 +504,11 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     kind: 'human',
     tagName: 'Jon Keller',
     dialogLine: 'Welcome to JG. Sunglasses stay on.',
-    idleLines: [{ text: 'Wanna see a magic trick?', periodS: 14, delayS: -1.68 }],
+    // `sayJon` shows the same line twice per 14 s cycle: 19%-32% and 61%-74%.
+    idleLines: [
+      { text: 'Wanna see a magic trick?', periodS: 14, delayS: 0, window: [0.19, 0.32] },
+      { text: 'Wanna see a magic trick?', periodS: 14, delayS: 0, window: [0.61, 0.74] },
+    ],
     dialog: LINE_DIALOG,
     figure: {
       style: 'spiky',
@@ -478,6 +520,8 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       glasses: 'sun',
       mouth: 'smirk',
       prop: 'scarf',
+      // Town Center's design puts three playing cards in his hand (`trick`).
+      cards: true,
     },
   },
   sydney: {
@@ -488,12 +532,40 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     kind: 'human',
     tagName: 'Sydney Murauskas',
     dialogLine: 'Welcome to JG HQ!',
+    // `saySyd` (21%-33%) and `saySyd2` (60%-84%), 24 s, no delay.
     idleLines: [
-      { text: 'Look what we won!', periodS: 24, delayS: -3.36 },
-      { text: 'Serve. Grind. Grow. Inspire.', periodS: 24, delayS: -12.72 },
+      { text: 'Look what we won!', periodS: 24, delayS: 0, window: [0.21, 0.33] },
+      { text: 'Serve. Grind. Grow. Inspire.', periodS: 24, delayS: 0, window: [0.6, 0.84] },
     ],
     dialog: LINE_DIALOG,
     figure: SYDNEY_FIGURE,
+  },
+  // #113: Town Center's design draws Jory Hutchins on the couch with her own
+  // nameplate and `sayJory` bubble. Name, title and dialog line from her
+  // design/Characters.dc.html card; figure from humans.js's `hutchins`.
+  jory: {
+    id: 'jory',
+    name: 'Jory Hutchins',
+    title: 'Director of Career Development',
+    roomId: 'town-center',
+    kind: 'human',
+    tagName: 'Jory Hutchins',
+    dialogLine: 'The tribe has spoken.',
+    // `sayJory` (63%-88%), 9 s, no delay.
+    idleLines: [{ text: 'COUCH. IS. LAVA.', periodS: 9, delayS: 0, window: [0.63, 0.88] }],
+    dialog: LINE_DIALOG,
+    figure: {
+      style: 'short',
+      hair: 'brown',
+      skin: 'fair',
+      top: '#1f6b4a',
+      collar: 'crew',
+      glasses: 'rect',
+      beard: 'stubble',
+      teeth: true,
+      hat: 'survivor',
+      tee: 'survivor',
+    },
   },
   'front-desk': {
     id: 'front-desk',
@@ -543,14 +615,10 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: 'Who broke CI? Be honest.', periodS: 22, delayS: -1 },
       { text: 'Grab the hammer. CI is red.', periodS: 22, delayS: -10 },
     ],
-    // #92 D3 round 2 moved Ian to (1,5) and Dom to (2,5), one tile apart
-    // (confirmed via an e2e screenshot to overlap at their derived screen
-    // position): nudged apart horizontally, opposite Dom's own +80 below.
-    // 80, not 70 (#36 round-2 review item 4): the minimum that clears their
-    // bubble rects at the shared bubble-width ceiling (`npc-sprite.ts`'s own
-    // `MAX_BUBBLE_WIDTH`) while still spanning Ian's own tile x, confirmed by
-    // `npcs.test.ts`'s geometric bubble-rect check.
-    bubbleOffsetX: -80,
+    // No `still` and no nudge: the Dev Pit design draws him without the
+    // shared idle bob, but he now walks a loop (owner request, 2026-09-25;
+    // `motions/dev-pit.ts`), and Dom, whose bubble his used to clear, is no
+    // longer in this Room.
     dialog: BUG_SQUASH_DIALOG,
     figure: IAN_FIGURE,
   },
@@ -578,6 +646,8 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       beard: 'full',
       mouth: 'smirk',
       greys: true,
+      // Dev Pit's design raises a red whiteboard marker (`scribble`).
+      marker: DEV_PIT_RED_MARKER,
     },
   },
   dom: {
@@ -593,8 +663,6 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: 'Dashboards are lava.', periodS: 18, delayS: -7 },
       { text: 'Do not tell facilities.', periodS: 18, delayS: -13 },
     ],
-    // See Ian's own bubbleOffsetX note above -- the two are one tile apart.
-    bubbleOffsetX: 80,
     dialog: LINE_DIALOG,
     figure: DOM_FIGURE,
   },
@@ -611,17 +679,13 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: 'This diagram is load-bearing.', periodS: 20, delayS: -8 },
       { text: 'Whiteboard is the real repo.', periodS: 20, delayS: -14 },
     ],
-    // #92 D3 round 2's row-1 trio (Ryan, Steven, Sam) sit only 2 tiles apart
-    // each (confirmed via an e2e screenshot to overlap): Ryan and Sam nudged
-    // apart from Steven in the middle, opposite Sam's own +100 below.
-    // 100, not 110 (#36 round-2 review item 4): 110 pushed the bubble rect
-    // (at `npc-sprite.ts`'s own `MAX_BUBBLE_WIDTH` ceiling) fully past Ryan's
-    // own tile x, so its rect no longer spanned him; 100 is the exact value
-    // both constraints allow here, confirmed by `npcs.test.ts`'s geometric
-    // bubble-rect check.
-    bubbleOffsetX: -100,
+    // No nudge (#113): the row-1 trio (Ryan, Steven, Sam) sit two tiles
+    // apart on a diagonal, one screen row (50 px) apart each, so their
+    // one-line, design-height bubbles no longer overlap.
     dialog: LINE_DIALOG,
-    figure: RYAN_FIGURE,
+    // Dev Pit's design raises a cyan whiteboard marker (`scribble`); Team
+    // Room 4's doesn't, so it's this entry's own override.
+    figure: { ...RYAN_FIGURE, marker: DEV_PIT_CYAN_MARKER },
   },
   sam: {
     id: 'sam',
@@ -636,10 +700,9 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: 'Drawing the architecture. Again.', periodS: 20, delayS: -11 },
       { text: 'Ship it Friday. What could go wrong.', periodS: 20, delayS: -17 },
     ],
-    // See Ryan's own bubbleOffsetX note above -- the row-1 trio sit close together.
-    bubbleOffsetX: 100,
     dialog: LINE_DIALOG,
-    figure: SAM_FIGURE,
+    // As Ryan's: the marker is Dev Pit's only.
+    figure: { ...SAM_FIGURE, marker: DEV_PIT_CYAN_MARKER },
   },
   kevin: {
     id: 'kevin',
@@ -665,8 +728,14 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     kind: 'human',
     tagName: 'Ann Marie',
     dialogLine: 'That cap? Totally your color.',
-    idleLines: [{ text: 'Try it on!', periodS: 12, delayS: -6 }],
+    idleLines: [
+      { text: 'Cyan cap? 120 tokens.', periodS: 12, delayS: 0 },
+      { text: 'Try it on!', periodS: 12, delayS: -6 },
+    ],
     bubbleOffsetX: -90,
+    // Her stall's tile sits one screen row above Millie's, so her bubble
+    // would overlap the top 5 px of Millie's: lifted 8 px to clear it.
+    bubbleOffsetY: -8,
     dialog: LINE_DIALOG,
     figure: {
       style: 'wavyLong',
@@ -758,7 +827,9 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: 'Reel talk: check the sender.', periodS: 28, delayS: -20 },
     ],
     dialog: LINE_DIALOG,
-    figure: ANTHONY_FIGURE,
+    // Roof Deck's design gives him a fishing rod baited with a "FREE $$$"
+    // envelope instead of his laptop; the Hallway's keeps the laptop.
+    figure: { ...ANTHONY_FIGURE, prop: 'fishingRod' },
   },
   tristin: {
     id: 'tristin',
@@ -772,12 +843,6 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: "It's 12° out here.", periodS: 24, delayS: -1 },
       { text: 'Worth it for snacks.', periodS: 24, delayS: -13 },
     ],
-    // Confirmed via an e2e screenshot: at his own tile's derived screen
-    // position, Tristin's bubble overlapped Millie's nameplate (they sit far
-    // apart on the design's own hand-placed canvas, but close together once
-    // both are projected from `roofDeck.npcSlots`' tile grid). Nudged up to
-    // clear it.
-    bubbleOffsetY: -60,
     dialog: LINE_DIALOG,
     look: TRISTIN_LOOK,
   },
@@ -821,6 +886,8 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       top: '#6E86A8',
       pattern: 'stripes',
       pattern2: '#9FB3CC',
+      // The Kitchen design's green apron over the shirt.
+      apron: true,
       collar: 'button',
       glasses: 'rect',
       teeth: true,
@@ -840,9 +907,13 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: 'GOLDEN. Not before.', periodS: 13, delayS: -4.5 },
       { text: 'Tom, stop eating the burnt ones.', periodS: 13, delayS: -9 },
     ],
+    // The Kitchen design draws her without the shared idle bob.
+    still: true,
     dialog: PANCAKE_FLIP_DIALOG,
     figure: {
-      style: 'curlyLong',
+      // The Kitchen design's textured hair and pleated toque, not humans.js's
+      // curls and puffy chef's hat.
+      style: 'texturedLong',
       hair: 'blond',
       skin: 'fair',
       top: '#161719',
@@ -852,7 +923,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       earrings: '#F06A5A',
       teeth: true,
       prop: 'spatula',
-      hat: 'chef',
+      hat: 'toque',
     },
   },
   tonya: {
@@ -907,6 +978,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: 'Standup was 4 minutes. Record.', periodS: 26, delayS: -12 },
       { text: 'Trivia time. Door stays shut.', periodS: 26, delayS: -20 },
     ],
+    bobPeriodS: ICEBOX_BOB_PERIOD_S,
     dialog: LINE_DIALOG,
     // The same figure as her Roof Deck appearance (`millie` above); shared
     // via the `MILLIE_FIGURE` constant so the two can't drift.
@@ -925,9 +997,10 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: 'Account manager mode: on.', periodS: 15, delayS: -7 },
       { text: 'Nope, that is billable.', periodS: 15, delayS: -12 },
     ],
+    bobPeriodS: ICEBOX_BOB_PERIOD_S,
     dialog: LINE_DIALOG,
-    // humans.js's spec. The Room design also seats her on a stool with a
-    // laptop on her lap, a scene-only pose the renderer doesn't draw.
+    // humans.js's spec, seated with a laptop on her lap as the Room design
+    // draws her (#113).
     figure: {
       style: 'wavyLong',
       hair: 'lblond',
@@ -936,6 +1009,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       sleeveless: true,
       necklace: true,
       teeth: true,
+      seated: 'laptop',
     },
   },
   jason: {
@@ -951,6 +1025,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: 'Three questions and you may pass.', periodS: 26, delayS: -10 },
       { text: 'Kickoff in 4:32. Sit.', periodS: 26, delayS: -18 },
     ],
+    bobPeriodS: ICEBOX_BOB_PERIOD_S,
     dialog: LINE_DIALOG,
     figure: {
       style: 'buzz',
@@ -977,15 +1052,11 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: 'One more for the recap.', periodS: 21, delayS: -9 },
       { text: 'Say hackathon!', periodS: 21, delayS: -16 },
     ],
-    // Confirmed via an e2e screenshot (#113): at their own tiles' derived
-    // screen positions, Jethro's bubble (his row+col puts his feet, and so
-    // his head-top, far enough down-screen that HEAD_TOP_OFFSET_Y alone
-    // isn't enough clearance) crowded right up against Nicole's nameplate
-    // just above and to his left. Nudged up to clear it, the same fix
-    // Roof Deck's Tristin got against Millie's nameplate.
-    bubbleOffsetY: -60,
+    bobPeriodS: ICEBOX_BOB_PERIOD_S,
     dialog: LINE_DIALOG,
-    figure: JETHRO_FIGURE,
+    // The Icebox design straps a camera rig to his chest; Team Room 1's
+    // doesn't, so it's this entry's own override.
+    figure: { ...JETHRO_FIGURE, cameraRig: true },
   },
   'darrin-icebox': {
     id: 'darrin-icebox',
@@ -1000,6 +1071,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: 'Serve. Grind. Grow. Inspire.', periodS: 15, delayS: -6 },
       { text: 'Who is demoing first?', periodS: 15, delayS: -11 },
     ],
+    bobPeriodS: ICEBOX_BOB_PERIOD_S,
     dialog: LINE_DIALOG,
     // The same figure as his Town Center appearance (`darrin` above); shared
     // via the `DARRIN_FIGURE` constant so the two can't drift.
@@ -1028,6 +1100,9 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     tagName: 'Emily Smith',
     dialogLine: 'Ever thought about joining JG?',
     idleLines: staticLine('Joining JG?'),
+    // One tile from Anthony, one screen row above him, and both bubbles are
+    // always shown: lifted 8 px to clear the top of his.
+    bubbleOffsetY: -8,
     dialog: LINE_DIALOG,
     figure: {
       style: 'wavyLong',
