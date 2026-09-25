@@ -10,16 +10,25 @@ const DOOR_HOTSPOT_SIZE = { width: 70, height: 165 };
 
 // Traced from `design/Room 02 Dev Pit.dc.html`'s fixtures: the "SPRINT 42"
 // whiteboard/desk cluster (cols 1-4, rows 1-3) and a small pedestal by THE
-// ICEBOX elevator (col 11, row 3). Every NPC's own tile (see `npcSlots`
-// below) is additionally blocked so a Penguin can't walk through them (#16
-// fix 5) -- this Room's floor was otherwise fully open.
+// ICEBOX elevator (col 11, row 3). #92 D3 resync added five more desks
+// (each a monitor tile plus the desktop/keyboard tile just in front of it,
+// the same two-tile footprint the original desk already blocked): (4,1)/
+// (5,2) (partially overlapping the original cluster's own (4,2)), (1,4)/
+// (1,5), (4,5) (its monitor tile (4,4) is left walkable -- blocking it seals
+// (2,4)/(3,4)/(2,5) into a pocket with no other opening, `reachability.test.ts`
+// catches this, so it's left walkable as a documented exception, the same
+// call Roof Deck's Kevin/Josh aisle makes), (7,1) (its desktop tiles
+// (7,2)/(8,2) were already blocked as Ryan's and Sam's own NPC tiles,
+// below), and (7,4)/(7,5). Every NPC's own tile (see `npcSlots` below) is
+// additionally blocked so a Penguin can't walk through them (#16 fix 5) --
+// this Room's floor was otherwise fully open.
 const WALKABLE: readonly (readonly boolean[])[] = [
   [true, true, true, true, true, true, true, true, true, true, true, true],
-  [true, false, false, false, true, true, true, true, true, true, true, true],
-  [true, false, false, false, false, true, true, false, false, true, true, true],
+  [true, false, false, false, false, true, true, false, true, true, true, true],
+  [true, false, false, false, false, false, true, false, false, true, true, true],
   [true, true, false, false, false, true, true, true, true, true, true, false],
-  [true, true, true, true, true, true, true, true, true, true, true, true],
-  [true, true, true, false, true, true, true, true, true, true, true, true],
+  [true, false, true, true, true, true, true, false, true, true, true, true],
+  [true, false, true, false, false, true, true, false, true, true, true, true],
   [true, true, false, true, true, true, true, true, true, true, true, true],
   [true, true, true, true, true, true, true, true, true, true, true, true],
   [true, true, true, true, true, true, true, true, true, true, false, true],
@@ -29,9 +38,9 @@ const WALKABLE: readonly (readonly boolean[])[] = [
 /**
  * Traced from `design/Room 02 Dev Pit.dc.html`: a real door back to Town
  * Center, and THE ICEBOX disabled (not one of this prototype's five Rooms).
- * The design has no in-scene door or elevator toward The Melt/Kitchen at
- * all (confirmed: no "MELT"/"KITCHEN" text anywhere in the file), so this
- * Room defines no door to The Melt.
+ * The design has no in-scene door or elevator toward the Kitchen at all
+ * (confirmed: no "MELT"/"KITCHEN" text anywhere in the file), so this
+ * Room defines no door to the Kitchen.
  */
 export const devPit: RoomDefinition = {
   id: 'dev-pit',

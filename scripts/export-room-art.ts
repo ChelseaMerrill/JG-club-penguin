@@ -53,7 +53,7 @@ type RoomId = 'town-center' | 'dev-pit' | 'the-melt' | 'roof-deck' | 'igloo';
 const ROOM_FILES: Record<RoomId, string> = {
   'town-center': 'Room 01 Town Center.dc.html',
   'dev-pit': 'Room 02 Dev Pit.dc.html',
-  'the-melt': 'Room 04 Kitchen.dc.html', // The Melt is the Kitchen.
+  'the-melt': 'Kitchen.dc.html', // RoomId `the-melt` stays; the design now calls it THE KITCHEN (#92 D1).
   'roof-deck': 'Room 05 Roof Deck.dc.html', // not the "05b ... Day" variant.
   igloo: 'Room 06 Igloo.dc.html',
 };
@@ -235,28 +235,40 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
     },
   ],
   'the-melt': [
-    // Every character in this Room is a flat, non-animated svg+nameplate
-    // pair (confirmed by inspection -- no CSS keyframes are applied to any
-    // figure here), so this Room has no `animation` rules for characters.
+    // #92 D3 resync: the design now names a single "Chelsea" (near the
+    // pancake station) instead of the pre-resync "Chef Chelsea"/"Chelsea
+    // Merrill" pair, and adds "Tom", a walking, coffee-obsessed NPC.
+    // Chelsea, Tonya and Jesse are still flat, non-animated svg+nameplate
+    // pairs; only Tom and every speech bubble use CSS keyframes.
     {
       kind: 'animation',
       names: ['blink'],
-      comment: "Blinking '↙ TOWN CENTER' / 'ROOF DECK ↗' room-exit nav pills (HUD).",
+      comment:
+        "Blinking '↙ TOWN CENTER' / 'ROOF DECK ↗' room-exit nav pills, and the new 'TALK · PANCAKE FLIP' / 'TALK · COFFEE RUSH' minigame prompt pills (all HUD).",
+    },
+    {
+      kind: 'animation',
+      names: ['tomWalk'],
+      comment:
+        "Tom's walking figure: unlike this Room's other NPCs, his nested name/speech bubbles all sit inside his own animated group, so this one rule hides his entire figure.",
+    },
+    {
+      kind: 'animation',
+      names: ['idle'],
+      comment:
+        "Tonya's and Jesse's subtle idle body motion (their nameplates are static -- see the labels rule below).",
+    },
+    {
+      kind: 'animation',
+      names: ['say'],
+      comment:
+        'Every speech bubble in this Room (Chelsea, Tonya, Jesse and the floating "who took my yogurt" bubble), all sharing this one keyframe.',
     },
     {
       kind: 'labels',
-      texts: [
-        'Chef Chelsea',
-        'Fresh pot!',
-        'Chelsea Merrill',
-        'Flip it NOW.',
-        'who took my yogurt',
-        'Tonya',
-        'Jesse',
-        'You',
-      ],
+      texts: ['Chelsea', 'Tonya', 'Jesse', 'You'],
       comment:
-        'Stationary NPCs/Penguins and their name/speech labels: two cook NPCs (Chef Chelsea, Chelsea Merrill) plus their bubbles, a floating "who took my yogurt" bubble, the Tonya and Jesse penguin NPCs, and the local player.',
+        'Stationary NPCs/Penguins and their nameplates: the Chelsea and Tonya/Jesse penguin NPCs, and the local player.',
     },
     {
       kind: 'cluster',
@@ -266,8 +278,8 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
     },
     {
       kind: 'cluster',
-      anchor: 'THE MELT',
-      companions: ['THE MELT', 'KITCHEN · FLOOR 5 · 4 PENGUINS HERE · COFFEE: FRESH'],
+      anchor: 'THE KITCHEN',
+      companions: ['THE KITCHEN', 'KITCHEN · FLOOR 5 · 4 PENGUINS HERE · COFFEE: FRESH'],
       comment: 'Room title/subtitle banner (HUD).',
     },
     {
