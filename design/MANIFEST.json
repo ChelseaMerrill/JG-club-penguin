@@ -2,10 +2,10 @@
   "tool": "claude-design",
   "source": "6050d967-ba2e-4edd-819f-f7dcf4ed9d61",
   "source_url": "https://claude.ai/design/p/6050d967-ba2e-4edd-819f-f7dcf4ed9d61",
-  "synced": "2026-09-24",
+  "synced": "2026-09-25",
   "synced_by": "milliehime",
   "snapshot": "Club JenGuin logo directions.zip",
-  "plan_id": "513587b3d1b8",
+  "plan_id": "7f1d152274be",
   "files": {
     "Characters.dc.html": {
       "sha256": "6a357a2adf750ce56651c90ddbfa39fec7e3bfb085588638d0d3bb44fdcd1dff",
@@ -84,12 +84,12 @@
       "bytes": 69351
     },
     "Room 05 Roof Deck.dc.html": {
-      "sha256": "585355bf0f27f10869ba39c2da9486617d7ae3d0a3af6c92ce8ed86e069355bb",
-      "bytes": 96375
+      "sha256": "079476b0f6413774263e9dd23bf9f67aca9aa952b7502f802be09a622c29029c",
+      "bytes": 96979
     },
     "Room 05b Roof Deck Day.dc.html": {
-      "sha256": "21d9740d0f9057f97bdf710abf4f6310403526d31af351aaf4181a850a9c52e4",
-      "bytes": 87765
+      "sha256": "62005ab38ae8130ff5f674706acdfe624b226966eaa92e855f6bf70701ef8c3a",
+      "bytes": 88369
     },
     "Room 06 Igloo.dc.html": {
       "sha256": "a71da5d8a4c6b8afc44ca7e7a36b1ef0cae3527d538ad6930eb82f25f603d50f",
