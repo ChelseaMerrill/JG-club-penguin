@@ -1,7 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import type { Facing, HexColor, PenguinLook, RoomId, Tile } from '../src/contracts';
-import type { RegisteredPlayer } from '../src/game/movement/registered-player';
-import type { PenguinAnim } from '../src/game/penguin/poses';
+import type { Tile } from '../src/contracts';
 import {
   HEADING_ABOVE_ANCHOR,
   HEADING_BELOW_ANCHOR,
@@ -13,54 +11,12 @@ import { tileToScreen } from '../src/game/rooms/iso';
 import { HEADING_BLOCK_ID } from '../src/ui/wall-text/wall-text';
 import { computeStageFit } from '../src/ui/stage';
 import { GAME_HEIGHT, GAME_WIDTH } from '../src/game/stage-size';
+import type { RoomDebugInfo } from './support/room-debug-types';
 
-// Mirrors `src/game/rooms/dev-room-hook.ts`'s debug shape (see
-// `e2e/room-framework.spec.ts` for why this is redeclared rather than
-// imported: `dev-room-hook.ts` reads `import.meta.env`, which the `e2e`
-// tsconfig doesn't type-check). Kept identical, field for field, to
-// `e2e/click-to-move.spec.ts`'s own copy: TypeScript's global `Window`
-// augmentation requires every redeclaration of `__roomDebug` to resolve to
-// the same type.
-interface LocalPenguinDebugInfo {
-  tile: Tile;
-  target?: Tile;
-  anim: PenguinAnim;
-  facing: Facing;
-  moving: boolean;
-  flipX: boolean;
-  lookName: string;
-  lookBody: HexColor;
-  playerId: string;
-}
-
-interface RoomDebugInfo {
-  roomId: RoomId;
-  scrollX: number;
-  scrollY: number;
-  localPenguin?: LocalPenguinDebugInfo;
-  textureListenerCount?: number;
-  npcArrivedLog?: string[];
-  doorReachedLog?: string[];
-  localPenguinMoveLog?: Tile[];
-  localPenguinArrivedLog?: Tile[];
-  restartRoom?: () => void;
-  restartCount?: number;
-  penguinCount?: number;
-  remotePenguinCount?: number;
-  remotePenguins?: Array<{
-    playerId: string;
-    tile: Tile;
-    moving: boolean;
-    placedTile: Tile;
-    walkStartedAt?: number;
-  }>;
-  setRegisteredPlayer?: (player: RegisteredPlayer) => void;
-  spawnDebugPenguin?: (tile: Tile, look: PenguinLook) => void;
-}
-
+// `__roomDebug`'s type comes from the shared `./support/room-debug-types`;
+// `__wallTextTest` is this spec's own.
 declare global {
   interface Window {
-    __roomDebug?: RoomDebugInfo;
     // Test-only (#77 review round 1 fix 2); see `src/main.ts`'s own
     // `window.__wallTextTest` assignment.
     __wallTextTest?: { setSessionActive: (active: boolean) => void };
