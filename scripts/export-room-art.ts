@@ -190,9 +190,15 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
     },
     {
       kind: 'labels',
-      texts: ['Front Desk', 'Welcome to JG HQ!', 'You', 'Gil · betta'],
+      texts: ['Front Desk', 'Welcome to JG HQ!', 'You'],
       comment:
-        'Static (non-animated) name/speech labels not wrapped in an animated group: the Front Desk receptionist (a penguin NPC) and her greeting bubble, the local player\'s "You" nameplate, and the fish tank\'s name label.',
+        'Static (non-animated) name/speech labels not wrapped in an animated group: the Front Desk receptionist (a penguin NPC) and her greeting bubble, and the local player\'s "You" nameplate.',
+    },
+    {
+      kind: 'selector',
+      selectors: ['rect[x="1162.5"][y="448.25"]', 'text[x="1192.5"][y="459.25"]'],
+      comment:
+        "#132 review fix: the fish tank's 'Gil · betta' nameplate background and label text, hidden individually rather than through the `labels` rule above -- that rule's 3-sibling walk back from the text passes the nameplate rect and then the tank glass's two closing `<line>` edges, hiding the tank's front vertical edge along with the nameplate and leaving a visibly broken tank in the exported art. Both tank edges stay visible with this rule instead.",
     },
     {
       kind: 'text-only',
@@ -356,7 +362,7 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
         'polygon[points="395,467.5 330,500 395,532.5 420,520 385,502.5 445,502.5 445,482.5 400,495"]',
       ],
       comment:
-        "#132: an unlabelled floor-arrow decal near the Town Center elevator that isn't a working door -- the real exits (Town Center, Roof Deck) are the labelled wall signage/elevators, not this arrow.",
+        "#132: an unlabelled floor-arrow decal by the left-wall counter that isn't a working door -- the Kitchen's real exits (Town Center, Roof Deck) are the labelled wall signage, each a framed door (not an elevator), not this arrow.",
     },
     {
       kind: 'cluster',
@@ -571,15 +577,17 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
       kind: 'labels',
       texts: ['home sweet ice', 'You', 'Hexle · Bit'],
       comment:
-        'The local player\'s stationary figure/nameplate and speech bubble, and the pet Hexle "Bit" -- a live pet, not fixed furniture (compare Gil the fish in Town Center).',
+        'The local player\'s stationary figure/nameplate and speech bubble, and the pet Hexle "Bit" -- a live pet, not fixed furniture (compare Gil the fish in Town Center). This only reaches Bit\'s smile path and two eye circles (the `labels` rule\'s 3-sibling walk back from the "Hexle · Bit" text); see the `selector` rule below for the rest of him.',
     },
     {
       kind: 'selector',
       selectors: [
         'polygon[points="395,467.5 330,500 395,532.5 420,520 385,502.5 445,502.5 445,482.5 400,495"]',
+        'polygon[points="800,569 820,580 820,602 800,613 780,602 780,580"]',
+        'ellipse[cx="800"][cy="615"]',
       ],
       comment:
-        "#132: an unlabelled floor-arrow decal by the left wall that isn't a working door -- the Igloo's only real exit (Town Center) is the labelled elevator, not this arrow.",
+        "#132: an unlabelled floor-arrow decal by the left wall that isn't a working door -- the Igloo's only real exit (Town Center) is the labelled elevator, not this arrow. Also (#132 review fix) the pet Hexle Bit's body polygon and ground-shadow ellipse, left baked in by the `labels` rule above.",
     },
     {
       kind: 'cluster',
@@ -742,6 +750,40 @@ function freezeSmilAnimations(): void {
     smilSvg.pauseAnimations?.();
     smilSvg.setCurrentTime?.(0);
   });
+}
+
+// Runs in the browser context (page.evaluate), after hideLiveElements and
+// applyArtFixes: a #132 review hardening check. Every non-working floor-arrow
+// decal this design bakes shares one shape -- an unlabelled 7- or 8-point
+// `<polygon fill="#00BDFF">` -- so once every Room's hide rules have run, no
+// such polygon should still be visible unless it's the Roof Deck's KITCHEN
+// arrow (a real, working exit, kept inside its own `<a href="Kitchen.dc.
+// html">`). Fails loudly listing the offending polygons' `points` instead of
+// silently letting a design resync reintroduce a non-working arrow.
+function assertNoStrayArrowPolygons(roomId: string): void {
+  const isDisplayedWithin = (el: Element): boolean => {
+    for (let n: Element | null = el; n; n = n.parentElement) {
+      if (getComputedStyle(n).display === 'none') return false;
+    }
+    return true;
+  };
+  const offenders = Array.from(document.querySelectorAll('polygon[fill="#00BDFF"]')).filter(
+    (el) => {
+      const pointCount = (el.getAttribute('points') ?? '')
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean).length;
+      if (pointCount !== 7 && pointCount !== 8) return false;
+      if (el.closest('a[href]')) return false;
+      return isDisplayedWithin(el);
+    },
+  );
+  if (offenders.length > 0) {
+    throw new Error(
+      `${roomId}: ${offenders.length} visible 7/8-point #00BDFF arrow polygon(s) remain outside an <a href>: ` +
+        offenders.map((el) => el.getAttribute('points')).join(' | '),
+    );
+  }
 }
 
 // Runs in the browser context (page.evaluate) against one Room's rules.
@@ -1006,6 +1048,7 @@ async function exportRoom(
 
   await page.evaluate(hideLiveElements, rules);
   await page.evaluate(applyArtFixes, ART_FIXES[roomId] ?? []);
+  await page.evaluate(assertNoStrayArrowPolygons, roomId);
   await page.waitForTimeout(POST_HIDE_SETTLE_MS);
 
   const outPath = path.join(OUTPUT_DIR, `${roomId}.png`);
