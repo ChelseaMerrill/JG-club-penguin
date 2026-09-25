@@ -8,6 +8,12 @@ export const ROOM_IDS = [
   'roof-deck',
   'igloo',
   'the-icebox',
+  'office-hallway',
+  'team-room-1',
+  'team-room-2',
+  'team-room-3',
+  'team-room-4',
+  'bathroom',
 ] as const;
 
 /**
