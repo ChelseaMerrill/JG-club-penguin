@@ -57,7 +57,19 @@ const PAGE_LOAD_TIMEOUT_MS = 15_000;
 // with such a script.
 const BENIGN_PAGE_ERRORS: readonly RegExp[] = [/^DCLogic is not defined$/];
 
-type RoomId = 'town-center' | 'dev-pit' | 'the-melt' | 'roof-deck' | 'igloo' | 'the-icebox';
+type RoomId =
+  | 'town-center'
+  | 'dev-pit'
+  | 'the-melt'
+  | 'roof-deck'
+  | 'igloo'
+  | 'the-icebox'
+  | 'office-hallway'
+  | 'team-room-1'
+  | 'team-room-2'
+  | 'team-room-3'
+  | 'team-room-4'
+  | 'bathroom';
 
 // Per-Room overrides of STAGE_SELECTOR (#51 D3), for a design file whose
 // first `data-screen-label` element isn't the Stage this Room exports (e.g.
@@ -78,6 +90,12 @@ const ROOM_FILES: Record<RoomId, string> = {
   'roof-deck': 'Room 05 Roof Deck.dc.html', // not the "05b ... Day" variant.
   igloo: 'Room 06 Igloo.dc.html',
   'the-icebox': 'Room 03 The Icebox.dc.html', // #51 D1.
+  'office-hallway': 'Room 11 Office Hallway.dc.html', // #51 D1: the design calls it THE CORRIDOR.
+  'team-room-1': 'Team Room 1.dc.html',
+  'team-room-2': 'Team Room 2.dc.html',
+  'team-room-3': 'Team Room 3.dc.html',
+  'team-room-4': 'Team Room 4.dc.html',
+  bathroom: 'Room 13 Bathroom.dc.html', // #51 D1: the design calls it THE THAW ROOM.
 };
 
 // A hide rule targets one of three shapes the design markup uses for a live
@@ -121,6 +139,14 @@ type HideRule =
   // that moves a label harmlessly stops matching, rather than silently
   // hiding the wrong node.
   | { kind: 'text-only'; entries: { text: string; transform: string }[]; comment: string }
+  // Exact CSS selectors (#51), each of which must match exactly one element
+  // (the export fails otherwise). For a character the design draws as loose,
+  // unlabelled pieces interleaved with the furniture around it (a figure
+  // `<svg>` seated between a couch's faces, a shadow drawn before the desk
+  // in front of it), which no text-anchored rule can reach without also
+  // sweeping up that furniture. Each selector pins the element by its own
+  // position attributes, so a design resync that moves it stops the export.
+  | { kind: 'selector'; selectors: string[]; comment: string }
   // HTML/DIV HUD chrome. `anchor` is a literal text string known to be
   // unique on the page; `companions` (which includes the anchor) is the
   // full set of literal strings that must all appear somewhere in the
@@ -529,6 +555,302 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
       comment: 'Bottom chat/action toolbar (HUD).',
     },
   ],
+  'office-hallway': [
+    // #51: every character here is a flat, un-animated `peng()`-style run of
+    // shadow, figure, nameplate and (optional) speech bubble.
+    {
+      kind: 'labels',
+      texts: [
+        'You',
+        'Michael S.',
+        'standup in 5',
+        'Samantha',
+        'Daniel',
+        'Emily Smith',
+        'Joining JG?',
+        'Anthony Conway',
+        'Is this link safe?',
+      ],
+      comment:
+        'The local player, the Michael S., Samantha and Daniel Penguins, and Emily Smith and Anthony Conway, with their nameplates and speech bubbles.',
+    },
+    {
+      kind: 'animation',
+      names: ['blink'],
+      comment: "Blinking '↙ TOWN CENTER' and 'TEAM ROOMS 1–6 ↘' room-exit nav pills (HUD).",
+    },
+    {
+      kind: 'cluster',
+      anchor: '← MAP',
+      companions: ['← MAP', '11 · OFFICE HALLWAY (O1–O9)'],
+      comment: 'Top-left breadcrumb nav (HUD).',
+    },
+    {
+      kind: 'cluster',
+      anchor: 'THE CORRIDOR',
+      companions: ['THE CORRIDOR', 'OFFICES 1–9 · KNOCK BEFORE YOU WADDLE · 4 PENGUINS'],
+      comment: 'Room title/subtitle banner (HUD).',
+    },
+    {
+      kind: 'cluster',
+      anchor: 'MENU',
+      companions: ['1,250', '12 ONLINE', 'MENU', 'QUEST'],
+      comment: 'Top-right token/presence/menu/quest HUD cluster.',
+    },
+    {
+      kind: 'cluster',
+      anchor: 'EMOTE',
+      companions: ['EMOTE', 'SNOWBALL', 'QUESTS'],
+      comment: 'Bottom chat/action toolbar (HUD).',
+    },
+  ],
+  'team-room-1': [
+    {
+      kind: 'animation',
+      names: ['domrun'],
+      comment:
+        "Dom's running figure: an HTML overlay whose name bubble and `domtalk` speech bubble are nested inside its own animated wrapper.",
+    },
+    {
+      kind: 'cluster',
+      anchor: 'Jethro',
+      companions: ['Jethro', "Act natural. Camera's rolling."],
+      comment:
+        "Jethro's HTML overlay: his speech bubble, nameplate, bobbing figure (camera flash included) and shadow share one un-animated wrapper.",
+    },
+    {
+      kind: 'labels',
+      texts: ['You'],
+      comment: "The local player's static figure and nameplate.",
+    },
+    {
+      kind: 'animation',
+      names: ['blink'],
+      comment: "Blinking 'HALLWAY ↓' room-exit nav pill (HUD).",
+    },
+    {
+      kind: 'cluster',
+      anchor: '← MAP',
+      companions: ['← MAP', '08 · TEAM ROOM 1 · AI LAB'],
+      comment: 'Top-left breadcrumb nav (HUD).',
+    },
+    {
+      kind: 'cluster',
+      anchor: 'TEAM ROOM 1',
+      companions: ['TEAM ROOM 1', 'TEAM RM 1 · 337 SF · 2 GPU RACKS · TRAINING 73% · 3 PENGUINS'],
+      comment: 'Room title/subtitle banner (HUD).',
+    },
+    {
+      kind: 'cluster',
+      anchor: 'MENU',
+      companions: ['1,250', '12 ONLINE', 'MENU', 'QUEST'],
+      comment: 'Top-right token/presence/menu/quest HUD cluster.',
+    },
+    {
+      kind: 'cluster',
+      anchor: 'EMOTE',
+      companions: ['EMOTE', 'SNOWBALL', 'QUESTS'],
+      comment: 'Bottom chat/action toolbar (HUD).',
+    },
+  ],
+  'team-room-2': [
+    {
+      kind: 'cluster',
+      anchor: 'Ian',
+      companions: ['Ian', 'have you installed the atlas plugin yet?', 'TALK · BUG SQUASH'],
+      comment:
+        "Ian's HTML overlay: his speech bubble, nameplate, bobbing figure, shadow and 'TALK · BUG SQUASH' prompt pill share one un-animated wrapper.",
+    },
+    {
+      kind: 'labels',
+      texts: ['You'],
+      comment: "The local player's static figure and nameplate.",
+    },
+    {
+      kind: 'animation',
+      names: ['blink'],
+      comment: "Blinking 'HALLWAY ↓' room-exit nav pill (HUD).",
+    },
+    {
+      kind: 'cluster',
+      anchor: '← MAP',
+      companions: ['← MAP', '09 · TEAM ROOM 2 · UX STUDIO'],
+      comment: 'Top-left breadcrumb nav (HUD).',
+    },
+    {
+      kind: 'cluster',
+      // The banner's own mixed-case text.
+      anchor: 'TEAM Room 2',
+      companions: ['TEAM Room 2', 'TEAM RM 2 · 292 SF · STICKY WALL · 2 PENGUINS · CRIT AT 3PM'],
+      comment: 'Room title/subtitle banner (HUD).',
+    },
+    {
+      kind: 'cluster',
+      anchor: 'MENU',
+      companions: ['1,250', '12 ONLINE', 'MENU', 'QUEST'],
+      comment: 'Top-right token/presence/menu/quest HUD cluster.',
+    },
+    {
+      kind: 'cluster',
+      anchor: 'EMOTE',
+      companions: ['EMOTE', 'SNOWBALL', 'QUESTS'],
+      comment: 'Bottom chat/action toolbar (HUD).',
+    },
+  ],
+  'team-room-3': [
+    {
+      kind: 'labels',
+      texts: ['Millie', 'Casey', 'Sydney', 'So, open to new roles?'],
+      comment:
+        "Millie's shadow, figure and nameplate (one flat run), and the nameplates and speech bubble the design draws for Casey and Sydney after all the furniture.",
+    },
+    {
+      kind: 'selector',
+      selectors: [
+        'svg[x="807.2"][y="325.2"]',
+        'svg[x="864.2"][y="547.7"]',
+        'ellipse[cx="899"][cy="633.5"]',
+      ],
+      comment:
+        "Casey's figure, seated between the couch's own faces, and Sydney's figure and shadow, drawn before the desk in front of her. The couch's own large shadow ellipse is furniture and stays.",
+    },
+    {
+      kind: 'animation',
+      names: ['rats'],
+      comment: "Casey's periodic 'RATS' speech bubble.",
+    },
+    {
+      kind: 'label-group',
+      texts: ['You'],
+      comment: "The local player's own Penguin: a translated <g> of shadow, figure and nameplate.",
+    },
+    {
+      kind: 'animation',
+      names: ['blink'],
+      comment: "Blinking 'HALLWAY ↓' room-exit nav pill (HUD).",
+    },
+    {
+      kind: 'cluster',
+      anchor: '← MAP',
+      companions: ['← MAP', '10 · TEAM ROOM 3 · DATA CAVE'],
+      comment: 'Top-left breadcrumb nav (HUD).',
+    },
+    {
+      kind: 'cluster',
+      anchor: 'TEAM ROOM 3',
+      companions: [
+        'TEAM ROOM 3',
+        'TEAM RM 3 · 287 SF · LIGHTS LOW · 2 HUMANS · 1 PENGUIN · 4 DASHBOARDS',
+      ],
+      comment: 'Room title/subtitle banner (HUD).',
+    },
+    {
+      kind: 'cluster',
+      anchor: 'MENU',
+      companions: ['1,250', '12 ONLINE', 'MENU', 'QUEST'],
+      comment: 'Top-right token/presence/menu/quest HUD cluster.',
+    },
+    {
+      kind: 'cluster',
+      anchor: 'EMOTE',
+      companions: ['EMOTE', 'SNOWBALL', 'QUESTS'],
+      comment: 'Bottom chat/action toolbar (HUD).',
+    },
+  ],
+  'team-room-4': [
+    {
+      kind: 'labels',
+      texts: ['You', 'LET IT RIP', 'Sam', 'Ryan'],
+      comment:
+        "The local player and its 'LET IT RIP' bubble, Ryan's shadow, figure and nameplate, and Sam's nameplate.",
+    },
+    {
+      kind: 'selector',
+      selectors: [
+        'ellipse[cx="1072"][cy="612"]',
+        'svg[x="1042"][y="550.5"]',
+        'text[x="1040"][y="560"]',
+        'text[x="1098"][y="555"]',
+      ],
+      comment:
+        "Sam's shadow, his bobbing figure and the two music notes floating off him, none of which sit next to his nameplate. The Beystadium's own spinning tops are the stadium prop and stay.",
+    },
+    {
+      kind: 'label-group',
+      texts: ['Michael'],
+      comment:
+        'Michael Prete: a translated <g> of shadow, figure, nameplate and his Beyblade-challenge bubble.',
+    },
+    {
+      kind: 'animation',
+      names: ['blink'],
+      comment: "Blinking 'HALLWAY ↓' room-exit nav pill (HUD).",
+    },
+    {
+      kind: 'cluster',
+      anchor: '← MAP',
+      companions: ['← MAP', '07 · TEAM ROOM 4 · THE POD'],
+      comment: 'Top-left breadcrumb nav (HUD).',
+    },
+    {
+      kind: 'cluster',
+      anchor: 'TEAM ROOM 4',
+      companions: [
+        'TEAM ROOM 4',
+        'TEAM RM 4 · 350 SF · 4 CORNER DESKS · COUCH · BEYSTADIUM · 3 PENGUINS',
+      ],
+      comment: 'Room title/subtitle banner (HUD).',
+    },
+    {
+      kind: 'cluster',
+      anchor: 'MENU',
+      companions: ['1,250', '12 ONLINE', 'MENU', 'QUEST'],
+      comment: 'Top-right token/presence/menu/quest HUD cluster.',
+    },
+    {
+      kind: 'cluster',
+      anchor: 'EMOTE',
+      companions: ['EMOTE', 'SNOWBALL', 'QUESTS'],
+      comment: 'Bottom chat/action toolbar (HUD).',
+    },
+  ],
+  bathroom: [
+    {
+      kind: 'labels',
+      texts: ['You', 'no snowballs in here', 'Jessie', 'occupied since standup'],
+      comment:
+        'The local player and the Jessie Penguin, each a flat run of shadow, figure, nameplate and speech bubble. The Penguin icons on the wall signs are signage and stay.',
+    },
+    {
+      kind: 'animation',
+      names: ['blink'],
+      comment: "Blinking 'HALLWAY ↘' room-exit nav pill (HUD).",
+    },
+    {
+      kind: 'cluster',
+      anchor: '← MAP',
+      companions: ['← MAP', '13 · BATHROOM (JOKE ROOM)'],
+      comment: 'Top-left breadcrumb nav (HUD).',
+    },
+    {
+      kind: 'cluster',
+      anchor: 'THE THAW ROOM',
+      companions: ['THE THAW ROOM', 'BATHROOM · FLOOR 5 · 1 OF 2 STALLS FREE · SNOWBALLS DISABLED'],
+      comment: 'Room title/subtitle banner (HUD).',
+    },
+    {
+      kind: 'cluster',
+      anchor: 'MENU',
+      companions: ['1,250', '12 ONLINE', 'MENU', 'QUEST'],
+      comment: 'Top-right token/presence/menu/quest HUD cluster.',
+    },
+    {
+      kind: 'cluster',
+      anchor: 'EMOTE',
+      companions: ['EMOTE', 'SNOWBALL', 'QUESTS'],
+      comment: 'Bottom chat/action toolbar (HUD).',
+    },
+  ],
   igloo: [
     {
       kind: 'animation',
@@ -873,6 +1195,22 @@ function hideLiveElements(rules: HideRule[]): void {
     }
   }
 
+  // #51: hides exactly one element per selector, failing the export loudly
+  // when a selector matches none or several (a design resync that moved or
+  // duplicated the element), rather than leaving a character baked in.
+  function hideSelectors(selectors: string[]): void {
+    for (const selector of selectors) {
+      const matches = document.querySelectorAll(selector);
+      const only = matches[0];
+      if (matches.length !== 1 || !only) {
+        throw new Error(
+          `selector hide rule expected exactly one element for "${selector}", found ${matches.length}`,
+        );
+      }
+      hide(only);
+    }
+  }
+
   function hideCluster(anchor: string, companions: string[]): void {
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
     let node: Node | null;
@@ -907,6 +1245,7 @@ function hideLiveElements(rules: HideRule[]): void {
     else if (rule.kind === 'labels') hideLabels(rule.texts);
     else if (rule.kind === 'label-group') hideLabelGroups(rule.texts);
     else if (rule.kind === 'text-only') hideTextOnly(rule.entries);
+    else if (rule.kind === 'selector') hideSelectors(rule.selectors);
     else hideCluster(rule.anchor, rule.companions);
   }
 }
