@@ -1,14 +1,74 @@
 import { expect, test, type Page } from '@playwright/test';
+import type { Facing, HexColor, PenguinLook, RoomId, Tile } from '../src/contracts';
+import type { RegisteredPlayer } from '../src/game/movement/registered-player';
+import type { PenguinAnim } from '../src/game/penguin/poses';
 import {
   HEADING_ABOVE_ANCHOR,
   HEADING_BELOW_ANCHOR,
-  HEADING_MAX_WIDTH,
   townCenter,
   VALUE_LABEL_ABOVE_ANCHOR,
   VALUE_LABEL_BELOW_ANCHOR,
-  VALUE_LABEL_MAX_WIDTH,
 } from '../src/game/rooms/definitions/town-center';
+import { tileToScreen } from '../src/game/rooms/iso';
+import { HEADING_BLOCK_ID } from '../src/ui/wall-text/wall-text';
 import { computeStageFit } from '../src/ui/stage';
+import { GAME_HEIGHT, GAME_WIDTH } from '../src/game/stage-size';
+
+// Mirrors `src/game/rooms/dev-room-hook.ts`'s debug shape (see
+// `e2e/room-framework.spec.ts` for why this is redeclared rather than
+// imported: `dev-room-hook.ts` reads `import.meta.env`, which the `e2e`
+// tsconfig doesn't type-check). Kept identical, field for field, to
+// `e2e/click-to-move.spec.ts`'s own copy: TypeScript's global `Window`
+// augmentation requires every redeclaration of `__roomDebug` to resolve to
+// the same type.
+interface LocalPenguinDebugInfo {
+  tile: Tile;
+  target?: Tile;
+  anim: PenguinAnim;
+  facing: Facing;
+  moving: boolean;
+  flipX: boolean;
+  lookName: string;
+  lookBody: HexColor;
+  playerId: string;
+}
+
+interface RoomDebugInfo {
+  roomId: RoomId;
+  scrollX: number;
+  scrollY: number;
+  localPenguin?: LocalPenguinDebugInfo;
+  textureListenerCount?: number;
+  npcArrivedLog?: string[];
+  doorReachedLog?: string[];
+  localPenguinMoveLog?: Tile[];
+  localPenguinArrivedLog?: Tile[];
+  restartRoom?: () => void;
+  restartCount?: number;
+  penguinCount?: number;
+  remotePenguinCount?: number;
+  remotePenguins?: Array<{
+    playerId: string;
+    tile: Tile;
+    moving: boolean;
+    placedTile: Tile;
+    walkStartedAt?: number;
+  }>;
+  setRegisteredPlayer?: (player: RegisteredPlayer) => void;
+  spawnDebugPenguin?: (tile: Tile, look: PenguinLook) => void;
+}
+
+declare global {
+  interface Window {
+    __roomDebug?: RoomDebugInfo;
+    // Test-only (#77 review round 1 fix 2); see `src/main.ts`'s own
+    // `window.__wallTextTest` assignment.
+    __wallTextTest?: { setSessionActive: (active: boolean) => void };
+  }
+}
+
+const BOOT_TIMEOUT = 15_000;
+const LONG_WALK_TIMEOUT = 15_000;
 
 /** Fails the test on any uncaught page error or console error. */
 function collectErrors(page: Page): string[] {
@@ -30,6 +90,27 @@ async function hideLandingPage(page: Page): Promise<void> {
   await page.evaluate(() => {
     document.querySelector<HTMLElement>('#ui .landing')!.hidden = true;
   });
+}
+
+/** `window.__roomDebug`, deep-cloned across the page boundary. */
+async function debugInfo(page: Page): Promise<RoomDebugInfo | undefined> {
+  return page.evaluate(() => window.__roomDebug);
+}
+
+/** Waits for `__roomDebug.localPenguin` to appear after `page.goto` (mirrors `e2e/click-to-move.spec.ts`). */
+async function waitForBoot(page: Page): Promise<void> {
+  await expect
+    .poll(async () => (await debugInfo(page))?.localPenguin, { timeout: BOOT_TIMEOUT })
+    .not.toBeUndefined();
+}
+
+/** Converts a Stage pixel point (1600x900 logical) to a page click point via the canvas's own bounding box. */
+async function clickStagePoint(page: Page, point: { x: number; y: number }): Promise<void> {
+  const canvasBox = await page.locator('#game canvas').boundingBox();
+  if (!canvasBox) throw new Error('canvas not visible');
+  const scaleX = canvasBox.width / GAME_WIDTH;
+  const scaleY = canvasBox.height / GAME_HEIGHT;
+  await page.mouse.click(canvasBox.x + point.x * scaleX, canvasBox.y + point.y * scaleY);
 }
 
 interface Box {
@@ -60,19 +141,26 @@ function hexBoxStagePx(
   };
 }
 
-/** Scales a Stage-pixel box into viewport pixels via `computeStageFit`. */
-function toViewportBox(box: Box, fit: ReturnType<typeof computeStageFit>): Box {
+/**
+ * Converts a Playwright (viewport-px) bounding box into Stage px via the
+ * inverse of `computeStageFit` (#77 review round 1 fix 4: comparing in one
+ * consistent coordinate space, rather than scaling the expected box into
+ * viewport px, means the tolerance below means the same thing -- Stage px --
+ * at every viewport size).
+ */
+function toStageBox(box: Box, fit: ReturnType<typeof computeStageFit>): Box {
   return {
-    x: fit.left + box.x * fit.scale,
-    y: fit.top + box.y * fit.scale,
-    width: box.width * fit.scale,
-    height: box.height * fit.scale,
+    x: (box.x - fit.left) / fit.scale,
+    y: (box.y - fit.top) / fit.scale,
+    width: box.width / fit.scale,
+    height: box.height / fit.scale,
   };
 }
 
-// Sub-pixel rounding/anti-aliasing tolerance, viewport px (matches
-// `e2e/stage.spec.ts`'s own `toBeLessThanOrEqual(1)` geometry tolerance).
-const EPSILON = 1;
+// Sub-pixel rounding/anti-aliasing tolerance, Stage px (#77 review round 1
+// fix 4: fixed in Stage units rather than viewport px, so it means the same
+// real-world margin regardless of the viewport's own scale factor).
+const EPSILON = 0.5;
 
 function expectInside(inner: Box, outer: Box, label: string): void {
   expect(inner.x, `${label} left edge`).toBeGreaterThanOrEqual(outer.x - EPSILON);
@@ -104,6 +192,12 @@ test('core-values-poster', async ({ page }) => {
     const canvas = page.locator('#game canvas');
     await expect(canvas).toBeVisible();
     await hideLandingPage(page);
+    await waitForBoot(page);
+    // Lets the web font (Anton, loaded from Google Fonts -- src/style.css's
+    // mirrored `colors_and_type.css`) finish before measuring any label's
+    // rendered box (#77 review round 1 fix 4): otherwise a first-paint race
+    // against a fallback font could measure the wrong glyph metrics.
+    await page.evaluate(() => document.fonts.ready);
 
     const blocks = townCenter.wallText ?? [];
     expect(blocks.length).toBeGreaterThan(0);
@@ -118,23 +212,29 @@ test('core-values-poster', async ({ page }) => {
       const domBox = await locator.boundingBox();
       expect(domBox, `${block.id} bounding box`).not.toBeNull();
 
-      const isHeading = block.id === 'heading';
+      const isHeading = block.id === HEADING_BLOCK_ID;
       const aboveAnchor = isHeading ? HEADING_ABOVE_ANCHOR : VALUE_LABEL_ABOVE_ANCHOR;
       const belowAnchor = isHeading ? HEADING_BELOW_ANCHOR : VALUE_LABEL_BELOW_ANCHOR;
-      const expectedMaxWidth = isHeading ? HEADING_MAX_WIDTH : VALUE_LABEL_MAX_WIDTH;
-      expect(block.maxWidth).toBe(expectedMaxWidth);
 
-      const hexBox = toViewportBox(hexBoxStagePx(block, aboveAnchor, belowAnchor), fit);
-      expectInside(domBox!, hexBox, `${viewport.name} "${block.id}"`);
+      const stageBox = toStageBox(domBox!, fit);
+      const hexBox = hexBoxStagePx(block, aboveAnchor, belowAnchor);
+      expectInside(stageBox, hexBox, `${viewport.name} "${block.id}"`);
     }
 
     await page.screenshot({ path: `test-results/core-values-poster/${viewport.name}.png` });
 
     // #77 scope change: the wall labels stay tiny (fitted to their
     // hexagons, as just asserted above), so clicking the poster opens a
-    // properly legible card instead.
+    // properly legible card instead. The poster button only accepts a click
+    // with a Session active (#77 review round 1 fix 2); e2e can't complete a
+    // real Google sign-in, so this flips the same guard's flag directly via
+    // the test-only hook `src/main.ts` exposes.
+    await page.evaluate(() => window.__wallTextTest?.setSessionActive(true));
+
     const posterButton = page.locator('.wall-text__poster');
     await expect(posterButton).toBeVisible();
+
+    const moveLogBeforePosterClick = (await debugInfo(page))?.localPenguinMoveLog?.length ?? 0;
     await posterButton.click();
 
     const card = page.locator('.core-values-card');
@@ -146,9 +246,72 @@ test('core-values-poster', async ({ page }) => {
 
     await page.screenshot({ path: `test-results/core-values-poster/card-${viewport.name}.png` });
 
+    // #77 review round 1 fix 4 (D6): the poster button is a real DOM
+    // element over the canvas, so clicking it never reaches `RoomScene`'s
+    // click-to-move handler -- confirmed directly against the move log,
+    // not just inferred from the button intercepting the click.
+    expect((await debugInfo(page))?.localPenguinMoveLog).toHaveLength(moveLogBeforePosterClick);
+
     await page.keyboard.press('Escape');
     await expect(card).toBeHidden();
+
+    // D6, continued (1600x900 only -- the click-to-tile-screen-point math
+    // below is derived for this exact scale; `e2e/click-to-move.spec.ts`
+    // already covers click-to-move/door-click across viewports in general,
+    // so this only needs to prove the *poster* doesn't interfere with
+    // either, once).
+    if (viewport.name === '1600x900') {
+      const origin = townCenter.grid.origin;
+
+      // A walkable floor tile whose screen point (900, 325) sits just
+      // outside the poster's own hit rect (977.5..1112.5, 176.3..311.3) but
+      // close to it -- "near the labels" without overlapping them.
+      const nearPosterTile: Tile = { col: 2, row: 0 };
+      expect(townCenter.walkable[nearPosterTile.row]?.[nearPosterTile.col]).toBe(true);
+
+      const moveLogBeforeFloorClick = (await debugInfo(page))?.localPenguinMoveLog?.length ?? 0;
+      await clickStagePoint(page, tileToScreen(nearPosterTile, origin));
+      await expect
+        .poll(async () => (await debugInfo(page))?.localPenguinMoveLog?.length)
+        .toBe(moveLogBeforeFloorClick + 1);
+
+      // A door hotspot near the same area still walks to it and logs
+      // door:reached -- hand-computed exactly like
+      // `e2e/click-to-move.spec.ts`'s own DEV PIT door case.
+      const door = townCenter.doors.find((candidate) => candidate.targetRoomId !== null);
+      if (!door) throw new Error('expected town-center to have at least one enabled door');
+      const doorApproachTile: Tile = { col: 10, row: 0 };
+      const doorCenter = {
+        x: door.hotspot.x + door.hotspot.width / 2,
+        y: door.hotspot.y + door.hotspot.height / 2,
+      };
+      await clickStagePoint(page, doorCenter);
+      await expect
+        .poll(async () => (await debugInfo(page))?.localPenguin, { timeout: LONG_WALK_TIMEOUT })
+        .toMatchObject({ tile: doorApproachTile, moving: false });
+      expect((await debugInfo(page))?.doorReachedLog).toContain(door.label);
+    }
   }
+
+  expect(errors).toEqual([]);
+});
+
+test('core-values-poster-only-in-town-center', async ({ page }) => {
+  const errors = collectErrors(page);
+
+  // #77 review round 1 fix 1: the wall-text overlay's first render must
+  // match whatever Room `RoomScene` itself boots into (`?room=`), not always
+  // `SPAWN_ROOM_ID` -- otherwise Town Center's poster text/button render
+  // over Dev Pit here.
+  await page.setViewportSize({ width: 1618, height: 918 });
+  await page.goto('/?room=dev-pit');
+
+  await expect(page.locator('#game canvas')).toBeVisible();
+  await hideLandingPage(page);
+  await waitForBoot(page);
+
+  await expect(page.locator('.wall-text__label')).toHaveCount(0);
+  await expect(page.locator('.wall-text__poster')).toHaveCount(0);
 
   expect(errors).toEqual([]);
 });
