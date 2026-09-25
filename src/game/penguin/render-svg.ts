@@ -1,5 +1,5 @@
 import type { Eyes, Hat, Pattern, PenguinLook } from '../../contracts';
-import { contrastRatio, MIN_CONTRAST, pickContrasting } from './contrast';
+import { pickContrasting, pickContrastingOverlay, reachesMinContrast } from './contrast';
 import { DESIGN_TO_VIEWBOX_SCALE } from './design-scale';
 import { penguinLookHash } from './look-hash';
 import {
@@ -26,7 +26,11 @@ export interface ResolvedPenguinColors {
   bodyOutline: string;
   /** Extra rim on the belly path, against the body. */
   bellyRim: string | null;
-  /** HEX/STRIPES ink -- the body colour, or a substitute that clears the belly. */
+  /**
+   * HEX/STRIPES ink -- the body colour, or a substitute whose *painted*
+   * colour (it's drawn at `PATTERN_OPACITY` over the belly) clears the
+   * belly (#79 review round 1 nit 1).
+   */
   patternInk: string;
   /** Rim around the PIXEL HEART pattern, against the belly. */
   pixelHeartRim: string | null;
@@ -50,10 +54,6 @@ export interface ResolvedPenguinColors {
   warWeekFill: string;
 }
 
-function reachesMinContrast(color: string, surfaces: readonly string[]): boolean {
-  return surfaces.every((surface) => contrastRatio(color, surface) >= MIN_CONTRAST);
-}
-
 /**
  * Resolves every colour `renderPenguinSvg` draws for `look`, applying the
  * #79 execution plan's per-part rule table. Pure: no DOM or Phaser import,
@@ -74,7 +74,11 @@ export function resolvePenguinColors(look: PenguinLook): ResolvedPenguinColors {
     bellyRim: reachesMinContrast(look.belly, [look.body])
       ? null
       : pickContrasting(STROKE, [look.belly, look.body]),
-    patternInk: pickContrasting(look.body, [look.belly]),
+    // Checked as painted (opacity PATTERN_OPACITY over the belly), not raw
+    // (#79 review round 1 nit 1): HEX/STRIPES ink at full strength can pass
+    // 3:1 against the belly and still fail once blended down to its actual
+    // on-screen colour.
+    patternInk: pickContrastingOverlay(look.body, look.belly, PATTERN_OPACITY),
     pixelHeartRim: reachesMinContrast(ACCENT, [look.belly])
       ? null
       : pickContrasting(STROKE, [look.belly]),
@@ -100,10 +104,82 @@ export function resolvePenguinColors(look: PenguinLook): ResolvedPenguinColors {
   };
 }
 
-/** A thin rim stroke on a filled shape, or '' when no rim is needed. */
-function rimAttr(color: string | null, width = 1.5): string {
+/**
+ * The pre-#79 renderer's fixed colours for `look`, byte-for-byte: the
+ * outline, cap outline and headphone band are always `STROKE`; every
+ * rim/halo is `null`; the pattern ink is always the raw body colour
+ * (`renderPattern`'s old `bodyColor` parameter); the WAR WEEK BAND fill is
+ * always `EYE_PUPIL`. Used only by the #79 golden regression test and the
+ * e2e evidence grid's "before" column, both of which reproduce the old
+ * renderer's output through the *current* markup templates
+ * (`renderPenguinSvgWithColors`) instead of keeping a second copy of them.
+ */
+export function preContrastFixColors(look: PenguinLook): ResolvedPenguinColors {
+  return {
+    bodyOutline: STROKE,
+    bellyRim: null,
+    patternInk: look.body,
+    pixelHeartRim: null,
+    snowflakeRim: null,
+    eyeWhiteRim: null,
+    eyeStarRim: null,
+    beakRim: null,
+    feetRim: null,
+    capOutline: STROKE,
+    headphoneBand: STROKE,
+    snorkelRim: null,
+    warWeekFill: EYE_PUPIL,
+  };
+}
+
+/**
+ * A thin rim stroke on a filled shape, or '' when no rim is needed.
+ * `RIM_WIDTH` is the top of the #79 execution plan's "about 1.5-2 viewBox
+ * units" range (#79 review round 1 nit 4).
+ */
+export const RIM_WIDTH = 2;
+function rimAttr(color: string | null, width = RIM_WIDTH): string {
   return color ? ` stroke="${color}" stroke-width="${width}"` : '';
 }
+
+/**
+ * Extra stroke-width a halo adds over its source line/shape's own width, so
+ * the halo reads as a soft outline around the original rather than a
+ * same-sized duplicate swallowing it (#79 review round 1 nit 5). Every halo
+ * width below is named `<source width> + HALO_MARGIN`, not a re-picked
+ * magic number.
+ */
+export const HALO_MARGIN = 3;
+
+/**
+ * The opacity `renderPattern`'s HEX/STRIPES branches actually paint their
+ * ink at (kept as the literal `opacity=".55"` string there, to match the
+ * design byte-for-byte); `resolvePenguinColors` uses this numeric value to
+ * check the *blended*, on-screen ink colour against the belly, not the raw
+ * ink itself (#79 review round 1 nit 1).
+ */
+export const PATTERN_OPACITY = 0.55;
+
+// Shared geometry (#79 review round 1 nit 5): each constant is the raw,
+// paint-free coordinate data for one shape, referenced by both its normal
+// (single) draw and, where a halo applies, the wider duplicate drawn
+// underneath -- so the two copies can never drift apart by a retyped
+// coordinate.
+const SLEEPY_LEFT_D = 'M45 35 Q50 30 55 35';
+const SLEEPY_RIGHT_D = 'M65 35 Q70 30 75 35';
+const SLEEPY_LINE_WIDTH = 3;
+
+const WINK_LINE_D = 'M65 34 L75 34';
+const WINK_LINE_WIDTH = 3;
+
+const SNOWFLAKE_LINES =
+  '<line x1="60" y1="62" x2="60" y2="98"></line><line x1="44" y1="71" x2="76" y2="89"></line><line x1="76" y1="71" x2="44" y2="89"></line><path d="M56 68 L60 62 L64 68 M56 92 L60 98 L64 92"></path>';
+const SNOWFLAKE_LINE_WIDTH = 2.5;
+
+const SNORKEL_FRAME_RECT_ATTRS = 'x="38" y="26" width="44" height="16" rx="6"';
+const SNORKEL_FRAME_WIDTH = 4;
+const SNORKEL_STRAP_D = 'M84 30 L92 30 L92 6';
+const SNORKEL_STRAP_WIDTH = 5;
 
 /**
  * The design's own figure box (`design/Penguin Creator.dc.html`'s
@@ -224,9 +300,9 @@ function renderPattern(
       // Keeps the design's cyan; for these stroke-only lines a halo is a
       // wider duplicate drawn first, so the original cyan lines sit on top.
       const halo = rims.snowflakeRim
-        ? `<g stroke="${rims.snowflakeRim}" stroke-width="5.5" stroke-linecap="round"><line x1="60" y1="62" x2="60" y2="98"></line><line x1="44" y1="71" x2="76" y2="89"></line><line x1="76" y1="71" x2="44" y2="89"></line><path d="M56 68 L60 62 L64 68 M56 92 L60 98 L64 92"></path></g>`
+        ? `<g stroke="${rims.snowflakeRim}" stroke-width="${SNOWFLAKE_LINE_WIDTH + HALO_MARGIN}" stroke-linecap="round">${SNOWFLAKE_LINES}</g>`
         : '';
-      return `${halo}<g stroke="${ACCENT}" stroke-width="2.5" stroke-linecap="round"><line x1="60" y1="62" x2="60" y2="98"></line><line x1="44" y1="71" x2="76" y2="89"></line><line x1="76" y1="71" x2="44" y2="89"></line><path d="M56 68 L60 62 L64 68 M56 92 L60 98 L64 92"></path></g>`;
+      return `${halo}<g stroke="${ACCENT}" stroke-width="${SNOWFLAKE_LINE_WIDTH}" stroke-linecap="round">${SNOWFLAKE_LINES}</g>`;
     }
     case 'PLAIN':
     default:
@@ -243,17 +319,17 @@ function renderEyes(
   switch (effective) {
     case 'SLEEPY': {
       const halo = rims.eyeWhiteRim
-        ? `<g fill="none" stroke="${rims.eyeWhiteRim}" stroke-width="6" stroke-linecap="round"><path d="M45 35 Q50 30 55 35"></path><path d="M65 35 Q70 30 75 35"></path></g>`
+        ? `<g fill="none" stroke="${rims.eyeWhiteRim}" stroke-width="${SLEEPY_LINE_WIDTH + HALO_MARGIN}" stroke-linecap="round"><path d="${SLEEPY_LEFT_D}"></path><path d="${SLEEPY_RIGHT_D}"></path></g>`
         : '';
-      return `${halo}<g><path d="M45 35 Q50 30 55 35" fill="none" stroke="${EYE_WHITE}" stroke-width="3" stroke-linecap="round"></path><path d="M65 35 Q70 30 75 35" fill="none" stroke="${EYE_WHITE}" stroke-width="3" stroke-linecap="round"></path></g>`;
+      return `${halo}<g><path d="${SLEEPY_LEFT_D}" fill="none" stroke="${EYE_WHITE}" stroke-width="${SLEEPY_LINE_WIDTH}" stroke-linecap="round"></path><path d="${SLEEPY_RIGHT_D}" fill="none" stroke="${EYE_WHITE}" stroke-width="${SLEEPY_LINE_WIDTH}" stroke-linecap="round"></path></g>`;
     }
     case 'STAR':
       return `<g fill="${ACCENT}"${rimAttr(rims.eyeStarRim)}><polygon points="50,28 51.8,32.5 56.5,32.8 52.9,35.8 54,40.5 50,38 46,40.5 47.1,35.8 43.5,32.8 48.2,32.5"></polygon><polygon points="70,28 71.8,32.5 76.5,32.8 72.9,35.8 74,40.5 70,38 66,40.5 67.1,35.8 63.5,32.8 68.2,32.5"></polygon></g>`;
     case 'WINK': {
       const lineHalo = rims.eyeWhiteRim
-        ? `<path d="M65 34 L75 34" stroke="${rims.eyeWhiteRim}" stroke-width="6" stroke-linecap="round"></path>`
+        ? `<path d="${WINK_LINE_D}" stroke="${rims.eyeWhiteRim}" stroke-width="${WINK_LINE_WIDTH + HALO_MARGIN}" stroke-linecap="round"></path>`
         : '';
-      return `<g>${lineHalo}<circle cx="50" cy="34" r="4.5" fill="${EYE_WHITE}"${rimAttr(rims.eyeWhiteRim)}></circle><circle cx="51" cy="34" r="2" fill="${EYE_PUPIL}"></circle><path d="M65 34 L75 34" stroke="${EYE_WHITE}" stroke-width="3" stroke-linecap="round"></path></g>`;
+      return `<g>${lineHalo}<circle cx="50" cy="34" r="4.5" fill="${EYE_WHITE}"${rimAttr(rims.eyeWhiteRim)}></circle><circle cx="51" cy="34" r="2" fill="${EYE_PUPIL}"></circle><path d="${WINK_LINE_D}" stroke="${EYE_WHITE}" stroke-width="${WINK_LINE_WIDTH}" stroke-linecap="round"></path></g>`;
     }
     case 'ROUND':
     default:
@@ -274,11 +350,13 @@ function renderHat(
       return `<g><path d="M32 22 C38 4 82 4 88 22 L60 18 Z" fill="${capColor}" stroke="${resolved.capOutline}" stroke-width="2"></path><path d="M30 22 L98 26 L96 30 L30 26 Z" fill="${capColor}" stroke="${resolved.capOutline}" stroke-width="2"></path><polygon points="60,10 65,13 65,18 60,21 55,18 55,13" fill="${resolved.capOutline}"></polygon></g>`;
     case 'SNORKEL': {
       // The frame/strap are stroke-only, so their rim is a wider halo drawn
-      // first (same shapes), rather than a `stroke` attribute (#79 D2).
+      // first (same shapes), rather than a `stroke` attribute (#79 D2). Each
+      // shape's halo width is its own source width plus HALO_MARGIN, not a
+      // shared magic number (#79 review round 1 nit 5).
       const halo = resolved.snorkelRim
-        ? `<g fill="none" stroke="${resolved.snorkelRim}" stroke-width="7" stroke-linecap="round"><rect x="38" y="26" width="44" height="16" rx="6"></rect><path d="M84 30 L92 30 L92 6"></path></g>`
+        ? `<g fill="none" stroke="${resolved.snorkelRim}" stroke-linecap="round"><rect ${SNORKEL_FRAME_RECT_ATTRS} stroke-width="${SNORKEL_FRAME_WIDTH + HALO_MARGIN}"></rect><path d="${SNORKEL_STRAP_D}" stroke-width="${SNORKEL_STRAP_WIDTH + HALO_MARGIN}"></path></g>`
         : '';
-      return `<g>${halo}<rect x="38" y="26" width="44" height="16" rx="6" fill="none" stroke="${ACCENT}" stroke-width="4"></rect><rect x="42" y="29" width="16" height="10" rx="2" fill="${SNORKEL_LENS}" opacity=".8"></rect><rect x="62" y="29" width="16" height="10" rx="2" fill="${SNORKEL_LENS}" opacity=".8"></rect><path d="M84 30 L92 30 L92 6" fill="none" stroke="${ACCENT}" stroke-width="5" stroke-linecap="round"></path><path d="M20 22 C30 6 90 6 100 22 L60 14 Z" fill="${SNORKEL_MASK}" stroke="${STROKE}" stroke-width="3"></path></g>`;
+      return `<g>${halo}<rect ${SNORKEL_FRAME_RECT_ATTRS} fill="none" stroke="${ACCENT}" stroke-width="${SNORKEL_FRAME_WIDTH}"></rect><rect x="42" y="29" width="16" height="10" rx="2" fill="${SNORKEL_LENS}" opacity=".8"></rect><rect x="62" y="29" width="16" height="10" rx="2" fill="${SNORKEL_LENS}" opacity=".8"></rect><path d="${SNORKEL_STRAP_D}" fill="none" stroke="${ACCENT}" stroke-width="${SNORKEL_STRAP_WIDTH}" stroke-linecap="round"></path><path d="M20 22 C30 6 90 6 100 22 L60 14 Z" fill="${SNORKEL_MASK}" stroke="${STROKE}" stroke-width="3"></path></g>`;
     }
     case 'HEADPHONES':
       return `<g><path d="M30 34 C30 10 90 10 90 34" fill="none" stroke="${resolved.headphoneBand}" stroke-width="5"></path><rect x="24" y="28" width="10" height="16" rx="4" fill="${capColor}" stroke="${resolved.capOutline}" stroke-width="2"></rect><rect x="86" y="28" width="10" height="16" rx="4" fill="${capColor}" stroke="${resolved.capOutline}" stroke-width="2"></rect></g>`;
@@ -291,7 +369,15 @@ function renderHat(
 }
 
 /**
- * Renders `look` at `pose` as a standalone SVG string, verbatim from
+ * Renders `look` at `pose` using the already-resolved `colors`, instead of
+ * resolving them from `look` itself. `renderPenguinSvg` is a thin wrapper
+ * that calls this with `resolvePenguinColors(look)`; tests and the #79
+ * evidence grid call it directly with a forced `ResolvedPenguinColors` --
+ * most importantly `preContrastFixColors(look)`, which reproduces the
+ * pre-#79 renderer's fixed-colour output byte-for-byte -- so there's only
+ * ever one copy of the actual markup (#79 review round 1 nit 2).
+ *
+ * Otherwise identical to `renderPenguinSvg`: verbatim from
  * `design/Penguin Creator.dc.html`'s figure (L38-71) with its `sc-if`
  * branches resolved and its CSS keyframe animations baked into `pose`'s
  * static transforms (#31 D2/D3). Pure: no DOM or Phaser import, so it runs
@@ -305,13 +391,14 @@ function renderHat(
  * inline on one DOM page (e.g. the e2e grid) can guarantee unique ids itself
  * without relying on every cell happening to differ by look or pose.
  */
-export function renderPenguinSvg(
+export function renderPenguinSvgWithColors(
   look: PenguinLook,
   pose: PenguinPose = { anim: look.emote, frame: 0 },
   options: { idPrefix?: string } = {},
+  colors: ResolvedPenguinColors = resolvePenguinColors(look),
 ): string {
   const framePose = resolvePenguinFramePose(pose);
-  const resolved = resolvePenguinColors(look);
+  const resolved = colors;
   const clipId = options.idPrefix
     ? `penguin-belly-${options.idPrefix}`
     : `penguin-belly-${penguinLookHash(look)}-${pose.anim}-${pose.frame}`;
@@ -357,4 +444,18 @@ export function renderPenguinSvg(
   const minX = -PENGUIN_FRAME_PADDING_X;
   const minY = -PENGUIN_FRAME_PADDING_Y;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${minX} ${minY} ${PENGUIN_FRAME_WIDTH} ${PENGUIN_FRAME_HEIGHT}" width="${PENGUIN_FRAME_WIDTH}" height="${PENGUIN_FRAME_HEIGHT}">${figure}</svg>`;
+}
+
+/**
+ * Renders `look` at `pose` as a standalone SVG string, resolving its
+ * colours with `resolvePenguinColors` (#79 D2). See
+ * `renderPenguinSvgWithColors` for the markup itself and every other detail
+ * (`idPrefix`, `look.name` never appearing, pure/no-DOM).
+ */
+export function renderPenguinSvg(
+  look: PenguinLook,
+  pose: PenguinPose = { anim: look.emote, frame: 0 },
+  options: { idPrefix?: string } = {},
+): string {
+  return renderPenguinSvgWithColors(look, pose, options, resolvePenguinColors(look));
 }
