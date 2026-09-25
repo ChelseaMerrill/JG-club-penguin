@@ -173,7 +173,9 @@ begin
       v_progress = jsonb_build_object(
         'devPitVisited', true,
         'roundsFinished', jsonb_build_array('bug-squash', 'pancake-flip'),
-        'completedQuests', jsonb_build_array('main')
+        'completedQuests', jsonb_build_array('main'),
+        -- Added by 20260925010000_beystadium.sql (B7): no Beystadium wins here.
+        'matchWins', '{}'::jsonb
       )
     );
     v_detail := array_append(v_detail, format('quest_progress=%s', v_progress));

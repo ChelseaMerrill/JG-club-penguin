@@ -162,6 +162,48 @@ describe('Minigame quest evaluation', () => {
   });
 });
 
+describe('the Beystadium Quest (Let It Rip: win 3 matches)', () => {
+  it('is in the build once Beystadium is registered, located at Michael in Team Room 4', () => {
+    const quests = questsInBuild(QUEST_DEFINITIONS, { beystadium: stubFactory });
+    const quest = quests.find((q) => q.id === 'beystadium');
+
+    expect(quest).toMatchObject({
+      title: 'LET IT RIP · WIN 3 MATCHES',
+      location: 'THE POD · TEAM ROOM 4 · TALK TO MICHAEL',
+    });
+  });
+
+  it('counts match wins, not the best, as "x / 3" progress', () => {
+    const bey = status(
+      evaluateQuests(
+        QUEST_DEFINITIONS,
+        freshPlayer({ bests: { beystadium: 12 }, matchWins: { beystadium: 2 } }),
+      ),
+      'beystadium',
+    );
+
+    expect(bey.progress).toBe(2);
+    expect(bey.target).toBe(3);
+    expect(bey.done).toBe(false);
+    expect(bey.nextHint).toEqual({ text: 'Win 3 Beystadium matches', location: 'TEAM ROOM 4' });
+  });
+
+  it('starts at 0 / 3, and is done at the third win (when Let It Rip unlocks)', () => {
+    const none = status(evaluateQuests(QUEST_DEFINITIONS, freshPlayer()), 'beystadium');
+    const third = status(
+      evaluateQuests(
+        QUEST_DEFINITIONS,
+        freshPlayer({ matchWins: { beystadium: 3 }, badges: ['let-it-rip'] }),
+      ),
+      'beystadium',
+    );
+
+    expect(none.progress).toBe(0);
+    expect(third.done).toBe(true);
+    expect(third.nextHint).toBeNull();
+  });
+});
+
 describe('questTransitions and step toasts', () => {
   it('reports each main step newly done, with the new count', () => {
     const before = evaluateQuests(QUEST_DEFINITIONS, freshPlayer({ ownedItems: ['beanbag'] }));

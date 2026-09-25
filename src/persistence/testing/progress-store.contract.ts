@@ -37,6 +37,26 @@ const NEUTRAL_SNOW_CONE_STATS: MinigameStatsMap['snow-cone-stand'] = {
   lost: 0,
 };
 
+/** A 2-1 Beystadium match win: 7 strikes landed, 2 perfect launches. */
+const WON_MATCH: MinigameStatsMap['beystadium'] = {
+  won: 1,
+  roundsWon: 2,
+  roundsLost: 1,
+  strikes: 7,
+  perfectLaunches: 2,
+  bey: 0,
+};
+
+/** A 1-2 Beystadium match loss. */
+const LOST_MATCH: MinigameStatsMap['beystadium'] = {
+  won: 0,
+  roundsWon: 1,
+  roundsLost: 2,
+  strikes: 3,
+  perfectLaunches: 0,
+  bey: 2,
+};
+
 /**
  * The one behavioral suite every `ProgressStore` implementation must pass:
  * the in-memory fake (`createInMemoryProgressStore`) and the real store
@@ -325,6 +345,93 @@ export function describeProgressStoreContract(
       expect(result.badgeEarned).toBe(true);
     });
 
+    // Beystadium: 60 Tokens for a match win, 15 for a loss, whatever else
+    // the stats say; the best is strikes landed; Let It Rip is earned by the
+    // third match win in total, not by any one round's score.
+    describe('Beystadium', () => {
+      it('a won match pays 60 Tokens and sets the best to strikes landed', async () => {
+        const { store } = await makeHarness();
+
+        const result = await store.recordRound('beystadium', 7, WON_MATCH);
+
+        expect(result).toEqual({
+          tokensAwarded: 60,
+          balance: 160,
+          newBest: true,
+          badgeEarned: false,
+        });
+        expect((await store.loadAll()).bests).toEqual({ beystadium: 7 });
+      });
+
+      it('a lost match pays 15 Tokens', async () => {
+        const { store } = await makeHarness();
+
+        const result = await store.recordRound('beystadium', 3, LOST_MATCH);
+
+        expect(result.tokensAwarded).toBe(15);
+        expect(result.balance).toBe(115);
+      });
+
+      it('earns Let It Rip (+50 once) on exactly the third match win; losses never count', async () => {
+        const { store, advanceSeconds } = await makeHarness();
+
+        const first = await store.recordRound('beystadium', 7, WON_MATCH);
+        await advanceSeconds(45);
+        const loss = await store.recordRound('beystadium', 3, LOST_MATCH);
+        await advanceSeconds(45);
+        const second = await store.recordRound('beystadium', 7, WON_MATCH);
+        await advanceSeconds(45);
+        const third = await store.recordRound('beystadium', 7, WON_MATCH);
+        await advanceSeconds(45);
+        const fourth = await store.recordRound('beystadium', 7, WON_MATCH);
+
+        expect([first, loss, second, third, fourth].map((r) => r.badgeEarned)).toEqual([
+          false,
+          false,
+          false,
+          true,
+          false,
+        ]);
+        // 100 + 60 + 15 + 60 + (60 + 50 bonus) + 60.
+        expect(third.balance).toBe(345);
+        expect(fourth.balance).toBe(405);
+        expect((await store.loadAll()).badges).toEqual(['let-it-rip']);
+      });
+
+      it('counts match wins in questProgress().matchWins', async () => {
+        const { store, advanceSeconds } = await makeHarness();
+
+        await store.recordRound('beystadium', 7, WON_MATCH);
+        await advanceSeconds(45);
+        await store.recordRound('beystadium', 3, LOST_MATCH);
+        await advanceSeconds(45);
+        await store.recordRound('beystadium', 7, WON_MATCH);
+
+        expect((await store.questProgress()).matchWins).toEqual({ beystadium: 2 });
+      });
+
+      const invalidMatches: Array<[label: string, stats: Record<string, number>]> = [
+        ['won 2', { ...WON_MATCH, won: 2 }],
+        ['won 1 with only 1 round won', { ...WON_MATCH, roundsWon: 1 }],
+        ['won 0 with 2 rounds won', { ...LOST_MATCH, roundsWon: 2, roundsLost: 1 }],
+        ['3 rounds won', { ...WON_MATCH, roundsWon: 3 }],
+        ['3 rounds lost', { ...LOST_MATCH, roundsLost: 3 }],
+        ['2 rounds won and 2 lost', { ...WON_MATCH, roundsLost: 2 }],
+        ['bey 3', { ...WON_MATCH, bey: 3 }],
+      ];
+      it.each(invalidMatches)(
+        'rejects a match with %s as invalid_stats, paying nothing',
+        async (_label, stats) => {
+          const { store } = await makeHarness();
+
+          await expect(store.recordRound('beystadium', 0, stats as never)).rejects.toMatchObject({
+            code: 'invalid_stats',
+          });
+          expect((await store.loadAll()).tokens).toBe(100);
+        },
+      );
+    });
+
     it('purchase deducts the price, then rejects an unaffordable, duplicate or unknown item', async () => {
       const { store } = await makeHarness();
 
@@ -451,6 +558,7 @@ export function describeProgressStoreContract(
         stats: { rushCone25: 100 },
         cap: 600,
       },
+      { minigameId: 'beystadium', durationSeconds: 45, score: 7, stats: WON_MATCH, cap: 60 },
     ];
     it.each(durationCases)(
       '$minigameId: a second round 9 s later is round_too_soon, 10 s later is accepted',
@@ -638,6 +746,7 @@ export function describeProgressStoreContract(
           devPitVisited: false,
           roundsFinished: [],
           completedQuests: [],
+          matchWins: {},
         });
       });
 

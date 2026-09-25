@@ -96,6 +96,11 @@ export interface QuestProgress {
   roundsFinished: MinigameId[];
   /** Ordered by Quest id. */
   completedQuests: string[];
+  /** Match wins per Minigame with a match-win Badge (only Beystadium): how
+   *  many recorded rounds have `stats.won = 1`. A Minigame with no win has
+   *  no entry. Producer: the Beystadium migration's `quest_progress`.
+   *  Consumer: the Beystadium Quest's "x / 3" progress. */
+  matchWins: Partial<Record<MinigameId, number>>;
 }
 
 /**

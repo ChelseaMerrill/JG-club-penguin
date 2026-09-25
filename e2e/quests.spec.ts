@@ -107,10 +107,17 @@ test('the widget tracks the main Quest and opens the Quests panel; TRACK and BAD
   const panel = page.locator('.quests');
   await expect(panel).toBeVisible();
   await expect(widget).toBeHidden();
-  // Main + one per registered Minigame (Bug Squash, Pancake Flip, Snow Cone Stand, Coffee Rush).
-  await expect(panel.locator('[data-quests-tab="active"]')).toHaveText('ACTIVE · 5');
+  // Main + one per registered Minigame (Bug Squash, Pancake Flip, Snow Cone
+  // Stand, Coffee Rush, Beystadium).
+  await expect(panel.locator('[data-quests-tab="active"]')).toHaveText('ACTIVE · 6');
   await expect(panel.locator('[data-quests-tab="done"]')).toHaveText('DONE · 0');
-  await expect(panel.locator('.quests__row')).toHaveCount(5);
+  await expect(panel.locator('.quests__row')).toHaveCount(6);
+  const bey = panel.locator('[data-quest-id="beystadium"]');
+  await expect(bey.locator('.quests__row-title')).toHaveText('LET IT RIP · WIN 3 MATCHES');
+  await expect(bey.locator('.quests__row-location')).toHaveText(
+    'THE POD · TEAM ROOM 4 · TALK TO MICHAEL',
+  );
+  await expect(bey.locator('.quests__row-progress')).toHaveText('0 / 3');
   const main = panel.locator('[data-quest-id="main"]');
   await expect(main.locator('.quests__row-progress')).toHaveText('1 / 5');
   await expect(main.locator('.quests__row-location')).toHaveText('MAIN · ANY ROOM');
@@ -245,6 +252,18 @@ test('every Quest done: the widget shows ALL QUESTS DONE with a line and opens t
     });
     await t.purchase('beanbag');
   });
+  // Beystadium's Quest is three match wins, and record_round's anti-farm
+  // rule refuses a round less than 10 s after the previous one of the same
+  // Minigame, so the wins are spaced out for real.
+  test.setTimeout(90_000);
+  const beystadiumWin = { won: 1, roundsWon: 2, roundsLost: 0, strikes: 6, perfectLaunches: 1 };
+  for (let win = 0; win < 3; win++) {
+    if (win > 0) await page.waitForTimeout(10_500);
+    await page.evaluate(
+      (stats) => window.__questsTest!.recordRound('beystadium', stats.strikes, stats),
+      beystadiumWin,
+    );
+  }
 
   await expect(widget.locator('.quest-widget__label')).toHaveText('ALL QUESTS DONE');
   await expect(widget.locator('.quest-widget__title')).toHaveText(
@@ -256,9 +275,9 @@ test('every Quest done: the widget shows ALL QUESTS DONE with a line and opens t
   await widget.click();
   const panel = page.locator('.quests');
   await expect(panel).toBeVisible();
-  await expect(panel.locator('[data-quests-tab="done"]')).toHaveText('DONE · 5');
+  await expect(panel.locator('[data-quests-tab="done"]')).toHaveText('DONE · 6');
   await expect(panel.locator('[data-quests-tab="done"]')).toHaveAttribute('aria-pressed', 'true');
-  await expect(panel.locator('.quests__row')).toHaveCount(5);
+  await expect(panel.locator('.quests__row')).toHaveCount(6);
 
   expect(errors).toEqual([]);
 });

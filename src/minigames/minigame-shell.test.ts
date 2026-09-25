@@ -17,7 +17,7 @@ import { createOverlayManager } from '../ui/hud/overlay-manager';
 import { isMinigameOpen } from './is-minigame-open';
 import { createMinigameLauncher, type MinigameLauncher } from './minigame-launcher';
 import { MINIGAME_OVERLAY_ID } from './minigame-shell';
-import type { Minigame, MinigameContext, MinigameFactory } from './minigame';
+import type { Minigame, MinigameContext, MinigameDoneSummary, MinigameFactory } from './minigame';
 
 interface FakeGameHandle {
   factory: MinigameFactory<'bug-squash'>;
@@ -28,7 +28,14 @@ interface FakeGameHandle {
   endCalls: number;
 }
 
-function createFakeGame(durationSec = 5, opts: { endThrows?: boolean } = {}): FakeGameHandle {
+function createFakeGame(
+  durationSec = 5,
+  opts: {
+    endThrows?: boolean;
+    howToSubtitle?: string;
+    doneSummary?: () => MinigameDoneSummary;
+  } = {},
+): FakeGameHandle {
   let ctx: MinigameContext<'bug-squash'> | undefined;
   let score = 0;
   let stats: MinigameStatsMap['bug-squash'] = { squashed: 0, score: 0, bestCombo: 0, escaped: 0 };
@@ -66,6 +73,8 @@ function createFakeGame(durationSec = 5, opts: { endThrows?: boolean } = {}): Fa
           return { score, stats };
         },
       };
+      if (opts.howToSubtitle) Object.assign(game, { howToSubtitle: opts.howToSubtitle });
+      if (opts.doneSummary) Object.assign(game, { doneSummary: opts.doneSummary });
       return game;
     },
   };
@@ -477,6 +486,72 @@ describe('minigame shell: pause', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("minigame shell: a game's own headings (Beystadium's MATCH OVER)", () => {
+  it('keeps ROUND COMPLETE, the title, SCORE and no quote when the game has no doneSummary', async () => {
+    const { layer, gameHandle, launcher } = setup();
+    startPlaying(layer, launcher);
+    gameHandle.finishNow();
+
+    await vi.waitFor(() => expect(isHidden(layer, '.minigame__done')).toBe(false));
+    expect(layer.querySelector('.minigame__done-kicker')?.textContent).toBe('ROUND COMPLETE');
+    expect(layer.querySelector('.minigame__done-title')?.textContent).toBe('FAKE GAME');
+    expect(
+      layer.querySelector('[data-done-stat="score"] .minigame__done-stat-label')?.textContent,
+    ).toBe('SCORE');
+    expect(isHidden(layer, '.minigame__done-quote')).toBe(true);
+  });
+
+  it("shows the game's doneSummary: heading, relabelled score, extra rows before it, and a quote", async () => {
+    const doneSummary = vi.fn((): MinigameDoneSummary => ({
+      kicker: 'MATCH OVER',
+      title: 'CHAMPION',
+      scoreLabel: 'STRIKES LANDED',
+      rows: [
+        { key: 'match', label: 'SCORE', value: '2 – 1' },
+        { key: 'perfectLaunches', label: 'PERFECT LAUNCHES', value: '2' },
+      ],
+      quote: 'Michael: "...best of five?"',
+    }));
+    const { layer, gameHandle, launcher } = setup({
+      game: createFakeGame(5, { doneSummary }),
+    });
+    startPlaying(layer, launcher);
+    gameHandle.setScoreAndStats(7, { squashed: 0, score: 7, bestCombo: 0, escaped: 0 });
+    gameHandle.finishNow();
+
+    await vi.waitFor(() => expect(isHidden(layer, '.minigame__done')).toBe(false));
+    expect(doneSummary).toHaveBeenCalledTimes(1);
+    expect(layer.querySelector('.minigame__done-kicker')?.textContent).toBe('MATCH OVER');
+    expect(layer.querySelector('.minigame__done-title')?.textContent).toBe('CHAMPION');
+    const rows = [...layer.querySelectorAll<HTMLElement>('.minigame__done-stat')]
+      .filter((row) => !row.hidden)
+      .map((row) => [
+        row.querySelector('.minigame__done-stat-label')?.textContent,
+        row.querySelector('.minigame__done-stat-value')?.textContent,
+      ]);
+    expect(rows.slice(0, 3)).toEqual([
+      ['SCORE', '2 – 1'],
+      ['PERFECT LAUNCHES', '2'],
+      ['STRIKES LANDED', '7'],
+    ]);
+    expect(isHidden(layer, '.minigame__done-quote')).toBe(false);
+    expect(layer.querySelector('.minigame__done-quote')?.textContent).toBe(
+      'Michael: "...best of five?"',
+    );
+  });
+
+  it('shows howToSubtitle in place of "<TITLE> · N SECONDS" on the how-to-play screen', () => {
+    const { layer, launcher } = setup({
+      game: createFakeGame(5, { howToSubtitle: 'BEYSTADIUM · BEST OF 3 · VS MICHAEL' }),
+    });
+    launcher.launch('bug-squash');
+
+    expect(layer.querySelector('.minigame__howto-subtitle')?.textContent).toBe(
+      'BEYSTADIUM · BEST OF 3 · VS MICHAEL',
+    );
   });
 });
 

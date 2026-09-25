@@ -10,9 +10,9 @@ type TabId = 'badges' | 'trophies' | 'awards';
 
 interface BadgeTile {
   /**
-   * Exactly the design's tile title (`design/Trophy Case.dc.html`); equal to
-   * `badgeDisplayName(badgeId)` for the three tiles this build can actually
-   * earn.
+   * Exactly the design's tile title (`design/Trophy Case.dc.html`), except
+   * Barista (which has no design tile); equal to `badgeDisplayName(badgeId)`
+   * for every tile this build can actually earn.
    */
   title: string;
   /**
@@ -29,13 +29,14 @@ interface BadgeTile {
 }
 
 /**
- * The Trophy Case's 12 BADGES tiles, in the design's own order. Four carry
+ * The Trophy Case's 12 BADGES tiles, in the design's own order. Five carry
  * a real `BadgeId` that `ProgressStore.loadAll` can report earned: one per
  * Minigame (Breakfast Club/Pancake Flip, Brain Freeze/Snow Cone Stand,
- * Exterminator/Bug Squash, Barista/Coffee Rush). The design has no Barista
- * tile, so Barista takes the design's "Let It Rip · WIN 3 BEY MATCHES" slot,
- * which has no game behind it. The other eight have no earning logic in this
- * prototype and always render locked with their design hint.
+ * Exterminator/Bug Squash, Let It Rip/Beystadium, Barista/Coffee Rush).
+ * Let It Rip keeps the design's own 7th slot. The design has no Barista
+ * tile, so Barista takes the design's 12th, "Mullet Mania · HIGH SCORE ·
+ * ARCADE", which has no game behind it. The other seven have no earning
+ * logic in this prototype and always render locked with their design hint.
  */
 const BADGE_TILES: readonly BadgeTile[] = [
   { title: 'First Waddle', hint: 'LOG IN', badgeId: null },
@@ -44,12 +45,12 @@ const BADGE_TILES: readonly BadgeTile[] = [
   { title: 'Breakfast Club', hint: '20 STACKED · PANCAKE FLIP', badgeId: 'breakfast-club' },
   { title: 'Brain Freeze', hint: '200 TOKENS · SNOW CONES', badgeId: 'brain-freeze' },
   { title: 'Exterminator', hint: '500 · BUG SQUASH', badgeId: 'exterminator' },
-  { title: 'Barista', hint: '15 CUPS · COFFEE RUSH', badgeId: 'barista' },
+  { title: 'Let It Rip', hint: 'WIN 3 BEY MATCHES', badgeId: 'let-it-rip' },
   { title: 'Rail Rider', hint: 'SLIDE THE STAIRWELL', badgeId: null },
   { title: 'Hexle Parent', hint: 'ADOPT A HEXLE', badgeId: null },
   { title: 'Interior Penguin', hint: '6 IGLOO ITEMS', badgeId: null },
   { title: 'Night Owl', hint: 'ONLINE AFTER 2AM', badgeId: null },
-  { title: 'Mullet Mania', hint: 'HIGH SCORE · ARCADE', badgeId: null },
+  { title: 'Barista', hint: '15 CUPS · COFFEE RUSH', badgeId: 'barista' },
 ];
 
 /** The design's "n / 12 BADGES" denominator. */

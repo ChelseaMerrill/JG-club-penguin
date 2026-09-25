@@ -142,7 +142,8 @@ export function createMinigameShell<K extends MinigameId>(deps: MinigameShellDep
   howtoTitle.textContent = 'HOW TO PLAY';
   const howtoSubtitle = document.createElement('div');
   howtoSubtitle.className = 'minigame__howto-subtitle';
-  howtoSubtitle.textContent = `${minigame.title} · ${minigame.durationSec} SECONDS`;
+  howtoSubtitle.textContent =
+    minigame.howToSubtitle ?? `${minigame.title} · ${minigame.durationSec} SECONDS`;
   const howtoList = document.createElement('ul');
   howtoList.className = 'minigame__howto-list';
   for (const line of minigame.howToPlay) {
@@ -262,6 +263,11 @@ export function createMinigameShell<K extends MinigameId>(deps: MinigameShellDep
   doneBadgeCaption.textContent = 'ADDED TO YOUR TROPHY CASE';
   doneBadge.append(doneBadgeName, doneBadgeCaption);
 
+  // A game's own result line (`MinigameDoneSummary.quote`), under the Badge row.
+  const doneQuote = document.createElement('div');
+  doneQuote.className = 'minigame__done-quote';
+  doneQuote.hidden = true;
+
   const doneError = document.createElement('div');
   doneError.className = 'minigame__done-error';
   doneError.hidden = true;
@@ -283,6 +289,7 @@ export function createMinigameShell<K extends MinigameId>(deps: MinigameShellDep
     doneStats,
     doneSavingEl,
     doneBadge,
+    doneQuote,
     doneError,
     doneLeaderboard,
     doneActions,
@@ -410,6 +417,31 @@ export function createMinigameShell<K extends MinigameId>(deps: MinigameShellDep
     }
   }
 
+  /** Applies the game's own `doneSummary()` headings, if it has one. A
+   *  throwing `doneSummary` just leaves the shell's generic headings. */
+  function applyDoneSummary(): void {
+    if (!minigame.doneSummary) return;
+    let summary;
+    try {
+      summary = minigame.doneSummary();
+    } catch {
+      return;
+    }
+    doneKicker.textContent = summary.kicker;
+    doneTitle.textContent = summary.title;
+    if (summary.scoreLabel !== undefined) {
+      const label = doneScore.row.querySelector('.minigame__done-stat-label');
+      if (label) label.textContent = summary.scoreLabel;
+    }
+    for (const extra of summary.rows) {
+      const { row, value } = makeDoneStat(extra.key, extra.label);
+      value.textContent = extra.value;
+      doneStats.insertBefore(row, doneScore.row);
+    }
+    doneQuote.textContent = summary.quote ?? '';
+    doneQuote.hidden = summary.quote === null;
+  }
+
   async function finishRound(): Promise<void> {
     if (roundEnded) return;
     roundEnded = true;
@@ -433,6 +465,7 @@ export function createMinigameShell<K extends MinigameId>(deps: MinigameShellDep
     }
 
     const { score, stats } = ended;
+    applyDoneSummary();
 
     // Informational-only event (#37 D per game-events.ts), fired right
     // after `end()` and independently of `recordRound` below — never on

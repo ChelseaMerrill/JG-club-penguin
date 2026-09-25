@@ -28,6 +28,10 @@ export interface MinigameTestHandle {
    *  Snow Cone Stand isn't the loaded Minigame. Additive alongside
    *  `finishNow`/`finishPancakeFlipNow` (issue #49). */
   finishSnowConeStandNow(): void;
+  /** Ends a Beystadium match now, as it stands (a match not yet won pays as
+   *  a loss), as if the shell's timer reached 0. A no-op when Beystadium
+   *  isn't the loaded Minigame. */
+  finishBeystadiumNow(): void;
   /** Launches another registered Minigame in the same page once the
    *  current shell has closed (#46: finishing two different Minigames in one
    *  page for the Quest e2e). The `finish*` methods above then drive the

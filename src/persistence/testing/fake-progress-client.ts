@@ -125,7 +125,7 @@ export function makeFakeClient(responses: FakeResponses = {}): {
   const questProgress =
     responses.questProgress ??
     ({
-      data: { devPitVisited: false, roundsFinished: [], completedQuests: [] },
+      data: { devPitVisited: false, roundsFinished: [], completedQuests: [], matchWins: {} },
       error: null,
     } satisfies FakeResult<unknown>);
   const markDevPitVisited =

@@ -51,6 +51,7 @@ async function getSharedDb(): Promise<PGliteInterface> {
   await db.exec(readSqlFile('supabase', 'migrations', '20260924010000_saved_progress.sql'));
   await db.exec(readSqlFile('supabase', 'migrations', '20260924020000_leaderboard.sql'));
   await db.exec(readSqlFile('supabase', 'migrations', '20260925000000_quests.sql'));
+  await db.exec(readSqlFile('supabase', 'migrations', '20260925010000_beystadium.sql'));
   sharedDb = db;
   return db;
 }

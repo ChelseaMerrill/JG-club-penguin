@@ -199,6 +199,27 @@ export interface LeaderboardRpcRow {
 }
 
 /**
+ * `quest_progress().matchWins`, keeping only known Minigame ids with a
+ * whole, non-negative count; anything else (missing, malformed) reads as no
+ * wins rather than trusting an unexpected shape into Quest progress.
+ */
+function toMatchWins(value: unknown): Partial<Record<MinigameId, number>> {
+  const wins: Partial<Record<MinigameId, number>> = {};
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return wins;
+  for (const [id, count] of Object.entries(value as Record<string, unknown>)) {
+    if (
+      id in MINIGAME_RULES &&
+      typeof count === 'number' &&
+      Number.isInteger(count) &&
+      count >= 0
+    ) {
+      wins[id as MinigameId] = count;
+    }
+  }
+  return wins;
+}
+
+/**
  * Column -> `PenguinLook` field mapping, exactly `pglite-progress-store.ts`'s
  * `toLook`: `penguin_color` is the body colour, `idle_emote` is the emote,
  * `penguin_name` is the name.
@@ -538,6 +559,7 @@ export function createSupabaseProgressStore(
       devPitVisited: result.devPitVisited === true,
       roundsFinished: Array.isArray(result.roundsFinished) ? result.roundsFinished : [],
       completedQuests: Array.isArray(result.completedQuests) ? result.completedQuests : [],
+      matchWins: toMatchWins(result.matchWins),
     };
   }
 

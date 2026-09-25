@@ -22,6 +22,9 @@ export interface QuestInputs {
   roundsFinished: readonly MinigameId[];
   /** Quests the server has already paid (`complete_quest`). */
   completedQuests: readonly string[];
+  /** Recorded match wins per Minigame (`QuestProgress.matchWins`), for a
+   *  `'match-wins'` Minigame Quest; missing counts as none. */
+  matchWins?: Partial<Record<MinigameId, number>>;
 }
 
 export interface QuestStepStatus {
@@ -37,7 +40,7 @@ export interface QuestHint {
 
 export interface QuestStatus {
   quest: QuestDefinition;
-  /** Steps done (main Quest) or the personal best (Minigame Quest). */
+  /** Steps done (main Quest), or the personal best or match wins (Minigame Quest). */
   progress: number;
   target: number;
   done: boolean;
@@ -79,16 +82,19 @@ function evaluateQuest(quest: QuestDefinition, inputs: QuestInputs): QuestStatus
     };
   }
 
-  const best = inputs.bests[quest.minigameId] ?? 0;
+  const progress =
+    quest.goalKind === 'match-wins'
+      ? (inputs.matchWins?.[quest.minigameId] ?? 0)
+      : (inputs.bests[quest.minigameId] ?? 0);
   const badgeId = MINIGAME_RULES[quest.minigameId].badgeId;
-  const done = best >= quest.goal || inputs.badges.includes(badgeId);
+  const done = progress >= quest.goal || inputs.badges.includes(badgeId);
   return {
     quest,
-    progress: best,
+    progress,
     target: quest.goal,
     done,
     steps: [],
-    nextHint: done ? null : { text: quest.hint, location: roomTitle(quest.roomId) },
+    nextHint: done ? null : { text: quest.hint, location: quest.hintLocation },
   };
 }
 

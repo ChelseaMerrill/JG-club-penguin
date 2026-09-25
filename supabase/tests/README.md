@@ -104,3 +104,31 @@ It also checks `security definer`/`search_path = ''`/one overload each and the
    rolled back) and prints only booleans, counts and Token amounts.
 3. Save the result table to `test-results/46-quests-proof-supabase/output.txt`,
    and paste the same table on #46.
+
+   `20260925010000_beystadium.sql` adds `matchWins` to `quest_progress()`, so
+   once it is applied this proof expects `matchWins: {}` in that row.
+
+## Beystadium (reviewer gate)
+
+`80_beystadium_proof.sql` proves `20260925010000_beystadium.sql` (decisions
+B2-B9 in its header) against the same #9 H1 fixture Player: as the fixture
+signed in, an impossible match result is `invalid_stats` and pays nothing, a
+won match pays 60 with the best set to strikes landed, a second round inside
+10 s is `round_too_soon`, a win half the 45 s window later is clamped to 30,
+a loss pays 15 and never counts, Let It Rip (+50 once) is earned on exactly
+the third match win and not again on the fourth, `quest_progress()` reports
+`matchWins`, and `leaderboard('beystadium')` is accepted; as anon
+`record_round`, `quest_progress` and `leaderboard` are denied (`42501`). It
+also checks `security definer`/`search_path = ''`/one overload each and the
+`authenticated`-only grants.
+
+1. Local: covered automatically by `sql-beystadium.test.ts`'s PGlite run in
+   `npm test` (not by `run-local.sh`).
+2. Real Postgres/Supabase: apply `20260925010000_beystadium.sql` in the SQL
+   editor (after every earlier migration), then open
+   `80_beystadium_proof.sql`, replace every occurrence of
+   `00000000-0000-0000-0000-00000000f1f0` with the real #9 H1 fixture
+   Player's id, and run it. Expect every row's `pass` column to read `true`,
+   including the final `ALL` row. It changes nothing (everything is rolled
+   back) and prints only booleans, counts and Token amounts.
+3. Save the result table to `test-results/80-beystadium-proof-supabase/output.txt`.

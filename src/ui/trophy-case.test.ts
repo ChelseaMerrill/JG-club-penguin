@@ -72,7 +72,21 @@ describe('createTrophyCase', () => {
     );
   });
 
-  it("shows Coffee Rush's Barista in the design's Let It Rip slot, unlocked once earned", async () => {
+  it("shows Beystadium's Let It Rip in the design's own 7th slot, unlocked once earned", async () => {
+    const { q, qa, trophyCase } = setup(['let-it-rip']);
+
+    await trophyCase.open();
+
+    const letItRip = q('[data-badge-id="let-it-rip"]');
+    expect(letItRip.classList.contains('trophy-case__badge--earned')).toBe(true);
+    expect(letItRip.querySelector('.trophy-case__badge-name')?.textContent).toBe('Let It Rip');
+    expect(letItRip.querySelector('.trophy-case__badge-hint')?.textContent).toBe(
+      'WIN 3 BEY MATCHES',
+    );
+    expect(qa('.trophy-case__badge').indexOf(letItRip)).toBe(6);
+  });
+
+  it("shows Coffee Rush's Barista in the Mullet Mania slot (12th), unlocked once earned", async () => {
     const { q, qa, trophyCase } = setup(['barista']);
 
     await trophyCase.open();
@@ -83,8 +97,9 @@ describe('createTrophyCase', () => {
     expect(barista.querySelector('.trophy-case__badge-hint')?.textContent).toBe(
       '15 CUPS · COFFEE RUSH',
     );
+    expect(qa('.trophy-case__badge').indexOf(barista)).toBe(11);
     const names = qa('.trophy-case__badge-name').map((el) => el.textContent);
-    expect(names).not.toContain('Let It Rip');
+    expect(names).not.toContain('Mullet Mania');
     expect(names).toHaveLength(12);
   });
 

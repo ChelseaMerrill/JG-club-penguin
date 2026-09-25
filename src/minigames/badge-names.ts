@@ -13,6 +13,8 @@ const BADGE_NAMES: Record<BadgeId, string> = {
   'breakfast-club': 'Breakfast Club',
   barista: 'Barista',
   'brain-freeze': 'Brain Freeze',
+  // Verbatim from `design/Minigame Beystadium.dc.html`'s done screen.
+  'let-it-rip': 'Let It Rip',
 };
 
 export function badgeDisplayName(badgeId: BadgeId): string {
