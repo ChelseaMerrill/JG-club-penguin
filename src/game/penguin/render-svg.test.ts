@@ -16,6 +16,7 @@ import { ACCENT, BACKDROP, EYE_PUPIL, EYE_WHITE, STROKE } from './palette';
 import { PENGUIN_ANIMS, PENGUIN_FRAMES, type PenguinPose } from './poses';
 import {
   PATTERN_OPACITY,
+  pathCenterX,
   PENGUIN_FRAME_HEIGHT,
   PENGUIN_FRAME_PADDING_X,
   PENGUIN_FRAME_PADDING_Y,
@@ -318,6 +319,33 @@ describe('renderPenguinSvg facing (#147)', () => {
     const withoutFacing = renderPenguinSvg(DEFAULT_LOOK, { anim: 'LAUGH', frame: 0 });
     const explicitRight = renderPenguinSvg(DEFAULT_LOOK, { anim: 'LAUGH', frame: 0 }, {}, 'right');
     expect(explicitRight).toBe(withoutFacing);
+  });
+});
+
+// #147 review fix: `pathCenterX` assumes every `PENGUIN_TEXT_PATHS[*].d`
+// consumes absolute commands in plain `x y` coordinate pairs, so its "every
+// even-indexed number is an x-coordinate" reasoning holds. Guarded directly
+// (rather than only indirectly through a rendered `<g transform>`, which
+// would still pass if some *other* path happened to average out correctly).
+describe('pathCenterX (#147 review fix)', () => {
+  it.each(Object.entries(PENGUIN_TEXT_PATHS))(
+    "%s's d uses only absolute M/L/Q/C/Z commands and plain numbers",
+    (_name, { d }) => {
+      expect(d).toMatch(/^[MLQCZ0-9.\s-]+$/);
+    },
+  );
+
+  it("computes HA HA's bounding-box x-centre from its own min/max coordinates", () => {
+    // Known-good value from an independent recomputation of every x
+    // coordinate in `PENGUIN_TEXT_PATHS.haha.d` (min 100, max 181.84), not
+    // `pathCenterX` itself, so this can't pass merely by construction.
+    expect(pathCenterX(PENGUIN_TEXT_PATHS.haha.d)).toBeCloseTo(140.92, 1);
+  });
+
+  it('returns a finite centre (never NaN) for a path with no coordinates', () => {
+    expect(pathCenterX('')).toBe(0);
+    expect(pathCenterX('Z')).toBe(0);
+    expect(Number.isNaN(pathCenterX(''))).toBe(false);
   });
 });
 

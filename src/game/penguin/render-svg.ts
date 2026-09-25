@@ -322,10 +322,23 @@ const SEAT_Y = (DESIGN_SEAT_TOP_FROM_CANVAS_TOP - DESIGN_FIGURE_TOP_GAP) / DESIG
  * frame's shared one -- most lettering is baked `text-anchor="middle"` at
  * design x=60 anyway, but "HA HA" (`text-anchor="start"` at x=100) is not, so
  * a shared constant would displace it instead of merely un-mirroring it.
+ *
+ * Relies on every `PENGUIN_TEXT_PATHS[*].d` using only absolute `M`/`L`/`Q`/
+ * `C`/`Z` commands and plain (non-scientific-notation) numbers -- guarded by
+ * `render-svg.test.ts`'s regex check -- since a relative command (lowercase
+ * `m`/`l`/`q`/`c`) would mix offsets in with absolute coordinates here.
+ * Exported so it's unit-testable directly (#147 review fix), matching this
+ * file's existing pattern of exporting small pure helpers rather than only
+ * testing them indirectly through `renderPenguinSvg`'s full output.
  */
-function pathCenterX(d: string): number {
+export function pathCenterX(d: string): number {
   const coordinates = d.match(/-?\d+(?:\.\d+)?/g)?.map(Number) ?? [];
   const xs = coordinates.filter((_, index) => index % 2 === 0);
+  // An empty (or coordinate-free) `d` has no bounding box; falling through to
+  // `Math.min()`/`Math.max()` on an empty array (`Infinity`/`-Infinity`)
+  // would otherwise average out to `NaN` and poison the mirror transform
+  // (#147 review fix).
+  if (xs.length === 0) return 0;
   return (Math.min(...xs) + Math.max(...xs)) / 2;
 }
 

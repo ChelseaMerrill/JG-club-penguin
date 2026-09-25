@@ -39,7 +39,7 @@ The fixed 1600x900 surface every screen is authored on. It is scaled to fit the 
 One cell of a Room's isometric grid (2:1, 100x50 pixels), addressed by column and row. Penguin positions, movement targets, doors, spawn points and NPC positions are Tiles, never pixels.
 
 **Facing**
-Which way a Penguin is turned: left or right. The artwork is mirrored for the other direction.
+Which way a Penguin is turned: left or right. The artwork is mirrored for the other direction. Baked lettering (HA HA, the JG LOGO/JG CAP "JG", WAR WEEK) is counter-mirrored before the mirror is applied, so it still reads correctly rather than backwards when the Penguin faces left (#147).
 
 **Map**
 The in-game map screen, opened from the HUD. Clicking a prototype Room on the Map takes the Penguin there; Rooms outside the prototype show as coming soon.

@@ -702,6 +702,7 @@ export class RoomScene extends Scene {
             facing: controller.state.facing,
             moving: controller.isMoving(),
             flipX: this.penguinSprite()?.flipX ?? false,
+            textureKey: this.penguinSprite()?.texture.key,
             lookName: this.currentLook.name,
             lookBody: this.currentLook.body,
             playerId: controller.state.playerId,
