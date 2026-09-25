@@ -1,62 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
-import type { Facing, HexColor, PenguinLook, RoomId, Tile } from '../src/contracts';
-import type { RegisteredPlayer } from '../src/game/movement/registered-player';
-import type { PenguinAnim } from '../src/game/penguin/poses';
 import { devPit } from '../src/game/rooms/definitions/dev-pit';
 import { igloo } from '../src/game/rooms/definitions/igloo';
 import { roofDeck } from '../src/game/rooms/definitions/roof-deck';
 import { townCenter } from '../src/game/rooms/definitions/town-center';
 import { GAME_HEIGHT, GAME_WIDTH } from '../src/game/stage-size';
-
-// Mirrors `src/game/rooms/dev-room-hook.ts`'s `RoomDebugInfo` (#15 D6),
-// redeclared rather than imported for the same reason `click-to-move.spec.ts`
-// and `room-framework.spec.ts` redeclare it: `dev-room-hook.ts` reads
-// `import.meta.env`, which the `e2e` tsconfig doesn't type-check. Kept
-// identical, field for field, to those two files' own copies: TypeScript's
-// global `Window` augmentation requires every redeclaration of
-// `__roomDebug` in this program to resolve to the same type.
-interface LocalPenguinDebugInfo {
-  tile: Tile;
-  target?: Tile;
-  anim: PenguinAnim;
-  facing: Facing;
-  moving: boolean;
-  flipX: boolean;
-  lookName: string;
-  lookBody: HexColor;
-  playerId: string;
-}
-
-interface RoomDebugEventLogEntry {
-  type: 'room:leave' | 'room:enter';
-  roomId: RoomId;
-}
-
-interface RoomDebugInfo {
-  roomId: RoomId;
-  scrollX: number;
-  scrollY: number;
-  localPenguin?: LocalPenguinDebugInfo;
-  textureListenerCount?: number;
-  npcArrivedLog?: string[];
-  doorReachedLog?: string[];
-  localPenguinMoveLog?: Tile[];
-  restartRoom?: () => void;
-  restartCount?: number;
-  penguinCount?: number;
-  remotePenguinCount?: number;
-  setRegisteredPlayer?: (player: RegisteredPlayer) => void;
-  spawnDebugPenguin?: (tile: Tile, look: PenguinLook) => void;
-  comingSoonHint?: string | null;
-  changeRoom?: (roomId: RoomId) => void;
-  roomEventLog?: RoomDebugEventLogEntry[];
-}
-
-declare global {
-  interface Window {
-    __roomDebug?: RoomDebugInfo;
-  }
-}
+import type { RoomDebugInfo } from './support/room-debug-types';
 
 const BOOT_TIMEOUT = 15_000;
 const WALK_TIMEOUT = 15_000;
@@ -129,8 +77,16 @@ test('room transitions: doors, changeRoom, HUD, reload (#15)', async ({ page }) 
   await expect.poll(async () => (await debugInfo(page))?.comingSoonHint).toBe('THE ICEBOX');
   expect((await debugInfo(page))?.roomId).toBe('town-center');
   await page.screenshot({ path: 'test-results/room-transitions/coming-soon-hint.png' });
+
+  // DOOR_HINT_DURATION_MS (`RoomScene.ts`) is 2000ms: still shown partway
+  // through that window, then gone. The "still shown" half is a strict,
+  // point-in-time check (it would catch the hint disappearing too early);
+  // the "gone" half polls generously rather than a fixed wait, so parallel
+  // e2e workers' CPU contention can't flake it.
+  await page.waitForTimeout(1500);
+  expect((await debugInfo(page))?.comingSoonHint).toBe('THE ICEBOX');
   await expect
-    .poll(async () => (await debugInfo(page))?.comingSoonHint, { timeout: 10_000 })
+    .poll(async () => (await debugInfo(page))?.comingSoonHint, { timeout: 15_000 })
     .toBeNull();
 
   // --- The DEV PIT door walks the Penguin there, then loads Dev Pit at the
@@ -192,15 +148,25 @@ test('room transitions: doors, changeRoom, HUD, reload (#15)', async ({ page }) 
     .toEqual(igloo.spawnTile);
   await page.screenshot({ path: 'test-results/room-transitions/igloo.png' });
 
-  // --- The event log shows every room:leave before its room:enter, in order,
-  // apart from the very first enter (no Session-starting leave, #26 D6).
-  const log = (await debugInfo(page))?.roomEventLog ?? [];
-  expect(log[0]).toEqual({ type: 'room:enter', roomId: 'town-center' });
-  for (let i = 1; i < log.length; i += 2) {
-    expect(log[i]?.type).toBe('room:leave');
-    expect(log[i + 1]?.type).toBe('room:enter');
-  }
-  expect(log.length).toBeGreaterThanOrEqual(9);
+  // --- The event log is exactly this sequence: every room:leave's roomId
+  // equals the room the previous room:enter just landed in, and the very
+  // first enter (Session start, `enterSpawnRoom`) has no preceding leave
+  // (#26 D6). The disabled-door click above never changes Room, so it left
+  // no trace here.
+  const log = (await debugInfo(page))?.roomEventLog;
+  expect(log).toEqual([
+    { type: 'room:enter', roomId: 'town-center' },
+    { type: 'room:leave', roomId: 'town-center' },
+    { type: 'room:enter', roomId: 'dev-pit' },
+    { type: 'room:leave', roomId: 'dev-pit' },
+    { type: 'room:enter', roomId: 'town-center' },
+    { type: 'room:leave', roomId: 'town-center' },
+    { type: 'room:enter', roomId: 'roof-deck' },
+    { type: 'room:leave', roomId: 'roof-deck' },
+    { type: 'room:enter', roomId: 'town-center' },
+    { type: 'room:leave', roomId: 'town-center' },
+    { type: 'room:enter', roomId: 'igloo' },
+  ]);
 
   expect(errors).toEqual([]);
 });

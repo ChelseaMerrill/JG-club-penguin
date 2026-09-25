@@ -1,67 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
-import {
-  DEFAULT_LOOK,
-  type Facing,
-  type HexColor,
-  type PenguinLook,
-  type RoomId,
-  type Tile,
-} from '../src/contracts';
-import type { RegisteredPlayer } from '../src/game/movement/registered-player';
-import type { PenguinAnim } from '../src/game/penguin/poses';
+import { DEFAULT_LOOK, type PenguinLook, type Tile } from '../src/contracts';
 import { townCenter } from '../src/game/rooms/definitions/town-center';
 import { tileToScreen } from '../src/game/rooms/iso';
 import { GAME_HEIGHT, GAME_WIDTH } from '../src/game/stage-size';
-
-// Mirrors `src/game/rooms/dev-room-hook.ts`'s debug shape (see
-// `e2e/room-framework.spec.ts` for why this is redeclared rather than
-// imported: `dev-room-hook.ts` reads `import.meta.env`, which the `e2e`
-// tsconfig doesn't type-check). Kept identical, field for field, to
-// `e2e/room-framework.spec.ts`'s own copy: TypeScript's global `Window`
-// augmentation requires every redeclaration of `__roomDebug` to resolve to
-// the same type.
-interface LocalPenguinDebugInfo {
-  tile: Tile;
-  target?: Tile;
-  anim: PenguinAnim;
-  facing: Facing;
-  moving: boolean;
-  flipX: boolean;
-  lookName: string;
-  lookBody: HexColor;
-  playerId: string;
-}
-
-interface RoomDebugEventLogEntry {
-  type: 'room:leave' | 'room:enter';
-  roomId: RoomId;
-}
-
-interface RoomDebugInfo {
-  roomId: RoomId;
-  scrollX: number;
-  scrollY: number;
-  localPenguin?: LocalPenguinDebugInfo;
-  textureListenerCount?: number;
-  npcArrivedLog?: string[];
-  doorReachedLog?: string[];
-  localPenguinMoveLog?: Tile[];
-  restartRoom?: () => void;
-  restartCount?: number;
-  penguinCount?: number;
-  remotePenguinCount?: number;
-  setRegisteredPlayer?: (player: RegisteredPlayer) => void;
-  spawnDebugPenguin?: (tile: Tile, look: PenguinLook) => void;
-  comingSoonHint?: string | null;
-  changeRoom?: (roomId: RoomId) => void;
-  roomEventLog?: RoomDebugEventLogEntry[];
-}
-
-declare global {
-  interface Window {
-    __roomDebug?: RoomDebugInfo;
-  }
-}
+import type { RoomDebugInfo } from './support/room-debug-types';
 
 /** Generous: the very first poll also waits out Phaser/WebGL's cold-start init. */
 const BOOT_TIMEOUT = 15_000;

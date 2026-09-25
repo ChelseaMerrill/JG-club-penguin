@@ -83,7 +83,7 @@ const sceneReady = whenSceneReady(game).then((scene) => {
   penguins = scene.penguins;
   roomNavigator = createRoomNavigator({
     scene: {
-      showRoom: (roomId, entryTile) => scene.showRoom(roomId, entryTile),
+      showRoom: (roomId, entryTile, force) => scene.showRoom(roomId, entryTile, force),
       whenNextReady: () => scene.whenNextReady(),
       onDoorReached: (handler) => scene.onDoorReached(handler),
       showComingSoonHint: (door) => scene.showComingSoonHint(door),
@@ -295,8 +295,7 @@ async function startSession(player: Player, previous: RoomChannel | null): Promi
  * function's body from a production build, matching the other dev hooks.
  */
 function initDevAsPlayerHook(): boolean {
-  const e2eHooksEnabled = import.meta.env.DEV || import.meta.env.VITE_E2E_HOOKS === 'true';
-  if (!e2eHooksEnabled) return false;
+  if (!HOOKS_ENABLED) return false;
   if (!new URLSearchParams(window.location.search).has('asPlayer')) return false;
 
   const fixturePlayer: Player = {
@@ -464,18 +463,27 @@ const auth = startAuth({
   },
   onSignedOut: () => {
     currentPlayer = null;
-    // A dev hook (including #15's `?asPlayer`) owns `registry.player` and any
-    // Session itself; the real, always-eventually-fired signed-out signal
-    // (there's no real browser session in a dev/e2e run) must not clobber
-    // either one out from under it.
+    // Only #15's `?asPlayer` owns `registry.player`/the Session itself
+    // outside the normal auth flow; the real, always-eventually-fired
+    // session-less signed-out signal must not clobber either one out from
+    // under it. `?hud`/`?creator`/`?minigame` never touch `registry.player`
+    // or start a real Session themselves, so this cleanup still runs for
+    // them exactly as it did before #15 (review round 1 narrowed this from
+    // the broader `devHookActive`, which incorrectly skipped it for them too).
+    if (!devAsPlayerActive) {
+      // Per `src/contracts/rooms.ts`, `room:leave` comes before `bindPlayer(null)`.
+      const channel = endSession();
+      bindPlayer(game.registry, null);
+      progress.stop();
+      if (channel) void stopChannel(channel);
+      if (pendingPrevious) void stopChannel(pendingPrevious);
+      pendingPrevious = null;
+    }
+    // Every dev hook (including `?asPlayer`) owns its own UI state; the real
+    // signed-out signal must not reach back in and hide/reset it (`dev-hud-
+    // hook.ts`'s own doc comment covers why: `hud.show()` already ran
+    // synchronously, and this signal always arrives later).
     if (devHookActive) return;
-    // Per `src/contracts/rooms.ts`, `room:leave` comes before `bindPlayer(null)`.
-    const channel = endSession();
-    bindPlayer(game.registry, null);
-    progress.stop();
-    if (channel) void stopChannel(channel);
-    if (pendingPrevious) void stopChannel(pendingPrevious);
-    pendingPrevious = null;
     penguinEditor.playerSignedOut();
     // Quits any in-progress round (no `recordRound`) rather than leaving it
     // open behind a signed-out session.

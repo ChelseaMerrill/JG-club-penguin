@@ -1,54 +1,14 @@
 import { expect, test, type Page } from '@playwright/test';
-import type { Facing, HexColor, PenguinLook, RoomId, Tile } from '../src/contracts';
-import type { RegisteredPlayer } from '../src/game/movement/registered-player';
 import { igloo } from '../src/game/rooms/definitions/igloo';
-import type { PenguinAnim } from '../src/game/penguin/poses';
 import { GAME_HEIGHT, GAME_WIDTH } from '../src/game/stage-size';
 import type { MinigameTestHandle } from '../src/minigames/minigame-test-handle';
+import type { RoomDebugInfo } from './support/room-debug-types';
 
-// Mirrors `src/game/rooms/dev-room-hook.ts`'s `RoomDebugInfo` (see
-// `e2e/room-framework.spec.ts`/`e2e/click-to-move.spec.ts` for why this is
-// redeclared rather than imported).
-interface LocalPenguinDebugInfo {
-  tile: Tile;
-  target?: Tile;
-  anim: PenguinAnim;
-  facing: Facing;
-  moving: boolean;
-  flipX: boolean;
-  lookName: string;
-  lookBody: HexColor;
-  playerId: string;
-}
-
-interface RoomDebugEventLogEntry {
-  type: 'room:leave' | 'room:enter';
-  roomId: RoomId;
-}
-
-interface RoomDebugInfo {
-  roomId: RoomId;
-  scrollX: number;
-  scrollY: number;
-  localPenguin?: LocalPenguinDebugInfo;
-  textureListenerCount?: number;
-  npcArrivedLog?: string[];
-  doorReachedLog?: string[];
-  localPenguinMoveLog?: Tile[];
-  restartRoom?: () => void;
-  restartCount?: number;
-  penguinCount?: number;
-  remotePenguinCount?: number;
-  setRegisteredPlayer?: (player: RegisteredPlayer) => void;
-  spawnDebugPenguin?: (tile: Tile, look: PenguinLook) => void;
-  comingSoonHint?: string | null;
-  changeRoom?: (roomId: RoomId) => void;
-  roomEventLog?: RoomDebugEventLogEntry[];
-}
-
+// `__roomDebug`'s type/ambient declaration comes from the `RoomDebugInfo`
+// import above (see `e2e/support/room-debug-types.ts`); `__minigameTest` is
+// this spec's own (shared with `minigame.spec.ts`/`pancake-flip.spec.ts`).
 declare global {
   interface Window {
-    __roomDebug?: RoomDebugInfo;
     __minigameTest?: MinigameTestHandle;
   }
 }
