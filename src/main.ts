@@ -60,7 +60,12 @@ import {
   type EmotePenguinView,
 } from './emotes/emote-controller';
 import { EMOTE_TO_ANIM } from './emotes/emote-rules';
-import { createSnowballController, type SnowballController } from './snowball/snowball-controller';
+import {
+  createSnowballController,
+  type SnowballController,
+  type SnowballRoomChannel,
+  type SnowballView,
+} from './snowball/snowball-controller';
 import {
   exposeSnowballDebug,
   type SnowballThrowLogEntry,
@@ -433,7 +438,9 @@ async function stopChannel(channel: RoomChannel): Promise<void> {
 /**
  * Turns Snowball mode on or off everywhere at once (#53 D6): the scene's
  * aiming and the HUD's button and panel. Refused (stays off) outside a
- * Session. Exits on a Room change, sign-out, and any HUD overlay opening.
+ * Session. Exits on a Room change, sign-out, any HUD overlay opening,
+ * Escape (via the HUD's own keydown handling, #109), and the throw that
+ * takes ammo to 0 (via the controller's `onAmmoEmptied`, #109).
  */
 function setSnowballMode(on: boolean): void {
   const next = on && snowballController !== null && roomScene !== null;
@@ -504,6 +511,28 @@ function endSession(): RoomChannel | null {
   return channel;
 }
 
+/**
+ * Creates a Snowball controller against `channel`/`view`/`playerId`, assigns
+ * it to `snowballController`, and wires its ammo reporting into the HUD
+ * (#109): the create → assign → `setSnowballAmmo` → `onAmmoChange` →
+ * `onAmmoEmptied` sequence shared by `startSession`'s real controller and
+ * `initDevAsPlayerHook`'s stub one.
+ */
+function wireSnowballController(
+  channel: SnowballRoomChannel,
+  view: SnowballView,
+  playerId: string,
+): SnowballController {
+  const snowball = createSnowballController({ channel, view, playerId });
+  snowballController = snowball;
+  const ammo = snowball.ammo();
+  hud.setSnowballAmmo(ammo.count, ammo.capacity);
+  snowball.onAmmoChange(({ count, capacity }) => hud.setSnowballAmmo(count, capacity));
+  // #109: the throw that takes ammo to 0 leaves the mode once it's sent.
+  snowball.onAmmoEmptied(() => setSnowballMode(false));
+  return snowball;
+}
+
 async function startSession(player: Player, previous: RoomChannel | null): Promise<void> {
   const generation = ++signInGeneration;
   if (previous) {
@@ -542,15 +571,7 @@ async function startSession(player: Player, previous: RoomChannel | null): Promi
   });
   const scene = roomScene;
   if (scene) {
-    const snowball = createSnowballController({
-      channel,
-      view: scene.snowball,
-      playerId: player.id,
-    });
-    snowballController = snowball;
-    const ammo = snowball.ammo();
-    hud.setSnowballAmmo(ammo.count, ammo.capacity);
-    snowball.onAmmoChange(({ count, capacity }) => hud.setSnowballAmmo(count, capacity));
+    wireSnowballController(channel, scene.snowball, player.id);
   }
   channel.onRoomChange((roomId) => debugOverlay?.setCurrentRoom(roomId));
   // #53: a Room change leaves Snowball mode and drops every snow hat graphic.
@@ -582,6 +603,17 @@ async function startSession(player: Player, previous: RoomChannel | null): Promi
  * `sceneReady` first, since the navigator doesn't exist until then. Both env
  * checks are direct `import.meta.env.*` reads, so Vite strips this
  * function's body from a production build, matching the other dev hooks.
+ *
+ * Also wires a Snowball controller (#109) against a local-only stub channel
+ * (`send` resolves `true` at once; `on` is never called, and `onRoomChange`
+ * is never called either since the stub is never told about a Room change
+ * directly): an e2e spec can drive Snowball mode's real Escape/last-throw
+ * exits under `?asPlayer&hud` without #15 D6/A6's "no Room channel"
+ * changing: no Presence, no Postgres, no other Player ever observes this
+ * fixture Player's throw. Because the stub's own `onRoomChange` never fires,
+ * a Room change here is instead caught via `room:leave` (#109): without it,
+ * the HUD could keep showing Snowball mode on after a `?asPlayer` Room
+ * change even though `startSession`'s real controller always exits on one.
  */
 function initDevAsPlayerHook(): boolean {
   if (!HOOKS_ENABLED) return false;
@@ -595,6 +627,16 @@ function initDevAsPlayerHook(): boolean {
   bindPlayer(game.registry, fixturePlayer);
   void sceneReady.then(() => {
     void roomNavigator?.enterSpawnRoom();
+    if (!roomScene) return;
+    const stubChannel: SnowballRoomChannel = {
+      send: () => Promise.resolve(true),
+      on: () => () => {},
+      onRoomChange: () => () => {},
+    };
+    wireSnowballController(stubChannel, roomScene.snowball, fixturePlayer.id);
+    // #109: the stub channel can't tell the controller about a Room change
+    // itself, so leave the mode directly off `room:leave`.
+    gameEvents.on('room:leave', () => setSnowballMode(false));
   });
   return true;
 }
@@ -637,7 +679,11 @@ const hud = createHud(getUiLayer(), {
 });
 
 // #53 D8/N8: any HUD overlay opening (Creator, Minigame, Trophy Case,
-// Market, MENU, the Map) leaves Snowball mode.
+// Market, MENU, the Map) leaves Snowball mode. Also clears the scene's
+// aiming state (`roomScene?.setAiming`), which `hud.ts`'s own matching
+// `overlays.onOpen` subscription (#109) can't reach directly; harmless and
+// idempotent alongside that one since `setSnowballMode(false)` while
+// already off is a no-op.
 hud.overlays.onOpen(() => setSnowballMode(false));
 
 exposeSnowballDebug(() => ({
