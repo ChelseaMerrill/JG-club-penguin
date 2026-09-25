@@ -3,12 +3,14 @@ import type { HumanFigureSpec } from '../game/npcs/render-npc-svg';
 
 /**
  * Every NPC slot id on `main` (#16's five prototype Rooms' `npcSlots`,
- * confirmed against `src/game/rooms/definitions/*.ts` at the #36 scope-change
- * comment's `main` @ `5ddaaae`). No slot id lacked a matching character in
- * `design/Characters.dc.html`/`design/build/humans.js` or a Room design's own
- * inline SVG (Front Desk, Kevin, Tristin, Chef Chelsea, Tonya, Jesse are all
- * named, drawn Penguin-kind background characters in their own Room's
- * `.dc.html`, just not part of "the 24 humans" character sheet).
+ * confirmed against `src/game/rooms/definitions/*.ts`). No slot id lacked a
+ * matching character in `design/Characters.dc.html`/`design/build/humans.js`
+ * or a Room design's own inline SVG (Front Desk, Kevin, Tristin, Tonya,
+ * Jesse are all named, drawn Penguin-kind background characters in their own
+ * Room's `.dc.html`, just not part of "the 24 humans" character sheet).
+ * `tom` replaces the old `chef-chelsea` slot -- #91's Kitchen design resync
+ * removed Chef Chelsea entirely and introduced Tom instead (#36 round-1
+ * follow-up).
  */
 export type NpcId =
   | 'darrin'
@@ -29,7 +31,7 @@ export type NpcId =
   | 'anthony'
   | 'tristin'
   | 'casey'
-  | 'chef-chelsea'
+  | 'tom'
   | 'chelsea'
   | 'tonya'
   | 'jesse';
@@ -178,7 +180,7 @@ function staticLine(text: string): NpcBubbleLine[] {
 
 /**
  * The fixed look most background/market Penguin-kind NPCs share (Front Desk,
- * Kevin, Chef Chelsea, Tonya, Jesse): traced from their shared `peng()`-style
+ * Kevin, Tonya, Jesse): traced from their shared `peng()`-style
  * figure markup in the Room designs -- `#161719` body, `#00BDFF`
  * cap/beak/feet, `#F4F4F4` belly, the `JG CAP` hat silhouette. Exact per-NPC
  * fidelity beyond that (e.g. a chef's hat) isn't attempted; a judgment call,
@@ -193,16 +195,16 @@ const TRISTIN_LOOK: PenguinLook = { ...DEFAULT_LOOK, name: '', body: '#3a4046', 
  * `NPCS`: every prototype Room's NPC, keyed by `NpcId` (#36 D1). Names come
  * from `design/Characters.dc.html`'s character sheet (D1/A3); titles come
  * from the same sheet, with `null` for every "TITLE TBD" card its footnote
- * lists (Chelsea, Dom, Ashley, Millie, Casey, Ryan, Sam) plus Ann Marie's own
- * resolved "SUBSCRIPTION AI" (#36 round-1 review item 1).
+ * lists (Chelsea, Dom, Ashley, Millie, Casey, Ryan, Sam, Tom) plus Ann
+ * Marie's own resolved "SUBSCRIPTION AI" (#36 round-1 review item 1).
  * `design/build/humans.js`'s figure `spec`s are used for the Human NPCs'
  * rendered figures only, never for name/title. `idleLines` come from each
  * Room design's own `say`-cycling (or static) speech bubbles (round-1 item
  * 2), and `dialogLine` is the sheet's own short quote, shown in the dialog
  * panel instead.
  *
- * The 6 Penguin-kind background NPCs (Front Desk, Kevin, Tristin, Chef
- * Chelsea, Tonya, Jesse) are named, drawn characters in their own Room's
+ * The 5 Penguin-kind background NPCs (Front Desk, Kevin, Tristin, Tonya,
+ * Jesse) are named, drawn characters in their own Room's
  * `.dc.html` inline SVG but never appear in the character sheet's "24
  * humans" -- their name/line/tag all come from that inline markup instead.
  */
@@ -298,6 +300,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     tagName: 'Ashley',
     dialogLine: 'The chicken stays. Non-negotiable.',
     idleLines: [
+      { text: 'Incoming!', periodS: 9, delayS: -4.2 },
       { text: 'Most spirited. Deal with it.', periodS: 14, delayS: -5 },
       { text: 'Catch!', periodS: 14, delayS: -9.5 },
     ],
@@ -321,8 +324,8 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     tagName: 'Ian',
     dialogLine: 'Who broke CI? Be honest.',
     idleLines: [
-      { text: 'Who broke CI? Be honest.', periodS: 12, delayS: -1 },
-      { text: 'Green means go home.', periodS: 12, delayS: -7 },
+      { text: 'Who broke CI? Be honest.', periodS: 22, delayS: -1 },
+      { text: 'Grab the hammer. CI is red.', periodS: 22, delayS: -10 },
     ],
     dialog: BUG_SQUASH_DIALOG,
     figure: {
@@ -345,8 +348,8 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     tagName: 'Steven',
     dialogLine: 'Architecture question. Ready?',
     idleLines: [
-      { text: 'Architecture question. Ready?', periodS: 13, delayS: -3 },
-      { text: 'It scales. Probably.', periodS: 13, delayS: -9 },
+      { text: 'Boxes and arrows. Mostly arrows.', periodS: 14, delayS: -2 },
+      { text: 'This diagram scales. Trust me.', periodS: 14, delayS: -9 },
     ],
     dialog: LINE_DIALOG,
     figure: {
@@ -615,17 +618,38 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       hat: 'headphones',
     },
   },
-  'chef-chelsea': {
-    id: 'chef-chelsea',
-    name: 'Chef Chelsea',
+  tom: {
+    id: 'tom',
+    // design/Characters.dc.html: "TOM O'NEILL". Figure spec from
+    // design/build/humans.js's `tom` entry. Chef Chelsea no longer appears
+    // in the design (#91's Kitchen resync); Tom replaces her npcSlot.
+    name: "Tom O'Neill",
     title: null,
     roomId: 'the-melt',
-    kind: 'penguin',
-    tagName: 'Chef Chelsea',
-    dialogLine: 'Fresh pot!',
-    idleLines: staticLine('Fresh pot!'),
+    kind: 'human',
+    tagName: 'Tom',
+    dialogLine: 'Fresh pot. Do not touch.',
+    idleLines: [
+      { text: 'Fresh pot. Do not touch.', periodS: 16, delayS: -1 },
+      { text: 'Coffee run?', periodS: 16, delayS: -6 },
+      { text: 'This is my fourth. Fifth. Whatever.', periodS: 16, delayS: -11 },
+    ],
+    // No 'coffee-rush' factory exists in createDefaultMinigameRegistry() yet
+    // (#50, Coffee Rush, isn't merged), so this stays a plain line dialog
+    // rather than an NpcMinigameDialog; revisit once #50 lands.
     dialog: LINE_DIALOG,
-    look: MARKET_PENGUIN_LOOK,
+    figure: {
+      style: 'sideSwept',
+      hair: 'sandy',
+      skin: 'fair',
+      top: '#6E86A8',
+      pattern: 'stripes',
+      pattern2: '#9FB3CC',
+      collar: 'button',
+      glasses: 'rect',
+      teeth: true,
+      prop: 'coffee',
+    },
   },
   chelsea: {
     id: 'chelsea',
@@ -633,9 +657,13 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     title: null,
     roomId: 'the-melt',
     kind: 'human',
-    tagName: 'Chelsea Merrill',
+    tagName: 'Chelsea',
     dialogLine: 'Flip it NOW.',
-    idleLines: staticLine('Flip it NOW.'),
+    idleLines: [
+      { text: 'Flip it NOW.', periodS: 13, delayS: 0 },
+      { text: 'GOLDEN. Not before.', periodS: 13, delayS: -4.5 },
+      { text: 'Tom, stop eating the burnt ones.', periodS: 13, delayS: -9 },
+    ],
     dialog: PANCAKE_FLIP_DIALOG,
     figure: {
       style: 'curlyLong',
@@ -658,8 +686,11 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'the-melt',
     kind: 'penguin',
     tagName: 'Tonya',
-    dialogLine: 'who took my yogurt',
-    idleLines: staticLine('who took my yogurt'),
+    dialogLine: 'Clean your mug.',
+    idleLines: [
+      { text: 'Clean your mug.', periodS: 15, delayS: -5 },
+      { text: 'I made the sign. I mean it.', periodS: 15, delayS: -12 },
+    ],
     dialog: LINE_DIALOG,
     look: MARKET_PENGUIN_LOOK,
   },
@@ -670,11 +701,11 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'the-melt',
     kind: 'penguin',
     tagName: 'Jesse',
-    // No line is drawn in `design/Room 04 Kitchen.dc.html` for Jesse (every
-    // other background Penguin there has one); invented, reported on #36
-    // rather than left unset, since this field is required.
-    dialogLine: 'Order up!',
-    idleLines: staticLine('Order up!'),
+    dialogLine: 'Is this decaf? Be honest.',
+    idleLines: [
+      { text: 'Is this decaf? Be honest.', periodS: 15, delayS: -2 },
+      { text: 'Snack drawer is a lie.', periodS: 15, delayS: -9 },
+    ],
     dialog: LINE_DIALOG,
     look: MARKET_PENGUIN_LOOK,
   },

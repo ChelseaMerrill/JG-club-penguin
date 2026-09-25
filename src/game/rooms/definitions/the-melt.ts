@@ -18,8 +18,8 @@ const DOOR_HOTSPOT_SIZE = { width: 70, height: 165 };
 // white/teal), so they're walkable rather than blocked under the counter
 // cluster or the floor-arrow decal near the TOWN CENTER door (#16 fix 5).
 // Chelsea's and Jesse's own tiles are additionally blocked so a Penguin
-// can't walk through them (#16 fix 5); Chef Chelsea's and Tonya's tiles
-// already sat on unwalkable counters.
+// can't walk through them (#16 fix 5); Tom's and Tonya's tiles already sat
+// on unwalkable counters.
 const WALKABLE: readonly (readonly boolean[])[] = [
   [false, false, false, false, false, false, false, false, false, false, true, true],
   [false, false, false, false, false, false, false, false, false, false, true, true],
@@ -67,10 +67,17 @@ export const theMelt: RoomDefinition = {
     },
   ],
   npcSlots: [
-    { npcId: 'chef-chelsea', tile: { col: 3, row: 1 } },
+    // Tom O'Neill replaces Chef Chelsea (#91's Kitchen design resync removed
+    // her entirely and introduced Tom instead, #36 round-1 follow-up). Tile
+    // estimated the same way Dev Pit's own execution plan estimated
+    // Steven's: no ground-shadow ellipse for Tom in the design, so this is
+    // his nameplate position plus the typical nameplate-to-shadow y offset
+    // (+87.4px) seen on Tonya's and Jesse's own nameplate/shadow pairs in
+    // this same Room.
+    { npcId: 'tom', tile: { col: 7, row: 1 } },
     // "Chelsea Merrill": a full name like Darrin Jahnel's, kebab-cased to
-    // first name only — distinct from `chef-chelsea` above (the design
-    // names two different Chelseas in this Room).
+    // first name only — distinct from Tom's own former "Chef Chelsea" role
+    // (the design named two different Chelseas in this Room before #91).
     { npcId: 'chelsea', tile: { col: 4, row: 8 } },
     { npcId: 'tonya', tile: { col: 8, row: 7 } },
     { npcId: 'jesse', tile: { col: 11, row: 2 } },

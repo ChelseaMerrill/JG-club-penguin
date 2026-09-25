@@ -36,10 +36,11 @@ describe('NPCS', () => {
 
   it('sets title: null for every "TITLE TBD" card on design/Characters.dc.html\'s footnote list', () => {
     // The footnote (line ~217): "TITLE TBD cards still need yours: Chelsea,
-    // Tom, Dom, Ashley, Emily, Millie, Casey, Ryan, Sam." Tom and Emily have
-    // no npcSlot in this prototype; the rest are asserted here (#36 round-1
-    // review item 1, blocking).
-    const tbdIds: NpcId[] = ['chelsea', 'dom', 'ashley', 'millie', 'casey', 'ryan', 'sam'];
+    // Tom, Dom, Ashley, Emily, Millie, Casey, Ryan, Sam." Emily has no
+    // npcSlot in this prototype; the rest (including Tom, who gained a slot
+    // in #91's Kitchen resync) are asserted here (#36 round-1 review item 1,
+    // blocking).
+    const tbdIds: NpcId[] = ['chelsea', 'dom', 'ashley', 'millie', 'casey', 'ryan', 'sam', 'tom'];
     for (const id of tbdIds) {
       expect(NPCS[id].title, `${id}'s title`).toBeNull();
     }
@@ -67,7 +68,14 @@ describe('NPCS', () => {
     expect(NPCS['ann-marie'].tagName).toBe('Ann Marie');
     expect(NPCS.darrin.tagName).toBe('Darrin Jahnel');
     expect(NPCS.sydney.tagName).toBe('Sydney Murauskas');
-    expect(NPCS.chelsea.tagName).toBe('Chelsea Merrill');
+    expect(NPCS.tom.tagName).toBe('Tom');
+  });
+
+  it('tags Chelsea Merrill as "Chelsea" in The Melt, per the #91 Kitchen design\'s own nameplate', () => {
+    // A documented exception to The Melt's otherwise-full-name convention:
+    // design/Kitchen.dc.html's own nameplate for her literally reads
+    // "Chelsea", not "Chelsea Merrill" (#36 round-1 follow-up).
+    expect(NPCS.chelsea.tagName).toBe('Chelsea');
   });
 
   it('gives the four Roof Deck vendors a -90px bubbleOffsetX, traced from the design, and no offset elsewhere', () => {
@@ -81,13 +89,19 @@ describe('NPCS', () => {
     }
   });
 
-  it("matches design/Room 02 Dev Pit.dc.html's own say-cycle timing for Ian and Ryan", () => {
-    // Traced directly from the design's `<g style="animation:say 12s
-    // ease-in-out -1s infinite;...">`/`-7s` (Ian) and `20s`/`-2s,-8s,-14s`
-    // (Ryan) markup (#36 round-1 review item 2).
+  it("matches design/Room 02 Dev Pit.dc.html's own say-cycle timing for Ian, Steven and Ryan", () => {
+    // Traced directly from the (post-#91-resync) design's `<g style=
+    // "animation:say 22s ease-in-out -1s infinite;...">`/`-10s` (Ian), `14s`/
+    // `-2s,-9s` (Steven), and `20s`/`-2s,-8s,-14s` (Ryan, unchanged by #91)
+    // markup (#36 round-1 review item 2, and the round-1 follow-up's Ian/
+    // Steven line updates).
     expect(NPCS.ian.idleLines).toEqual([
-      { text: 'Who broke CI? Be honest.', periodS: 12, delayS: -1 },
-      { text: 'Green means go home.', periodS: 12, delayS: -7 },
+      { text: 'Who broke CI? Be honest.', periodS: 22, delayS: -1 },
+      { text: 'Grab the hammer. CI is red.', periodS: 22, delayS: -10 },
+    ]);
+    expect(NPCS.steven.idleLines).toEqual([
+      { text: 'Boxes and arrows. Mostly arrows.', periodS: 14, delayS: -2 },
+      { text: 'This diagram scales. Trust me.', periodS: 14, delayS: -9 },
     ]);
     expect(NPCS.ryan.idleLines).toEqual([
       { text: 'LGTM. One nit.', periodS: 20, delayS: -2 },
@@ -96,15 +110,46 @@ describe('NPCS', () => {
     ]);
   });
 
-  it('gives Front Desk and every The Melt NPC a single static (periodS: 0) idle line', () => {
-    // design/Room 04 Kitchen.dc.html has zero `animation:say` occurrences
-    // (#36 round-1 review item 2/3); Front Desk's own bubble in Town Center
-    // is the one exception there with no `animation:say` wrapper either.
-    const staticIds: NpcId[] = ['front-desk', 'chef-chelsea', 'chelsea', 'tonya', 'jesse'];
-    for (const id of staticIds) {
-      expect(NPCS[id].idleLines, `${id}'s idleLines`).toHaveLength(1);
-      expect(NPCS[id].idleLines[0]?.periodS, `${id}'s periodS`).toBe(0);
-    }
+  it("matches design/Kitchen.dc.html's own say-cycle timing for Tom, Chelsea, Tonya and Jesse", () => {
+    // #91's Kitchen design resync replaced The Melt's static bubbles with the
+    // same generic `say`-cycling every other Room already uses (#36 round-1
+    // follow-up).
+    expect(NPCS.tom.idleLines).toEqual([
+      { text: 'Fresh pot. Do not touch.', periodS: 16, delayS: -1 },
+      { text: 'Coffee run?', periodS: 16, delayS: -6 },
+      { text: 'This is my fourth. Fifth. Whatever.', periodS: 16, delayS: -11 },
+    ]);
+    expect(NPCS.chelsea.idleLines).toEqual([
+      { text: 'Flip it NOW.', periodS: 13, delayS: 0 },
+      { text: 'GOLDEN. Not before.', periodS: 13, delayS: -4.5 },
+      { text: 'Tom, stop eating the burnt ones.', periodS: 13, delayS: -9 },
+    ]);
+    expect(NPCS.tonya.idleLines).toEqual([
+      { text: 'Clean your mug.', periodS: 15, delayS: -5 },
+      { text: 'I made the sign. I mean it.', periodS: 15, delayS: -12 },
+    ]);
+    expect(NPCS.jesse.idleLines).toEqual([
+      { text: 'Is this decaf? Be honest.', periodS: 15, delayS: -2 },
+      { text: 'Snack drawer is a lie.', periodS: 15, delayS: -9 },
+    ]);
+  });
+
+  it('gives Front Desk a single static (periodS: 0) idle line', () => {
+    // Front Desk's own bubble in Town Center has no `animation:say` wrapper
+    // at all, unlike every other NPC (including, since #91, every The Melt
+    // NPC) (#36 round-1 review item 2/3).
+    expect(NPCS['front-desk'].idleLines).toHaveLength(1);
+    expect(NPCS['front-desk'].idleLines[0]?.periodS).toBe(0);
+  });
+
+  it('replaces Chef Chelsea with Tom in The Melt (removed by the #91 Kitchen design resync)', () => {
+    expect(getNpcDefinition('chef-chelsea')).toBeUndefined();
+    const tom = NPCS.tom;
+    expect(tom.name).toBe("Tom O'Neill");
+    expect(tom.title).toBeNull();
+    expect(tom.roomId).toBe('the-melt');
+    expect(tom.kind).toBe('human');
+    expect(tom.dialog).toMatchObject({ kind: 'line' });
   });
 
   it("includes Ian Ballard in Dev Pit with a Bug Squash dialog and the trigger design's own quote/subtitle", () => {
