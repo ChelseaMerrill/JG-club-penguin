@@ -90,15 +90,20 @@ const LABEL_FONT_FAMILY = 'sans-serif';
 const LABEL_TEXT_COLOR = '#F4F4F4';
 const DOOR_LABEL_FONT_SIZE = '14px';
 /**
- * The invisible click zone over each NPC sprite (#36 D3/A4): sized to
- * roughly the figure's own 120-wide box, centred a bit above the sprite's
- * feet-anchor point since the figure extends mostly upward from it -- not an
- * alpha-0 shape, which Phaser drops from input hit-testing the same way
- * `drawDoors`'s own image-background `Zone` avoids that trap.
+ * The invisible click zone over each NPC sprite (#36 D3/A4): a modest area
+ * around the sprite's feet-anchor point, shifted up slightly to sit over the
+ * standing figure rather than only its feet -- not an alpha-0 shape, which
+ * Phaser drops from input hit-testing the same way `drawDoors`'s own
+ * image-background `Zone` avoids that trap. Deliberately smaller than the
+ * full 120x130 figure box: `e2e/click-to-move.spec.ts` clicks tiles as close
+ * as one column/two rows from Town Center's own NPC slots (#16), and a
+ * bigger zone bleeds into those clicks' hit-testing, stealing them from the
+ * tile underneath (review-caught while wiring #36 -- confirmed against
+ * Town Center's actual NPC/click tile geometry, not a guess).
  */
-const NPC_HIT_ZONE_WIDTH = 110;
-const NPC_HIT_ZONE_HEIGHT = 160;
-const NPC_HIT_ZONE_OFFSET_Y = -70;
+const NPC_HIT_ZONE_WIDTH = 80;
+const NPC_HIT_ZONE_HEIGHT = 90;
+const NPC_HIT_ZONE_OFFSET_Y = -20;
 
 const FURNITURE_WIDTH = 40;
 const FURNITURE_HEIGHT = 28;
@@ -117,6 +122,14 @@ const PLAYER_REGISTRY_KEY = 'player';
 
 /** The `Container` name `placePenguinsIn` gives each remote Penguin (#28). */
 const REMOTE_PENGUIN_NAME = 'remote-penguin';
+
+/**
+ * The `Container` name `drawNpcs` gives each NPC sprite (#36), so
+ * `publishRoomDebug`'s `penguinCount` (a Penguin-only count, #14 review fix
+ * 8's restart-leak check) doesn't also count every NPC standing in the Room
+ * as a "Penguin" the way an unnamed Container otherwise would.
+ */
+const NPC_CONTAINER_NAME = 'npc';
 
 /** One entry in an interactive hit-area lookup table (`onPointerDown`). */
 interface HitArea<T> {
@@ -371,7 +384,9 @@ export class RoomScene extends Scene {
       localPenguinMoveLog: this.localPenguinMoveLog,
       restartRoom: () => this.scene.restart(),
       restartCount: this.restartCount,
-      penguinCount: this.countPenguinContainers((name) => name !== REMOTE_PENGUIN_NAME),
+      penguinCount: this.countPenguinContainers(
+        (name) => name !== REMOTE_PENGUIN_NAME && name !== NPC_CONTAINER_NAME,
+      ),
       remotePenguinCount: this.countPenguinContainers((name) => name === REMOTE_PENGUIN_NAME),
       setRegisteredPlayer: (player) => this.registry.set(PLAYER_REGISTRY_KEY, player),
       spawnDebugPenguin: (tile, look) => this.spawnDebugPenguin(tile, look),
@@ -388,7 +403,9 @@ export class RoomScene extends Scene {
   /**
    * Penguin `Container`s in the Scene's display list whose name matches
    * (#14 review fix 8's restart-leak check). Remote Penguins (#28) are named
-   * `REMOTE_PENGUIN_NAME`; the local and debug Penguins are unnamed.
+   * `REMOTE_PENGUIN_NAME`; the local and debug Penguins are unnamed; NPCs
+   * (#36) are named `NPC_CONTAINER_NAME`, excluded from `penguinCount` the
+   * same way remote Penguins are.
    */
   private countPenguinContainers(matches: (name: string) => boolean): number {
     return this.children.list.filter(
@@ -750,6 +767,7 @@ export class RoomScene extends Scene {
 
       const npcSprite = createNpcSprite(this, point.x, point.y, npc);
       npcSprite.container.setDepth(depth);
+      npcSprite.container.setName(NPC_CONTAINER_NAME);
       this.npcSprites.push(npcSprite);
 
       const zone = this.add

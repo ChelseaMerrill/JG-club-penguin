@@ -959,16 +959,25 @@ body {
    click-blocking overlay), the root itself stays `pointer-events: none` --
    the same pattern `.hud` uses -- so only `.npc-dialog__panel` is
    click-through-blocking; a click elsewhere on the Stage still reaches the
-   canvas underneath. */
+   canvas underneath.
+
+   Pointer events: `#ui > *` (near the top of this file) opts every direct
+   child of `#ui` back into `pointer-events: auto`, the same trap `.hud`'s own
+   comment documents. `#ui > .npc-dialog` below re-overrides that back to
+   `none` -- it needs the extra `#ui >` specificity to win the cascade over
+   `#ui > *` -- so only `.npc-dialog__panel` itself opts back into `auto`. */
 .npc-dialog {
   position: absolute;
   inset: 0;
   z-index: 1;
-  pointer-events: none;
   display: flex;
   align-items: flex-end;
   justify-content: center;
   padding-bottom: 90px;
+}
+
+#ui > .npc-dialog {
+  pointer-events: none;
 }
 
 .npc-dialog[hidden] {
