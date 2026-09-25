@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import type { RoomId } from '../src/contracts';
 import { devPit } from '../src/game/rooms/definitions/dev-pit';
 import { roofDeck } from '../src/game/rooms/definitions/roof-deck';
+import { theMelt } from '../src/game/rooms/definitions/the-melt';
 import { tileToScreen } from '../src/game/rooms/iso';
 import { GAME_HEIGHT, GAME_WIDTH } from '../src/game/stage-size';
 import type { RoomDebugInfo } from './support/room-debug-types';
@@ -119,6 +120,70 @@ test("Dev Pit: clicking near Ian's head (not just his feet) still opens his dial
     .poll(async () => (await debugInfo(page))?.npcArrivedLog, { timeout: LONG_WALK_TIMEOUT })
     .toContain('ian');
   await expect(page.locator('.npc-dialog')).toBeVisible();
+
+  expect(errors).toEqual([]);
+});
+
+test('Roof Deck: clicking Josh arrives, opens his dialog, and WORK A SHIFT opens Snow Cone Stand', async ({
+  page,
+}) => {
+  const errors = await bootRoom(page, 'roof-deck');
+
+  const josh = roofDeck.npcSlots.find((slot) => slot.npcId === 'josh');
+  if (!josh) throw new Error('expected roof-deck to have a "josh" NPC slot');
+  const point = tileToScreen(josh.tile, roofDeck.grid.origin);
+
+  await clickStagePoint(page, point);
+
+  await expect
+    .poll(async () => (await debugInfo(page))?.npcArrivedLog, { timeout: LONG_WALK_TIMEOUT })
+    .toContain('josh');
+
+  const dialog = page.locator('.npc-dialog');
+  await expect(dialog).toBeVisible();
+  await expect(dialog.locator('.npc-dialog__name')).toHaveText('Josh Cantor-Stone');
+
+  const grabButton = dialog.getByRole('button', { name: 'WORK A SHIFT' });
+  await expect(grabButton).toBeVisible();
+  await grabButton.click();
+
+  await expect(page.locator('.minigame__howto')).toBeVisible();
+  await expect(page.locator('.minigame__howto-subtitle')).toContainText('SNOW CONE STAND');
+  await expect(dialog).toBeHidden();
+
+  await page.screenshot({ path: 'test-results/npcs-roof-deck/snow-cone-stand-launched.png' });
+
+  expect(errors).toEqual([]);
+});
+
+test('The Melt: clicking Tom arrives, opens his dialog, and GRAB THE POT opens Coffee Rush', async ({
+  page,
+}) => {
+  const errors = await bootRoom(page, 'the-melt');
+
+  const tom = theMelt.npcSlots.find((slot) => slot.npcId === 'tom');
+  if (!tom) throw new Error('expected the-melt to have a "tom" NPC slot');
+  const point = tileToScreen(tom.tile, theMelt.grid.origin);
+
+  await clickStagePoint(page, point);
+
+  await expect
+    .poll(async () => (await debugInfo(page))?.npcArrivedLog, { timeout: LONG_WALK_TIMEOUT })
+    .toContain('tom');
+
+  const dialog = page.locator('.npc-dialog');
+  await expect(dialog).toBeVisible();
+  await expect(dialog.locator('.npc-dialog__name')).toHaveText("Tom O'Neill");
+
+  const grabButton = dialog.getByRole('button', { name: 'GRAB THE POT' });
+  await expect(grabButton).toBeVisible();
+  await grabButton.click();
+
+  await expect(page.locator('.minigame__howto')).toBeVisible();
+  await expect(page.locator('.minigame__howto-subtitle')).toContainText('COFFEE RUSH');
+  await expect(dialog).toBeHidden();
+
+  await page.screenshot({ path: 'test-results/npcs-the-melt/coffee-rush-launched.png' });
 
   expect(errors).toEqual([]);
 });
