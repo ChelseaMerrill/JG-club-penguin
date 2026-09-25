@@ -53,12 +53,16 @@ export interface NpcBob {
   periodMs: number;
 }
 
-/** The draw scale by kind, unless the NPC carries its own `scale` (Front Desk's 0.5). */
-export function npcScale(npc: Pick<NpcDefinition, 'kind' | 'scale'>): number {
-  return npc.scale ?? (npc.kind === 'human' ? HUMAN_NPC_SCALE : PENGUIN_NPC_SCALE);
+/**
+ * The draw scale by kind. Penguin-kind NPCs keep only this layout default:
+ * they are being removed from the Rooms (only Players appear as Penguins,
+ * PR #133), so #113 doesn't restyle them.
+ */
+export function npcScale(npc: Pick<NpcDefinition, 'kind'>): number {
+  return npc.kind === 'human' ? HUMAN_NPC_SCALE : PENGUIN_NPC_SCALE;
 }
 
-export function npcLayout(npc: Pick<NpcDefinition, 'kind' | 'scale'>): NpcLayout {
+export function npcLayout(npc: Pick<NpcDefinition, 'kind'>): NpcLayout {
   const scale = npcScale(npc);
   const nameplateBottomY = -FIGURE_HEIGHT * scale - NAMEPLATE_GAP_ABOVE_FIGURE;
   const nameplateTopY = nameplateBottomY - NAMEPLATE_HEIGHT;
@@ -79,7 +83,7 @@ export function npcLayout(npc: Pick<NpcDefinition, 'kind' | 'scale'>): NpcLayout
 
 /**
  * The idle bob, or `null` for an NPC its design leaves still (Dev Pit's Ian,
- * Chelsea, Front Desk). The cycle is the designs' 3 s unless the NPC carries
+ * Chelsea). The cycle is the designs' 3 s unless the NPC carries
  * its own `bobPeriodS` (the Icebox's 1.1 s).
  */
 export function npcBob(npc: Pick<NpcDefinition, 'still' | 'bobPeriodS'>): NpcBob | null {

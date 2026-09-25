@@ -135,6 +135,9 @@ describe('NPCS', () => {
       for (const room of ROOM_DEFINITIONS) {
         const shown = room.npcSlots.flatMap((slot) => {
           const npc = getNpcDefinition(slot.npcId)!;
+          // Penguin-kind NPCs are being removed from the Rooms (only Players
+          // appear as Penguins, PR #133), so they're left out.
+          if (npc.kind === 'penguin') return [];
           const feet = tileToScreen(slot.tile, room.grid.origin);
           const bottom = feet.y + npcLayout(npc).bubbleBottomY + (npc.bubbleOffsetY ?? 0);
           const centerX = feet.x + (npc.bubbleOffsetX ?? 0);

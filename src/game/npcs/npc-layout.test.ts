@@ -7,29 +7,18 @@ import { npcBob, npcLayout, npcScale } from './npc-layout';
 // - Town Center's Darrin Jahnel (a Human at 0.62): figure `<svg y="362.5"
 //   height="80.6">`, so feet = 362.5 + 120 * 0.62 = 436.9; nameplate
 //   `<rect y="337.4" height="20">`; bubble `<rect y="303.4" height="30">`.
-// - Town Center's Front Desk (a Penguin at 0.5): `<svg y="359.75">`, feet
-//   419.75; nameplate `<rect y="334.25" height="20">`.
 // - Town Center's "You" (a Penguin at 0.58): `<svg y="548.66">`, feet
 //   618.26; nameplate `<rect y="522.6" height="20">`.
 const DARRIN_FEET = 436.9;
 const DARRIN_NAMEPLATE_TOP = 337.4 - DARRIN_FEET;
 const DARRIN_NAMEPLATE_BOTTOM = 357.4 - DARRIN_FEET;
 const DARRIN_BUBBLE_BOTTOM = 333.4 - DARRIN_FEET;
-const FRONT_DESK_NAMEPLATE_TOP = 334.25 - 419.75;
 const YOU_NAMEPLATE_TOP = 522.6 - 618.26;
 
 describe('npcScale', () => {
   it('draws Humans at 0.62 and Penguin NPCs at 0.58, as every Room design does', () => {
     expect(npcScale({ kind: 'human' })).toBe(0.62);
     expect(npcScale({ kind: 'penguin' })).toBe(0.58);
-  });
-
-  it("uses an NPC's own scale override when it has one", () => {
-    expect(npcScale({ kind: 'penguin', scale: 0.5 })).toBe(0.5);
-  });
-
-  it('draws Front Desk at the design’s 0.5', () => {
-    expect(npcScale(NPCS['front-desk'])).toBe(0.5);
   });
 });
 
@@ -41,10 +30,8 @@ describe('npcLayout', () => {
     expect(layout.bubbleBottomY).toBeCloseTo(DARRIN_BUBBLE_BOTTOM, 0);
   });
 
-  it("puts Front Desk's (0.5) and a 0.58 Penguin's nameplate where Town Center draws them (within the design's own sub-pixel rounding)", () => {
-    const frontDeskTop = npcLayout(NPCS['front-desk']).nameplateTopY;
+  it("puts a 0.58 Penguin's nameplate where Town Center draws one (within the design's own sub-pixel rounding)", () => {
     const penguinTop = npcLayout({ kind: 'penguin' }).nameplateTopY;
-    expect(Math.abs(frontDeskTop - FRONT_DESK_NAMEPLATE_TOP)).toBeLessThan(1.5);
     expect(Math.abs(penguinTop - YOU_NAMEPLATE_TOP)).toBeLessThan(1.5);
   });
 
@@ -75,11 +62,10 @@ describe('npcBob', () => {
     expect(npcBob(NPCS.jethro)).toEqual({ distance: 3, periodMs: 1100 });
   });
 
-  it('keeps the NPCs the designs leave still (Dev Pit Ian, Chelsea, Front Desk) from bobbing', () => {
+  it('keeps the NPCs the designs leave still (Dev Pit Ian, Chelsea) from bobbing', () => {
     expect(npcBob({ still: true })).toBeNull();
     expect(npcBob(NPCS.ian)).toBeNull();
     expect(npcBob(NPCS.chelsea)).toBeNull();
-    expect(npcBob(NPCS['front-desk'])).toBeNull();
     expect(npcBob(NPCS['ian-team-room-2'])).not.toBeNull();
   });
 });

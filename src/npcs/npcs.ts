@@ -183,14 +183,8 @@ interface NpcDefinitionBase {
    */
   bubbleOffsetY?: number;
   /**
-   * The draw scale, when the Room design draws this NPC at something other
-   * than its kind's default (`npc-layout.ts`: Humans 0.62, Penguins 0.58).
-   * Only Front Desk sets it (0.5, `width="60"` in Town Center's design).
-   */
-  scale?: number;
-  /**
    * `true` for an NPC its Room design draws without the shared `idle` bob
-   * (#113: Dev Pit's Ian, Chelsea, Front Desk). Every other NPC bobs.
+   * (#113: Dev Pit's Ian, Chelsea). Every other NPC bobs.
    */
   still?: boolean;
   /**
@@ -285,32 +279,23 @@ function staticLine(text: string): NpcBubbleLine[] {
 }
 
 /**
- * Penguin-kind NPCs are drawn by `render-penguin-npc-svg.ts`, the Room
- * designs' shared `peng()` figure, which reads only a look's `body` (body
- * and flippers) and `cap` (the small brow cap); beak, feet and belly are
- * fixed. Each constant below is traced from the NPCs' own Room design
- * markup (#113).
- *
- * Front Desk, Kevin, the Hallway's Michael S. and the Bathroom's Jessie: the
- * default `#161719` body with a `#F4F4F4` cap.
+ * The fixed look most background/market Penguin-kind NPCs share (Front Desk,
+ * Kevin, Tonya, Jesse): traced from their shared `peng()`-style
+ * figure markup in the Room designs -- `#161719` body, `#00BDFF`
+ * cap/beak/feet, `#F4F4F4` belly, the `JG CAP` hat silhouette. Exact per-NPC
+ * fidelity beyond that (e.g. a chef's hat) isn't attempted; a judgment call,
+ * the same kind the #16 execution plan already documents for market fixtures.
+ */
+const MARKET_PENGUIN_LOOK: PenguinLook = { ...DEFAULT_LOOK, name: '' };
+
+/**
+ * The Hallway's Michael S. and the Bathroom's Jessie (#51): the shared
+ * `peng()` figure with a `#F4F4F4` cap, per their Room designs' own markup.
  */
 const WHITE_CAP_PENGUIN_LOOK: PenguinLook = { ...DEFAULT_LOOK, name: '', cap: '#F4F4F4' };
 
-/** Tristin and Tonya: the designs' `#3a4046` grey body with a `#0C4B5F` cap. */
-const GREY_PENGUIN_LOOK: PenguinLook = {
-  ...DEFAULT_LOOK,
-  name: '',
-  body: '#3a4046',
-  cap: '#0C4B5F',
-};
-
-/** Jesse: the Kitchen design's `#0C4B5F` teal body with a `#F4F4F4` cap. */
-const TEAL_PENGUIN_LOOK: PenguinLook = {
-  ...DEFAULT_LOOK,
-  name: '',
-  body: '#0C4B5F',
-  cap: '#F4F4F4',
-};
+/** Tristin's figure uses the design's `#3a4046`/`#0C4B5F` grey-blue Penguin body/cap instead. */
+const TRISTIN_LOOK: PenguinLook = { ...DEFAULT_LOOK, name: '', body: '#3a4046', cap: '#0C4B5F' };
 
 /**
  * Darrin Jahnel's figure, shared by his Town Center (`darrin`) and Icebox
@@ -594,15 +579,8 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     tagName: 'Front Desk',
     dialogLine: 'Welcome to JG HQ!',
     idleLines: staticLine('Welcome to JG HQ!'),
-    // Town Center's design draws her smaller than the other Penguins
-    // (`width="60"`, i.e. 0.5) and without the shared idle bob.
-    scale: 0.5,
-    still: true,
-    // Sydney's tile is just in front of hers, so Sydney's bubbles would sit
-    // on top of this always-shown one: lifted 28 px to stay above them.
-    bubbleOffsetY: -28,
     dialog: LINE_DIALOG,
-    look: WHITE_CAP_PENGUIN_LOOK,
+    look: MARKET_PENGUIN_LOOK,
   },
   ashley: {
     id: 'ashley',
@@ -750,7 +728,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     ],
     bubbleOffsetX: -90,
     dialog: LINE_DIALOG,
-    look: WHITE_CAP_PENGUIN_LOOK,
+    look: MARKET_PENGUIN_LOOK,
   },
   'ann-marie': {
     id: 'ann-marie',
@@ -876,7 +854,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: 'Worth it for snacks.', periodS: 24, delayS: -13 },
     ],
     dialog: LINE_DIALOG,
-    look: GREY_PENGUIN_LOOK,
+    look: TRISTIN_LOOK,
   },
   casey: {
     id: 'casey',
@@ -971,7 +949,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: 'I made the sign. I mean it.', periodS: 15, delayS: -12 },
     ],
     dialog: LINE_DIALOG,
-    look: GREY_PENGUIN_LOOK,
+    look: MARKET_PENGUIN_LOOK,
   },
   // Spelled "Jesse" here, unlike the Bathroom's "Jessie" (see that entry's
   // own comment) -- a deliberate human decision to keep them as two separate
@@ -989,7 +967,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: 'Snack drawer is a lie.', periodS: 15, delayS: -9 },
     ],
     dialog: LINE_DIALOG,
-    look: TEAL_PENGUIN_LOOK,
+    look: MARKET_PENGUIN_LOOK,
   },
   // #51: the Icebox's five NPCs. Names/titles from design/Characters.dc.html
   // (Millie is on its TITLE TBD list), figures from design/build/humans.js
