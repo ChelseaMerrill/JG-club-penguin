@@ -16,7 +16,7 @@ const LONG_WALK_TIMEOUT = 15_000;
 const PROOF_ROOT = 'test-results/npc-motion-roof-deck';
 /** `RoomScene`'s NPC click zone sits this far above the feet (`NPC_HIT_ZONE_OFFSET_Y`). */
 const HIT_ZONE_OFFSET_Y = -50;
-const MOVING_NPCS = ['brandon', 'anthony', 'millie', 'tristin'];
+const MOVING_NPCS = ['brandon', 'anthony', 'millie'];
 
 test.use({ viewport: { width: 1600, height: 900 } });
 

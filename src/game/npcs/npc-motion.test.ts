@@ -112,7 +112,7 @@ describe('NPC motion (#113)', () => {
     const moving = (Object.keys(NPCS) as NpcId[]).filter(
       (id) => NPCS[id].roomId === 'roof-deck' && getNpcMotion(id),
     );
-    expect(moving.sort()).toEqual(['anthony', 'brandon', 'millie', 'tristin']);
+    expect(moving.sort()).toEqual(['anthony', 'brandon', 'millie']);
   });
 
   it('compiles every motion in the registry, and only for known NPCs', () => {

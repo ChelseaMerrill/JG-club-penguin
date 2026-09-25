@@ -68,11 +68,6 @@ export const ROOF_DECK_MOTIONS: Partial<Record<NpcId, NpcMotionSpec>> = {
       animation: 'mkMillie 20s ease-in-out infinite',
     },
   },
-  tristin: {
-    path: {
-      keyframes:
-        '@keyframes mkTristin { 0% { transform: translate(0,0);} 28.3%,38.3% { transform: translate(470px, -19.99999999999997px);} 62.7%,70.7% { transform: translate(305px, -102.49999999999999px);} 100% { transform: translate(0,0);} }',
-      animation: 'mkTristin 24s ease-in-out infinite',
-    },
-  },
+  // Tristin's `mkTristin` walk isn't ported: he's a Penguin-kind NPC, and only
+  // Players appear as Penguins (owner decision, 2026-09-25), so he has no slot.
 };

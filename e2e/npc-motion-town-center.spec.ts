@@ -77,10 +77,9 @@ test('Town Center NPCs walk their designed paths; Darrin pumps his fists, Jon do
   const errors = await bootTownCenter(page);
 
   for (const id of MOVING_NPCS) expect((await npc(page, id)).moving).toBe(true);
-  // The Front Desk penguin keeps #36's idle bob and never leaves her slot.
-  const frontDesk = await npc(page, 'front-desk');
-  const frontDeskRest = tileToScreen({ col: 6, row: 1 }, townCenter.grid.origin);
-  expect(frontDesk).toMatchObject({ x: frontDeskRest.x, y: frontDeskRest.y, moving: false });
+  // The Front Desk receptionist is a Penguin-kind NPC, so she isn't placed:
+  // only Players appear as Penguins (owner decision, 2026-09-25).
+  expect((await debugInfo(page))?.npcs?.['front-desk']).toBeUndefined();
 
   const start = await npc(page, 'darrin');
   const seen = [start];
