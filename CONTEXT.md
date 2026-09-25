@@ -89,6 +89,9 @@ A bounded exchange between a Penguin and an NPC — either **Dialogue** (the NPC
 **Minigame**
 A short, timed activity launched from an NPC Interaction, such as Bug Squash in Dev Pit or Pancake Flip in The Melt. Each play is a **round**: it has a timer and a score, pays Tokens, saves the Player's **personal best** for that Minigame, and can earn a Badge. Payouts are calculated by the server, never trusted from the client.
 
+**Leaderboard**
+A per-Minigame ranking of named Players' personal bests, shown by Penguin name; ties go to whoever reached the score first. Shown on the Minigame's done screen, all-time, top 10 plus the Player's own rank when it falls outside that.
+
 **Quest**
 A tracked objective shown in the Quests panel and the HUD quest widget. Stretch for the prototype. "Task" is not part of this project's vocabulary.
 

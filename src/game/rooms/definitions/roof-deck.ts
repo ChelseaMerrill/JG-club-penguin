@@ -39,7 +39,7 @@ const WALKABLE: readonly (readonly boolean[])[] = [
  * only exit indicator is a "↙ ELEVATOR · STAIRS · KITCHEN" HUD nav pill, with
  * no in-world hotspot to place. Per #16 D3 ("doors placed on the design's
  * door signs/doorways"), there is nothing to place here, so this Room has no
- * doors; it's still reachable via Town Center's and The Melt's elevator/
+ * doors; it's still reachable via Town Center's and the Kitchen's elevator/
  * stairs doors, whose `entryTile` points at this Room's own `spawnTile`. This
  * is reported as a deviation on the #16 execution plan. `spawnTile` isn't any
  * NPC's own interaction tile (#16 fix 4; see `reachability.test.ts`).

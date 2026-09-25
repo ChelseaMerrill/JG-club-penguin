@@ -47,7 +47,7 @@ function bodyTransformAttr(pose: PenguinPose): string {
 }
 
 interface DesignTextSpec {
-  key: 'haha' | 'jgLogo' | 'warWeek';
+  key: 'haha' | 'jgLogo' | 'warWeek' | 'jgCap';
   text: string;
   x: number;
   y: number;
@@ -94,10 +94,20 @@ const DESIGN_TEXT_SPECS: DesignTextSpec[] = [
     textAnchor: 'middle',
     letterSpacing: 1,
   },
+  {
+    key: 'jgCap',
+    text: 'JG',
+    x: 60,
+    y: 19.4,
+    fontFamily: 'Anton, Impact, sans-serif',
+    fontSize: 5,
+    fill: '#F4F4F4',
+    textAnchor: 'middle',
+  },
 ];
 
 interface GridRow {
-  key: 'haha' | 'jgLogo' | 'warWeek';
+  key: 'haha' | 'jgLogo' | 'warWeek' | 'jgCap';
   label: string;
   pose: PenguinPose;
   pathsSvg: string;
@@ -138,6 +148,15 @@ function buildRows(): GridRow[] {
         idPrefix: 'war-week-band',
       }),
       pathD: PENGUIN_TEXT_PATHS.warWeek.d,
+    },
+    {
+      key: 'jgCap',
+      label: 'JG CAP hat crown (JG -- Anton, #92 D4)',
+      pose: { anim: DEFAULT_LOOK.emote, frame: 0 },
+      pathsSvg: renderPenguinSvg({ ...DEFAULT_LOOK, hat: 'JG CAP' }, undefined, {
+        idPrefix: 'jg-cap',
+      }),
+      pathD: PENGUIN_TEXT_PATHS.jgCap.d,
     },
   ];
 }

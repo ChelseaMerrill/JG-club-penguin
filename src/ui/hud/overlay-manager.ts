@@ -1,9 +1,10 @@
 /**
- * Tracks which single HUD overlay is open at a time (MENU now; the Map and
- * the Penguin Creator register their own overlays once #33/#35 land).
- * Opening a new overlay closes whichever one is already open first, and
- * Escape closes whichever one is currently open. One `createOverlayManager()`
- * per `createHud()` instance; `destroy()` removes its own `keydown` listener.
+ * Tracks which single HUD overlay is open at a time (MENU, the Map (#33),
+ * the Penguin Creator (#35), the Trophy Case, the Market, and a Minigame
+ * shell each register their own overlay). Opening a new overlay closes
+ * whichever one is already open first, and Escape closes whichever one is
+ * currently open. One `createOverlayManager()` per `createHud()` instance;
+ * `destroy()` removes its own `keydown` listener.
  */
 export interface OverlayManager {
   /** Opens `id`, closing any other open overlay first. Re-opening the
