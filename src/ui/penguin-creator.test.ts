@@ -132,31 +132,113 @@ describe('createPenguinCreator', () => {
     expect(q<HTMLInputElement>('#penguin-creator-name').maxLength).toBe(16);
   });
 
-  it('refuses to submit without a name', () => {
+  it('disables WADDLE IN and shows a hint when there is no name', () => {
     const { q, creator, onSubmit, submit } = setup();
     creator.open(DEFAULT_LOOK, { dismissible: false });
 
     expect(q<HTMLInputElement>('#penguin-creator-name').value).toBe('');
     expect(q('.penguin-creator__nameplate').textContent).toBe('Unnamed Penguin');
+    expect(q<HTMLButtonElement>('.penguin-creator__submit').disabled).toBe(true);
+    expect(q('.penguin-creator__name-hint').textContent).toBe(
+      'Give your Penguin a name to waddle in',
+    );
+
     submit();
 
     expect(onSubmit).not.toHaveBeenCalled();
-    expect(q('.penguin-creator__error').textContent).toBe('Your Penguin needs a name.');
   });
 
-  it('clears the missing-name error once a name is typed', () => {
-    const { q, creator, submit } = setup();
+  it('keeps WADDLE IN disabled for a whitespace-only name, then enables it once a name is typed', () => {
+    const { q, creator } = setup();
     creator.open(DEFAULT_LOOK, { dismissible: false });
-    submit();
-
     const name = q<HTMLInputElement>('#penguin-creator-name');
+    const button = () => q<HTMLButtonElement>('.penguin-creator__submit');
+    const hint = () => q('.penguin-creator__name-hint').textContent;
+
     name.value = '   ';
     name.dispatchEvent(new Event('input'));
-    expect(q('.penguin-creator__error').textContent).toBe('Your Penguin needs a name.');
+    expect(button().disabled).toBe(true);
+    expect(hint()).toBe('Give your Penguin a name to waddle in');
 
     name.value = 'Waddles';
     name.dispatchEvent(new Event('input'));
-    expect(q('.penguin-creator__error').textContent).toBe('');
+    expect(button().disabled).toBe(false);
+    expect(hint()).toBe('');
+  });
+
+  it('disables WADDLE IN and shows the too-long hint over 16 characters', () => {
+    const { q, creator } = setup();
+    creator.open(DEFAULT_LOOK, { dismissible: false });
+    const name = q<HTMLInputElement>('#penguin-creator-name');
+
+    name.value = 'A'.repeat(17);
+    name.dispatchEvent(new Event('input'));
+
+    expect(q<HTMLButtonElement>('.penguin-creator__submit').disabled).toBe(true);
+    expect(q('.penguin-creator__name-hint').textContent).toBe('Names are 1–16 characters');
+  });
+
+  it('enables WADDLE IN at exactly 16 characters', () => {
+    const { q, creator } = setup();
+    creator.open(DEFAULT_LOOK, { dismissible: false });
+    const name = q<HTMLInputElement>('#penguin-creator-name');
+
+    name.value = 'A'.repeat(16);
+    name.dispatchEvent(new Event('input'));
+
+    expect(q<HTMLButtonElement>('.penguin-creator__submit').disabled).toBe(false);
+    expect(q('.penguin-creator__name-hint').textContent).toBe('');
+  });
+
+  it('the disabled rule applies in dismissible mode too', () => {
+    const { q, creator } = setup();
+    creator.open(DEFAULT_LOOK, { dismissible: true });
+
+    expect(q<HTMLButtonElement>('.penguin-creator__submit').disabled).toBe(true);
+  });
+
+  it('setSaving(false) restores the disabled state for an invalid draft rather than clearing it', () => {
+    const { q, creator } = setup();
+    creator.open(DEFAULT_LOOK, { dismissible: false });
+
+    creator.setSaving(true);
+    creator.setSaving(false);
+
+    expect(q<HTMLButtonElement>('.penguin-creator__submit').disabled).toBe(true);
+  });
+
+  it('Enter in the name field cannot bypass an invalid name', () => {
+    const { q, creator, onSubmit } = setup();
+    creator.open(DEFAULT_LOOK, { dismissible: false });
+    const name = q<HTMLInputElement>('#penguin-creator-name');
+
+    name.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('Enter in the name field submits a valid name, the same as WADDLE IN', () => {
+    const { q, creator, onSubmit } = setup();
+    creator.open(initial, { dismissible: false });
+    const name = q<HTMLInputElement>('#penguin-creator-name');
+
+    name.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+
+    expect(onSubmit).toHaveBeenCalledWith(initial);
+  });
+
+  it('a load or save error shown through showError is not cleared by typing the name', () => {
+    const { q, creator } = setup();
+    creator.open(initial, { dismissible: false });
+
+    creator.showError("Couldn't save your Penguin: invalid_look");
+    const name = q<HTMLInputElement>('#penguin-creator-name');
+    name.value = 'Ada';
+    name.dispatchEvent(new Event('input'));
+
+    expect(q('.penguin-creator__error').textContent).toBe(
+      "Couldn't save your Penguin: invalid_look",
+    );
   });
 
   it('SHUFFLE changes the look but keeps the name and Idle animation', () => {
