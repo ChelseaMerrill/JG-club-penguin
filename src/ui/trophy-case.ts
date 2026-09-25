@@ -16,37 +16,35 @@ interface BadgeTile {
    */
   title: string;
   /**
-   * The design's own hint text, kept verbatim -- including "Breakfast
-   * Club"'s "20 SERVED · COFFEE RUSH", which names the wrong Minigame for
-   * that Badge (its threshold, 20, is actually Pancake Flip's). See the #42
-   * execution report rather than "fixing" the design's copy here.
+   * The design's own hint text, except "Breakfast Club": the design says
+   * "20 SERVED · COFFEE RUSH", but Breakfast Club is Pancake Flip's Badge
+   * (20 stacked, `minigame-rules.ts`), so its hint names Pancake Flip.
    */
   hint: string;
   /**
    * `null` for a design badge this build has no earning logic for yet (it
-   * always renders locked). A real `BadgeId` otherwise. The design has no
-   * tile at all for `barista`: it is never shown here.
+   * always renders locked). A real `BadgeId` otherwise.
    */
   badgeId: BadgeId | null;
 }
 
 /**
- * The Trophy Case's 12 BADGES tiles, in the design's own order. Only three
- * carry a real `BadgeId` that `ProgressStore.loadAll` can ever report earned
- * in this build (Exterminator/Bug Squash, Breakfast Club/Pancake Flip, Brain
- * Freeze/Snow Cone Stand, a stretch game); Barista/Coffee Rush unlocks with
- * that stretch game too, but the design has no tile for it. The other nine
- * have no earning logic in this prototype and always render locked with
- * their design hint.
+ * The Trophy Case's 12 BADGES tiles, in the design's own order. Four carry
+ * a real `BadgeId` that `ProgressStore.loadAll` can report earned: one per
+ * Minigame (Breakfast Club/Pancake Flip, Brain Freeze/Snow Cone Stand,
+ * Exterminator/Bug Squash, Barista/Coffee Rush). The design has no Barista
+ * tile, so Barista takes the design's "Let It Rip · WIN 3 BEY MATCHES" slot,
+ * which has no game behind it. The other eight have no earning logic in this
+ * prototype and always render locked with their design hint.
  */
 const BADGE_TILES: readonly BadgeTile[] = [
   { title: 'First Waddle', hint: 'LOG IN', badgeId: null },
   { title: 'Snowmageddon', hint: '5 SNOWBALL HITS / DAY', badgeId: null },
   { title: 'Ship It', hint: 'FINISH THE MAIN QUEST', badgeId: null },
-  { title: 'Breakfast Club', hint: '20 SERVED · COFFEE RUSH', badgeId: 'breakfast-club' },
+  { title: 'Breakfast Club', hint: '20 STACKED · PANCAKE FLIP', badgeId: 'breakfast-club' },
   { title: 'Brain Freeze', hint: '200 TOKENS · SNOW CONES', badgeId: 'brain-freeze' },
   { title: 'Exterminator', hint: '500 · BUG SQUASH', badgeId: 'exterminator' },
-  { title: 'Let It Rip', hint: 'WIN 3 BEY MATCHES', badgeId: null },
+  { title: 'Barista', hint: '15 CUPS · COFFEE RUSH', badgeId: 'barista' },
   { title: 'Rail Rider', hint: 'SLIDE THE STAIRWELL', badgeId: null },
   { title: 'Hexle Parent', hint: 'ADOPT A HEXLE', badgeId: null },
   { title: 'Interior Penguin', hint: '6 IGLOO ITEMS', badgeId: null },
