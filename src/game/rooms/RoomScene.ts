@@ -660,6 +660,21 @@ export class RoomScene extends Scene {
     for (const door of room.doors) {
       const centerX = door.hotspot.x + door.hotspot.width / 2;
       const centerY = door.hotspot.y + door.hotspot.height / 2;
+
+      // Over exported design art the door is already drawn, so the hit area
+      // is an invisible Zone (#16). Not an alpha-0 shape: Phaser drops
+      // objects that won't render from input hit-testing, so an alpha-0
+      // rectangle can never be clicked.
+      if (isImageBackground) {
+        const zone = this.add
+          .zone(centerX, centerY, door.hotspot.width, door.hotspot.height)
+          .setDepth(DOOR_DEPTH)
+          .setInteractive({ useHandCursor: true });
+        this.doorHitAreas.push({ object: zone, data: door });
+        continue;
+      }
+
+      // Procedural rough art gets the outlined rectangle and label.
       const rect = this.add.rectangle(
         centerX,
         centerY,
@@ -670,15 +685,6 @@ export class RoomScene extends Scene {
       rect.setDepth(DOOR_DEPTH);
       rect.setInteractive({ useHandCursor: true });
       this.doorHitAreas.push({ object: rect, data: door });
-
-      // Over exported design art the door is already drawn, so the hit area
-      // stays invisible and unlabelled (#16); only procedural rough art gets
-      // the outlined rectangle and label.
-      if (isImageBackground) {
-        rect.setAlpha(0);
-        continue;
-      }
-
       rect.setStrokeStyle(DOOR_BORDER_WIDTH, DOOR_BORDER_COLOR);
       this.add
         .text(centerX, centerY, door.label, {
