@@ -41,6 +41,11 @@ export interface HudDeps {
    * outright (no call) while any other HUD overlay is open.
    */
   onSnowballToggle?: (on: boolean) => void;
+  /**
+   * Opens (or toggles) the Quests panel (#46). The QUESTS button shows only
+   * when this is wired.
+   */
+  onQuests?: () => void;
 }
 
 export interface Hud {
@@ -55,6 +60,10 @@ export interface Hud {
   setSnowballMode(on: boolean): void;
   /** Updates the mode panel's ammo pips and "N LEFT · REFILLS 1 / 4S" line (#53). */
   setSnowballAmmo(count: number, capacity: number): void;
+  /** Top-right container, under the Token row, that #46's quest widget renders into. */
+  questSlot: HTMLElement;
+  /** Shows the QUESTS button as active while the Quests panel is open (#46). */
+  setQuestsActive(on: boolean): void;
 }
 
 const MENU_OVERLAY_ID = 'menu';
@@ -245,7 +254,18 @@ export function createHud(layer: HTMLElement, deps: HudDeps): Hud {
   questsButton.type = 'button';
   questsButton.className = 'hud__button hud__button--bottom hud__button--quests';
   questsButton.textContent = 'QUESTS';
-  questsButton.hidden = true;
+  // #46: shown once the Quests panel is wired in.
+  questsButton.hidden = !deps.onQuests;
+  questsButton.addEventListener('click', () => {
+    overlays.close(MENU_OVERLAY_ID);
+    closeMenu();
+    deps.onQuests?.();
+  });
+
+  // #46: the quest widget's slot, under the Token row (design HUD-TOWN).
+  // Before MENU's panel in DOM order so an open MENU paints over it.
+  const questSlot = document.createElement('div');
+  questSlot.className = 'hud__quest-slot';
 
   bottomBar.append(chatSlot, emoteButton, snowballButton, mapButton, iglooButton, questsButton);
 
@@ -258,14 +278,14 @@ export function createHud(layer: HTMLElement, deps: HudDeps): Hud {
   toastEl.setAttribute('role', 'status');
   let toastTimer: ReturnType<typeof setTimeout> | null = null;
 
-  function showToast(message: string): void {
+  function showToast(message: string, durationMs: number = TOAST_DURATION_MS): void {
     if (toastTimer !== null) clearTimeout(toastTimer);
     toastEl.textContent = message;
     toastEl.hidden = false;
     toastTimer = setTimeout(() => {
       toastEl.hidden = true;
       toastTimer = null;
-    }, TOAST_DURATION_MS);
+    }, durationMs);
   }
 
   // Snowball mode's bottom-centre panel (#53, design HUD-SNOWBALL): title,
@@ -309,7 +329,7 @@ export function createHud(layer: HTMLElement, deps: HudDeps): Hud {
     snowballButton.classList.toggle('hud__button--active', on);
   }
 
-  root.append(titleBlock, topRight, menuPanel, snowballPanel, bottomBar, toastEl);
+  root.append(titleBlock, topRight, questSlot, menuPanel, snowballPanel, bottomBar, toastEl);
   layer.append(root);
 
   const emotePicker = createEmotePicker(root, {
@@ -335,12 +355,18 @@ export function createHud(layer: HTMLElement, deps: HudDeps): Hud {
 
   const unsubscribeRoomEnter = gameEvents.on('room:enter', ({ roomId }) => setRoom(roomId));
   const unsubscribeTokens = gameEvents.on('tokens:changed', ({ balance }) => setBalance(balance));
-  const unsubscribeToast = gameEvents.on('ui:toast', ({ message }) => showToast(message));
+  const unsubscribeToast = gameEvents.on('ui:toast', ({ message, durationMs }) =>
+    showToast(message, durationMs),
+  );
 
   return {
     overlays,
     setSnowballMode,
     setSnowballAmmo,
+    questSlot,
+    setQuestsActive(on) {
+      questsButton.classList.toggle('hud__button--active', on);
+    },
     show() {
       root.hidden = false;
     },

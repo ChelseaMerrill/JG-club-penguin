@@ -53,6 +53,9 @@ function deferredStore(): { store: ProgressStore; resolve: (snapshot: ProgressSn
       purchase: () => Promise.reject(new Error('unused in this test')),
       setSlot: () => Promise.reject(new Error('unused in this test')),
       leaderboard: () => Promise.reject(new Error('unused in this test')),
+      questProgress: () => Promise.reject(new Error('unused in this test')),
+      markDevPitVisited: () => Promise.reject(new Error('unused in this test')),
+      completeQuest: () => Promise.reject(new Error('unused in this test')),
     },
     resolve: resolveFn,
   };
@@ -67,6 +70,9 @@ function failingStore(): ProgressStore {
     purchase: () => Promise.reject(new Error('unused in this test')),
     setSlot: () => Promise.reject(new Error('unused in this test')),
     leaderboard: () => Promise.reject(new Error('unused in this test')),
+    questProgress: () => Promise.reject(new Error('unused in this test')),
+    markDevPitVisited: () => Promise.reject(new Error('unused in this test')),
+    completeQuest: () => Promise.reject(new Error('unused in this test')),
   };
 }
 
@@ -233,6 +239,9 @@ describe('createProgressSession', () => {
         purchase: () => Promise.reject(new Error('unused in this test')),
         setSlot: () => Promise.reject(new Error('unused in this test')),
         leaderboard: () => Promise.reject(new Error('unused in this test')),
+        questProgress: () => Promise.reject(new Error('unused in this test')),
+        markDevPitVisited: () => Promise.reject(new Error('unused in this test')),
+        completeQuest: () => Promise.reject(new Error('unused in this test')),
       };
       await session.start(PLAYER, store);
       const wrapped = registry.get(PROGRESS_STORE_KEY) as ProgressStore;
@@ -269,6 +278,37 @@ describe('createProgressSession', () => {
       const snapshot = registry.get(PROGRESS_KEY) as ProgressSnapshot;
       expect(snapshot.tokens).toBe(result.balance);
       expect(snapshot.ownedItems).toEqual(['beanbag']);
+    });
+
+    it('completeQuest keeps the snapshot balance current; questProgress and markDevPitVisited pass through', async () => {
+      const { registry, wrapped } = await setup();
+      await wrapped.saveLook({ ...DEFAULT_LOOK, name: 'Chilly' });
+      await wrapped.markDevPitVisited();
+      await wrapped.recordRound('bug-squash', 0, {
+        score: 0,
+        squashed: 0,
+        bestCombo: 0,
+        escaped: 0,
+      });
+      await wrapped.recordRound('pancake-flip', 0, {
+        golden: 0,
+        flipNow: 0,
+        raw: 0,
+        burnt: 0,
+        stacked: 0,
+        bestStreak: 0,
+      });
+      await wrapped.purchase('beanbag');
+
+      expect(await wrapped.questProgress()).toEqual({
+        devPitVisited: true,
+        roundsFinished: ['bug-squash', 'pancake-flip'],
+        completedQuests: [],
+      });
+      const result = await wrapped.completeQuest('main');
+
+      expect(result).toEqual({ tokensAwarded: 150, balance: 200, alreadyCompleted: false });
+      expect((registry.get(PROGRESS_KEY) as ProgressSnapshot).tokens).toBe(200);
     });
 
     it('setSlot moves an item between slots and empties on null', async () => {
@@ -392,6 +432,23 @@ describe('createActiveProgressStore', () => {
     await expect(active.setSlot(1, null)).rejects.toMatchObject({ code: 'not_authenticated' });
     await expect(active.leaderboard('bug-squash')).rejects.toMatchObject({
       code: 'not_authenticated',
+    });
+    await expect(active.questProgress()).rejects.toMatchObject({ code: 'not_authenticated' });
+    await expect(active.completeQuest('main')).rejects.toMatchObject({
+      code: 'not_authenticated',
+    });
+  });
+
+  it('forwards the Quest methods to the signed-in store', async () => {
+    const registry = createFakeRegistry();
+    registry.set(PROGRESS_STORE_KEY, createInMemoryProgressStore());
+    const active = createActiveProgressStore(registry);
+
+    await active.markDevPitVisited();
+
+    expect((await active.questProgress()).devPitVisited).toBe(true);
+    await expect(active.completeQuest('main')).rejects.toMatchObject({
+      code: 'quest_incomplete',
     });
   });
 });

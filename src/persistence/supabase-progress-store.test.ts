@@ -593,4 +593,82 @@ describe('createSupabaseProgressStore', () => {
       await expect(store.leaderboard('bug-squash')).resolves.toEqual([]);
     });
   });
+
+  describe('Quests (#46)', () => {
+    it('questProgress calls quest_progress and maps its result', async () => {
+      const { client, calls } = makeFakeClient({
+        questProgress: {
+          data: {
+            devPitVisited: true,
+            roundsFinished: ['bug-squash'],
+            completedQuests: [],
+          },
+          error: null,
+        },
+      });
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID });
+
+      await expect(store.questProgress()).resolves.toEqual({
+        devPitVisited: true,
+        roundsFinished: ['bug-squash'],
+        completedQuests: [],
+      });
+      expect(calls).toContainEqual(['rpc.quest_progress', {}]);
+    });
+
+    it('questProgress never emits ui:toast on failure', async () => {
+      const { client } = makeFakeClient({
+        questProgress: { data: null, error: { message: 'not_authenticated' } },
+      });
+      const messages: string[] = [];
+      const emitter = createEmitter<GameEventMap>();
+      emitter.on('ui:toast', ({ message }) => messages.push(message));
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID, emitter });
+
+      await expect(store.questProgress()).rejects.toMatchObject({ code: 'not_authenticated' });
+      expect(messages).toEqual([]);
+    });
+
+    it('markDevPitVisited calls mark_dev_pit_visited with no arguments', async () => {
+      const { client, calls } = makeFakeClient();
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID });
+
+      await store.markDevPitVisited();
+
+      expect(calls).toContainEqual(['rpc.mark_dev_pit_visited', {}]);
+    });
+
+    it('completeQuest sends quest_id and emits tokens:changed with the server balance', async () => {
+      const { client, calls } = makeFakeClient({
+        completeQuest: {
+          data: { tokensAwarded: 150, balance: 201, alreadyCompleted: false },
+          error: null,
+        },
+      });
+      const balances: number[] = [];
+      const emitter = createEmitter<GameEventMap>();
+      emitter.on('tokens:changed', ({ balance }) => balances.push(balance));
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID, emitter });
+
+      const result = await store.completeQuest('main');
+
+      expect(calls).toContainEqual(['rpc.complete_quest', { quest_id: 'main' }]);
+      expect(result).toEqual({ tokensAwarded: 150, balance: 201, alreadyCompleted: false });
+      expect(balances).toEqual([201]);
+    });
+
+    it.each(['quest_incomplete', 'unknown_quest'] as const)(
+      'maps %s to a ProgressStoreError with that code',
+      async (code) => {
+        const { client } = makeFakeClient({
+          completeQuest: { data: null, error: { message: code } },
+        });
+        const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID });
+
+        const rejection = store.completeQuest('main');
+        await expect(rejection).rejects.toBeInstanceOf(ProgressStoreError);
+        await expect(rejection).rejects.toMatchObject({ code });
+      },
+    );
+  });
 });

@@ -602,5 +602,121 @@ export function describeProgressStoreContract(
         expect(result.tokensAwarded).toBe(tokensPerUnit);
       },
     );
+
+    // #46: Quests. Progress comes from saved data; only the Dev Pit visit
+    // is new saved state, and only the main Quest is paid by the server.
+    describe('Quests (#46)', () => {
+      const SMALL_BUG_SQUASH_STATS: MinigameStatsMap['bug-squash'] = {
+        score: 10,
+        squashed: 1,
+        bestCombo: 1,
+        escaped: 0,
+      };
+
+      /** Meets every main-Quest step except those listed in `skip`. */
+      async function meetMainQuestSteps(
+        store: ProgressStore,
+        skip: readonly string[] = [],
+      ): Promise<void> {
+        if (!skip.includes('create-penguin')) {
+          await store.saveLook({ ...DEFAULT_LOOK, name: 'Quester' });
+        }
+        if (!skip.includes('visit-dev-pit')) await store.markDevPitVisited();
+        if (!skip.includes('finish-bug-squash')) {
+          await store.recordRound('bug-squash', 10, SMALL_BUG_SQUASH_STATS);
+        }
+        if (!skip.includes('finish-pancake-flip')) {
+          await store.recordRound('pancake-flip', 0, NEUTRAL_PANCAKE_STATS);
+        }
+        if (!skip.includes('buy-igloo-gear')) await store.purchase('beanbag');
+      }
+
+      it('starts a fresh Player with no Dev Pit visit, no finished rounds and no completed Quests', async () => {
+        const { store } = await makeHarness();
+
+        expect(await store.questProgress()).toEqual({
+          devPitVisited: false,
+          roundsFinished: [],
+          completedQuests: [],
+        });
+      });
+
+      it('remembers the Dev Pit visit, and a second visit is harmless', async () => {
+        const { store } = await makeHarness();
+
+        await store.markDevPitVisited();
+        await store.markDevPitVisited();
+
+        expect((await store.questProgress()).devPitVisited).toBe(true);
+      });
+
+      it('lists a Minigame as finished after any recorded round, even one scoring 0 (no best)', async () => {
+        const { store } = await makeHarness();
+
+        await store.recordRound('pancake-flip', 0, NEUTRAL_PANCAKE_STATS);
+
+        expect((await store.questProgress()).roundsFinished).toEqual(['pancake-flip']);
+        expect((await store.loadAll()).bests).toEqual({});
+      });
+
+      it('completeQuest rejects an unknown Quest id as unknown_quest', async () => {
+        const { store } = await makeHarness();
+
+        await expect(store.completeQuest('hexle')).rejects.toMatchObject({
+          code: 'unknown_quest',
+        });
+      });
+
+      const mainSteps = [
+        'create-penguin',
+        'visit-dev-pit',
+        'finish-bug-squash',
+        'finish-pancake-flip',
+        'buy-igloo-gear',
+      ];
+      it.each(mainSteps)(
+        'completeQuest("main") refuses with quest_incomplete while "%s" is not met, paying nothing',
+        async (missing) => {
+          const { store } = await makeHarness();
+          await meetMainQuestSteps(store, [missing]);
+          const before = (await store.loadAll()).tokens;
+
+          await expect(store.completeQuest('main')).rejects.toMatchObject({
+            code: 'quest_incomplete',
+          });
+          expect((await store.loadAll()).tokens).toBe(before);
+          expect((await store.questProgress()).completedQuests).toEqual([]);
+        },
+      );
+
+      it('completeQuest("main") pays 150 Tokens once; a second call returns alreadyCompleted and pays nothing', async () => {
+        const { store } = await makeHarness();
+        await meetMainQuestSteps(store);
+        // 100 start + 1 (Bug Squash 10 points) + 0 (neutral Pancake Flip) - 50 (Beanbag).
+        expect((await store.loadAll()).tokens).toBe(51);
+
+        const first = await store.completeQuest('main');
+        const second = await store.completeQuest('main');
+
+        expect(first).toEqual({ tokensAwarded: 150, balance: 201, alreadyCompleted: false });
+        expect(second).toEqual({ tokensAwarded: 0, balance: 201, alreadyCompleted: true });
+        expect((await store.loadAll()).tokens).toBe(201);
+        expect((await store.questProgress()).completedQuests).toEqual(['main']);
+      });
+
+      it('counts the main-Quest steps in any order', async () => {
+        const { store } = await makeHarness();
+        await store.purchase('beanbag');
+        await store.recordRound('pancake-flip', 0, NEUTRAL_PANCAKE_STATS);
+        await store.markDevPitVisited();
+        await store.recordRound('bug-squash', 10, SMALL_BUG_SQUASH_STATS);
+        await store.saveLook({ ...DEFAULT_LOOK, name: 'Backwards' });
+
+        await expect(store.completeQuest('main')).resolves.toMatchObject({
+          tokensAwarded: 150,
+          alreadyCompleted: false,
+        });
+      });
+    });
   });
 }

@@ -70,7 +70,10 @@ export function initDevMinigameHook(hud: Hud, launcher: MinigameLauncher): boole
   }
 
   hud.show();
-  const hooks = launched.minigame;
+  // `let`, not `const`: `launch()` (#46) swaps in the next Minigame so the
+  // `finish*` methods below drive whichever one is currently loaded.
+  let hooks: unknown = launched.minigame;
+  let currentId: MinigameId = rawId;
 
   window.__minigameTest = {
     setStubScore(score) {
@@ -83,7 +86,7 @@ export function initDevMinigameHook(hud: Hud, launcher: MinigameLauncher): boole
       // Gated on the requested id, not just the hook shape: Bug Squash's
       // own `debugFinishNow` would otherwise also match
       // `hasPancakeFlipHooks`'s duck-typing.
-      if (rawId === 'pancake-flip' && hasPancakeFlipHooks(hooks)) hooks.debugFinishNow();
+      if (currentId === 'pancake-flip' && hasPancakeFlipHooks(hooks)) hooks.debugFinishNow();
     },
     finishCoffeeRushNow() {
       // Same duck-typing gate as `finishPancakeFlipNow`.
@@ -92,7 +95,16 @@ export function initDevMinigameHook(hud: Hud, launcher: MinigameLauncher): boole
     finishSnowConeStandNow() {
       // Gated on the requested id for the same reason as
       // `finishPancakeFlipNow` above.
-      if (rawId === 'snow-cone-stand' && hasSnowConeStandHooks(hooks)) hooks.debugFinishNow();
+      if (currentId === 'snow-cone-stand' && hasSnowConeStandHooks(hooks)) hooks.debugFinishNow();
+    },
+    launch(minigameId) {
+      if (!isMinigameId(minigameId)) return;
+      try {
+        hooks = launcher.launch(minigameId).minigame;
+        currentId = minigameId;
+      } catch {
+        // Not registered in this build: a no-op, like an unknown `?minigame=`.
+      }
     },
   };
 

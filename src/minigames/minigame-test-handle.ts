@@ -1,3 +1,5 @@
+import type { MinigameId } from '../contracts/game-events';
+
 /**
  * Test handle `initDevMinigameHook` (`dev-minigame-hook.ts`) exposes on
  * `window` for e2e specs. Kept in its own file, separate from
@@ -26,4 +28,9 @@ export interface MinigameTestHandle {
    *  Snow Cone Stand isn't the loaded Minigame. Additive alongside
    *  `finishNow`/`finishPancakeFlipNow` (issue #49). */
   finishSnowConeStandNow(): void;
+  /** Launches another registered Minigame in the same page once the
+   *  current shell has closed (#46: finishing two different Minigames in one
+   *  page for the Quest e2e). The `finish*` methods above then drive the
+   *  newly launched one. */
+  launch(minigameId: MinigameId): void;
 }
