@@ -1,54 +1,13 @@
 import { expect, test, type Page } from '@playwright/test';
-import type { Facing, HexColor, PenguinLook, RoomId, Tile } from '../src/contracts';
-import type { RegisteredPlayer } from '../src/game/movement/registered-player';
 import { roofDeck } from '../src/game/rooms/definitions/roof-deck';
-import type { PenguinAnim } from '../src/game/penguin/poses';
 import { GAME_HEIGHT, GAME_WIDTH } from '../src/game/stage-size';
 import type { MinigameTestHandle } from '../src/minigames/minigame-test-handle';
+import type { RoomDebugInfo } from './support/room-debug-types';
 
-// Mirrors `src/game/rooms/dev-room-hook.ts`'s `RoomDebugInfo` (see
-// `e2e/trophy-case.spec.ts`/`e2e/click-to-move.spec.ts` for why this is
-// redeclared rather than imported).
-interface LocalPenguinDebugInfo {
-  tile: Tile;
-  target?: Tile;
-  anim: PenguinAnim;
-  facing: Facing;
-  moving: boolean;
-  flipX: boolean;
-  lookName: string;
-  lookBody: HexColor;
-  playerId: string;
-}
-
-interface RoomDebugInfo {
-  roomId: RoomId;
-  scrollX: number;
-  scrollY: number;
-  localPenguin?: LocalPenguinDebugInfo;
-  textureListenerCount?: number;
-  npcArrivedLog?: string[];
-  doorReachedLog?: string[];
-  localPenguinMoveLog?: Tile[];
-  localPenguinArrivedLog?: Tile[];
-  restartRoom?: () => void;
-  restartCount?: number;
-  penguinCount?: number;
-  remotePenguinCount?: number;
-  remotePenguins?: Array<{
-    playerId: string;
-    tile: Tile;
-    moving: boolean;
-    placedTile: Tile;
-    walkStartedAt?: number;
-  }>;
-  setRegisteredPlayer?: (player: RegisteredPlayer) => void;
-  spawnDebugPenguin?: (tile: Tile, look: PenguinLook) => void;
-}
-
+// `__roomDebug`'s ambient type comes from `./support/room-debug-types`;
+// `__minigameTest` is this spec's own.
 declare global {
   interface Window {
-    __roomDebug?: RoomDebugInfo;
     __minigameTest?: MinigameTestHandle;
   }
 }
