@@ -72,6 +72,22 @@ describe('createTrophyCase', () => {
     );
   });
 
+  it("shows Coffee Rush's Barista in the design's Let It Rip slot, unlocked once earned", async () => {
+    const { q, qa, trophyCase } = setup(['barista']);
+
+    await trophyCase.open();
+
+    const barista = q('[data-badge-id="barista"]');
+    expect(barista.classList.contains('trophy-case__badge--earned')).toBe(true);
+    expect(barista.querySelector('.trophy-case__badge-name')?.textContent).toBe('Barista');
+    expect(barista.querySelector('.trophy-case__badge-hint')?.textContent).toBe(
+      '15 CUPS · COFFEE RUSH',
+    );
+    const names = qa('.trophy-case__badge-name').map((el) => el.textContent);
+    expect(names).not.toContain('Let It Rip');
+    expect(names).toHaveLength(12);
+  });
+
   it('renders an earned Badge unlocked and the rest locked with their design hint', async () => {
     const { q, qa, trophyCase } = setup(['exterminator']);
 
@@ -87,6 +103,10 @@ describe('createTrophyCase', () => {
     const breakfastClub = q('[data-badge-id="breakfast-club"]');
     expect(breakfastClub.classList.contains('trophy-case__badge--earned')).toBe(false);
     expect(breakfastClub.querySelector('.trophy-case__badge-icon')?.textContent).toBe('?');
+    // Pancake Flip's Badge, not Coffee Rush's (the design's copy names the wrong game).
+    expect(breakfastClub.querySelector('.trophy-case__badge-hint')?.textContent).toBe(
+      '20 STACKED · PANCAKE FLIP',
+    );
 
     // All 12 design tiles are present, each with its own hint.
     expect(qa('.trophy-case__badge')).toHaveLength(TROPHY_CASE_BADGE_SLOTS);
