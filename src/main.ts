@@ -21,13 +21,16 @@ import {
   type RoomChannel,
 } from './realtime/room-channel';
 import { toRealtimeClient } from './realtime/supabase-realtime';
-import { SPAWN_ROOM_ID } from './contracts';
+import { SPAWN_ROOM_ID, type PenguinLook } from './contracts';
 import { createInMemoryProgressStore } from './persistence/in-memory-progress-store';
 import { STARTING_TOKENS } from './persistence/minigame-rules';
 import { createMinigameLauncher } from './minigames/minigame-launcher';
 import { createDefaultMinigameRegistry } from './minigames/minigame-registry';
 import { initDevMinigameHook } from './minigames/dev-minigame-hook';
 import { MINIGAME_OVERLAY_ID } from './minigames/minigame-shell';
+import { createPenguinCreator } from './ui/penguin-creator';
+import { createPenguinEditor } from './penguin/penguin-editor';
+import { initDevCreatorHook } from './penguin/dev-creator-hook';
 
 // Fail fast on a missing or malformed .env before anything boots.
 loadEnv();
@@ -62,6 +65,14 @@ let channelPlayerId: string | null = null;
 // race with a later sign-out (or a newer sign-in) never creates a stray
 // Room channel.
 let signInGeneration = 0;
+/** The signed-in Player; a loaded or saved look replaces its `look`. */
+let currentPlayer: Player | null = null;
+/**
+ * A previous Player's Room channel, still to stop when the next Session
+ * starts. A Session starts only once the Player has a Penguin, which for a
+ * new Player is after the Penguin Creator's first save.
+ */
+let pendingPrevious: RoomChannel | null = null;
 
 const debugOverlay = isDebugEnabled()
   ? createDebugOverlay(uiLayer, {
@@ -84,6 +95,21 @@ const debugOverlay = isDebugEnabled()
 gameEvents.on('room:enter', ({ roomId }) => {
   roomScene?.showRoom(roomId);
 });
+
+/**
+ * Applies a look loaded from or saved through the Penguin Creator everywhere
+ * at once: `registry.player` (which `RoomScene` restyles the local Penguin
+ * from) and the Room channel's Presence payload, so a mid-session save needs
+ * no reload.
+ */
+function applyLocalLook(look: PenguinLook): void {
+  if (!currentPlayer) return;
+  currentPlayer = { ...currentPlayer, look };
+  bindPlayer(game.registry, currentPlayer);
+  if (!channelPlayerId) return;
+  roomChannel?.setLook(look);
+  debugOverlay?.setOwnLook(look);
+}
 
 function composeView(view: RemotePenguinView): RemotePenguinView {
   if (!debugOverlay) return view;
@@ -197,25 +223,73 @@ const minigameLauncher = createMinigameLauncher({
 const devHudActive = initDevHudHook(hud);
 const devMinigameActive = initDevMinigameHook(hud, minigameLauncher);
 
+const creator = createPenguinCreator(uiLayer, {
+  onSubmit: (look) => {
+    void penguinEditor.submit(look);
+  },
+  onCancel: () => {
+    penguinEditor.cancel();
+  },
+});
+
+const penguinEditor = createPenguinEditor({
+  creator,
+  store: progressStore,
+  overlays: hud.overlays,
+  onLookChanged: applyLocalLook,
+  onReady: () => {
+    hud.show();
+    if (!currentPlayer) return;
+    const previous = pendingPrevious;
+    pendingPrevious = null;
+    void startSession(currentPlayer, previous);
+  },
+  onError: (message) => {
+    gameEvents.emit('ui:toast', { message });
+  },
+});
+
+// After `penguinEditor` exists; see the note on `devHudActive` above.
+const devCreatorActive = initDevCreatorHook(penguinEditor);
+const devHookActive = devHudActive || devMinigameActive || devCreatorActive;
+
+gameEvents.on('ui:open-creator', () => {
+  penguinEditor.edit();
+});
+
 const auth = startAuth({
   client: toAuthClient(client),
   onSignedIn: (player) => {
-    const samePlayer = roomChannel !== null && channelPlayerId === player.id;
-    // A different Player while a Room channel exists: leave it first.
-    const previous = !samePlayer && roomChannel ? endSession() : null;
+    // A repeat sign-in event for the same Player keeps the Session and the
+    // look already loaded for it.
+    if (currentPlayer?.id === player.id) return;
+    // A different Player while a Session exists: leave it first.
+    const previous = currentPlayer ? endSession() : null;
+    currentPlayer = player;
     // `room:enter` fires only after `registry.player` is set.
     bindPlayer(game.registry, player);
-    if (!samePlayer) void startSession(player, previous);
-    if (devHudActive || devMinigameActive) return;
+    if (devHookActive) {
+      void startSession(player, previous);
+      return;
+    }
     overlay.showSignedIn();
-    hud.show();
+    // The HUD and the Session (Town Center, Presence) start in `onReady`:
+    // straight away for a returning Player, after the Penguin Creator's
+    // first save for a new one.
+    if (pendingPrevious) void stopChannel(pendingPrevious);
+    pendingPrevious = previous;
+    void penguinEditor.playerSignedIn();
   },
   onSignedOut: () => {
+    currentPlayer = null;
     // Per `src/contracts/rooms.ts`, `room:leave` comes before `bindPlayer(null)`.
     const channel = endSession();
     bindPlayer(game.registry, null);
     if (channel) void stopChannel(channel);
-    if (devHudActive || devMinigameActive) return;
+    if (pendingPrevious) void stopChannel(pendingPrevious);
+    pendingPrevious = null;
+    if (devHookActive) return;
+    penguinEditor.playerSignedOut();
     // Quits any in-progress round (no `recordRound`) rather than leaving it
     // open behind a signed-out session.
     hud.overlays.close(MINIGAME_OVERLAY_ID);
