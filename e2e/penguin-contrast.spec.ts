@@ -6,12 +6,16 @@ import {
   type Pattern,
   type PenguinLook,
 } from '../src/contracts';
-import { renderPenguinSvg } from '../src/game/penguin/render-svg';
+import {
+  preContrastFixColors,
+  renderPenguinSvg,
+  renderPenguinSvgWithColors,
+} from '../src/game/penguin/render-svg';
 
-// Renders `renderPenguinSvg` in this Node test process (not the browser
-// under test) and drops the resulting SVG markup straight into the page, so
-// the screenshot is the renderer's real output, following
-// `e2e/penguin-renderer.spec.ts`'s approach.
+// Renders `renderPenguinSvg`/`renderPenguinSvgWithColors` in this Node test
+// process (not the browser under test) and drops the resulting SVG markup
+// straight into the page, so the screenshot is the renderer's real output,
+// following `e2e/penguin-renderer.spec.ts`'s approach.
 
 interface ProblemCombo {
   /** The ticket's own six-row problem table (#79), one entry per row. */
@@ -20,6 +24,9 @@ interface ProblemCombo {
    * across the row's rendered variants when there's more than one (a row
    * naming two swatches, e.g. "#161719 / #3a4046"). */
   values: Array<Partial<PenguinLook>>;
+  /** Extra cells beyond the standard hat/eyes/pattern rotation, each merged
+   * with this row's first `values` entry (#79 review round 1 nit 3). */
+  extraCells?: Array<{ label: string; overrides: Partial<PenguinLook> }>;
 }
 
 const PROBLEM_COMBOS: ProblemCombo[] = [
@@ -42,6 +49,14 @@ const PROBLEM_COMBOS: ProblemCombo[] = [
   {
     label: '#79 problem 5 — Cap #0C4B5F (teal cap): cap outline/JG badge disappear',
     values: [{ cap: '#0C4B5F' }],
+    // #79 review round 1 nit 3: this row also gets a WINK, a SNOWFLAKE and
+    // a WAR WEEK BAND cell, since the standard rotation below only ever
+    // shows this row with JG CAP/SNORKEL/HEADPHONES and ROUND/STAR/SLEEPY.
+    extraCells: [
+      { label: 'EYES WINK', overrides: { eyes: 'WINK' } },
+      { label: 'PATTERN SNOWFLAKE', overrides: { pattern: 'SNOWFLAKE' } },
+      { label: 'HAT WAR WEEK BAND', overrides: { hat: 'WAR WEEK BAND' } },
+    ],
   },
   {
     label: '#79 problem 6 — Feet #0C4B5F (teal feet): feet lost against the backdrop',
@@ -51,22 +66,44 @@ const PROBLEM_COMBOS: ProblemCombo[] = [
 
 // Exercised across each row's variants, so every problem combination is
 // also shown with several hats, eyes and belly patterns, not just the
-// default JG CAP / ROUND / PLAIN look.
+// default JG CAP / ROUND / PLAIN look. STAR is paired with JG CAP, not
+// SNORKEL, so the STAR eyes stay visible above the snorkel mask instead of
+// being hidden behind it (#79 review round 1 nit 3).
 const HAT_VARIANTS: Hat[] = ['JG CAP', 'SNORKEL', 'HEADPHONES'];
-const EYES_VARIANTS: Eyes[] = ['ROUND', 'STAR', 'SLEEPY'];
+const EYES_VARIANTS: Eyes[] = ['STAR', 'ROUND', 'SLEEPY'];
 const PATTERN_VARIANTS: Pattern[] = ['PLAIN', 'PIXEL HEART', 'HEX'];
 const VARIANTS_PER_ROW = 3;
 
 interface GridRow {
   label: string;
-  svg: string;
+  beforeSvg: string;
+  afterSvg: string;
 }
 
 function buildRows(): GridRow[] {
   const rows: GridRow[] = [];
   // Every cell gets its own `idPrefix` (#31 review fix 7), so the many
-  // inline SVGs on this one page never clash on the belly `clipPath` id.
-  const nextIdPrefix = (): string => `cell-${rows.length}`;
+  // inline SVGs on this one page never clash on the belly `clipPath` id --
+  // including the two (before/after) SVGs rendered per row.
+  let idCounter = 0;
+  const nextIdPrefix = (): string => `cell-${idCounter++}`;
+
+  // #79 review round 1 nit 3: a "before" column, rendered through the
+  // *current* markup (`renderPenguinSvgWithColors`) forced to the pre-#79
+  // renderer's fixed colours (`preContrastFixColors`), so it's a faithful
+  // reproduction of the old renderer rather than a second implementation.
+  const pushRow = (label: string, look: PenguinLook): void => {
+    rows.push({
+      label,
+      beforeSvg: renderPenguinSvgWithColors(
+        look,
+        undefined,
+        { idPrefix: nextIdPrefix() },
+        preContrastFixColors(look),
+      ),
+      afterSvg: renderPenguinSvg(look, undefined, { idPrefix: nextIdPrefix() }),
+    });
+  };
 
   for (const combo of PROBLEM_COMBOS) {
     for (let i = 0; i < VARIANTS_PER_ROW; i++) {
@@ -75,11 +112,11 @@ function buildRows(): GridRow[] {
       const eyes = EYES_VARIANTS[i];
       const pattern = PATTERN_VARIANTS[i];
       const look: PenguinLook = { ...DEFAULT_LOOK, ...overrides, hat, eyes, pattern };
-
-      rows.push({
-        label: `${combo.label} · HAT ${hat} · EYES ${eyes} · PATTERN ${pattern}`,
-        svg: renderPenguinSvg(look, undefined, { idPrefix: nextIdPrefix() }),
-      });
+      pushRow(`${combo.label} · HAT ${hat} · EYES ${eyes} · PATTERN ${pattern}`, look);
+    }
+    for (const extra of combo.extraCells ?? []) {
+      const look: PenguinLook = { ...DEFAULT_LOOK, ...combo.values[0], ...extra.overrides };
+      pushRow(`${combo.label} · ${extra.label}`, look);
     }
   }
 
@@ -88,7 +125,13 @@ function buildRows(): GridRow[] {
 
 function buildHtml(rows: GridRow[]): string {
   const rowsHtml = rows
-    .map((row) => `<div class="row"><span class="label">${row.label}</span>${row.svg}</div>`)
+    .map(
+      (row) => `<div class="row">
+  <span class="label">${row.label}</span>
+  <div class="cell"><span class="cell-label">BEFORE</span>${row.beforeSvg}</div>
+  <div class="cell"><span class="cell-label">AFTER</span>${row.afterSvg}</div>
+</div>`,
+    )
     .join('\n');
 
   return `<!DOCTYPE html>
@@ -100,6 +143,8 @@ function buildHtml(rows: GridRow[]): string {
   .grid { display: flex; flex-direction: column; gap: 4px; padding: 16px; }
   .row { display: flex; align-items: center; gap: 12px; }
   .label { width: 460px; font-size: 12px; flex: none; }
+  .cell { display: flex; flex-direction: column; align-items: center; gap: 2px; flex: none; }
+  .cell-label { font-size: 10px; letter-spacing: .08em; opacity: .7; }
   svg { flex: none; }
 </style>
 </head>
@@ -123,7 +168,8 @@ test('penguin-contrast-grid', async ({ page }) => {
 
   await page.setContent(buildHtml(rows));
 
-  await expect(page.locator('svg')).toHaveCount(rows.length);
+  // Two SVGs (before/after) per row.
+  await expect(page.locator('svg')).toHaveCount(rows.length * 2);
 
   await page.screenshot({
     path: 'test-results/penguin-contrast/grid.png',
