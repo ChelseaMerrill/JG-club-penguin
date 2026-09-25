@@ -10,6 +10,7 @@ import {
 } from '../../contracts';
 import type { RegisteredPlayer } from '../movement/registered-player';
 import type { PenguinAnim } from '../penguin';
+import type { RemotePenguinDebugInfo } from './room-penguin-view';
 
 /**
  * Gates every hook in this module. `true` in local `npm run dev` and in the
@@ -89,6 +90,8 @@ export interface RoomDebugInfo {
   doorReachedLog?: string[];
   /** Target tile per `local-penguin:move` emission (walk start or re-route), oldest first. */
   localPenguinMoveLog?: Tile[];
+  /** Tile per `local-penguin:arrived` emission, oldest first (#43). */
+  localPenguinArrivedLog?: Tile[];
   /** Restarts the Scene (`this.scene.restart()`), for the cleanup e2e test. */
   restartRoom?: () => void;
   /**
@@ -106,6 +109,11 @@ export interface RoomDebugInfo {
   penguinCount?: number;
   /** Count of remote Penguin `Container`s (#28's `RoomPenguinView`) in the Scene's display list. */
   remotePenguinCount?: number;
+  /**
+   * One entry per remote Penguin `RoomPenguinView` currently shows (#43 D6);
+   * see `RemotePenguinDebugInfo` for each field's meaning.
+   */
+  remotePenguins?: RemotePenguinDebugInfo[];
   /**
    * Test-only: sets `registry.player`, exercising the real sign-in
    * look/id-update path end to end (review fixes 1 and 4) rather than
