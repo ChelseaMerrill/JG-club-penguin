@@ -1,7 +1,13 @@
 import './style.css';
 import { loadEnv } from './env';
 import { startGame, whenSceneReady } from './game/main';
-import type { RoomScene } from './game/rooms/RoomScene';
+import {
+  LOCAL_PENGUIN_ARRIVED_EVENT,
+  LOCAL_PENGUIN_MOVE_EVENT,
+  type LocalPenguinArrivedEvent,
+  type LocalPenguinMoveEvent,
+  type RoomScene,
+} from './game/rooms/RoomScene';
 import type { RoomPenguinView } from './game/rooms/room-penguin-view';
 import { createStubRoomDriver } from './game/stub-rooms';
 import { getSupabaseClient } from './auth/supabase-client';
@@ -69,6 +75,18 @@ let penguins: RoomPenguinView | null = null;
 const sceneReady = whenSceneReady(game).then((scene) => {
   roomScene = scene;
   penguins = scene.penguins;
+  // #43: attached once (the same Scene instance and its `events` emitter are
+  // reused across every `showRoom` restart). A local walk's start/re-route
+  // broadcasts `move`; its arrival (never a queued re-route, never an
+  // own-tile no-op) tracks the Presence tile once, not per step or frame.
+  scene.events.on(LOCAL_PENGUIN_MOVE_EVENT, (event: LocalPenguinMoveEvent) => {
+    roomChannel?.send('move', { target: event.target }).catch((err: unknown) => {
+      console.error('[main] move broadcast failed', err);
+    });
+  });
+  scene.events.on(LOCAL_PENGUIN_ARRIVED_EVENT, (event: LocalPenguinArrivedEvent) => {
+    roomChannel?.setTile(event.tile, event.facing);
+  });
   return scene.penguins;
 });
 
@@ -241,6 +259,11 @@ async function startSession(player: Player, previous: RoomChannel | null): Promi
   });
   channel.onRoomChange((roomId) => debugOverlay?.setCurrentRoom(roomId));
   channel.onSubscribedChange((subscribed) => debugOverlay?.setSubscribed(subscribed));
+  // #43: a remote Player's click-to-move walks their Penguin the same way
+  // ours does, rather than snapping it forward.
+  channel.on('move', ({ playerId, target }) => {
+    view.walkTo(playerId, target);
+  });
 
   rooms.enter(SPAWN_ROOM_ID, player.id);
 }
@@ -368,7 +391,7 @@ const penguinEditor = createPenguinEditor({
 });
 
 // After `penguinEditor` exists; see the note on `devHudActive` above.
-const devCreatorActive = initDevCreatorHook(penguinEditor);
+const devCreatorActive = initDevCreatorHook(penguinEditor, progressStore);
 const devHookActive = devHudActive || devMinigameActive || devCreatorActive;
 
 gameEvents.on('ui:open-creator', () => {
@@ -381,8 +404,15 @@ const auth = startAuth({
     // A repeat sign-in event for the same Player keeps the Session and the
     // look already loaded for it.
     if (currentPlayer?.id === player.id) return;
-    // A different Player while a Session exists: leave it first.
-    const previous = currentPlayer ? endSession() : null;
+    // A different Player while a Session exists: leave it first, and take
+    // down the previous Player's HUD rather than leaving it showing over the
+    // next Player's sign-in gate (#75 review round 1).
+    const isAccountSwitch = currentPlayer !== null;
+    const previous = isAccountSwitch ? endSession() : null;
+    if (isAccountSwitch) {
+      hud.overlays.close(MINIGAME_OVERLAY_ID);
+      hud.hide();
+    }
     currentPlayer = player;
     // `room:enter` fires only after `registry.player` is set.
     bindPlayer(game.registry, player);
@@ -397,7 +427,13 @@ const auth = startAuth({
       }),
     );
     if (devHookActive) {
-      void startSession(player, previous);
+      // #75 review round 1: `player.look.name` is always '' here (a real
+      // sign-in's look only ever gains a name later, once progress loads
+      // through `penguinEditor`), so a Session can never legitimately start
+      // on this path for a real sign-in. Hook mode (`?hud`, `?minigame`,
+      // `?creator`) never exercises real auth in e2e, so this is a no-op in
+      // practice; it's kept only so a real `SIGNED_IN` doesn't slip an
+      // unnamed Player into a Session.
       return;
     }
     overlay.showSignedIn();

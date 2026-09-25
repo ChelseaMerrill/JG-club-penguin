@@ -4,6 +4,12 @@ import { defineConfig, devices } from '@playwright/test';
 // local server for that run (it also test.skip()s itself without this var).
 const deployUrl = process.env.DEPLOY_URL;
 
+const SHARED_TEST_USER_SPECS = [
+  '**/presence-two-browsers.spec.ts',
+  '**/chat-two-browsers.spec.ts',
+  '**/movement-sync.spec.ts',
+];
+
 export default defineConfig({
   testDir: 'e2e',
   outputDir: 'playwright-output',
@@ -12,7 +18,22 @@ export default defineConfig({
   use: {
     baseURL: deployUrl ?? 'http://localhost:4173',
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  // The specs that sign in the shared test users A/B (#43): run concurrently,
+  // they'd race each other's Presence roster and Room state, so they get
+  // their own single-worker project instead of `chromium`'s parallel workers.
+  projects: [
+    {
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'] },
+      testIgnore: SHARED_TEST_USER_SPECS,
+    },
+    {
+      name: 'realtime-shared-users',
+      use: { ...devices['Desktop Chrome'] },
+      testMatch: SHARED_TEST_USER_SPECS,
+      workers: 1,
+    },
+  ],
   webServer: deployUrl
     ? undefined
     : {
