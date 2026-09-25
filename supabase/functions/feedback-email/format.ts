@@ -3,7 +3,7 @@
 // network APIs here, so Vitest runs it (src/feedback/feedback-email.test.ts)
 // and index.ts stays a thin wrapper.
 
-/** A public.feedback row as a Database Webhook sends it (20260925010000_feedback.sql). */
+/** A public.feedback row as a Database Webhook sends it (20260925020000_feedback.sql). */
 export interface FeedbackRecord {
   id: string;
   player_id: string | null;

@@ -107,7 +107,7 @@ It also checks `security definer`/`search_path = ''`/one overload each and the
 
 ## In-game feedback
 
-`feedback_proof.sql` proves `20260925010000_feedback.sql` against the same #9
+`feedback_proof.sql` proves `20260925020000_feedback.sql` against the same #9
 H1 fixture Player, in `46_quests_proof.sql`'s style: as the fixture signed in,
 `submit_feedback()` stores a trimmed issue or suggestion with its Room and
 returns `{ id }`; refuses bad input with `invalid_feedback` and the 6th
@@ -120,7 +120,7 @@ overload and the `authenticated`-only grant.
 
 1. Local: covered automatically by `sql-feedback.test.ts`'s PGlite run in
    `npm test` (not by `run-local.sh`).
-2. Real Supabase: apply `supabase/migrations/20260925010000_feedback.sql` in
+2. Real Supabase: apply `supabase/migrations/20260925020000_feedback.sql` in
    the SQL editor first, then open `feedback_proof.sql`, replace every
    occurrence of `00000000-0000-0000-0000-00000000f1f0` with the real #9 H1
    fixture Player's id, and run it. Expect every row's `pass` column to read

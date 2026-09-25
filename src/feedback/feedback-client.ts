@@ -1,7 +1,7 @@
 /**
  * The in-game feedback channel: a Player reports an issue or makes a
  * suggestion from the HUD's feedback button. Submissions go only through
- * `public.submit_feedback` (supabase/migrations/20260925010000_feedback.sql),
+ * `public.submit_feedback` (supabase/migrations/20260925020000_feedback.sql),
  * which validates, rate-limits and stores them; a Database Webhook then
  * emails the owner (supabase/functions/feedback-email). Deliberately not part
  * of `ProgressStore`: feedback is not Player progress.
