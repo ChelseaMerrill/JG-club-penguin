@@ -45,8 +45,9 @@ type TextAnchor = 'start' | 'middle';
 // strings using `middle` anchor. `fill` values come from `palette.ts` (#62
 // review fix 6), the same module `render-svg.ts` reads its own colours from,
 // rather than repeating the hex literals here.
-interface TextSpec {
-  key: string;
+/** One design string to outline; `Key` is the generated object's key union. */
+interface TextSpec<Key extends string> {
+  key: Key;
   text: string;
   fontPath: string;
   fontSize: number;
@@ -57,7 +58,7 @@ interface TextSpec {
   fill: string;
 }
 
-const TEXT_SPECS: TextSpec[] = [
+const TEXT_SPECS: TextSpec<'haha' | 'jgLogo' | 'warWeek' | 'jgCap'>[] = [
   {
     key: 'haha',
     text: 'HA HA',
@@ -110,7 +111,7 @@ const TEXT_SPECS: TextSpec[] = [
 // letter-spacing="1">SURVIVOR</text>` and the Roof Deck design's `<text
 // x="118" y="98" text-anchor="middle" font-family="Anton, Impact, sans-serif"
 // font-size="7" fill="#00BDFF">FREE $$$</text>`.
-const NPC_TEXT_SPECS: TextSpec[] = [
+const NPC_TEXT_SPECS: TextSpec<'survivorTee' | 'freeBait'>[] = [
   {
     key: 'survivorTee',
     text: 'SURVIVOR',
@@ -149,7 +150,7 @@ const NPC_TEXT_SPECS: TextSpec[] = [
 // check the "WAR WEEK" outlines land where Chromium's own text-anchor="middle"
 // centres real `letter-spacing="1"` text -- see #62 D2). Returns path data
 // rounded to 2 decimals (#62 D2).
-function layoutTextPath(font: opentype.Font, spec: TextSpec): string {
+function layoutTextPath(font: opentype.Font, spec: TextSpec<string>): string {
   const chars = Array.from(spec.text);
   const scale = spec.fontSize / font.unitsPerEm;
   const advances = chars.map((ch) => font.charToGlyph(ch).advanceWidth * scale);
@@ -190,8 +191,8 @@ function renderFileHeader(): string {
   );
 }
 
-async function writeTextPathsFile(
-  specs: TextSpec[],
+async function writeTextPathsFile<Key extends string>(
+  specs: readonly TextSpec<Key>[],
   outputPath: string,
   typeName: string,
   constName: string,

@@ -309,9 +309,11 @@ export function createNpcSprite(
     for (const line of npc.idleLines) scheduleLine(line);
   }
 
-  // The designs' idle bob moves the figure only; the nameplate stays put. A
-  // designed motion (#113) replaces it: those NPCs' tracks already carry
-  // the design's own bob where it has one.
+  // The idle bob moves the figure only; the nameplate and bubble stay put,
+  // as most Room designs' `idle` does. (The Roof Deck vendors' `idle` group
+  // also carries their nameplate and bubble; that 3 px drift isn't ported.)
+  // A designed motion (#113) replaces the bob: those NPCs' tracks already
+  // carry the design's own bob where it has one.
   let bobTween: Tweens.Tween | null = null;
   const bob = npcBob(npc, { designedMotion: hasDesignedMotion });
   if (bob && !reducedMotion) {

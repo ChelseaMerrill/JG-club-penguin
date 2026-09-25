@@ -17,9 +17,6 @@ export const SPEECH_BUBBLE_PADDING_X = 12;
 /** 7 px above and below a 13 px line makes the designs' 30 px tall pill. */
 export const SPEECH_BUBBLE_PADDING_Y = 7;
 
-/** The widest a speech bubble pill can ever render. */
-export const MAX_BUBBLE_WIDTH = SPEECH_BUBBLE_MAX_TEXT_WIDTH + SPEECH_BUBBLE_PADDING_X * 2;
-
 /** The designs' pill height for one line of text. */
 const ONE_LINE_BUBBLE_HEIGHT = 30;
 /** Each wrapped line past the first adds about one 13 px line of text. */

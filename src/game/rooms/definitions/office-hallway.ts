@@ -30,8 +30,10 @@ const FLOOR_MARKER_SIZE = { width: 97, height: 44 };
 // raw nearest-tile picks, (3,3) and (6,3), each sat under (or, for Emily,
 // overlapping) the TEAM ROOM 7/8 floor markers' own hit rects; both are
 // moved one tile toward each other instead, confirmed against `iso.ts`'s
-// tile math and `RoomScene.ts`'s `NPC_HIT_ZONE_WIDTH`/`HEIGHT` that neither
-// NPC's hit zone intersects a marker's hotspot rect (#51 review fix 5). The
+// tile math and the NPC click area then in `RoomScene.ts` (a fixed 64x110
+// zone) that neither NPC's hit zone intersects a marker's hotspot rect (#51
+// review fix 5). #113's smaller click area (`npc-layout.ts`'s `hitArea`)
+// fits inside that old zone, so it still holds. The
 // design also draws Michael S. at (5,1), Samantha at (11,1) and Daniel at
 // (13,2), but only Players appear as Penguins in the World (owner decision
 // 2026-09-25; PR #133), so those three aren't NPCs and their tiles stay

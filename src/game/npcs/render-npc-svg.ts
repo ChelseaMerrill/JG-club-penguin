@@ -471,6 +471,8 @@ function renderHumanFigure(spec: HumanFigureSpec, idPrefix: string): string {
       `<circle cx="113" cy="54" r="5.5" fill="${hand}" stroke="${OUTLINE}" stroke-width="2"></circle>` +
       `<rect x="110" y="44" width="6" height="14" rx="2" fill="${color}" stroke="${OUTLINE}" stroke-width="1.5"></rect>`;
   }
+  // Keep this last: it wraps everything drawn so far (`o`) in the seated
+  // offset, so any part added after it wouldn't sit with the figure.
   if (spec.seated === 'laptop') {
     // The whole figure sits 14 px lower, a lap over its legs.
     o =
