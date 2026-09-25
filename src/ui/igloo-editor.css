@@ -1,0 +1,184 @@
+/* The Igloo's Furniture editor (#41): the owner-only "EDIT IGLOO" button and
+   no-Furniture hint (a small standalone widget below the HUD's top-right
+   cluster, not part of `hud.ts`'s own bottom bar) plus the per-slot picker
+   modal, following `market.css`'s pattern -- every size here is Stage
+   pixels, filling the 1600x900 `#ui` layer. */
+
+.igloo-editor {
+  position: absolute;
+  top: calc(var(--hud-inset-y) + 52px);
+  right: var(--hud-inset-x);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  pointer-events: auto;
+}
+
+.igloo-editor[hidden] {
+  display: none;
+}
+
+.igloo-editor__button {
+  height: 40px;
+  padding: 0 18px;
+  border: none;
+  background: var(--jg-secondary);
+  clip-path: polygon(
+    12px 0,
+    calc(100% - 12px) 0,
+    100% 50%,
+    calc(100% - 12px) 100%,
+    12px 100%,
+    0 50%
+  );
+  font-family: var(--font-game-display);
+  font-size: 15px;
+  letter-spacing: 0.04em;
+  color: var(--fg-primary);
+  cursor: pointer;
+}
+
+.igloo-editor__button--active {
+  background: var(--jg-primary);
+  color: var(--jg-dark);
+}
+
+.igloo-editor__hint {
+  max-width: 260px;
+  padding: 10px 14px;
+  background: rgba(var(--jg-dark-rgb), 0.94);
+  border: 2px solid var(--jg-primary);
+  font: 700 12px var(--font-body);
+  text-align: right;
+  color: var(--fg-primary);
+}
+
+.igloo-editor__hint[hidden] {
+  display: none;
+}
+
+/* ---- The per-slot picker: `trophy-case.css`/`market.css`'s modal pattern ---- */
+
+.igloo-slot-picker {
+  --isp-cyan: var(--jg-primary);
+  --isp-teal: var(--jg-secondary);
+  --isp-light: var(--jg-light);
+  --isp-dark: var(--jg-dark);
+  --isp-locked-border: #0c4b5f;
+  --isp-locked-bg: #0a0c0f;
+
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 12, 15, 0.78);
+  backdrop-filter: blur(3px);
+  color: var(--isp-light);
+  font-family: var(--font-body);
+}
+
+.igloo-slot-picker[hidden] {
+  display: none;
+}
+
+.igloo-slot-picker__frame {
+  position: relative;
+  width: 380px;
+  max-height: 640px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 20px 22px;
+  background: rgba(22, 23, 25, 0.96);
+  border: 3px solid var(--isp-teal);
+  box-shadow: 0 10px 0 var(--isp-teal);
+}
+
+.igloo-slot-picker__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.igloo-slot-picker__title {
+  font-family: var(--font-game-display);
+  font-size: 24px;
+  line-height: 1;
+  color: var(--isp-cyan);
+  -webkit-text-stroke: 3px var(--isp-teal);
+  paint-order: stroke fill;
+}
+
+.igloo-slot-picker__close {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  background: var(--isp-teal);
+  border: none;
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  font: 400 15px var(--font-display);
+  color: var(--isp-light);
+  cursor: pointer;
+}
+
+.igloo-slot-picker__close:focus-visible {
+  outline: 3px solid var(--isp-light);
+  outline-offset: 2px;
+}
+
+.igloo-slot-picker__error {
+  margin: 0;
+  min-height: 14px;
+  font: 700 12px var(--font-body);
+  color: var(--isp-cyan);
+}
+
+.igloo-slot-picker__error:empty {
+  display: none;
+}
+
+.igloo-slot-picker__list {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: auto;
+}
+
+.igloo-slot-picker__option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: var(--isp-locked-bg);
+  border: 2px solid var(--isp-locked-border);
+  font: 700 13px var(--font-body);
+  color: var(--isp-light);
+  text-align: left;
+  cursor: pointer;
+}
+
+.igloo-slot-picker__option:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.igloo-slot-picker__option--current {
+  border-color: var(--isp-cyan);
+  background: rgba(var(--jg-secondary-rgb), 0.35);
+}
+
+.igloo-slot-picker__option-empty-icon {
+  width: 40px;
+  height: 40px;
+  flex: none;
+  border: 2px dashed var(--isp-locked-border);
+}
+
+.igloo-slot-picker__option-name {
+  flex: 1;
+}

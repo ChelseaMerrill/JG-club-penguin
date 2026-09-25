@@ -141,6 +141,12 @@ export interface RoomDebugInfo {
    * it.
    */
   spawnDebugPenguin?: (tile: Tile, look: PenguinLook) => void;
+  /**
+   * The Igloo's current Furniture layout (#41): item id per Furniture slot
+   * id (`"slot-1".."slot-6"`), `null` for an empty slot. `undefined` for a
+   * Room with no `furnitureSlots` (every Room but the Igloo).
+   */
+  furniture?: Record<string, string | null>;
 }
 
 declare global {

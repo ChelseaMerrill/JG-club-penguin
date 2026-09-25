@@ -29,6 +29,8 @@ import {
   HOOKS_ENABLED,
   resolveRoomIdFromLocation,
 } from './dev-room-hook';
+import { drawFurnitureArt } from './furniture-art';
+import { iglooSlotForSlotId } from './furniture-slots';
 import {
   depthForTile,
   screenToTile,
@@ -38,10 +40,17 @@ import {
   TILE_WIDTH,
 } from './iso';
 import { getRoomDefinition, hasRoomDefinition } from './registry';
-import type { RoomDefinition, RoomDoor, RoomHotspot, RoomNpcSlot } from './room-definition';
+import type {
+  RoomDefinition,
+  RoomDoor,
+  RoomFurnitureSlot,
+  RoomHotspot,
+  RoomNpcSlot,
+} from './room-definition';
 import { RoomPenguinView, type PlacePenguin } from './room-penguin-view';
 import type { SnowballView } from '../../snowball/snowball-controller';
 import { arcPoint, clampTileToGrid, type ScreenPoint } from '../../snowball/snowball-rules';
+import type { IglooSlot, ShopItem } from '../../persistence/progress-store';
 
 export const ROOM_SCENE_KEY = 'RoomScene';
 
@@ -78,8 +87,21 @@ export const DOOR_REACHED_EVENT = 'door:reached';
  */
 export const SNOWBALL_THROW_EVENT = 'snowball:aim-throw';
 
+/**
+ * Scene-local event (#41, not a contract event): a click on a highlighted
+ * Furniture slot while edit mode is on. `main.ts` answers it by opening the
+ * slot picker; unlike a door or NPC, the Penguin does not walk there first
+ * (`onPointerDown` resolves this before falling through to a plain tile
+ * click, the same way it resolves hotspot/door/NPC clicks first).
+ */
+export const FURNITURE_SLOT_CLICK_EVENT = 'furniture-slot:click';
+
 export interface SnowballThrowRequestEvent {
   target: Tile;
+}
+
+export interface FurnitureSlotClickEvent {
+  slot: RoomFurnitureSlot;
 }
 
 export interface LocalPenguinMoveEvent {
@@ -164,9 +186,13 @@ const SNOWBALL_HINT_OFFSET_Y = 56;
 const NPC_RADIUS = 18;
 const NPC_COLOR = 0x00bdff;
 
-const FURNITURE_WIDTH = 40;
-const FURNITURE_HEIGHT = 28;
-const FURNITURE_COLOR = 0x0c4b5f;
+// Furniture edit mode (#41): a highlighted, numbered marker per slot, drawn
+// over any Furniture already placed there, in the door/hotspot's own
+// cyan-outline vocabulary.
+const FURNITURE_SLOT_HIGHLIGHT_COLOR = 0x00bdff;
+const FURNITURE_SLOT_HIGHLIGHT_WIDTH = 3;
+const FURNITURE_SLOT_LABEL_FONT_SIZE = '16px';
+const FURNITURE_SLOT_LABEL_BG = 'rgba(10,11,13,0.75)';
 
 const PROP_WIDTH = 32;
 const PROP_HEIGHT = 32;
@@ -254,6 +280,15 @@ export class RoomScene extends Scene {
   private npcHitAreas: HitArea<RoomNpcSlot>[] = [];
   private doorHitAreas: HitArea<RoomDoor>[] = [];
   private hotspotHitAreas: HitArea<RoomHotspot>[] = [];
+  /** Only populated while `furnitureEditMode` is on (#41). */
+  private furnitureSlotHitAreas: HitArea<RoomFurnitureSlot>[] = [];
+  /** Every Graphics/Text/Zone `renderFurniture` drew, torn down on the next call (#41): unlike doors/hotspots/NPCs, this can redraw mid-Room from `setFurniture`/`setFurnitureEditMode`, not just once from `create()`. */
+  private furnitureObjects: GameObjects.GameObject[] = [];
+  /** `null` until `setFurniture` is first called (#41): before the Igloo's `ProgressSnapshot` has loaded. */
+  private furnitureSlots: Record<IglooSlot, string | null> | null = null;
+  private furnitureCatalog: readonly ShopItem[] = [];
+  /** Furniture edit mode (#41 resolved decision 3); always reset to off by `init()` on a Room change. */
+  private furnitureEditMode = false;
   private npcArrivedLog: string[] = [];
   private doorReachedLog: string[] = [];
   private localPenguinMoveLog: Tile[] = [];
@@ -384,6 +419,11 @@ export class RoomScene extends Scene {
     this.npcHitAreas = [];
     this.doorHitAreas = [];
     this.hotspotHitAreas = [];
+    this.furnitureSlotHitAreas = [];
+    this.furnitureObjects = [];
+    this.furnitureSlots = null;
+    this.furnitureCatalog = [];
+    this.furnitureEditMode = false;
     this.npcArrivedLog = [];
     this.doorReachedLog = [];
     this.localPenguinMoveLog = [];
@@ -418,6 +458,47 @@ export class RoomScene extends Scene {
    */
   onDoorReached(handler: (door: RoomDoor) => void): void {
     this.events.on(DOOR_REACHED_EVENT, ({ door }: DoorReachedEvent) => handler(door));
+  }
+
+  /**
+   * Registers `handler` for every Furniture slot clicked while edit mode is
+   * on (#41). Call once, like `onDoorReached`: `this.events` (and any
+   * listener already attached to it) survives every `scene.restart()`.
+   */
+  onFurnitureSlotClick(handler: (slot: RoomFurnitureSlot) => void): void {
+    this.events.on(FURNITURE_SLOT_CLICK_EVENT, ({ slot }: FurnitureSlotClickEvent) =>
+      handler(slot),
+    );
+  }
+
+  /**
+   * Feeds the Igloo's current Furniture layout and catalog in (#41 resolved
+   * decision 1): `slots` mirrors `ProgressSnapshot.slots` (every
+   * `IglooSlot`, `null` when empty); `catalog` resolves each placed item's
+   * `artKey`. `main.ts` calls this once after loading the Igloo's
+   * `ProgressSnapshot` on Room entry, and again after every successful
+   * `ProgressStore.setSlot` -- there is no live subscription here, matching
+   * the Trophy Case/Market's own "reload on open" pattern (#34). Harmless to
+   * call for a Room with no `furnitureSlots`: `renderFurniture` only ever
+   * looks at `room.furnitureSlots`, so the data is simply never drawn.
+   */
+  setFurniture(slots: Record<IglooSlot, string | null>, catalog: readonly ShopItem[]): void {
+    this.furnitureSlots = { ...slots };
+    this.furnitureCatalog = catalog;
+    if (this.room) this.renderFurniture(this.room);
+  }
+
+  /**
+   * Toggles Furniture edit mode (#41 resolved decision 3): while on, every
+   * Igloo Furniture slot draws a highlighted, numbered marker and becomes
+   * clickable (`FURNITURE_SLOT_CLICK_EVENT`, resolved in `onPointerDown`
+   * before a plain tile click, so a slot click never also moves the
+   * Penguin). `init()` resets this to off on every Room change, so leaving
+   * the Igloo always exits edit mode.
+   */
+  setFurnitureEditMode(on: boolean): void {
+    this.furnitureEditMode = on;
+    if (this.room) this.renderFurniture(this.room);
   }
 
   /**
@@ -499,7 +580,7 @@ export class RoomScene extends Scene {
     this.drawDoors(room);
     this.drawHotspots(room);
     this.drawProps(room);
-    this.drawFurniture(room);
+    this.renderFurniture(room);
     this.drawNpcs(room);
     this.spawnLocalPenguin(room);
 
@@ -576,7 +657,20 @@ export class RoomScene extends Scene {
       remotePenguins: this.penguins.debugRemotePenguins(),
       setRegisteredPlayer: (player) => this.registry.set(PLAYER_REGISTRY_KEY, player),
       spawnDebugPenguin: (tile, look) => this.spawnDebugPenguin(tile, look),
+      furniture: this.debugFurniture(),
     });
+  }
+
+  /** `__roomDebug.furniture` (#41): item id per Furniture slot id, `undefined` for a Room with no `furnitureSlots`. */
+  private debugFurniture(): Record<string, string | null> | undefined {
+    const room = this.room;
+    if (!room?.furnitureSlots) return undefined;
+    const result: Record<string, string | null> = {};
+    for (const slot of room.furnitureSlots) {
+      const iglooSlot = iglooSlotForSlotId(slot.id);
+      result[slot.id] = iglooSlot !== null ? (this.furnitureSlots?.[iglooSlot] ?? null) : null;
+    }
+    return result;
   }
 
   /** The Penguin's rendered `Sprite`, reached through its `container` (#14 review fix 8's `flipX` check). */
@@ -869,6 +963,18 @@ export class RoomScene extends Scene {
       return;
     }
 
+    // #41 resolved decision 3: only populated while edit mode is on, so this
+    // is a no-op outside it. Resolved before the plain tile click, the same
+    // way a door/hotspot/NPC click is: a slot click must not also move the
+    // Penguin.
+    const furnitureSlotHit = this.furnitureSlotHitAreas.find((hit) =>
+      currentlyOver.includes(hit.object),
+    );
+    if (furnitureSlotHit) {
+      this.handleFurnitureSlotClick(furnitureSlotHit.data);
+      return;
+    }
+
     const tile = screenToTile({ x: pointer.x, y: pointer.y }, room.grid.origin);
     this.handleTileClick(tile, room);
   }
@@ -903,6 +1009,18 @@ export class RoomScene extends Scene {
    */
   private handleHotspotClick(hotspot: RoomHotspot, room: RoomDefinition): void {
     gameEvents.emit('hotspot:click', { roomId: room.id, hotspotId: hotspot.id });
+  }
+
+  /**
+   * A click on a highlighted Furniture slot while edit mode is on (#41): a
+   * scene-local event, like doors/NPCs, rather than the shared `gameEvents`
+   * hotspot channel, since it needs no `RoomHotspot` and its only consumer
+   * (`main.ts`'s Igloo editor) is wired the same way `DOOR_REACHED_EVENT` is.
+   * Unlike a door or NPC, the Penguin does not walk there first.
+   */
+  private handleFurnitureSlotClick(slot: RoomFurnitureSlot): void {
+    const event: FurnitureSlotClickEvent = { slot };
+    this.events.emit(FURNITURE_SLOT_CLICK_EVENT, event);
   }
 
   /**
@@ -1220,13 +1338,84 @@ export class RoomScene extends Scene {
     }
   }
 
-  private drawFurniture(room: RoomDefinition): void {
+  /**
+   * Draws every Igloo Furniture slot (#41): nothing at an empty slot outside
+   * edit mode; the placed item's art (`furniture-art.ts`), depth-sorted with
+   * Penguins via `depthForTile(slot.tile)`, at a filled one. While edit mode
+   * is on, every slot (filled or empty) also gets a highlighted, numbered
+   * marker on top and a clickable hit area. Re-run on every `setFurniture`/
+   * `setFurnitureEditMode` call, not just once from `create()`, so it always
+   * tears down its own previous objects first rather than layering new ones
+   * over stale ones.
+   */
+  private renderFurniture(room: RoomDefinition): void {
+    for (const obj of this.furnitureObjects) obj.destroy();
+    this.furnitureObjects = [];
+    this.furnitureSlotHitAreas = [];
+
     for (const slot of room.furnitureSlots ?? []) {
+      const iglooSlot = iglooSlotForSlotId(slot.id);
+      const itemId = iglooSlot !== null ? (this.furnitureSlots?.[iglooSlot] ?? null) : null;
       const point = tileToScreen(slot.tile, room.grid.origin);
-      this.add
-        .rectangle(point.x, point.y, FURNITURE_WIDTH, FURNITURE_HEIGHT, FURNITURE_COLOR)
-        .setDepth(depthForTile(slot.tile));
+      const depth = depthForTile(slot.tile);
+
+      if (itemId) {
+        const item = this.furnitureCatalog.find((entry) => entry.id === itemId);
+        const art = drawFurnitureArt(this, item?.artKey ?? itemId, point).setDepth(depth);
+        this.furnitureObjects.push(art);
+      }
+
+      if (this.furnitureEditMode) {
+        this.furnitureObjects.push(...this.drawFurnitureSlotMarker(slot, point, depth, iglooSlot));
+      }
     }
+  }
+
+  /** One edit-mode slot marker (#41): an outlined isometric tile diamond, a numbered label, and -- when `iglooSlot` resolves -- a clickable `Zone`. */
+  private drawFurnitureSlotMarker(
+    slot: RoomFurnitureSlot,
+    point: ScreenPoint,
+    depth: number,
+    iglooSlot: IglooSlot | null,
+  ): GameObjects.GameObject[] {
+    const markerDepth = depth + 1;
+    const objects: GameObjects.GameObject[] = [];
+
+    const outline = this.add.graphics().setDepth(markerDepth);
+    outline.lineStyle(FURNITURE_SLOT_HIGHLIGHT_WIDTH, FURNITURE_SLOT_HIGHLIGHT_COLOR, 1);
+    outline.strokePoints(
+      [
+        { x: point.x, y: point.y - TILE_HEIGHT / 2 },
+        { x: point.x + TILE_WIDTH / 2, y: point.y },
+        { x: point.x, y: point.y + TILE_HEIGHT / 2 },
+        { x: point.x - TILE_WIDTH / 2, y: point.y },
+      ],
+      true,
+    );
+    objects.push(outline);
+
+    const label = this.add
+      .text(point.x, point.y, iglooSlot !== null ? String(iglooSlot) : '?', {
+        fontFamily: LABEL_FONT_FAMILY,
+        fontSize: FURNITURE_SLOT_LABEL_FONT_SIZE,
+        color: LABEL_TEXT_COLOR,
+        backgroundColor: FURNITURE_SLOT_LABEL_BG,
+        padding: { x: 6, y: 2 },
+      })
+      .setOrigin(0.5)
+      .setDepth(markerDepth);
+    objects.push(label);
+
+    if (iglooSlot !== null) {
+      const zone = this.add
+        .zone(point.x, point.y, TILE_WIDTH, TILE_HEIGHT)
+        .setDepth(markerDepth)
+        .setInteractive({ useHandCursor: true });
+      this.furnitureSlotHitAreas.push({ object: zone, data: slot });
+      objects.push(zone);
+    }
+
+    return objects;
   }
 
   private drawNpcs(room: RoomDefinition): void {

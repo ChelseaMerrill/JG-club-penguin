@@ -2,9 +2,11 @@ import './style.css';
 import { loadEnv } from './env';
 import { startGame, whenSceneReady } from './game/main';
 import {
+  FURNITURE_SLOT_CLICK_EVENT,
   LOCAL_PENGUIN_ARRIVED_EVENT,
   LOCAL_PENGUIN_MOVE_EVENT,
   SNOWBALL_THROW_EVENT,
+  type FurnitureSlotClickEvent,
   type LocalPenguinArrivedEvent,
   type LocalPenguinMoveEvent,
   type RoomScene,
@@ -82,6 +84,7 @@ import { initDevCreatorHook } from './penguin/dev-creator-hook';
 import { createTrophyCase, TROPHY_CASE_OVERLAY_ID } from './ui/trophy-case';
 import { createMapScreen } from './ui/map-screen';
 import { createMarket, MARKET_OVERLAY_ID } from './ui/market';
+import { createIglooEditor, type IglooEditor } from './ui/igloo-editor';
 import { wireBadgeToast } from './ui/badge-toast';
 
 // Fail fast on a missing or malformed .env before anything boots.
@@ -182,6 +185,8 @@ const wallText: WallText = createWallText(uiLayer, {
  */
 let roomScene: RoomScene | null = null;
 let penguins: RoomPenguinView | null = null;
+/** The Igloo's Furniture editor (#41): assigned once, after `hud`/`progressStore` exist below. */
+let iglooEditor: IglooEditor | null = null;
 /**
  * The one producer of `room:leave`/`room:enter` (#15 A1, replacing #28's
  * `stub-rooms.ts` wholesale). Built once the Scene exists, since it restarts
@@ -250,6 +255,10 @@ const sceneReady = whenSceneReady(game).then((scene) => {
     void controller.throwAt(target).then((sent) => {
       if (sent && HOOKS_ENABLED) snowballThrowLog.push({ target, at: Date.now() });
     });
+  });
+  // #41: a click on a highlighted Furniture slot while edit mode is on.
+  scene.events.on(FURNITURE_SLOT_CLICK_EVENT, ({ slot }: FurnitureSlotClickEvent) => {
+    void iglooEditor?.openPicker(slot);
   });
   return scene.penguins;
 });
@@ -407,6 +416,10 @@ function setSnowballMode(on: boolean): void {
   snowballMode = next;
   roomScene?.setAiming(next);
   hud.setSnowballMode(next);
+  // #41 resolved decision 4: Snowball aiming and Igloo edit mode are never
+  // both active. Entering edit mode is the other half of this rule (see
+  // `iglooEditor`'s `onEditModeChange` below).
+  if (next) iglooEditor?.exitEditMode();
 }
 
 /**
@@ -690,6 +703,50 @@ gameEvents.on('hotspot:click', ({ hotspotId }) => {
   void market.open();
 });
 
+/**
+ * Reloads the signed-in Player's `ProgressSnapshot` and pushes its Furniture
+ * layout/catalog into `RoomScene` (#41 resolved decision 1): called once on
+ * every Igloo `room:enter`, and again after every successful placement
+ * (`iglooEditor`'s `onSlotsChanged`). A no-op once the Room has since moved
+ * on (e.g. a slow load resolving after the Player already left the Igloo).
+ */
+async function refreshIglooFurniture(): Promise<void> {
+  if (!roomScene || roomScene.currentRoomId !== 'igloo') return;
+  try {
+    const snapshot = await progressStore.loadAll();
+    if (!roomScene || roomScene.currentRoomId !== 'igloo') return;
+    roomScene.setFurniture(snapshot.slots, snapshot.catalog);
+  } catch (err) {
+    console.error('[main] Igloo Furniture load failed', err);
+  }
+}
+
+// The Igloo's Furniture slots and "EDIT IGLOO" button (#41): owner-only
+// (this build has no visiting another Player's Igloo, so "signed in" is
+// always the owner), gated below on the current Room being the Igloo and a
+// Player being registered. The six slot markers/click handling live in
+// `RoomScene` (`setFurnitureEditMode`/`onFurnitureSlotClick`, wired above);
+// this only toggles that and renders its own small DOM button/hint/picker.
+iglooEditor = createIglooEditor(uiLayer, {
+  store: progressStore,
+  overlays: hud.overlays,
+  onEditModeChange: (on) => {
+    roomScene?.setFurnitureEditMode(on);
+    if (on) setSnowballMode(false);
+  },
+  onSlotsChanged: () => void refreshIglooFurniture(),
+});
+
+gameEvents.on('room:leave', ({ roomId }) => {
+  if (roomId === 'igloo') iglooEditor?.exitEditMode();
+});
+
+gameEvents.on('room:enter', ({ roomId }) => {
+  const isIgloo = roomId === 'igloo';
+  iglooEditor?.setVisible(isIgloo && Boolean(game.registry.get('player')));
+  if (isIgloo) void refreshIglooFurniture();
+});
+
 // #77 review round 1 nit 5: RoomScene builds a Phaser-side hit-area for
 // every `RoomDefinition.hotspots` entry, including this one, the same way it
 // does for the Trophy Case and the Igloo Gear stall above -- without this
@@ -762,6 +819,8 @@ const auth = startAuth({
     if (isAccountSwitch) {
       hud.overlays.close(MINIGAME_OVERLAY_ID);
       hud.hide();
+      iglooEditor?.exitEditMode();
+      iglooEditor?.setVisible(false);
     }
     currentPlayer = player;
     // `room:enter` fires only after `registry.player` is set.
@@ -824,6 +883,8 @@ const auth = startAuth({
     hud.overlays.close(TROPHY_CASE_OVERLAY_ID);
     hud.overlays.close(MARKET_OVERLAY_ID);
     hud.overlays.close(CORE_VALUES_OVERLAY_ID);
+    iglooEditor?.exitEditMode();
+    iglooEditor?.setVisible(false);
     overlay.showSignedOut();
     hud.hide();
   },
