@@ -17,7 +17,7 @@ describe('NPCS', () => {
     }
   });
 
-  it("places every NPC in exactly one Room's npcSlots, matching its own roomId", () => {
+  it("places every human NPC in exactly one Room's npcSlots, matching its own roomId, and no Penguin-kind NPC in any", () => {
     const slotIdsByRoom = new Map(
       ROOM_DEFINITIONS.map((room) => [room.id, room.npcSlots.map((slot) => slot.npcId)]),
     );
@@ -32,6 +32,12 @@ describe('NPCS', () => {
       const roomsContainingIt = ROOM_DEFINITIONS.filter((room) =>
         (slotIdsByRoom.get(room.id) ?? []).includes(npc.id),
       );
+      // Only Players appear as Penguins (owner decision, 2026-09-25): the
+      // designs' Penguin-kind NPCs keep their definitions but aren't placed.
+      if (npc.kind === 'penguin') {
+        expect(roomsContainingIt, `Penguin NPC "${npc.id}"`).toHaveLength(0);
+        continue;
+      }
       expect(roomsContainingIt, `NPC "${npc.id}"`).toHaveLength(1);
       expect(roomsContainingIt[0]?.id).toBe(npc.roomId);
     }

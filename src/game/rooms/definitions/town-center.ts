@@ -244,10 +244,11 @@ export const townCenter: RoomDefinition = {
     { npcId: 'darrin', tile: { col: 3, row: 4 } },
     { npcId: 'sydney', tile: { col: 6, row: 2 } },
     { npcId: 'jon', tile: { col: 6, row: 6 } },
-    // The receptionist penguin behind the Front Desk counter; her tile sits
-    // on the (unwalkable) counter itself, same as any NPC standing behind a
-    // fixed fixture (#16 D6).
-    { npcId: 'front-desk', tile: { col: 6, row: 1 } },
+    // The Front Desk receptionist is a Penguin in the design, so she isn't
+    // placed.
+    // Penguin-kind NPCs are left out of every Room: only Players appear as
+    // Penguins (owner decision, 2026-09-25). Their `NpcDefinition`s stay in
+    // `src/npcs/npcs.ts`.
     // Jory Hutchins has her own nameplate and speech bubble (`sayJory`), like
     // Darrin/Sydney/Jon, but her `jump` bounce animation and "SURVIVOR" badge
     // are nested *inside* Sydney's own `walkSyd` group in the design markup,

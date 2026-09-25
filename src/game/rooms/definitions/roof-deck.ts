@@ -102,7 +102,10 @@ export const roofDeck: RoomDefinition = {
     },
   ],
   npcSlots: [
-    { npcId: 'kevin', tile: { col: 7, row: 2 } },
+    // Kevin and Tristin are Penguins in the design, so they aren't placed.
+    // Penguin-kind NPCs are left out of every Room: only Players appear as
+    // Penguins (owner decision, 2026-09-25). Their `NpcDefinition`s stay in
+    // `src/npcs/npcs.ts`.
     // "Ann Marie": a first-plus-middle given name, kept in full (kebab-cased)
     // rather than reduced to a single first name, unlike Darrin Jahnel/Sydney
     // Murauskas/Jon Keller's Firstname-Lastname pattern.
@@ -111,7 +114,6 @@ export const roofDeck: RoomDefinition = {
     { npcId: 'josh', tile: { col: 11, row: 2 } },
     { npcId: 'brandon', tile: { col: 4, row: 6 } },
     { npcId: 'anthony', tile: { col: 7, row: 5 } },
-    { npcId: 'tristin', tile: { col: 5, row: 9 } },
     // Her ellipse inverts to col 12.2, one column past this Room's last
     // valid column (11); clamped to 11 — a judgment call reported on the
     // #16 execution plan.
