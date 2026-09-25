@@ -1,0 +1,282 @@
+/* Market: design/Room 05 Roof Deck.dc.html's MARKET panel. Fills the
+   1600x900 #ui layer, so every size here is Stage pixels, following
+   trophy-case.css's pattern; the frame itself stays close to the design's
+   own 330px-wide card rather than stretching full-Stage. */
+
+.market {
+  --mk-cyan: var(--jg-primary);
+  --mk-teal: var(--jg-secondary);
+  --mk-light: var(--jg-light);
+  --mk-dark: var(--jg-dark);
+  --mk-locked-border: #0c4b5f;
+  --mk-locked-bg: #0a0c0f;
+
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 12, 15, 0.78);
+  backdrop-filter: blur(3px);
+  color: var(--mk-light);
+  font-family: var(--font-body);
+}
+
+.market[hidden] {
+  display: none;
+}
+
+.market__frame {
+  position: relative;
+  width: 420px;
+  max-height: 720px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 20px 22px;
+  background: rgba(22, 23, 25, 0.96);
+  border: 3px solid var(--mk-teal);
+  box-shadow: 0 10px 0 var(--mk-teal);
+}
+
+.market__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+}
+
+.market__title-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.market__title {
+  font-family: var(--font-game-display);
+  font-size: 28px;
+  line-height: 1;
+  color: var(--mk-cyan);
+  -webkit-text-stroke: 3px var(--mk-teal);
+  paint-order: stroke fill;
+}
+
+.market__subtitle {
+  font: 400 11px var(--font-display);
+  letter-spacing: 0.16em;
+  color: var(--jg-inactive);
+}
+
+.market__close {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  background: var(--mk-teal);
+  border: none;
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  font: 400 15px var(--font-display);
+  color: var(--mk-light);
+  cursor: pointer;
+}
+
+.market__close:focus-visible {
+  outline: 3px solid var(--mk-light);
+  outline-offset: 2px;
+}
+
+.market__tabs {
+  display: flex;
+  gap: 8px;
+  border-bottom: 2px solid var(--mk-locked-border);
+  padding-bottom: 10px;
+}
+
+.market__tab {
+  padding: 6px 16px;
+  border: none;
+  background: var(--mk-cyan);
+  font: 400 12px var(--font-display);
+  letter-spacing: 0.16em;
+  color: var(--mk-dark);
+  cursor: default;
+}
+
+.market__body {
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: auto;
+}
+
+.market__items {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.market__item {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  background: var(--mk-locked-bg);
+  border: 2px solid var(--mk-locked-border);
+}
+
+.market__item--owned {
+  background: rgba(var(--jg-secondary-rgb), 0.35);
+  border-color: var(--mk-cyan);
+}
+
+.market__item-icon {
+  height: 44px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 4px;
+}
+
+/* ---- item art: reuses the Igloo Starter Kit's bar vocabulary where it
+   fits (Desk/Speakers/Dual Monitors), plus a bespoke flat shape for the
+   rest -- there is no dedicated art asset for any of these yet. ---- */
+
+.market__icon-bar {
+  border: 2px solid var(--mk-teal);
+}
+
+.market__icon-bar--desk {
+  background: #3a4046;
+}
+
+.market__icon-bar--speaker {
+  background: #3a4046;
+  border-radius: 3px 3px 0 0;
+}
+
+.market__icon-bar--monitor {
+  background: var(--mk-cyan);
+  border-radius: 2px;
+}
+
+.market__icon-beanbag {
+  width: 44px;
+  height: 32px;
+  background: var(--mk-teal);
+  border: 2px solid var(--mk-cyan);
+  border-radius: 50% 50% 10px 10px;
+}
+
+.market__icon-strip {
+  width: 48px;
+  height: 10px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--mk-cyan), var(--mk-teal), var(--mk-light));
+  box-shadow: 0 0 6px var(--mk-cyan);
+}
+
+.market__icon-disco {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: repeating-conic-gradient(var(--mk-cyan) 0deg 15deg, var(--mk-teal) 15deg 30deg);
+  border: 2px solid var(--mk-light);
+}
+
+.market__icon-cabinet {
+  width: 30px;
+  height: 44px;
+  background: #3a4046;
+  border: 2px solid var(--mk-teal);
+  position: relative;
+}
+
+.market__icon-cabinet::before {
+  content: '';
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  right: 4px;
+  height: 16px;
+  background: var(--mk-cyan);
+}
+
+.market__icon-placeholder {
+  width: 40px;
+  height: 40px;
+  background: var(--mk-locked-border);
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+}
+
+.market__item-name {
+  font: 700 12px var(--font-body);
+  color: var(--mk-light);
+}
+
+.market__item-price-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.market__item-price {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font: 400 13px var(--font-display);
+  color: var(--mk-cyan);
+}
+
+.market__item-price-icon {
+  width: 11px;
+  height: 13px;
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  background: var(--mk-cyan);
+}
+
+.market__item-buy {
+  padding: 4px 10px;
+  border: none;
+  background: var(--mk-cyan);
+  color: var(--mk-dark);
+  font: 400 11px var(--font-display);
+  letter-spacing: 0.14em;
+  clip-path: polygon(6px 0, calc(100% - 6px) 0, 100% 50%, calc(100% - 6px) 100%, 6px 100%, 0 50%);
+  cursor: pointer;
+}
+
+.market__item-buy:disabled {
+  cursor: default;
+}
+
+.market__item-buy--owned {
+  background: transparent;
+  color: var(--jg-inactive);
+}
+
+.market__error {
+  margin: 0;
+  min-height: 14px;
+  font: 700 12px var(--font-body);
+  color: var(--mk-cyan);
+}
+
+.market__error:empty {
+  display: none;
+}
+
+.market__footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 2px solid var(--mk-locked-border);
+  padding-top: 10px;
+  font: 400 11px var(--font-display);
+  letter-spacing: 0.14em;
+  color: var(--jg-inactive);
+}
+
+.market__balance {
+  color: var(--mk-light);
+}

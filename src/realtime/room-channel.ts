@@ -20,6 +20,7 @@ import {
   isHexColor,
   PATTERNS,
   PENGUIN_NAME_MAX,
+  UNSAFE_NAME_CHARS_RE,
   roomChannelKey,
   type Facing,
   type PenguinLook,
@@ -156,15 +157,6 @@ const BYE_TIMEOUT_MS = 300;
  */
 const FACINGS: Record<Facing, true> = { left: true, right: true };
 
-/**
- * Control, bidi and zero-width characters stripped from names before they
- * are shown: C0 controls, DEL/C1 controls, zero-width space through
- * right-to-left mark, bidi embedding/override controls, isolates, and BOM.
- */
-const UNSAFE_NAME_CHARS_RE =
-  // eslint-disable-next-line no-control-regex
-  /[\u0000-\u001F\u007F-\u009F\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g;
-
 function isOneOf<T extends string>(values: readonly T[], v: unknown): v is T {
   return typeof v === 'string' && (values as readonly string[]).includes(v);
 }
@@ -197,14 +189,18 @@ function isValidSentAt(v: unknown): v is number {
 
 /**
  * Strips control/bidi/zero-width characters and trims. An empty name is
- * valid (the Creator has not been completed yet); a non-string or a name
- * over `PENGUIN_NAME_MAX` falls back to `''` rather than rejecting the whole
- * Presence payload. Render it as `name || UNNAMED_PENGUIN`.
+ * valid on the wire (the Creator has not been completed yet); a non-string
+ * or a name over `PENGUIN_NAME_MAX` falls back to `''` rather than rejecting
+ * the whole Presence payload. The World doesn't draw a nameless Penguin,
+ * though: `''` isn't a placeholder to render, it's "not shown" (#75).
  */
 function sanitizeName(raw: unknown): string {
   if (typeof raw !== 'string') return '';
   const cleaned = raw.replace(UNSAFE_NAME_CHARS_RE, '').trim();
-  return cleaned.length <= PENGUIN_NAME_MAX ? cleaned : '';
+  // Code points, not UTF-16 units (review round 1): otherwise a name made of
+  // astral characters (e.g. an emoji) could be rejected well under the real
+  // PENGUIN_NAME_MAX limit.
+  return Array.from(cleaned).length <= PENGUIN_NAME_MAX ? cleaned : '';
 }
 
 /** Builds a fresh `PenguinLook` containing only known, valid keys, or `null` if any field is invalid. */
