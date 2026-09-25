@@ -15,6 +15,14 @@ const FAKE_LIVE_PATTERNS = [
   /\d+ SHOPPERS/,
   /BUILD PASSING/,
   /KICKOFF IN \d/,
+  // #51: the Hallway's, Team Rooms' and Bathroom's banners add headcounts,
+  // a training progress figure and a stall-occupancy count. The Igloo's
+  // "1 PENGUIN" is its fixed capacity, not a headcount, so only the plural
+  // is a live figure here.
+  /\d+ PENGUINS\b/,
+  /\d+ HUMANS?\b/,
+  /TRAINING \d+%/,
+  /STALLS FREE/,
 ];
 
 function room(overrides: Partial<RoomDefinition> & { id: RoomId }): RoomDefinition {
@@ -443,6 +451,13 @@ describe('ROOM_DEFINITIONS registry', () => {
       'roof-deck': ['the-melt'],
       igloo: ['town-center'],
       'the-icebox': ['dev-pit', 'town-center'],
+      // #51: the Hallway's TEAM ROOM 5-9 doors stay disabled (no designs).
+      'office-hallway': ['team-room-1', 'team-room-2', 'team-room-3', 'team-room-4', 'town-center'],
+      'team-room-1': ['office-hallway'],
+      'team-room-2': ['office-hallway'],
+      'team-room-3': ['office-hallway'],
+      'team-room-4': ['office-hallway'],
+      bathroom: ['office-hallway'],
     });
   });
 
@@ -482,6 +497,33 @@ describe('ROOM_DEFINITIONS registry', () => {
     expect(getRoomDefinition('the-icebox')).toMatchObject({
       title: 'THE ICEBOX',
       subtitle: 'CONFERENCE · 604 SF · GLASS WALL',
+    });
+    // #51: each banner minus its fabricated live figures (headcounts, the
+    // training progress, the stall occupancy) and, for the Bathroom, the
+    // "SNOWBALLS DISABLED" rule this build doesn't implement.
+    expect(getRoomDefinition('office-hallway')).toMatchObject({
+      title: 'THE CORRIDOR',
+      subtitle: 'OFFICES 1–9 · KNOCK BEFORE YOU WADDLE',
+    });
+    expect(getRoomDefinition('team-room-1')).toMatchObject({
+      title: 'TEAM ROOM 1',
+      subtitle: 'TEAM RM 1 · 337 SF · 2 GPU RACKS',
+    });
+    expect(getRoomDefinition('team-room-2')).toMatchObject({
+      title: 'TEAM ROOM 2',
+      subtitle: 'TEAM RM 2 · 292 SF · STICKY WALL · CRIT AT 3PM',
+    });
+    expect(getRoomDefinition('team-room-3')).toMatchObject({
+      title: 'TEAM ROOM 3',
+      subtitle: 'TEAM RM 3 · 287 SF · LIGHTS LOW · 4 DASHBOARDS',
+    });
+    expect(getRoomDefinition('team-room-4')).toMatchObject({
+      title: 'TEAM ROOM 4',
+      subtitle: 'TEAM RM 4 · 350 SF · 4 CORNER DESKS · COUCH · BEYSTADIUM',
+    });
+    expect(getRoomDefinition('bathroom')).toMatchObject({
+      title: 'THE THAW ROOM',
+      subtitle: 'BATHROOM · FLOOR 5',
     });
   });
 });

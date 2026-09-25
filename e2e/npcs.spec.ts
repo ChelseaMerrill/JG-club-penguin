@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import type { RoomId } from '../src/contracts';
 import { roofDeck } from '../src/game/rooms/definitions/roof-deck';
+import { teamRoom2 } from '../src/game/rooms/definitions/team-room-2';
 import { theMelt } from '../src/game/rooms/definitions/the-melt';
 import { tileToScreen } from '../src/game/rooms/iso';
 import { GAME_HEIGHT, GAME_WIDTH } from '../src/game/stage-size';
@@ -63,7 +64,19 @@ async function bootRoom(page: Page, roomId: RoomId): Promise<string[]> {
   return errors;
 }
 
-for (const roomId of ['town-center', 'dev-pit', 'the-melt', 'roof-deck', 'the-icebox'] as const) {
+for (const roomId of [
+  'town-center',
+  'dev-pit',
+  'the-melt',
+  'roof-deck',
+  'the-icebox',
+  'office-hallway',
+  'team-room-1',
+  'team-room-2',
+  'team-room-3',
+  'team-room-4',
+  'bathroom',
+] as const) {
   test(`npcs-${roomId}: NPCs show at their designed positions`, async ({ page }) => {
     const errors = await bootRoom(page, roomId);
 
@@ -99,6 +112,38 @@ test('Dev Pit: clicking Ian arrives, opens his dialog, and GRAB THE HAMMER opens
   await expect(dialog).toBeHidden();
 
   await page.screenshot({ path: 'test-results/npcs-dev-pit/bug-squash-launched.png' });
+
+  expect(errors).toEqual([]);
+});
+
+test('Team Room 2: clicking Ian arrives, opens his dialog, and GRAB THE HAMMER opens Bug Squash (#51)', async ({
+  page,
+}) => {
+  const errors = await bootRoom(page, 'team-room-2');
+
+  const ian = teamRoom2.npcSlots.find((slot) => slot.npcId === 'ian-team-room-2');
+  if (!ian) throw new Error('expected team-room-2 to have an "ian-team-room-2" NPC slot');
+  const point = tileToScreen(ian.tile, teamRoom2.grid.origin);
+
+  await clickStagePoint(page, point);
+
+  await expect
+    .poll(async () => (await debugInfo(page))?.npcArrivedLog, { timeout: LONG_WALK_TIMEOUT })
+    .toContain('ian-team-room-2');
+
+  const dialog = page.locator('.npc-dialog');
+  await expect(dialog).toBeVisible();
+  await expect(dialog.locator('.npc-dialog__name')).toHaveText('Ian Ballard');
+
+  const grabButton = dialog.getByRole('button', { name: 'GRAB THE HAMMER' });
+  await expect(grabButton).toBeVisible();
+  await grabButton.click();
+
+  await expect(page.locator('.minigame__howto')).toBeVisible();
+  await expect(page.locator('.minigame__howto-subtitle')).toContainText('BUG SQUASH');
+  await expect(dialog).toBeHidden();
+
+  await page.screenshot({ path: 'test-results/npcs-team-room-2/bug-squash-launched.png' });
 
   expect(errors).toEqual([]);
 });

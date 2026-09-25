@@ -60,7 +60,18 @@ describe('NPCS', () => {
     // npcSlot in this prototype; the rest (including Tom, who gained a slot
     // in #91's Kitchen resync) are asserted here (#36 round-1 review item 1,
     // blocking).
-    const tbdIds: NpcId[] = ['chelsea', 'dom', 'ashley', 'millie', 'casey', 'ryan', 'sam', 'tom'];
+    // #51 gives Emily her first slot (the Hallway); her card is on that list.
+    const tbdIds: NpcId[] = [
+      'chelsea',
+      'dom',
+      'ashley',
+      'millie',
+      'casey',
+      'ryan',
+      'sam',
+      'tom',
+      'emily',
+    ];
     for (const id of tbdIds) {
       expect(NPCS[id].title, `${id}'s title`).toBeNull();
     }
@@ -274,6 +285,126 @@ describe('NPCS', () => {
     }
   });
 
+  it("gives the Hallway's, Team Rooms 1-4's and the Bathroom's NPCs the sheet's names/titles and their Room design's own nameplates and lines (#51)", () => {
+    // Names/titles from design/Characters.dc.html (Emily, Dom, Millie, Casey,
+    // Ryan and Sam are on its TITLE TBD list); tags and idle lines verbatim
+    // from each Room design's nameplates and bubbles. Static bubbles are
+    // `periodS: 0`; Team Room 1's `jtalk` (4s, shown from 38%) and `domtalk`
+    // (6s, from 39%) and Team Room 3's `rats` (10s, from 80%) are
+    // re-expressed under the shared 7% show window: (0.38 - 0.07) * 4 =
+    // 1.24s -> -2.76s, (0.39 - 0.07) * 6 = 1.92s -> -4.08s, and
+    // (0.80 - 0.07) * 10 = 7.3s -> -2.7s. Repeat appearances get a
+    // `-<room>` suffixed id.
+    expect(NPCS.emily).toMatchObject({
+      kind: 'human',
+      name: 'Emily Smith',
+      title: null,
+      roomId: 'office-hallway',
+      tagName: 'Emily Smith',
+      dialogLine: 'Ever thought about joining JG?',
+      idleLines: [{ text: 'Joining JG?', periodS: 0, delayS: 0 }],
+    });
+    expect(NPCS['anthony-hallway']).toMatchObject({
+      name: 'Anthony Conway',
+      title: 'Director of IT',
+      roomId: 'office-hallway',
+      tagName: 'Anthony Conway',
+      idleLines: [{ text: 'Is this link safe?', periodS: 0, delayS: 0 }],
+    });
+    expect(NPCS['jethro-team-room-1']).toMatchObject({
+      name: 'Jethro Breuer',
+      title: 'Director of Digital Media',
+      roomId: 'team-room-1',
+      tagName: 'Jethro',
+      idleLines: [{ text: "Act natural. Camera's rolling.", periodS: 4, delayS: -2.76 }],
+    });
+    expect(NPCS['dom-team-room-1']).toMatchObject({
+      name: 'Dom Favata',
+      title: null,
+      roomId: 'team-room-1',
+      tagName: 'Dom',
+      idleLines: [{ text: 'you gotta be faster than that', periodS: 6, delayS: -4.08 }],
+    });
+    expect(NPCS['ian-team-room-2']).toMatchObject({
+      name: 'Ian Ballard',
+      title: 'VP of Engineering',
+      roomId: 'team-room-2',
+      tagName: 'Ian',
+      idleLines: [{ text: 'have you installed the atlas plugin yet?', periodS: 0, delayS: 0 }],
+      // The design draws his "TALK · BUG SQUASH" prompt under him.
+      dialog: { kind: 'minigame', minigameId: 'bug-squash' },
+    });
+    expect(NPCS['millie-team-room-3']).toMatchObject({
+      name: 'Millie Elliott',
+      title: null,
+      roomId: 'team-room-3',
+      tagName: 'Millie',
+      idleLines: [],
+    });
+    expect(NPCS['casey-team-room-3']).toMatchObject({
+      name: 'Casey Snow',
+      title: null,
+      roomId: 'team-room-3',
+      tagName: 'Casey',
+      idleLines: [{ text: 'RATS', periodS: 10, delayS: -2.7 }],
+      // The Igloo Gear stall is the Roof Deck's; here she is just gaming.
+      dialog: { kind: 'line' },
+    });
+    expect(NPCS['sydney-team-room-3']).toMatchObject({
+      name: 'Sydney Murauskas',
+      title: 'Technical Recruiter',
+      roomId: 'team-room-3',
+      tagName: 'Sydney',
+      idleLines: [{ text: 'So, open to new roles?', periodS: 0, delayS: 0 }],
+    });
+    expect(NPCS.michael).toMatchObject({
+      kind: 'human',
+      name: 'Michael Prete',
+      title: 'IT Associate',
+      roomId: 'team-room-4',
+      tagName: 'Michael',
+      dialogLine: '3-0. Again.',
+      idleLines: [{ text: 'I challenge you to a Beyblade battle!', periodS: 0, delayS: 0 }],
+    });
+    expect(NPCS['sam-team-room-4']).toMatchObject({
+      name: 'Sam Schantz',
+      title: null,
+      roomId: 'team-room-4',
+      tagName: 'Sam',
+      idleLines: [],
+    });
+    expect(NPCS['ryan-team-room-4']).toMatchObject({
+      name: 'Ryan Shendler',
+      title: null,
+      roomId: 'team-room-4',
+      tagName: 'Ryan',
+      idleLines: [],
+    });
+  });
+
+  it("draws each repeat appearance with the same figure and dialog line as the person's first Room (#51)", () => {
+    const repeats: [NpcId, NpcId][] = [
+      ['anthony-hallway', 'anthony'],
+      ['jethro-team-room-1', 'jethro'],
+      ['dom-team-room-1', 'dom'],
+      ['ian-team-room-2', 'ian'],
+      ['millie-team-room-3', 'millie'],
+      ['casey-team-room-3', 'casey'],
+      ['sydney-team-room-3', 'sydney'],
+      ['sam-team-room-4', 'sam'],
+      ['ryan-team-room-4', 'ryan'],
+    ];
+    for (const [repeat, first] of repeats) {
+      const again = NPCS[repeat];
+      const original = NPCS[first];
+      if (again.kind !== 'human' || original.kind !== 'human') {
+        throw new Error(`expected ${repeat} and ${first} to be Human NPCs`);
+      }
+      expect(again.figure, repeat).toBe(original.figure);
+      expect(again.dialogLine, repeat).toBe(original.dialogLine);
+    }
+  });
+
   it('gives Front Desk a single static (periodS: 0) idle line', () => {
     // Front Desk's own bubble in Town Center has no `animation:say` wrapper
     // at all, unlike every other NPC (including, since #91, every The Melt
@@ -366,7 +497,7 @@ describe('NPCS', () => {
   });
 
   it('every other NPC has a plain line dialog', () => {
-    const talkers: NpcId[] = ['ian', 'chelsea', 'casey', 'josh', 'tom'];
+    const talkers: NpcId[] = ['ian', 'ian-team-room-2', 'chelsea', 'casey', 'josh', 'tom'];
     for (const npc of Object.values(NPCS)) {
       if (talkers.includes(npc.id)) continue;
       expect(npc.dialog).toMatchObject({ kind: 'line' });
