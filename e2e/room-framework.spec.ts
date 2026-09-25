@@ -25,6 +25,11 @@ interface LocalPenguinDebugInfo {
   playerId: string;
 }
 
+interface RoomDebugEventLogEntry {
+  type: 'room:leave' | 'room:enter';
+  roomId: RoomId;
+}
+
 interface RoomDebugInfo {
   roomId: RoomId;
   scrollX: number;
@@ -40,6 +45,9 @@ interface RoomDebugInfo {
   remotePenguinCount?: number;
   setRegisteredPlayer?: (player: RegisteredPlayer) => void;
   spawnDebugPenguin?: (tile: Tile, look: PenguinLook) => void;
+  comingSoonHint?: string | null;
+  changeRoom?: (roomId: RoomId) => void;
+  roomEventLog?: RoomDebugEventLogEntry[];
 }
 
 declare global {
