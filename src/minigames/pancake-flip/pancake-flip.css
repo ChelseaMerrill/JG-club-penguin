@@ -1,0 +1,217 @@
+/* Pancake Flip (#39): the griddle, pans, cook bars, and legend ported from
+   `design/Minigame Pancake Flip.dc.html` into the shell's generic play area
+   (`.minigame__play-area`, `minigame-shell.ts`). Uses the JG design tokens
+   (`--jg-*`, `--font-*`) from `src/style.css`; the pancake browning shades
+   below have no equivalent named token (same exception `.stub-minigame`'s
+   own colors take), taken verbatim from the design file. All sizes are
+   Stage pixels: the `#ui` layer is a fixed 1600x900 canvas, already scaled
+   to fit the viewport. */
+
+.pancake-flip {
+  display: flex;
+  gap: 24px;
+  width: 100%;
+  height: 100%;
+  align-items: stretch;
+}
+
+.pancake-flip__board {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.pancake-flip__griddle {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-evenly;
+  gap: 12px;
+  padding: 0 24px;
+  background: #2f3338;
+  border: 3px solid var(--jg-secondary);
+  border-radius: 12px;
+}
+
+.pancake-flip__pan {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+
+.pancake-flip__cook-bar {
+  width: 140px;
+  height: 6px;
+  background: var(--stage-bg);
+}
+
+.pancake-flip__cook-bar-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--jg-secondary);
+  transition: width 100ms linear;
+}
+
+.pancake-flip__pan[data-stage='golden'] .pancake-flip__cook-bar-fill {
+  background: var(--jg-primary);
+}
+
+.pancake-flip__pan[data-stage='burnt'] .pancake-flip__cook-bar-fill {
+  background: var(--jg-light);
+}
+
+.pancake-flip__pan-surface {
+  width: 140px;
+  height: 140px;
+  border-radius: 50%;
+  background: #161719;
+  border: 5px solid var(--jg-secondary);
+  cursor: pointer;
+  padding: 0;
+  /* The pancake itself, drawn as a radial layer inside the pan surface so
+     one element carries both the click target and the cook color. */
+  background-image: radial-gradient(
+    circle at center,
+    var(--pancake-color, transparent) 0 44%,
+    transparent 45%
+  );
+}
+
+.pancake-flip__pan--selected .pancake-flip__pan-surface {
+  border-color: var(--jg-primary);
+}
+
+.pancake-flip__pan--filled[data-stage='raw'] .pancake-flip__pan-surface {
+  --pancake-color: #e8d3a8;
+}
+
+.pancake-flip__pan--filled[data-stage='flip-now'] .pancake-flip__pan-surface {
+  --pancake-color: #d9b47a;
+}
+
+.pancake-flip__pan--filled[data-stage='golden'] .pancake-flip__pan-surface {
+  --pancake-color: #c9a266;
+}
+
+.pancake-flip__pan--filled[data-stage='burnt'] .pancake-flip__pan-surface {
+  --pancake-color: #4a3220;
+}
+
+.pancake-flip__pan-label {
+  font: 400 12px var(--font-display);
+  letter-spacing: 0.14em;
+  color: var(--fg-muted);
+}
+
+.pancake-flip__pan--selected .pancake-flip__pan-label {
+  color: var(--jg-primary);
+}
+
+.pancake-flip__toast {
+  position: absolute;
+  left: 50%;
+  top: -6px;
+  transform: translateX(-50%);
+  padding: 8px 20px;
+  background: var(--jg-primary);
+  font-family: var(--font-game-display);
+  font-size: 20px;
+  letter-spacing: 0.06em;
+  color: var(--jg-dark);
+  z-index: 1;
+}
+
+.pancake-flip__toast[hidden] {
+  display: none;
+}
+
+.pancake-flip__toast[data-tone='bad'] {
+  background: var(--jg-light);
+  color: var(--jg-dark);
+}
+
+.pancake-flip__controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.pancake-flip__hint {
+  display: grid;
+  place-items: center;
+  height: 34px;
+  padding: 0 12px;
+  background: var(--jg-dark);
+  border: 2px solid var(--jg-secondary);
+  font: 400 12px var(--font-display);
+  letter-spacing: 0.08em;
+  color: var(--fg-primary);
+}
+
+.pancake-flip__flip-button {
+  display: grid;
+  place-items: center;
+  height: 34px;
+  padding: 0 22px;
+  background: var(--jg-primary);
+  border: 2px solid var(--jg-secondary);
+  font: 400 12px var(--font-display);
+  letter-spacing: 0.1em;
+  color: var(--jg-dark);
+  cursor: pointer;
+}
+
+.pancake-flip__side {
+  width: 220px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 18px;
+  background: var(--stage-bg);
+  border: 2px solid var(--jg-secondary);
+}
+
+.pancake-flip__side-label {
+  font: 400 11px var(--font-display);
+  letter-spacing: 0.2em;
+  color: var(--jg-primary);
+}
+
+.pancake-flip__streak-value {
+  font-family: var(--font-game-display);
+  font-size: 36px;
+  line-height: 1;
+  color: var(--fg-primary);
+  margin-bottom: 8px;
+}
+
+.pancake-flip__legend {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.pancake-flip__legend-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 10px;
+  background: var(--bg-panel);
+  border: 1px solid var(--jg-secondary);
+  font: 700 12px var(--font-body);
+  color: var(--fg-primary);
+}
+
+.pancake-flip__legend-row[data-tone='golden'] span:last-child,
+.pancake-flip__legend-row[data-tone='flip-now'] span:last-child {
+  color: var(--jg-primary);
+}

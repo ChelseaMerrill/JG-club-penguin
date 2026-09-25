@@ -1,14 +1,5 @@
 import type { TypedEmitter } from '../contracts/emitter';
-import {
-  DEFAULT_LOOK,
-  EYES,
-  HATS,
-  IDLE_EMOTES,
-  PATTERNS,
-  PENGUIN_NAME_MAX,
-  isHexColor,
-  type PenguinLook,
-} from '../contracts/penguin';
+import { DEFAULT_LOOK, type PenguinLook } from '../contracts/penguin';
 import type { BadgeId, GameEventMap, MinigameId, MinigameStatsMap } from '../contracts/game-events';
 import {
   BADGE_BONUS,
@@ -28,6 +19,7 @@ import {
   ProgressStoreError,
   emptySlots,
   isIglooSlot,
+  validateLook,
   type IglooSlot,
   type ProgressSnapshot,
   type ProgressStore,
@@ -44,32 +36,6 @@ function sortedByTimeThenId<T extends string>(entries: ReadonlyMap<T, number>): 
   return Array.from(entries.entries())
     .sort(([aId, aAt], [bId, bAt]) => aAt - bAt || aId.localeCompare(bId))
     .map(([id]) => id);
-}
-
-/**
- * `penguin_name`'s check constraints (#27's migration): trimmed and
- * 1-16 characters (counted in code points, not UTF-16 units) once the
- * Creator is complete, plus every color/enum field must be a value the
- * contract (#26) allows.
- */
-function validateLook(look: PenguinLook): void {
-  const nameLength = [...look.name].length;
-  const nameOk =
-    nameLength >= 1 && nameLength <= PENGUIN_NAME_MAX && look.name === look.name.trim();
-  if (
-    !nameOk ||
-    !isHexColor(look.body) ||
-    !isHexColor(look.cap) ||
-    !isHexColor(look.beak) ||
-    !isHexColor(look.feet) ||
-    !isHexColor(look.belly) ||
-    !(HATS as readonly string[]).includes(look.hat) ||
-    !(PATTERNS as readonly string[]).includes(look.pattern) ||
-    !(EYES as readonly string[]).includes(look.eyes) ||
-    !(IDLE_EMOTES as readonly string[]).includes(look.emote)
-  ) {
-    throw new ProgressStoreError('invalid_look');
-  }
 }
 
 interface PlayerState {
