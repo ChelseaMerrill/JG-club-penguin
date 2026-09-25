@@ -98,6 +98,7 @@ function createFakeStore(overrides: Partial<ProgressStore> = {}): ProgressStore 
     })),
     purchase: vi.fn(async () => ({ balance: 100 })),
     setSlot: vi.fn(async () => {}),
+    leaderboard: vi.fn(async () => []),
     ...overrides,
   } as ProgressStore;
 }

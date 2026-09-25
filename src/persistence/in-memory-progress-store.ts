@@ -1,6 +1,7 @@
 import type { TypedEmitter } from '../contracts/emitter';
 import { DEFAULT_LOOK, type PenguinLook } from '../contracts/penguin';
 import type { BadgeId, GameEventMap, MinigameId, MinigameStatsMap } from '../contracts/game-events';
+import { isBlankLeaderboardName, isUnderLeaderboardCeiling } from './leaderboard-rules';
 import {
   BADGE_BONUS,
   IGLOO_GEAR_CATALOG,
@@ -15,12 +16,14 @@ import {
   STATS_MAX_KEYS,
 } from './minigame-rules';
 import {
+  clampLeaderboardRows,
   IGLOO_SLOTS,
   ProgressStoreError,
   emptySlots,
   isIglooSlot,
   validateLook,
   type IglooSlot,
+  type LeaderboardEntry,
   type ProgressSnapshot,
   type ProgressStore,
   type PurchaseResult,
@@ -45,10 +48,23 @@ interface PlayerState {
   /** Badge id to the time (ms) it was earned, for `loadAll`'s ordering. */
   badges: Map<BadgeId, number>;
   bests: Partial<Record<MinigameId, number>>;
+  /** When each entry in `bests` was reached (`now()` at the round that set
+   *  it), for `leaderboard()`'s tie-break -- the fake's mirror of #27's
+   *  `minigame_bests.updated_at`. */
+  bestReachedAtMs: Partial<Record<MinigameId, number>>;
   lastRoundFinishedAtMs: Partial<Record<MinigameId, number>>;
   /** Item id to the time (ms) it was acquired, for `loadAll`'s ordering. */
   ownedItems: Map<string, number>;
   slots: Record<IglooSlot, string | null>;
+}
+
+/** One rival's Minigame best, for `InMemoryProgressStoreOptions.leaderboardRivals`. Test-only. */
+export interface LeaderboardRival {
+  penguinName: string;
+  minigameId: MinigameId;
+  bestScore: number;
+  /** Mirrors #27's `minigame_bests.updated_at`: when this best was reached, for the tie-break. */
+  reachedAtMs: number;
 }
 
 export interface InMemoryProgressStoreOptions {
@@ -56,6 +72,16 @@ export interface InMemoryProgressStoreOptions {
   now?: () => number;
   /** Omit to build a store that emits nothing (most contract tests). */
   emitter?: TypedEmitter<GameEventMap>;
+  /** Pre-seeds the fake's own Player as though the Penguin Creator were
+   *  already completed (sets `look` and `profileCreatedAt`), so a
+   *  `leaderboard()` test doesn't need a `saveLook` round-trip first to give
+   *  the caller a name. */
+  completedLook?: PenguinLook;
+  /** Other Players' Minigame bests, for `leaderboard()`. Test-only: the real
+   *  store reads these from every other signed-in Player via
+   *  `public.leaderboard`; the fake has no other Players, so this stands in
+   *  for them. */
+  leaderboardRivals?: readonly LeaderboardRival[];
 }
 
 /**
@@ -70,11 +96,12 @@ export function createInMemoryProgressStore(
   const emitter = options.emitter;
 
   const state: PlayerState = {
-    look: defaultLook(),
-    profileCreatedAt: null,
+    look: options.completedLook ? { ...options.completedLook } : defaultLook(),
+    profileCreatedAt: options.completedLook ? new Date(now()).toISOString() : null,
     tokens: STARTING_TOKENS,
     badges: new Map(),
     bests: {},
+    bestReachedAtMs: {},
     lastRoundFinishedAtMs: {},
     ownedItems: new Map(),
     slots: emptySlots(),
@@ -163,6 +190,7 @@ export function createInMemoryProgressStore(
     const newBest = rawBest > (previousBest ?? 0);
     if (newBest) {
       state.bests[minigameId] = rawBest;
+      state.bestReachedAtMs[minigameId] = nowMs;
     }
 
     let badgeEarned = false;
@@ -203,6 +231,73 @@ export function createInMemoryProgressStore(
     return { balance: state.tokens };
   }
 
+  async function leaderboard(minigameId: MinigameId, maxRows?: number): Promise<LeaderboardEntry[]> {
+    if (!MINIGAME_RULES[minigameId]) {
+      throw new ProgressStoreError('unknown_minigame');
+    }
+    const rows = clampLeaderboardRows(maxRows);
+
+    interface Candidate {
+      penguinName: string;
+      bestScore: number;
+      reachedAtMs: number;
+      isSelf: boolean;
+    }
+
+    function eligible(penguinName: string, bestScore: number): boolean {
+      return !isBlankLeaderboardName(penguinName) && isUnderLeaderboardCeiling(minigameId, bestScore);
+    }
+
+    const candidates: Candidate[] = [];
+    for (const rival of options.leaderboardRivals ?? []) {
+      if (rival.minigameId !== minigameId) continue;
+      if (!eligible(rival.penguinName, rival.bestScore)) continue;
+      candidates.push({
+        penguinName: rival.penguinName,
+        bestScore: rival.bestScore,
+        reachedAtMs: rival.reachedAtMs,
+        isSelf: false,
+      });
+    }
+
+    const ownBest = state.bests[minigameId];
+    const ownReachedAtMs = state.bestReachedAtMs[minigameId];
+    if (
+      ownBest !== undefined &&
+      ownReachedAtMs !== undefined &&
+      eligible(state.look.name, ownBest)
+    ) {
+      candidates.push({
+        penguinName: state.look.name,
+        bestScore: ownBest,
+        reachedAtMs: ownReachedAtMs,
+        isSelf: true,
+      });
+    }
+
+    // Mirrors `public.leaderboard`'s `order by best_score desc, updated_at
+    // asc, player_id asc`. The fake has no real per-Player id to break a
+    // full tie with, so it falls back to the name -- deterministic, but not
+    // meant to bit-match the SQL store's own (untestable-here) UUID order.
+    candidates.sort(
+      (a, b) =>
+        b.bestScore - a.bestScore ||
+        a.reachedAtMs - b.reachedAtMs ||
+        a.penguinName.localeCompare(b.penguinName),
+    );
+
+    const ranked: LeaderboardEntry[] = candidates.map((candidate, index) => ({
+      rank: index + 1,
+      penguinName: candidate.penguinName,
+      bestScore: candidate.bestScore,
+      isMe: candidate.isSelf,
+    }));
+
+    const top = ranked.filter((entry) => entry.rank <= rows);
+    const own = ranked.find((entry) => entry.isMe && entry.rank > rows);
+    return own ? [...top, own] : top;
+  }
+
   async function setSlot(slot: IglooSlot, itemId: string | null): Promise<void> {
     if (!isIglooSlot(slot)) {
       throw new ProgressStoreError('invalid_slot');
@@ -222,5 +317,5 @@ export function createInMemoryProgressStore(
     state.slots[slot] = itemId;
   }
 
-  return { loadAll, saveLook, recordRound, purchase, setSlot };
+  return { loadAll, saveLook, recordRound, purchase, setSlot, leaderboard };
 }

@@ -10,12 +10,14 @@ import type { BadgeId, GameEventMap, MinigameId, MinigameStatsMap } from '../con
 import type { Eyes, Hat, IdleEmote, Pattern, PenguinLook } from '../contracts/penguin';
 import { MINIGAME_RULES } from './minigame-rules';
 import {
+  LEADERBOARD_DEFAULT_ROWS,
   ProgressStoreError,
   emptySlots,
   isIglooSlot,
   isProgressErrorCode,
   validateLook,
   type IglooSlot,
+  type LeaderboardEntry,
   type ProgressErrorCode,
   type ProgressSnapshot,
   type ProgressStore,
@@ -174,7 +176,18 @@ export type ProgressTableName =
  */
 export interface ProgressClient {
   from(table: ProgressTableName): ProgressTable;
-  rpc(fn: 'record_round' | 'purchase_item', args: Record<string, unknown>): PromiseLike<RpcResult>;
+  rpc(
+    fn: 'record_round' | 'purchase_item' | 'leaderboard',
+    args: Record<string, unknown>,
+  ): PromiseLike<RpcResult>;
+}
+
+/** `public.leaderboard`'s row shape, straight off PostgREST. */
+export interface LeaderboardRpcRow {
+  rank: number;
+  penguin_name: string;
+  best_score: number;
+  is_me: boolean;
 }
 
 /**
@@ -473,7 +486,31 @@ export function createSupabaseProgressStore(
     });
   }
 
-  return { loadAll, saveLook, recordRound, purchase, setSlot };
+  // Deliberately not wrapped in `guarded()`: a failed *read* never emits
+  // `ui:toast` ("your progress wasn't saved" is the wrong message for this),
+  // so this rejects with the same error `guarded()` would have, just
+  // without the toast side effect. `async` still means a throw here becomes
+  // a rejected promise, never a synchronous throw.
+  async function leaderboard(minigameId: MinigameId, maxRows?: number): Promise<LeaderboardEntry[]> {
+    const { data, error } = await client.rpc('leaderboard', {
+      minigame_id: minigameId,
+      max_rows: maxRows ?? LEADERBOARD_DEFAULT_ROWS,
+    });
+    if (error) {
+      throw toProgressError(error);
+    }
+    const rows = (data ?? []) as LeaderboardRpcRow[];
+    // Maps exactly these four fields, even if the RPC ever returns more
+    // (#70 A2): nothing else is trusted to reach a rendered leaderboard row.
+    return rows.map((row) => ({
+      rank: row.rank,
+      penguinName: row.penguin_name,
+      bestScore: row.best_score,
+      isMe: row.is_me,
+    }));
+  }
+
+  return { loadAll, saveLook, recordRound, purchase, setSlot, leaderboard };
 }
 
 /**

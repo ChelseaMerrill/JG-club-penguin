@@ -11,6 +11,7 @@ import {
   IGLOO_SLOTS,
   ProgressStoreError,
   type IglooSlot,
+  type LeaderboardEntry,
   type ProgressSnapshot,
   type ProgressStore,
   type PurchaseResult,
@@ -193,8 +194,17 @@ function wrapStore(
     }
   }
 
+  // Read-only and pass-through: `leaderboard()` never changes the
+  // registry's snapshot, so it's forwarded straight to `store` (D6/D9).
+  function leaderboard(
+    minigameId: Parameters<ProgressStore['leaderboard']>[0],
+    maxRows?: number,
+  ): Promise<LeaderboardEntry[]> {
+    return store.leaderboard(minigameId, maxRows);
+  }
+
   return {
-    wrapper: { loadAll, saveLook, recordRound, purchase, setSlot },
+    wrapper: { loadAll, saveLook, recordRound, purchase, setSlot, leaderboard },
     loadInitial: loadAll,
   };
 }
@@ -264,5 +274,6 @@ export function createActiveProgressStore(
       current().recordRound(minigameId, score, stats),
     purchase: async (itemId) => current().purchase(itemId),
     setSlot: async (slot, itemId) => current().setSlot(slot, itemId),
+    leaderboard: async (minigameId, maxRows) => current().leaderboard(minigameId, maxRows),
   };
 }
