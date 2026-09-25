@@ -231,7 +231,10 @@ export function createInMemoryProgressStore(
     return { balance: state.tokens };
   }
 
-  async function leaderboard(minigameId: MinigameId, maxRows?: number): Promise<LeaderboardEntry[]> {
+  async function leaderboard(
+    minigameId: MinigameId,
+    maxRows?: number,
+  ): Promise<LeaderboardEntry[]> {
     if (!MINIGAME_RULES[minigameId]) {
       throw new ProgressStoreError('unknown_minigame');
     }
@@ -245,7 +248,9 @@ export function createInMemoryProgressStore(
     }
 
     function eligible(penguinName: string, bestScore: number): boolean {
-      return !isBlankLeaderboardName(penguinName) && isUnderLeaderboardCeiling(minigameId, bestScore);
+      return (
+        !isBlankLeaderboardName(penguinName) && isUnderLeaderboardCeiling(minigameId, bestScore)
+      );
     }
 
     const candidates: Candidate[] = [];

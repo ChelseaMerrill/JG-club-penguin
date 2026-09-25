@@ -39,3 +39,28 @@ not committed.
 
 Do not name real emails or Player ids anywhere the output gets saved or
 pasted; `27_rls_proof.sql` never selects or prints them itself.
+
+## #70 leaderboard (gate H2)
+
+`70_leaderboard_proof.sql` proves `public.leaderboard()` against the same #9
+H1 fixture Player, in `27_rls_proof.sql`'s style: rank order, the tie-break
+(whoever reached a tied score first), the caller's own row appended exactly
+once outside the requested row count, a blank-named Player's absence even
+when ranked highest, `security definer`/`search_path = ''`/a single
+overload, and the `authenticated`-only grant. It is live-data-tolerant: every
+throwaway best is set relative to whatever `max(best_score)` already exists
+for `bug-squash`, so it passes whether the project has zero real bests or
+thousands.
+
+1. Local (Docker): covered automatically by `sql-leaderboard.test.ts`'s
+   PGlite run (A1f) in `npm test`, not by `run-local.sh` (which only knows
+   about #27's proofs).
+2. Real Supabase (gate H2): open the Supabase SQL editor, signed in as the
+   project owner. Open `70_leaderboard_proof.sql`, replace every occurrence
+   of `00000000-0000-0000-0000-00000000f1f0` with the real #9 H1 fixture
+   Player's id, and run it. Expect every row's `pass` column to read `true`,
+   including the final `ALL` row. It changes nothing: the proof rolls back
+   everything it wrote before returning, and prints only counts and ranks --
+   no real Player's name, id or email.
+3. Save the result table to `test-results/70-leaderboard-proof-supabase/output.txt`,
+   and paste the same table on #70.

@@ -1,5 +1,10 @@
 import type { MinigameId } from '../contracts/game-events';
-import { FLAKY_POINTS, MAX_COMBO_MULTIPLIER, ROUND_SECONDS } from '../minigames/bug-squash/bug-squash-engine';
+import { UNSAFE_NAME_CHARS_RE } from '../contracts/penguin';
+import {
+  FLAKY_POINTS,
+  MAX_COMBO_MULTIPLIER,
+  ROUND_SECONDS,
+} from '../minigames/bug-squash/bug-squash-engine';
 import { PAN_COUNT, STAGE_FLIP_NOW_AT_SEC } from '../minigames/pancake-flip/pancake-flip-engine';
 import { MINIGAME_RULES } from './minigame-rules';
 
@@ -42,7 +47,8 @@ export const LEADERBOARD_SCORE_CEILINGS: Readonly<Record<MinigameId, number | nu
   // assuming the top cadence cap for the entire round, not just its last
   // third) bounds the total. Ceiling =
   // floor(90 / 2.4) * 4 = 37 * 4 = 148.
-  'pancake-flip': Math.floor(MINIGAME_RULES['pancake-flip'].durationSeconds / STAGE_FLIP_NOW_AT_SEC) * PAN_COUNT,
+  'pancake-flip':
+    Math.floor(MINIGAME_RULES['pancake-flip'].durationSeconds / STAGE_FLIP_NOW_AT_SEC) * PAN_COUNT,
   // No engine ships yet for these two (#38/#39 built Bug Squash/Pancake
   // Flip only), so there are no constants to derive a ceiling from.
   // Excluding nothing here is the conservative choice: a wrong guessed
@@ -53,20 +59,19 @@ export const LEADERBOARD_SCORE_CEILINGS: Readonly<Record<MinigameId, number | nu
 };
 
 /**
- * R1: the same invisible/control/bidi character set the migration strips
- * before checking a Penguin name is blank, plus ordinary whitespace
- * (`\s`). Kept here, not imported from `realtime/room-channel.ts`'s
- * (narrower) `UNSAFE_NAME_CHARS_RE`, because the SQL ranges this file must
- * agree with are broader (#70's red-team R1 lists the exact ranges; see the
- * migration's header comment).
+ * R1: a Penguin name is blank for leaderboard purposes once every
+ * invisible/control/bidi/format character (#75's `UNSAFE_NAME_CHARS_RE`,
+ * `src/contracts/penguin.ts` -- the same set the name-gate strips) and
+ * every ordinary whitespace character (JS `\s`, which already covers
+ * NBSP) is stripped from it. `UNSAFE_NAME_CHARS_RE` is
+ * Unicode-property-based (`\p{Default_Ignorable_Code_Point}`, `\p{Cf}`)
+ * and has no Postgres equivalent (no `\p{}` support there), so the
+ * migration's own char class spells out an aligned, explicit range list
+ * instead (see its header comment) rather than importing this. The two
+ * are reviewed together, not mechanically generated from one another.
  */
-export const LEADERBOARD_INVISIBLE_NAME_RE =
-  // eslint-disable-next-line no-control-regex
-  /[\u0000-\u001F\u007F-\u009F ­͏؜ᅟ-ᅠ឴-឵᠋-᠏​-‏‪-‮⁠-⁯⠀ㅤ︀-️﻿ﾠ\s]/g;
-
-/** True when `name` has nothing left after stripping `LEADERBOARD_INVISIBLE_NAME_RE`: the fake's mirror of the migration's blank-name exclusion (R1). */
 export function isBlankLeaderboardName(name: string): boolean {
-  return name.replace(LEADERBOARD_INVISIBLE_NAME_RE, '').length === 0;
+  return name.replace(UNSAFE_NAME_CHARS_RE, '').replace(/\s/gu, '').length === 0;
 }
 
 /** True when `score` is at or under `minigameId`'s `LEADERBOARD_SCORE_CEILINGS` entry (always true when that entry is `null`, meaning no ceiling). */

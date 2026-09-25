@@ -20,17 +20,19 @@
 -- only forbids *leading/trailing* ASCII whitespace, so a name made only of
 -- zero-width or bidi-control characters (invisible, but not blank by that
 -- constraint) must be excluded here explicitly. Postgres has no `\p{}`
--- Unicode property classes, so the ranges are spelled out: C0 controls
--- (\u0000-\u001F), DEL and C1 controls (\u007F-\u009F), NBSP ( ), soft
--- hyphen (­), combining grapheme joiner (͏), Arabic letter mark
--- (؜), Hangul fillers (ᅟ-ᅠ), Khmer inherent vowels
--- (឴-឵), Mongolian free variation selectors/vowel separator
--- (᠋-᠏), zero-width space through right-to-left mark
--- (​-‏), bidi embedding/override controls (‪-‮), word
--- joiner and friends (⁠-⁯), the Braille blank pattern (⠀),
--- the Hangul filler (ㅤ), variation selectors (︀-️), the
--- zero-width no-break space/BOM (﻿) and the halfwidth Hangul filler
--- (ﾠ).
+-- Unicode property classes, so the ranges below are spelled out in hex code
+-- points instead (kept aligned with, but not generated from, #75's broader
+-- Unicode-property-based `UNSAFE_NAME_CHARS_RE` in
+-- `src/contracts/penguin.ts`, which Postgres has no equivalent for): C0
+-- controls U+0000-U+001F, DEL and C1 controls U+007F-U+009F, NBSP U+00A0,
+-- soft hyphen U+00AD, combining grapheme joiner U+034F, Arabic letter mark
+-- U+061C, Hangul fillers U+115F-U+1160, Khmer inherent vowels
+-- U+17B4-U+17B5, Mongolian free variation selectors/vowel separator
+-- U+180B-U+180F, zero-width space through right-to-left mark
+-- U+200B-U+200F, bidi embedding/override controls U+202A-U+202E, word
+-- joiner and friends U+2060-U+206F, the Braille blank pattern U+2800, the
+-- Hangul filler U+3164, variation selectors U+FE00-U+FE0F, the zero-width
+-- no-break space/BOM U+FEFF, and the halfwidth Hangul filler U+FFA0.
 -- D4: the caller's own row is appended (with `is_me = true`) when it falls
 -- outside the requested `max_rows`; a caller with no best, or whose name is
 -- blank, gets no such row (R5). A caller already inside the top `max_rows`
@@ -93,7 +95,7 @@ begin
         -- list and rationale).
         and length(regexp_replace(
               pl.penguin_name,
-              '[\u0000-\u001F\u007F-\u009F ­͏؜ᅟ-ᅠ឴-឵᠋-᠏​-‏‪-‮⁠-⁯⠀ㅤ︀-️﻿ﾠ[:space:]]',
+              '[\u0000-\u001F\u007F-\u009F\u00A0\u00AD\u034F\u061C\u115F-\u1160\u17B4-\u17B5\u180B-\u180F\u200B-\u200F\u202A-\u202E\u2060-\u206F\u2800\u3164\uFE00-\uFE0F\uFEFF\uFFA0[:space:]]',
               '',
               'g'
             )) > 0

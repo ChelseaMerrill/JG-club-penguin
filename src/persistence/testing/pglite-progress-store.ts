@@ -21,6 +21,7 @@ import {
   emptySlots,
   isProgressErrorCode,
   type IglooSlot,
+  type LeaderboardEntry,
   type ProgressSnapshot,
   type ProgressStore,
   type PurchaseResult,
@@ -280,7 +281,36 @@ function createSqlProgressStore(db: PGliteInterface, playerId: string): Progress
     });
   }
 
-  return { loadAll, saveLook, recordRound, purchase, setSlot };
+  async function leaderboard(
+    minigameId: MinigameId,
+    maxRows?: number,
+  ): Promise<LeaderboardEntry[]> {
+    return runAsPlayer(async (tx) => {
+      const res =
+        maxRows === undefined
+          ? await tx.query<LeaderboardSqlRow>('select * from public.leaderboard($1)', [minigameId])
+          : await tx.query<LeaderboardSqlRow>('select * from public.leaderboard($1, $2)', [
+              minigameId,
+              maxRows,
+            ]);
+      return res.rows.map((row) => ({
+        rank: row.rank,
+        penguinName: row.penguin_name,
+        bestScore: row.best_score,
+        isMe: row.is_me,
+      }));
+    });
+  }
+
+  return { loadAll, saveLook, recordRound, purchase, setSlot, leaderboard };
+}
+
+/** `public.leaderboard`'s row shape, as PGlite returns it. */
+interface LeaderboardSqlRow {
+  rank: number;
+  penguin_name: string;
+  best_score: number;
+  is_me: boolean;
 }
 
 /** Builds a fresh Player (a new `auth.users` row) against the shared PGlite database. */
@@ -354,11 +384,36 @@ export interface PgliteLeaderboardFixture {
   leaderboardAs(
     playerId: string,
     minigameId: MinigameId,
-    maxRows?: number,
+    maxRows?: number | null,
   ): Promise<LeaderboardRow[]>;
   /** Runs `sql` as `anon` (no `sub` claim at all), for A1b: `public.leaderboard`
    *  is revoked from `anon`, so this is expected to reject with `42501`. */
   asAnon<T>(sql: string, params?: unknown[]): Promise<{ rows: T[] }>;
+  /** The current highest `best_score` under `minigameId` (0 if none), so a
+   *  test can seed scores relative to it (`max + N`) and stay above whatever
+   *  earlier tests in this shared database already wrote for that id --
+   *  the same "live-data-tolerant" technique R3's hosted proof uses. */
+  maxBestScore(minigameId: MinigameId): Promise<number>;
+  /** Calls `public.record_round` as `playerId`, for A1: seeding a
+   *  leaderboard test's bests through the real payout/best-tracking
+   *  function, not by writing `minigame_bests` directly. */
+  recordRoundAs(
+    playerId: string,
+    minigameId: MinigameId,
+    score: number,
+    stats: Record<string, number>,
+  ): Promise<void>;
+  /** Re-applies the leaderboard migration file, for A1e (must rerun cleanly). */
+  rerunMigration(): Promise<void>;
+  /** Runs a single parameterized `sql` statement as the unrestricted
+   *  (postgres) role -- for A2's `pg_proc`/`has_function_privilege`
+   *  introspection, which isn't a signed-in Player's own query. */
+  runSql<T>(sql: string, params?: unknown[]): Promise<{ rows: T[] }>;
+  /** Runs `sql` (one or more `;`-separated statements, e.g. a whole proof
+   *  file: a function definition followed by a `select` from it) as the
+   *  unrestricted (postgres) role, returning one `Results` per statement --
+   *  for A1f, whose interesting rows are the final `select`'s. */
+  execSql<T>(sql: string): Promise<Array<{ rows: T[] }>>;
 }
 
 export async function createPgliteLeaderboardFixture(): Promise<PgliteLeaderboardFixture> {
@@ -370,10 +425,9 @@ export async function createPgliteLeaderboardFixture(): Promise<PgliteLeaderboar
     await db.transaction(async (tx) => {
       await tx.query("select set_config('request.jwt.claim.sub', $1, true)", [playerId]);
       await tx.query('set local role authenticated');
-      await tx.query(
-        'insert into public.players (id) values ($1) on conflict (id) do nothing',
-        [playerId],
-      );
+      await tx.query('insert into public.players (id) values ($1) on conflict (id) do nothing', [
+        playerId,
+      ]);
     });
     // Written directly as the unrestricted (postgres) role: some fixture
     // names (invisible-only) would themselves be rejected by
@@ -406,7 +460,7 @@ export async function createPgliteLeaderboardFixture(): Promise<PgliteLeaderboar
   async function leaderboardAs(
     playerId: string,
     minigameId: MinigameId,
-    maxRows?: number,
+    maxRows?: number | null,
   ): Promise<LeaderboardRow[]> {
     return db.transaction(async (tx) => {
       await tx.query("select set_config('request.jwt.claim.sub', $1, true)", [playerId]);
@@ -430,5 +484,53 @@ export async function createPgliteLeaderboardFixture(): Promise<PgliteLeaderboar
     });
   }
 
-  return { addPlayer, setBestReachedAt, leaderboardAs, asAnon };
+  async function maxBestScore(minigameId: MinigameId): Promise<number> {
+    const res = await db.query<{ max: number | null }>(
+      'select max(best_score) as max from public.minigame_bests where minigame_id = $1',
+      [minigameId],
+    );
+    return res.rows[0]?.max ?? 0;
+  }
+
+  async function recordRoundAs(
+    playerId: string,
+    minigameId: MinigameId,
+    score: number,
+    stats: Record<string, number>,
+  ): Promise<void> {
+    await db.transaction(async (tx) => {
+      await tx.query("select set_config('request.jwt.claim.sub', $1, true)", [playerId]);
+      await tx.query('set local role authenticated');
+      await tx.query('select public.record_round($1, $2, $3::jsonb)', [
+        minigameId,
+        score,
+        JSON.stringify(stats),
+      ]);
+    });
+  }
+
+  async function rerunMigration(): Promise<void> {
+    await db.exec(readSqlFile('supabase', 'migrations', '20260924020000_leaderboard.sql'));
+  }
+
+  async function runSql<T>(sql: string, params: unknown[] = []): Promise<{ rows: T[] }> {
+    return db.query<T>(sql, params);
+  }
+
+  async function execSql<T>(sql: string): Promise<Array<{ rows: T[] }>> {
+    const results = await db.exec(sql);
+    return results as unknown as Array<{ rows: T[] }>;
+  }
+
+  return {
+    addPlayer,
+    setBestReachedAt,
+    leaderboardAs,
+    asAnon,
+    maxBestScore,
+    recordRoundAs,
+    rerunMigration,
+    runSql,
+    execSql,
+  };
 }

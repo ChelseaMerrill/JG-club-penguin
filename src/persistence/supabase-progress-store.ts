@@ -491,7 +491,10 @@ export function createSupabaseProgressStore(
   // so this rejects with the same error `guarded()` would have, just
   // without the toast side effect. `async` still means a throw here becomes
   // a rejected promise, never a synchronous throw.
-  async function leaderboard(minigameId: MinigameId, maxRows?: number): Promise<LeaderboardEntry[]> {
+  async function leaderboard(
+    minigameId: MinigameId,
+    maxRows?: number,
+  ): Promise<LeaderboardEntry[]> {
     const { data, error } = await client.rpc('leaderboard', {
       minigame_id: minigameId,
       max_rows: maxRows ?? LEADERBOARD_DEFAULT_ROWS,
