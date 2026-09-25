@@ -187,6 +187,13 @@ function isValidSentAt(v: unknown): v is number {
   return typeof v === 'number' && Number.isFinite(v) && v > 0;
 }
 
+/** `throwId` (#53): sender-unique, `[A-Za-z0-9]{1,16}`. */
+const THROW_ID_RE = /^[A-Za-z0-9]{1,16}$/;
+
+function isValidThrowId(v: unknown): v is string {
+  return typeof v === 'string' && THROW_ID_RE.test(v);
+}
+
 /**
  * Strips control/bidi/zero-width characters and trims. An empty name is
  * valid on the wire (the Creator has not been completed yet); a non-string
@@ -285,6 +292,28 @@ const BROADCAST_PARSERS: {
     const p = u as Record<string, unknown>;
     if (!isValidPlayerId(p.playerId)) return null;
     return { playerId: p.playerId };
+  },
+  'snowball:throw'(u) {
+    if (typeof u !== 'object' || u === null) return null;
+    const p = u as Record<string, unknown>;
+    if (!isValidPlayerId(p.playerId)) return null;
+    if (!isValidThrowId(p.throwId)) return null;
+    if (!isTile(p.target)) return null;
+    return {
+      playerId: p.playerId,
+      throwId: p.throwId,
+      target: { col: p.target.col, row: p.target.row },
+    };
+  },
+  'snowball:hit'(u) {
+    if (typeof u !== 'object' || u === null) return null;
+    const p = u as Record<string, unknown>;
+    if (!isValidPlayerId(p.playerId)) return null;
+    if (!isValidThrowId(p.throwId)) return null;
+    if (!isValidPlayerId(p.targetId)) return null;
+    // A thrower can never report a hit on themselves (D1).
+    if (p.targetId === p.playerId) return null;
+    return { playerId: p.playerId, throwId: p.throwId, targetId: p.targetId };
   },
 };
 

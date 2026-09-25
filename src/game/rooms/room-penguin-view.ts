@@ -26,6 +26,12 @@ export interface PlacedPenguin {
   step(point: ScreenPoint, durationMs: number, depthAt: (t: number) => number): Promise<void>;
   /** Shows a chat speech bubble above the Penguin, or clears it (`null`) (#44). */
   say(text: string | null): void;
+  /** Draws or removes the transient #53 snow hat (never part of the Penguin look). */
+  setSnowHat(on: boolean): void;
+  /** Whether the snow hat is actually drawn right now (#53 debug hook's `rendered`). */
+  hasSnowHat(): boolean;
+  /** The Penguin's current feet point, mid-tween included (#53 D3 hit detection), not its whole-tile position. */
+  point(): ScreenPoint;
   destroy(): void;
 }
 
@@ -496,6 +502,49 @@ export class RoomPenguinView implements RemotePenguinView {
     if (!placed) return false;
     placed.say(text);
     return true;
+  }
+
+  /**
+   * The playerIds of every remote Penguin currently placed (#53
+   * `SnowballView.shownRemoteIds`): never the local Penguin, and empty while
+   * detached. NPCs are `RoomScene` circles and never live in this view.
+   */
+  shownRemoteIds(): string[] {
+    return [...this.placed.keys()].filter(isPlayerKey);
+  }
+
+  /**
+   * A placed remote Penguin's current feet point, read from the Penguin
+   * itself so a walker mid-step reports where it is drawn, not the tile it
+   * is heading to (#53 D3). `null` for the local Penguin or anyone not placed.
+   */
+  pointOf(playerId: string): ScreenPoint | null {
+    return this.placed.get(playerId)?.point() ?? null;
+  }
+
+  /**
+   * Draws or removes a placed remote Penguin's snow hat (#53 D4). Returns
+   * whether a placed Penguin received the call. The hat lives on the placed
+   * Penguin only, so `remove`/`clear`/`detach` drop it with the Penguin and
+   * a later re-placement never carries it over.
+   */
+  setSnowHat(playerId: string, on: boolean): boolean {
+    const placed = this.placed.get(playerId);
+    if (!placed) return false;
+    placed.setSnowHat(on);
+    return true;
+  }
+
+  /** Whether a placed remote Penguin is actually drawing its snow hat right now (#53). */
+  hasSnowHat(playerId: string): boolean {
+    return this.placed.get(playerId)?.hasSnowHat() ?? false;
+  }
+
+  /** Takes the snow hat off every placed remote Penguin (#53: a Room change or session end). */
+  clearSnowHats(): void {
+    for (const key of this.placed.keys()) {
+      if (isPlayerKey(key)) this.placed.get(key)?.setSnowHat(false);
+    }
   }
 
   /** The raw, unmasked name decides whether to draw at all (#75); masking only affects the tag text. */

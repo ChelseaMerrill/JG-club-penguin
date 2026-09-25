@@ -173,12 +173,94 @@ describe('createHud', () => {
     expect((root.querySelector('.hud__menu-panel') as HTMLElement).hidden).toBe(true);
   });
 
-  it('EMOTE, SNOWBALL and QUESTS render hidden', () => {
+  it('EMOTE and QUESTS render hidden; the SNOWBALL button is shown (#53)', () => {
     const { root } = setup();
 
     expect((root.querySelector('.hud__button--emote') as HTMLElement).hidden).toBe(true);
-    expect((root.querySelector('.hud__button--snowball') as HTMLElement).hidden).toBe(true);
+    expect((root.querySelector('.hud__button--snowball') as HTMLElement).hidden).toBe(false);
     expect((root.querySelector('.hud__button--quests') as HTMLElement).hidden).toBe(true);
+  });
+
+  describe('Snowball mode (#53)', () => {
+    function snowballButton(root: HTMLElement): HTMLButtonElement {
+      return root.querySelector('.hud__button--snowball') as HTMLButtonElement;
+    }
+    function panel(root: HTMLElement): HTMLElement {
+      return root.querySelector('.hud__snowball-panel') as HTMLElement;
+    }
+
+    it('SNOWBALL asks to enter the mode; the panel stays hidden until the mode is set on', () => {
+      const onSnowballToggle = vi.fn();
+      const { root } = setup({ onSnowballToggle });
+
+      expect(panel(root).hidden).toBe(true);
+      snowballButton(root).click();
+
+      expect(onSnowballToggle).toHaveBeenCalledWith(true);
+      expect(panel(root).hidden).toBe(true);
+    });
+
+    it('setSnowballMode(true) shows the mode panel and the active button; SNOWBALL then asks to leave', () => {
+      const onSnowballToggle = vi.fn();
+      const { root, hud } = setup({ onSnowballToggle });
+
+      hud.setSnowballMode(true);
+
+      expect(panel(root).hidden).toBe(false);
+      expect(panel(root).textContent).toContain('SNOWBALL MODE');
+      expect(panel(root).textContent).toContain('Hit a penguin: they get a snow hat for 10s.');
+      expect(panel(root).textContent).not.toContain('Snowmageddon');
+      expect(snowballButton(root).classList.contains('hud__button--active')).toBe(true);
+
+      snowballButton(root).click();
+      expect(onSnowballToggle).toHaveBeenLastCalledWith(false);
+
+      hud.setSnowballMode(false);
+      expect(panel(root).hidden).toBe(true);
+      expect(snowballButton(root).classList.contains('hud__button--active')).toBe(false);
+    });
+
+    it('renders one pip per snowball of capacity and "N LEFT · REFILLS 1 / 4S"', () => {
+      const { root, hud } = setup();
+      hud.setSnowballMode(true);
+
+      hud.setSnowballAmmo(2, 3);
+      expect(root.querySelectorAll('.hud__snowball-pip')).toHaveLength(3);
+      expect(root.querySelectorAll('.hud__snowball-pip--full')).toHaveLength(2);
+      expect(root.querySelector('.hud__snowball-ammo-text')?.textContent).toBe(
+        '2 LEFT · REFILLS 1 / 4S',
+      );
+
+      hud.setSnowballAmmo(0, 3);
+      expect(root.querySelectorAll('.hud__snowball-pip--full')).toHaveLength(0);
+      expect(root.querySelector('.hud__snowball-ammo-text')?.textContent).toBe(
+        '0 LEFT · REFILLS 1 / 4S',
+      );
+    });
+
+    it('entering the mode closes MENU first, then enters', () => {
+      const onSnowballToggle = vi.fn();
+      const { root, hud } = setup({ onSnowballToggle });
+      (root.querySelector('.hud__button--menu') as HTMLButtonElement).click();
+      expect(hud.overlays.current()).toBe('menu');
+
+      snowballButton(root).click();
+
+      expect(hud.overlays.current()).toBeNull();
+      expect((root.querySelector('.hud__menu-panel') as HTMLElement).hidden).toBe(true);
+      expect(onSnowballToggle).toHaveBeenCalledWith(true);
+    });
+
+    it('refuses to enter the mode while another HUD overlay is open', () => {
+      const onSnowballToggle = vi.fn();
+      const { root, hud } = setup({ onSnowballToggle });
+      hud.overlays.open('penguin-creator', () => {});
+
+      snowballButton(root).click();
+
+      expect(onSnowballToggle).not.toHaveBeenCalled();
+      expect(hud.overlays.current()).toBe('penguin-creator');
+    });
   });
 
   it('renders the chat field with the shared 120 maxlength and its placeholder', () => {

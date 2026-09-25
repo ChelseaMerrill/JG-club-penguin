@@ -75,6 +75,9 @@ A one-off expression a Penguin shows to everyone in its Room, picked from the ei
 **Snowball mode**
 A HUD mode where Penguins throw snowballs at each other within a Room. Stretch for the prototype.
 
+**Snow hat**
+The 10 second effect on a Penguin hit by a snowball in Snowball mode, seen by everyone in the Room. Not a hat in the Penguin look, never part of Presence, and not shown to Players who join later.
+
 ### NPCs and Minigames
 
 **NPC**

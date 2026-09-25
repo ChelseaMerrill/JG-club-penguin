@@ -8,6 +8,7 @@ const SHARED_TEST_USER_SPECS = [
   '**/presence-two-browsers.spec.ts',
   '**/chat-two-browsers.spec.ts',
   '**/movement-sync.spec.ts',
+  '**/snowball-hit.spec.ts',
 ];
 
 export default defineConfig({

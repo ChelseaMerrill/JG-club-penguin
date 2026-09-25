@@ -50,16 +50,30 @@ export interface RoomBroadcastMap {
    * disappears before Presence propagates the leave.
    */
   'presence:bye': { playerId: string };
+  /**
+   * Producer/consumer: #53. Sent by the thrower's client when a snowball is
+   * thrown. `throwId` is sender-unique, `[A-Za-z0-9]{1,16}`. `target` is the
+   * aimed Tile (never pixels), snapped from the reticle.
+   */
+  'snowball:throw': { playerId: string; throwId: string; target: Tile };
+  /**
+   * Producer/consumer: #53. Sent only by the thrower's client, once hit
+   * detection on its own client picks a hit for `throwId`. `targetId` is the
+   * playerId of the Penguin hit, in the same Room; never the thrower's own
+   * `playerId` (the parser rejects `targetId === playerId`).
+   */
+  'snowball:hit': { playerId: string; throwId: string; targetId: string };
 }
 
 /**
- * Producer/consumer: #28 bus; #43, #44.
+ * Producer/consumer: #28 bus; #43, #44, #53.
  */
 export type RoomBroadcastEvent = keyof RoomBroadcastMap;
 
 /**
- * Reserved for #47 (emote) and #53 (snowball); not implemented. Because
- * these names are not keys of `RoomBroadcastMap`, sending one today is a
- * compile-time type error until those tickets add them.
+ * Reserved for #47 (emote); not implemented. Because this name is not a key
+ * of `RoomBroadcastMap`, sending it today is a compile-time type error until
+ * #47 adds it. `snowball:throw`/`snowball:hit` (#53) have moved into
+ * `RoomBroadcastMap` above and are no longer reserved.
  */
-export type ReservedBroadcastEvent = 'emote' | 'snowball:throw' | 'snowball:hit';
+export type ReservedBroadcastEvent = 'emote';

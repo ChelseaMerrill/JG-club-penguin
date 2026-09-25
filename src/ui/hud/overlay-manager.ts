@@ -14,12 +14,19 @@ export interface OverlayManager {
   close(id: string): void;
   /** The id of the currently open overlay, or `null` when none is open. */
   current(): string | null;
+  /**
+   * Fires after `open()` actually opens a *new* id (i.e. not a no-op
+   * re-open of the id already current). Used by #53 to exit Snowball mode
+   * whenever any HUD overlay opens. Returns an unsubscribe function.
+   */
+  onOpen(listener: (id: string) => void): () => void;
   /** Removes the `window` `keydown` listener this manager installed. */
   destroy(): void;
 }
 
 export function createOverlayManager(): OverlayManager {
   let openOverlay: { id: string; onClose: () => void } | null = null;
+  const openListeners = new Set<(id: string) => void>();
 
   function closeCurrent(): void {
     if (!openOverlay) return;
@@ -39,12 +46,19 @@ export function createOverlayManager(): OverlayManager {
       if (openOverlay?.id === id) return;
       closeCurrent();
       openOverlay = { id, onClose };
+      for (const listener of Array.from(openListeners)) listener(id);
     },
     close(id) {
       if (openOverlay?.id === id) closeCurrent();
     },
     current() {
       return openOverlay?.id ?? null;
+    },
+    onOpen(listener) {
+      openListeners.add(listener);
+      return () => {
+        openListeners.delete(listener);
+      };
     },
     destroy() {
       window.removeEventListener('keydown', handleKeydown);
