@@ -103,6 +103,13 @@ export interface RoomDebugInfo {
   /** Count of remote Penguin `Container`s (#28's `RoomPenguinView`) in the Scene's display list. */
   remotePenguinCount?: number;
   /**
+   * One entry per remote Penguin `RoomPenguinView` currently shows (#43 D6):
+   * its shown tile, whether it's mid-walk, and `placedTile` (the tile it
+   * was first placed at since the last Room `attach()`, e.g. from Presence
+   * on a late join), distinct from `tile` so a test can tell them apart.
+   */
+  remotePenguins?: Array<{ playerId: string; tile: Tile; moving: boolean; placedTile: Tile }>;
+  /**
    * Test-only: sets `registry.player`, exercising the real sign-in
    * look/id-update path end to end (review fixes 1 and 4) rather than
    * reaching into `RoomScene` internals.

@@ -1,9 +1,14 @@
 /**
- * STUB for #15 (Room navigation). Stands in for real World/Room navigation:
- * each Player always enters a Room at the same tile, spread per `playerId`
- * so two Penguins do not overlap. Replace wholesale when #15 lands.
+ * STUB for #15 (Room navigation). Stands in for real World/Room navigation.
+ * The entry tile it emits on `room:enter` is the entered Room's own
+ * `RoomDefinition.spawnTile` (#43 D2) when one is registered — the same
+ * tile `RoomScene` actually spawns the local Penguin on, so the tracked
+ * Presence tile matches what's drawn — falling back to a Player-hashed tile
+ * spread across cols/rows 3..8 (so two Penguins do not overlap) for a Room
+ * with no `RoomDefinition` yet. Replace wholesale when #15 lands.
  */
 import type { RoomEventMap, RoomId, Tile, TypedEmitter } from '../contracts';
+import { getRoomDefinition, hasRoomDefinition } from './rooms/registry';
 
 const ENTRY_MIN = 3;
 const ENTRY_SPAN = 6;
@@ -27,6 +32,17 @@ export function entryTileFor(playerId: string): Tile {
   };
 }
 
+/**
+ * The entry tile `enter()` emits for `roomId` (#43 D2): the Room's own
+ * `spawnTile` when it has a registered `RoomDefinition`, else the hashed
+ * fallback above. All five prototype Rooms are registered today (#16), so
+ * the fallback is currently unreachable in this build; it's kept for a
+ * `RoomId` added ahead of its `RoomDefinition`.
+ */
+function entryTileForRoom(roomId: RoomId, playerId: string): Tile {
+  return hasRoomDefinition(roomId) ? getRoomDefinition(roomId).spawnTile : entryTileFor(playerId);
+}
+
 export interface StubRoomDriver {
   /** Emits `room:leave` for the current Room (if any) before `room:enter` for `roomId`. A no-op when `roomId` is already the current Room. */
   enter(roomId: RoomId, playerId: string): void;
@@ -45,7 +61,7 @@ export function createStubRoomDriver(events: TypedEmitter<RoomEventMap>): StubRo
         events.emit('room:leave', { roomId: current });
       }
       current = roomId;
-      events.emit('room:enter', { roomId, entryTile: entryTileFor(playerId) });
+      events.emit('room:enter', { roomId, entryTile: entryTileForRoom(roomId, playerId) });
     },
     currentRoom(): RoomId | null {
       return current;

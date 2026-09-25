@@ -45,6 +45,7 @@ interface RoomDebugInfo {
   restartCount?: number;
   penguinCount?: number;
   remotePenguinCount?: number;
+  remotePenguins?: Array<{ playerId: string; tile: Tile; moving: boolean; placedTile: Tile }>;
   setRegisteredPlayer?: (player: RegisteredPlayer) => void;
   spawnDebugPenguin?: (tile: Tile, look: PenguinLook) => void;
 }

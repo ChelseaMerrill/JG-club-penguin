@@ -2,6 +2,7 @@ import { Data, GameObjects, Scene, Scenes, type Input, type Tweens } from 'phase
 import {
   gameEvents,
   SPAWN_ROOM_ID,
+  type Facing,
   type PenguinLook,
   type RoomId,
   type Tile,
@@ -12,6 +13,7 @@ import {
   type LocalPenguinController,
 } from '../movement/controller';
 import { nearestReachable, nearestWalkable, tilesEqual } from '../movement/pathfinding';
+import { TILE_STEP_MS } from '../movement/speed';
 import {
   resolveRegisteredLook,
   resolveRegisteredPlayerId,
@@ -47,6 +49,14 @@ export const ROOM_SCENE_KEY = 'RoomScene';
  */
 export const LOCAL_PENGUIN_MOVE_EVENT = 'local-penguin:move';
 /**
+ * Scene-local event (not a contract event): fired only when a walk's path
+ * is exhausted in `advanceStep` — never on a queued re-route (which keeps
+ * walking instead), and never on the own-tile `stopCleanly` no-op path.
+ * `main.ts` (#43) answers it with `roomChannel.setTile(tile, facing)`: one
+ * Presence track per arrival, never per step or frame.
+ */
+export const LOCAL_PENGUIN_ARRIVED_EVENT = 'local-penguin:arrived';
+/**
  * Scene-local event (#14 D5, not a contract event): fired on arrival at a
  * door's approach tile. #15 calls `changeRoom(door.targetRoomId)` from it.
  * A disabled door (`targetRoomId: null`) still fires this; #15 owns the
@@ -56,6 +66,11 @@ export const DOOR_REACHED_EVENT = 'door:reached';
 
 export interface LocalPenguinMoveEvent {
   target: Tile;
+}
+
+export interface LocalPenguinArrivedEvent {
+  tile: Tile;
+  facing: Facing;
 }
 
 export interface DoorReachedEvent {
@@ -100,10 +115,6 @@ const FURNITURE_COLOR = 0x0c4b5f;
 const PROP_WIDTH = 32;
 const PROP_HEIGHT = 32;
 const PROP_COLOR = 0x3a3d42;
-
-/** Tiles per second the local Penguin walks at (#14 D3). */
-const TILE_SPEED = 4;
-const TILE_STEP_MS = 1000 / TILE_SPEED;
 
 /** The registry key #14/`src/auth/player.ts`'s `bindPlayer` sets/removes. */
 const PLAYER_REGISTRY_KEY = 'player';
@@ -156,7 +167,8 @@ export interface RoomSceneData {
  * `scene.restart(data)` (#15) should treat Phaser's `Scenes.Events.CREATE`
  * (fired once `create()` finishes) as the "Room is ready" signal, not the
  * synchronous return of `start`/`restart` itself. Listeners for
- * `LOCAL_PENGUIN_MOVE_EVENT`/`DOOR_REACHED_EVENT` should be attached to
+ * `LOCAL_PENGUIN_MOVE_EVENT`/`LOCAL_PENGUIN_ARRIVED_EVENT`/`DOOR_REACHED_EVENT`
+ * should be attached to
  * `scene.events` exactly once, right after the Scene is first created: the
  * same `RoomScene` instance (and its `events` emitter) is reused across a
  * `scene.restart()`, so a listener attached once keeps receiving events
@@ -324,7 +336,7 @@ export class RoomScene extends Scene {
 
     // The remote Penguins (#28). Phaser destroys them with its display list
     // on shutdown; `detach()` only forgets them, so nothing is destroyed twice.
-    this.penguins.attach(placePenguinsIn(this), room.grid.origin);
+    this.penguins.attach(placePenguinsIn(this), room.grid.origin, room.walkable);
     this.events.once(Scenes.Events.SHUTDOWN, () => this.penguins.detach());
 
     if (HOOKS_ENABLED) this.publishRoomDebug();
@@ -362,6 +374,7 @@ export class RoomScene extends Scene {
       restartCount: this.restartCount,
       penguinCount: this.countPenguinContainers((name) => name !== REMOTE_PENGUIN_NAME),
       remotePenguinCount: this.countPenguinContainers((name) => name === REMOTE_PENGUIN_NAME),
+      remotePenguins: this.penguins.debugRemotePenguins(),
       setRegisteredPlayer: (player) => this.registry.set(PLAYER_REGISTRY_KEY, player),
       spawnDebugPenguin: (tile, look) => this.spawnDebugPenguin(tile, look),
     });
@@ -546,6 +559,11 @@ export class RoomScene extends Scene {
     if (!next) {
       penguin.idle();
       this.currentAnim = this.currentLook.emote;
+      const arrivedEvent: LocalPenguinArrivedEvent = {
+        tile: controller.state.tile,
+        facing: controller.state.facing,
+      };
+      this.events.emit(LOCAL_PENGUIN_ARRIVED_EVENT, arrivedEvent);
       const arrive = this.pendingArrival;
       this.pendingArrival = null;
       arrive?.();
@@ -739,20 +757,67 @@ export class RoomScene extends Scene {
  * Places #31 Penguins (figure, name tag, idle animation) in `scene`, for
  * `RoomPenguinView`'s remote Penguins. Each is named `REMOTE_PENGUIN_NAME`
  * so the debug hook can count remote and local Penguins apart.
+ *
+ * `step` (#43) tweens one tile step at `TILE_STEP_MS`, the same pace and
+ * `onUpdate` depth-sorting technique the local walk's own tween uses;
+ * `moveTo`/`step`/`destroy` all stop any tween already in flight, so a
+ * re-route, a Presence snap, or a Room teardown never leaves a stray tween
+ * driving a Penguin nobody is walking.
  */
 function placePenguinsIn(scene: Scene): PlacePenguin {
   return (look, point, depth, facing) => {
     const penguin = createPenguin(scene, point.x, point.y, look, { facing });
     penguin.container.setName(REMOTE_PENGUIN_NAME);
     penguin.container.setDepth(depth);
+
+    let activeTween: Tweens.Tween | null = null;
+    let pendingResolve: (() => void) | null = null;
+
+    function stopActiveStep(): void {
+      if (activeTween) {
+        activeTween.stop();
+        activeTween = null;
+      }
+      const resolve = pendingResolve;
+      pendingResolve = null;
+      resolve?.();
+    }
+
     return {
       setLook: (next) => penguin.setLook(next),
       setFacing: (next) => penguin.setFacing(next),
       moveTo: (next, nextDepth) => {
+        stopActiveStep();
         penguin.container.setPosition(next.x, next.y);
         penguin.container.setDepth(nextDepth);
       },
-      destroy: () => penguin.destroy(),
+      walk: () => penguin.walk(),
+      idle: () => penguin.idle(),
+      step: (next, durationMs, depthAt) => {
+        stopActiveStep();
+        return new Promise<void>((resolve) => {
+          pendingResolve = resolve;
+          activeTween = scene.tweens.add({
+            targets: penguin.container,
+            x: next.x,
+            y: next.y,
+            duration: durationMs,
+            onUpdate: (tween: Tweens.Tween) => {
+              penguin.container.setDepth(depthAt(tween.progress));
+            },
+            onComplete: () => {
+              activeTween = null;
+              const resolveFn = pendingResolve;
+              pendingResolve = null;
+              resolveFn?.();
+            },
+          });
+        });
+      },
+      destroy: () => {
+        stopActiveStep();
+        penguin.destroy();
+      },
     };
   };
 }
