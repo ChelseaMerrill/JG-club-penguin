@@ -1,57 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
-import type { Facing, HexColor, PenguinLook, RoomId, Tile } from '../src/contracts';
-import type { RegisteredPlayer } from '../src/game/movement/registered-player';
-import type { PenguinAnim } from '../src/game/penguin/poses';
-
-// Mirrors `src/game/rooms/dev-room-hook.ts`'s `RoomDebugInfo`. Redeclared
-// rather than imported for the same reason `e2e/click-to-move.spec.ts` and
-// `e2e/room-framework.spec.ts` do: `dev-room-hook.ts` reads
-// `import.meta.env`, which the `e2e` tsconfig doesn't type-check. Kept
-// identical, field for field, to those specs' own copies: TypeScript's
-// global `Window` augmentation requires every redeclaration of
-// `__roomDebug` to resolve to the same type.
-interface LocalPenguinDebugInfo {
-  tile: Tile;
-  target?: Tile;
-  anim: PenguinAnim;
-  facing: Facing;
-  moving: boolean;
-  flipX: boolean;
-  lookName: string;
-  lookBody: HexColor;
-  playerId: string;
-}
-
-interface RoomDebugInfo {
-  roomId: RoomId;
-  scrollX: number;
-  scrollY: number;
-  localPenguin?: LocalPenguinDebugInfo;
-  textureListenerCount?: number;
-  npcArrivedLog?: string[];
-  doorReachedLog?: string[];
-  localPenguinMoveLog?: Tile[];
-  localPenguinArrivedLog?: Tile[];
-  restartRoom?: () => void;
-  restartCount?: number;
-  penguinCount?: number;
-  remotePenguinCount?: number;
-  remotePenguins?: Array<{
-    playerId: string;
-    tile: Tile;
-    moving: boolean;
-    placedTile: Tile;
-    walkStartedAt?: number;
-  }>;
-  setRegisteredPlayer?: (player: RegisteredPlayer) => void;
-  spawnDebugPenguin?: (tile: Tile, look: PenguinLook) => void;
-}
-
-declare global {
-  interface Window {
-    __roomDebug?: RoomDebugInfo;
-  }
-}
+import './support/room-debug-types';
 
 /** Fails the test on any uncaught page error or console error. */
 function collectErrors(page: Page): string[] {
