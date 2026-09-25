@@ -57,6 +57,18 @@ test('deployed-leaderboard', async ({ page }) => {
     playerId,
   });
 
+  // A2, on the raw wire response (not the store-mapped one below): proves
+  // PostgREST itself returns exactly these 4 columns, so a passing
+  // store-side "maps exactly 4 keys" unit test can't be hiding a
+  // `select *`-style leak that the store's own mapping happens to mask.
+  const raw = await authedClient.rpc('leaderboard', { minigame_id: 'bug-squash' });
+  expect(raw.error).toBeNull();
+  const rawRows = (raw.data ?? []) as Array<Record<string, unknown>>;
+  expect(rawRows.length).toBeLessThanOrEqual(11);
+  for (const row of rawRows) {
+    expect(Object.keys(row).sort()).toEqual(['rank', 'penguin_name', 'best_score', 'is_me'].sort());
+  }
+
   const rows = await store.leaderboard('bug-squash');
 
   // At most the top 10 plus the caller's own appended row.

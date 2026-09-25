@@ -1,23 +1,23 @@
 // #70: `public.leaderboard` against a real Postgres database (PGlite).
 // Test isolation note: `createPgliteLeaderboardFixture`'s database is shared
 // across every test in this file (one PGlite instance per file, migrated
-// once -- see `pglite-progress-store.ts`). Three tests below need a
-// Minigame id all to themselves for clean rank assertions ('bug-squash' for
-// the real-`record_round` case, 'pancake-flip' for the ceiling-boundary
-// case); everything else uses 'coffee-rush'/'snow-cone-stand' (no ceiling)
-// with scores built relative to `maxBestScore(...)` first, so a test never
-// depends on running before or after any other -- the same
-// live-data-tolerant technique R3's hosted proof uses.
+// once -- see `pglite-progress-store.ts`). 'bug-squash' and 'pancake-flip'
+// are reserved for the small handful of tests below that need a Minigame id
+// all to themselves for exact, unbounded rank assertions (the real-
+// `record_round` case and each Minigame's own ceiling-boundary case);
+// everything else uses 'coffee-rush'/'snow-cone-stand' (no ceiling) with
+// scores built relative to `maxBestScore(...)` first (or bounds `max_rows`
+// to exactly the rows it created), so a test never depends on running
+// before or after any other -- the same live-data-tolerant technique R3's
+// hosted proof uses.
 
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { LEADERBOARD_SCORE_CEILINGS } from './leaderboard-rules';
-import {
-  createPgliteLeaderboardFixture,
-  createPgliteProgressStoreHarness,
-} from './testing/pglite-progress-store';
+import { isBlankLeaderboardName, LEADERBOARD_SCORE_CEILINGS } from './leaderboard-rules';
+import { createPgliteLeaderboardFixture } from './testing/pglite-progress-store';
+import { BLANK_NAME_CASES } from './testing/invisible-name-cases';
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(currentDir, '../..');
@@ -156,19 +156,26 @@ describe('public.leaderboard (PGlite)', () => {
 
     await expect(fixture.rerunMigration()).resolves.toBeUndefined();
 
-    const harnessA = await createPgliteProgressStoreHarness();
-    const harnessB = await createPgliteProgressStoreHarness();
-    await harnessA.store.recordRound('pancake-flip', 5, {
-      golden: 1,
-      flipNow: 0,
-      raw: 0,
-      burnt: 0,
-      stacked: 1,
-      bestStreak: 1,
-    });
+    // Not `ProgressStore.loadAll()`: every one of its queries already
+    // filters by `where player_id = $1` client-side, so it would read only
+    // B's own rows even with RLS completely disabled -- proving nothing
+    // about RLS itself (red-team round 2, 2026-09-25). This runs a bare
+    // `count(*)` with no such filter, as B, so RLS is the only thing that
+    // can narrow it.
+    const playerA = await fixture.addPlayer('RLS CHECK A');
+    const playerB = await fixture.addPlayer('RLS CHECK B');
+    // 'coffee-rush' (not 'pancake-flip'/'bug-squash', each reserved above
+    // for their own exact-row-count assertions): a plain, uncapped
+    // minigame_bests row is all this check needs.
+    await fixture.setBestReachedAt(playerA, 'coffee-rush', 1, 1);
 
-    const snapshotB = await harnessB.store.loadAll();
-    expect(snapshotB.bests['pancake-flip']).toBeUndefined();
+    const otherRows = await fixture.runSqlAs<{ count: number }>(
+      playerB,
+      'select count(*)::int from public.minigame_bests where player_id <> $1',
+      [playerB],
+    );
+
+    expect(otherRows.rows[0].count).toBe(0);
   });
 
   it('A1f: 70_leaderboard_proof.sql passes, including the ALL row', async () => {
@@ -210,6 +217,32 @@ describe('public.leaderboard (PGlite)', () => {
         { rank: 1, penguin_name: 'VISIBLE ONE', best_score: base + 5, is_me: true },
       ]);
     });
+
+    // Red-team round 2 (2026-09-25): the SQL char class and the fake's
+    // isBlankLeaderboardName must agree, character by character, on every
+    // name in this shared list -- including the two round-2 call-outs,
+    // three narrow no-break spaces (U+202F) and a supplementary-plane tag
+    // space (U+E0020).
+    it.each(BLANK_NAME_CASES)(
+      'the SQL function and isBlankLeaderboardName agree that $label is blank',
+      async ({ name }) => {
+        expect(isBlankLeaderboardName(name)).toBe(true);
+
+        const fixture = await createPgliteLeaderboardFixture();
+        const base = await fixture.maxBestScore('snow-cone-stand');
+        const visible = await fixture.addPlayer('VISIBLE CONTROL');
+        const invisible = await fixture.addPlayer(name);
+        await fixture.setBestReachedAt(visible, 'snow-cone-stand', base + 5, 5);
+        // Would rank #1 if the SQL function didn't also exclude it.
+        await fixture.setBestReachedAt(invisible, 'snow-cone-stand', base + 999, 1);
+
+        const rows = await fixture.leaderboardAs(visible, 'snow-cone-stand', 1);
+
+        expect(rows).toEqual([
+          { rank: 1, penguin_name: 'VISIBLE CONTROL', best_score: base + 5, is_me: true },
+        ]);
+      },
+    );
   });
 
   describe('R2: the per-Minigame plausibility ceiling', () => {
@@ -226,6 +259,26 @@ describe('public.leaderboard (PGlite)', () => {
 
       expect(rows).toEqual([
         { rank: 1, penguin_name: 'AT CEILING', best_score: ceiling, is_me: true },
+      ]);
+    });
+
+    it('excludes a Bug Squash best one point above the ceiling, includes one at it', async () => {
+      const fixture = await createPgliteLeaderboardFixture();
+      const ceiling = LEADERBOARD_SCORE_CEILINGS['bug-squash'];
+      expect(ceiling).not.toBeNull();
+      const atCeiling = await fixture.addPlayer('AT CEILING BS');
+      const overCeiling = await fixture.addPlayer('OVER CEILING BS');
+      await fixture.setBestReachedAt(atCeiling, 'bug-squash', ceiling as number, 5);
+      await fixture.setBestReachedAt(overCeiling, 'bug-squash', (ceiling as number) + 1, 1);
+
+      // max_rows: 1 -- 'bug-squash' also carries A1's own small (100-300)
+      // scores in this shared database; the ceiling values here (60000/1)
+      // always outrank those regardless, but bounding to 1 row keeps this
+      // assertion exact without depending on that.
+      const rows = await fixture.leaderboardAs(atCeiling, 'bug-squash', 1);
+
+      expect(rows).toEqual([
+        { rank: 1, penguin_name: 'AT CEILING BS', best_score: ceiling, is_me: true },
       ]);
     });
 

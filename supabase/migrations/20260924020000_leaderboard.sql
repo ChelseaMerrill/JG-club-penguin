@@ -33,6 +33,19 @@
 -- joiner and friends U+2060-U+206F, the Braille blank pattern U+2800, the
 -- Hangul filler U+3164, variation selectors U+FE00-U+FE0F, the zero-width
 -- no-break space/BOM U+FEFF, and the halfwidth Hangul filler U+FFA0.
+--
+-- Red-team round 2 (2026-09-25) widened the set further, each spelled out
+-- explicitly rather than trusted to a POSIX `[:space:]`/`\s` fallback
+-- (which, under the "C" locale PGlite and a hosted Postgres both normally
+-- run in, only ever matches ASCII whitespace): Ogham space mark U+1680,
+-- every other Unicode space separator U+2000-U+200A, line/paragraph
+-- separators U+2028-U+2029, narrow no-break space U+202F, medium
+-- mathematical space U+205F, ideographic space U+3000, the unassigned
+-- "specials" range U+FFF0-U+FFF8, and four supplementary-plane format-
+-- control ranges (`\U` with 8 hex digits, not `\u`'s 4): Egyptian
+-- hieroglyph format controls U+13430-U+1343F, Shorthand format controls
+-- U+1BCA0-U+1BCA3, musical symbol format controls U+1D173-U+1D17A, and the
+-- Tags block U+E0000-U+E0FFF.
 -- D4: the caller's own row is appended (with `is_me = true`) when it falls
 -- outside the requested `max_rows`; a caller with no best, or whose name is
 -- blank, gets no such row (R5). A caller already inside the top `max_rows`
@@ -95,7 +108,7 @@ begin
         -- list and rationale).
         and length(regexp_replace(
               pl.penguin_name,
-              '[\u0000-\u001F\u007F-\u009F\u00A0\u00AD\u034F\u061C\u115F-\u1160\u17B4-\u17B5\u180B-\u180F\u200B-\u200F\u202A-\u202E\u2060-\u206F\u2800\u3164\uFE00-\uFE0F\uFEFF\uFFA0[:space:]]',
+              '[\u0000-\u001F\u007F-\u009F\u00A0\u00AD\u034F\u061C\u115F-\u1160\u1680\u17B4-\u17B5\u180B-\u180F\u2000-\u200A\u200B-\u200F\u2028\u2029\u202A-\u202E\u202F\u205F\u2060-\u206F\u2800\u3000\u3164\uFE00-\uFE0F\uFEFF\uFFA0\uFFF0-\uFFF8\U00013430-\U0001343F\U0001BCA0-\U0001BCA3\U0001D173-\U0001D17A\U000E0000-\U000E0FFF[:space:]]',
               '',
               'g'
             )) > 0

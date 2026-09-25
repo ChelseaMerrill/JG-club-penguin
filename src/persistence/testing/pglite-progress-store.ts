@@ -288,8 +288,8 @@ function createSqlProgressStore(db: PGliteInterface, playerId: string): Progress
     return runAsPlayer(async (tx) => {
       const res =
         maxRows === undefined
-          ? await tx.query<LeaderboardSqlRow>('select * from public.leaderboard($1)', [minigameId])
-          : await tx.query<LeaderboardSqlRow>('select * from public.leaderboard($1, $2)', [
+          ? await tx.query<LeaderboardRow>('select * from public.leaderboard($1)', [minigameId])
+          : await tx.query<LeaderboardRow>('select * from public.leaderboard($1, $2)', [
               minigameId,
               maxRows,
             ]);
@@ -303,14 +303,6 @@ function createSqlProgressStore(db: PGliteInterface, playerId: string): Progress
   }
 
   return { loadAll, saveLook, recordRound, purchase, setSlot, leaderboard };
-}
-
-/** `public.leaderboard`'s row shape, as PGlite returns it. */
-interface LeaderboardSqlRow {
-  rank: number;
-  penguin_name: string;
-  best_score: number;
-  is_me: boolean;
 }
 
 /** Builds a fresh Player (a new `auth.users` row) against the shared PGlite database. */
@@ -414,6 +406,15 @@ export interface PgliteLeaderboardFixture {
    *  unrestricted (postgres) role, returning one `Results` per statement --
    *  for A1f, whose interesting rows are the final `select`'s. */
   execSql<T>(sql: string): Promise<Array<{ rows: T[] }>>;
+  /** Runs a single parameterized `sql` statement as `playerId` (signed in,
+   *  `role = authenticated`), with no client-side `where player_id = ...`
+   *  of its own -- unlike every `ProgressStore` query, which always filters
+   *  by the caller's own id regardless of RLS and so can never actually
+   *  prove RLS is doing anything. For A1e: a bare `select count(*) from
+   *  public.minigame_bests where player_id <> $1` run this way only reads 0
+   *  rows because RLS itself narrows the table, not because the query asked
+   *  it to. */
+  runSqlAs<T>(playerId: string, sql: string, params?: unknown[]): Promise<{ rows: T[] }>;
 }
 
 export async function createPgliteLeaderboardFixture(): Promise<PgliteLeaderboardFixture> {
@@ -522,6 +523,18 @@ export async function createPgliteLeaderboardFixture(): Promise<PgliteLeaderboar
     return results as unknown as Array<{ rows: T[] }>;
   }
 
+  async function runSqlAs<T>(
+    playerId: string,
+    sql: string,
+    params: unknown[] = [],
+  ): Promise<{ rows: T[] }> {
+    return db.transaction(async (tx) => {
+      await tx.query("select set_config('request.jwt.claim.sub', $1, true)", [playerId]);
+      await tx.query('set local role authenticated');
+      return tx.query<T>(sql, params);
+    });
+  }
+
   return {
     addPlayer,
     setBestReachedAt,
@@ -532,5 +545,6 @@ export async function createPgliteLeaderboardFixture(): Promise<PgliteLeaderboar
     rerunMigration,
     runSql,
     execSql,
+    runSqlAs,
   };
 }

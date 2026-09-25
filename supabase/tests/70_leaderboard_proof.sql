@@ -7,8 +7,8 @@
 -- outside the requested row count; excludes a Player whose name is blank
 -- (including one made only of invisible characters) even when their score
 -- would otherwise rank #1; is `security definer` with `search_path = ''`
--- locked down, has exactly one overload, and is revoked from anon/granted
--- to authenticated only.
+-- locked down, has exactly one overload, its exact result shape, and is
+-- revoked from anon/granted to authenticated only.
 --
 -- One replacement before pasting into the Supabase SQL editor: replace every
 -- occurrence of 00000000-0000-0000-0000-00000000f1f0 below with the real
@@ -16,13 +16,18 @@
 -- instructs.
 --
 -- Live-data-tolerant (R3): every throwaway best is set relative to
--- whatever `max(best_score)` already exists for 'bug-squash'
--- (`v_max + 3`, `v_max + 2`, `v_max + 2` again for the tie, `v_max + 10` for
--- the excluded unnamed Player), so this passes whether the project has zero
--- real bests or thousands, and never depends on running before or after any
--- other proof. Each throwaway Player is created through #27's own
--- precondition-handled `auth.users` insert (as `27_rls_proof.sql` does for
--- its Player B), with `players ... on conflict do nothing`.
+-- whatever `max(best_score)` already exists for 'coffee-rush' (`v_max + 3`,
+-- `v_max + 2`, `v_max + 2` again for the tie, `v_max + 10` for the excluded
+-- unnamed Player, `v_max + 11` for the excluded invisible-only-named
+-- Player), so this passes whether the project has zero real bests or
+-- thousands, and never depends on running before or after any other proof.
+-- Coffee Rush is used deliberately (red-team round 2, 2026-09-25): it has
+-- no `LEADERBOARD_SCORE_CEILINGS` entry, so an inflated `v_max + N` throwaway
+-- best is never itself at risk of being hidden by R2's ceiling filter the
+-- way it would be on a Minigame that has one. Each throwaway Player is
+-- created through #27's own precondition-handled `auth.users` insert (as
+-- `27_rls_proof.sql` does for its Player B), with
+-- `players ... on conflict do nothing`.
 --
 -- This changes nothing: every check runs inside pg_temp.proof_70(), which
 -- ends by raising and catching a sentinel exception, rolling back every
@@ -43,12 +48,13 @@ declare
   v_names text[] := array[]::text[];
   v_pass boolean[] := array[]::boolean[];
   v_detail text[] := array[]::text[];
-  v_game text := 'bug-squash';
+  v_game text := 'coffee-rush';
   v_max int;
   v_c_id uuid;
   v_d_id uuid;
   v_e_id uuid;
   v_f_id uuid;
+  v_g_id uuid;
   v_count int;
   v_rows_count int := 0;
   v_is_me_count int := 0;
@@ -59,6 +65,8 @@ declare
   v_name2 text;
   v_name3 text;
   v_saw_f boolean := false;
+  v_saw_g boolean := false;
+  v_result_shape text;
   v_all boolean;
   v_total int;
   r record;
@@ -66,9 +74,12 @@ declare
 begin
   begin
     -----------------------------------------------------------------------
-    -- Preconditions, as postgres. Reset the fixture's own bug-squash best
-    -- so a rerun starts clean, then read the current live max relative to
-    -- which every throwaway best below is set.
+    -- Preconditions, as postgres. Reset the fixture's own coffee-rush best
+    -- so a rerun starts clean, give it a visible name for the rank checks
+    -- below (R1 would otherwise exclude the fixture's own appended row too,
+    -- on a hosted project where the fixture Player happens to have a blank
+    -- name), then read the current live max relative to which every
+    -- throwaway best below is set.
     -----------------------------------------------------------------------
     perform set_config('role', 'postgres', true);
 
@@ -78,6 +89,7 @@ begin
     end if;
 
     delete from public.minigame_bests where player_id = fixture and minigame_id = v_game;
+    update public.players set penguin_name = 'PROOF FIXTURE' where id = fixture;
 
     select coalesce(max(best_score), 0) into v_max
     from public.minigame_bests
@@ -137,16 +149,37 @@ begin
     -- F stays unnamed (blank penguin_name): must never appear below, even
     -- though its best (v_max + 10) is the single highest of the five.
 
+    begin
+      insert into auth.users (id, email)
+      values (gen_random_uuid(), 'leaderboard-proof-g@example.invalid')
+      returning id into v_g_id;
+    exception when others then
+      raise exception
+        'precondition failed: could not create throwaway Player G in auth.users (sqlstate=%, sqlerrm=%)',
+        sqlstate, sqlerrm;
+    end;
+    insert into public.players (id) values (v_g_id) on conflict do nothing;
+    -- Red-team round 2 (2026-09-25): G's name is a single zero-width space
+    -- (U+200B), not the empty string -- invisible, but not blank by #27's
+    -- own `players_penguin_name_check` (leading/trailing *ASCII*
+    -- whitespace only). Must never appear below either, even though its
+    -- best (v_max + 11) is the single highest of all six.
+    update public.players set penguin_name = chr(8203) where id = v_g_id;
+
     -----------------------------------------------------------------------
-    -- Bests: C > D = E (tied, D reached first) > fixture; F highest of all
-    -- but unnamed.
+    -- Bests: C > D = E (tied, D reached first) > fixture; F and G highest
+    -- of all but unnamed/invisible-only. coffee-rush has no
+    -- LEADERBOARD_SCORE_CEILINGS entry, so none of these inflated
+    -- `v_max + N` bests risk being hidden by R2's ceiling filter instead of
+    -- by the name checks this proof is actually exercising.
     -----------------------------------------------------------------------
     insert into public.minigame_bests (player_id, minigame_id, best_score, updated_at)
     values
       (v_c_id, v_game, v_max + 3, now()),
       (v_d_id, v_game, v_max + 2, now() - interval '1 minute'),
       (v_e_id, v_game, v_max + 2, now()),
-      (v_f_id, v_game, v_max + 10, now())
+      (v_f_id, v_game, v_max + 10, now()),
+      (v_g_id, v_game, v_max + 11, now())
     on conflict (player_id, minigame_id) do update
       set best_score = excluded.best_score, updated_at = excluded.updated_at;
 
@@ -174,6 +207,9 @@ begin
       end if;
       if r.best_score = v_max + 10 then
         v_saw_f := true;
+      end if;
+      if r.best_score = v_max + 11 then
+        v_saw_g := true;
       end if;
       if v_rows_count = 1 then
         v_rank1 := r.rank;
@@ -207,6 +243,10 @@ begin
     v_pass := array_append(v_pass, not v_saw_f);
     v_detail := array_append(v_detail, format('unnamed row seen=%s (expected false)', v_saw_f));
 
+    v_names := array_append(v_names, 'invisible_only_named_highest_best_is_absent');
+    v_pass := array_append(v_pass, not v_saw_g);
+    v_detail := array_append(v_detail, format('invisible-only-named row seen=%s (expected false)', v_saw_g));
+
     v_names := array_append(v_names, 'total_rows_is_top_3_plus_own_row');
     v_pass := array_append(v_pass, v_rows_count = 4);
     v_detail := array_append(v_detail, format('rows=%s (expected 4)', v_rows_count));
@@ -236,6 +276,14 @@ begin
     -- security/shape checks, as postgres
     -----------------------------------------------------------------------
     perform set_config('role', 'postgres', true);
+
+    v_names := array_append(v_names, 'result_shape');
+    v_result_shape := pg_get_function_result('public.leaderboard(text, int)'::regprocedure);
+    v_pass := array_append(
+      v_pass,
+      v_result_shape = 'TABLE(rank integer, penguin_name text, best_score integer, is_me boolean)'
+    );
+    v_detail := array_append(v_detail, format('result shape=%s', v_result_shape));
 
     v_names := array_append(v_names, 'single_overload');
     select count(*) into v_count

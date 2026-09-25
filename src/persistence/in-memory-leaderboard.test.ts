@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_LOOK } from '../contracts/penguin';
-import { LEADERBOARD_SCORE_CEILINGS } from './leaderboard-rules';
+import { isBlankLeaderboardName, LEADERBOARD_SCORE_CEILINGS } from './leaderboard-rules';
 import { createInMemoryProgressStore } from './in-memory-progress-store';
-import { ProgressStoreError } from './progress-store';
+import { BLANK_NAME_CASES } from './testing/invisible-name-cases';
 
 const NAMED_LOOK = { ...DEFAULT_LOOK, name: 'CALLER ONE' };
 
@@ -107,6 +107,13 @@ describe('createInMemoryProgressStore().leaderboard', () => {
     expect(rows).toEqual([{ rank: 1, penguinName: 'VISIBLE', bestScore: 100, isMe: false }]);
   });
 
+  it.each(BLANK_NAME_CASES)(
+    'R1/round 2: isBlankLeaderboardName treats $label as blank',
+    ({ name }) => {
+      expect(isBlankLeaderboardName(name)).toBe(true);
+    },
+  );
+
   it("R1: the caller's own row is also excluded when its name is blank", async () => {
     const store = createInMemoryProgressStore({
       completedLook: { ...DEFAULT_LOOK, name: '' },
@@ -197,17 +204,9 @@ describe('createInMemoryProgressStore().leaderboard', () => {
     await expect(store.leaderboard('bug-squash')).resolves.toEqual([]);
   });
 
-  it('never rejects with a plain error for a known MinigameId (mirrors ProgressStoreError only)', async () => {
+  it('a board with no bests and no rivals resolves to [], not a rejection', async () => {
     const store = createInMemoryProgressStore();
 
     await expect(store.leaderboard('bug-squash')).resolves.toEqual([]);
-  });
-
-  it('an empty board resolves to []', async () => {
-    const store = createInMemoryProgressStore();
-
-    await expect(store.leaderboard('bug-squash')).resolves.toEqual([]);
-    // Sanity: ProgressStoreError stays importable/usable alongside this store.
-    expect(new ProgressStoreError('unknown_minigame').code).toBe('unknown_minigame');
   });
 });

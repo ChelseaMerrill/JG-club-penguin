@@ -45,11 +45,14 @@ pasted; `27_rls_proof.sql` never selects or prints them itself.
 `70_leaderboard_proof.sql` proves `public.leaderboard()` against the same #9
 H1 fixture Player, in `27_rls_proof.sql`'s style: rank order, the tie-break
 (whoever reached a tied score first), the caller's own row appended exactly
-once outside the requested row count, a blank-named Player's absence even
-when ranked highest, `security definer`/`search_path = ''`/a single
-overload, and the `authenticated`-only grant. It is live-data-tolerant: every
-throwaway best is set relative to whatever `max(best_score)` already exists
-for `bug-squash`, so it passes whether the project has zero real bests or
+once outside the requested row count, a blank-named and an invisible-only-
+named Player's absence even when ranked highest, the exact result shape,
+`security definer`/`search_path = ''`/a single overload, and the
+`authenticated`-only grant. It is live-data-tolerant: every throwaway best is
+set relative to whatever `max(best_score)` already exists for `coffee-rush`
+(chosen because it has no `LEADERBOARD_SCORE_CEILINGS` entry, so an inflated
+`v_max + N` throwaway best is never itself at risk of being hidden by R2's
+ceiling filter), so it passes whether the project has zero real bests or
 thousands.
 
 1. Local (Docker): covered automatically by `sql-leaderboard.test.ts`'s
@@ -64,3 +67,16 @@ thousands.
    no real Player's name, id or email.
 3. Save the result table to `test-results/70-leaderboard-proof-supabase/output.txt`,
    and paste the same table on #70.
+
+### Moderation: removing one forged/abusive best
+
+R2's plausibility ceiling and R1's blank-name filter both hide known-bad
+rows from the leaderboard, but a high-yet-technically-plausible forged score
+(under the ceiling) or an abusive-but-visible name can still show. Removing
+either is a one-line delete, as the project owner, in the Supabase SQL
+editor -- it only ever removes that one Minigame's best for that one Player,
+never their Token balance, Badges or other Minigame bests:
+
+```sql
+delete from public.minigame_bests where player_id = '<id>' and minigame_id = '<game>';
+```
