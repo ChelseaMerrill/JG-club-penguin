@@ -47,7 +47,24 @@ export type NpcId =
   | 'nicole'
   | 'jason'
   | 'jethro'
-  | 'darrin-icebox';
+  | 'darrin-icebox'
+  // #51: the Hallway's, Team Rooms 1-4's and the Bathroom's NPCs, by the same
+  // rule. Emily, Michael Prete, Michael S. and Jessie have no slot anywhere
+  // else, so they get bare ids; everyone else is a repeat appearance with a
+  // `-<room>` suffix.
+  | 'michael-s'
+  | 'emily'
+  | 'anthony-hallway'
+  | 'jethro-team-room-1'
+  | 'dom-team-room-1'
+  | 'ian-team-room-2'
+  | 'millie-team-room-3'
+  | 'casey-team-room-3'
+  | 'sydney-team-room-3'
+  | 'michael'
+  | 'sam-team-room-4'
+  | 'ryan-team-room-4'
+  | 'jessie';
 
 /**
  * A minigame-launching NPC's trigger dialog (#36 D4; round-1 review item 4
@@ -242,6 +259,12 @@ function staticLine(text: string): NpcBubbleLine[] {
  */
 const MARKET_PENGUIN_LOOK: PenguinLook = { ...DEFAULT_LOOK, name: '' };
 
+/**
+ * The Hallway's Michael S. and the Bathroom's Jessie (#51): the shared
+ * `peng()` figure with a `#F4F4F4` cap, per their Room designs' own markup.
+ */
+const WHITE_CAP_PENGUIN_LOOK: PenguinLook = { ...DEFAULT_LOOK, name: '', cap: '#F4F4F4' };
+
 /** Tristin's figure uses the design's `#3a4046`/`#0C4B5F` grey-blue Penguin body/cap instead. */
 const TRISTIN_LOOK: PenguinLook = { ...DEFAULT_LOOK, name: '', body: '#3a4046', cap: '#0C4B5F' };
 
@@ -275,6 +298,137 @@ const MILLIE_FIGURE: HumanFigureSpec = {
   collar: 'crew',
   necklace: true,
   teeth: true,
+};
+
+/**
+ * Ian Ballard's figure, shared by Dev Pit (`ian`) and Team Room 2
+ * (`ian-team-room-2`) (#51): the same person, the same `humans.js` spec, in
+ * one constant so the copies can't drift.
+ */
+const IAN_FIGURE: HumanFigureSpec = {
+  style: 'bald',
+  hair: 'brown',
+  skin: 'fair',
+  top: '#161719',
+  collar: 'polo',
+  beard: 'full',
+  teeth: true,
+  prop: 'laptop',
+};
+
+/**
+ * Dom Favata's figure, shared by Dev Pit (`dom`) and Team Room 1
+ * (`dom-team-room-1`) (#51): the same person, the same `humans.js` spec, in
+ * one constant so the copies can't drift.
+ */
+const DOM_FIGURE: HumanFigureSpec = {
+  style: 'short',
+  hair: 'brown',
+  skin: 'fair',
+  top: '#C9B48E',
+  collar: 'zip',
+  teeth: true,
+  prop: 'laptop',
+};
+
+/**
+ * Sydney Murauskas's figure, shared by Town Center (`sydney`) and Team Room 3
+ * (`sydney-team-room-3`) (#51): the same person, the same `humans.js` spec,
+ * in one constant so the copies can't drift.
+ */
+const SYDNEY_FIGURE: HumanFigureSpec = {
+  style: 'straightLong',
+  hair: 'caramel',
+  skin: 'med',
+  top: '#1f2a4a',
+  collar: 'crew',
+  necklace: true,
+  teeth: true,
+  prop: 'clipboard',
+};
+
+/**
+ * Casey Snow's figure, shared by Roof Deck (`casey`) and Team Room 3
+ * (`casey-team-room-3`) (#51): the same person, the same `humans.js` spec, in
+ * one constant so the copies can't drift.
+ */
+const CASEY_FIGURE: HumanFigureSpec = {
+  style: 'straightLong',
+  hair: 'sandy',
+  skin: 'fair',
+  top: '#2FB59A',
+  pattern: 'stripes',
+  pattern2: '#F4F4F4',
+  collar: 'crew',
+  necklace: true,
+  teeth: true,
+  hat: 'headphones',
+};
+
+/**
+ * Sam Schantz's figure, shared by Dev Pit (`sam`) and Team Room 4
+ * (`sam-team-room-4`) (#51): the same person, the same `humans.js` spec, in
+ * one constant so the copies can't drift.
+ */
+const SAM_FIGURE: HumanFigureSpec = {
+  style: 'spiky',
+  hair: 'dark',
+  skin: 'med',
+  top: '#00BDFF',
+  collar: 'crew',
+  glasses: 'thin',
+  teeth: true,
+  prop: 'coffee',
+};
+
+/**
+ * Ryan Shendler's figure, shared by Dev Pit (`ryan`) and Team Room 4
+ * (`ryan-team-room-4`) (#51): the same person, the same `humans.js` spec, in
+ * one constant so the copies can't drift.
+ */
+const RYAN_FIGURE: HumanFigureSpec = {
+  style: 'short',
+  hair: 'brown',
+  skin: 'fair',
+  top: '#0C4B5F',
+  collar: 'crew',
+  beard: 'stubble',
+  mouth: 'smirk',
+  prop: 'laptop',
+};
+
+/**
+ * Anthony Conway's figure, shared by Roof Deck (`anthony`) and the Hallway
+ * (`anthony-hallway`) (#51): the same person, the same `humans.js` spec, in
+ * one constant so the copies can't drift.
+ */
+const ANTHONY_FIGURE: HumanFigureSpec = {
+  style: 'shortDark',
+  hair: 'dark',
+  skin: 'light',
+  top: '#4a4f57',
+  collar: 'button',
+  beard: 'stubble',
+  teeth: true,
+  prop: 'laptop',
+};
+
+/**
+ * Jethro Breuer's figure, shared by the Icebox (`jethro`) and Team Room 1
+ * (`jethro-team-room-1`) (#51): the same person, the same `humans.js` spec,
+ * in one constant so the copies can't drift.
+ */
+const JETHRO_FIGURE: HumanFigureSpec = {
+  style: 'short',
+  hair: 'ash',
+  skin: 'fair',
+  top: '#4a4f57',
+  pattern: 'dots',
+  collar: 'button',
+  beard: 'full',
+  beardColor: '#A85A2A',
+  mouth: 'smirk',
+  prop: 'camera',
 };
 
 /**
@@ -345,16 +499,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: 'Serve. Grind. Grow. Inspire.', periodS: 24, delayS: -12.72 },
     ],
     dialog: LINE_DIALOG,
-    figure: {
-      style: 'straightLong',
-      hair: 'caramel',
-      skin: 'med',
-      top: '#1f2a4a',
-      collar: 'crew',
-      necklace: true,
-      teeth: true,
-      prop: 'clipboard',
-    },
+    figure: SYDNEY_FIGURE,
   },
   'front-desk': {
     id: 'front-desk',
@@ -413,16 +558,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     // `npcs.test.ts`'s geometric bubble-rect check.
     bubbleOffsetX: -80,
     dialog: BUG_SQUASH_DIALOG,
-    figure: {
-      style: 'bald',
-      hair: 'brown',
-      skin: 'fair',
-      top: '#161719',
-      collar: 'polo',
-      beard: 'full',
-      teeth: true,
-      prop: 'laptop',
-    },
+    figure: IAN_FIGURE,
   },
   steven: {
     id: 'steven',
@@ -466,15 +602,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     // See Ian's own bubbleOffsetX note above -- the two are one tile apart.
     bubbleOffsetX: 80,
     dialog: LINE_DIALOG,
-    figure: {
-      style: 'short',
-      hair: 'brown',
-      skin: 'fair',
-      top: '#C9B48E',
-      collar: 'zip',
-      teeth: true,
-      prop: 'laptop',
-    },
+    figure: DOM_FIGURE,
   },
   ryan: {
     id: 'ryan',
@@ -499,16 +627,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     // bubble-rect check.
     bubbleOffsetX: -100,
     dialog: LINE_DIALOG,
-    figure: {
-      style: 'short',
-      hair: 'brown',
-      skin: 'fair',
-      top: '#0C4B5F',
-      collar: 'crew',
-      beard: 'stubble',
-      mouth: 'smirk',
-      prop: 'laptop',
-    },
+    figure: RYAN_FIGURE,
   },
   sam: {
     id: 'sam',
@@ -526,16 +645,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     // See Ryan's own bubbleOffsetX note above -- the row-1 trio sit close together.
     bubbleOffsetX: 100,
     dialog: LINE_DIALOG,
-    figure: {
-      style: 'spiky',
-      hair: 'dark',
-      skin: 'med',
-      top: '#00BDFF',
-      collar: 'crew',
-      glasses: 'thin',
-      teeth: true,
-      prop: 'coffee',
-    },
+    figure: SAM_FIGURE,
   },
   kevin: {
     id: 'kevin',
@@ -654,16 +764,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: 'Reel talk: check the sender.', periodS: 28, delayS: -20 },
     ],
     dialog: LINE_DIALOG,
-    figure: {
-      style: 'shortDark',
-      hair: 'dark',
-      skin: 'light',
-      top: '#4a4f57',
-      collar: 'button',
-      beard: 'stubble',
-      teeth: true,
-      prop: 'laptop',
-    },
+    figure: ANTHONY_FIGURE,
   },
   tristin: {
     id: 'tristin',
@@ -700,18 +801,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     ],
     bubbleOffsetX: -90,
     dialog: IGLOO_GEAR_STALL_DIALOG,
-    figure: {
-      style: 'straightLong',
-      hair: 'sandy',
-      skin: 'fair',
-      top: '#2FB59A',
-      pattern: 'stripes',
-      pattern2: '#F4F4F4',
-      collar: 'crew',
-      necklace: true,
-      teeth: true,
-      hat: 'headphones',
-    },
+    figure: CASEY_FIGURE,
   },
   tom: {
     id: 'tom',
@@ -891,18 +981,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: 'Say hackathon!', periodS: 21, delayS: -16 },
     ],
     dialog: LINE_DIALOG,
-    figure: {
-      style: 'short',
-      hair: 'ash',
-      skin: 'fair',
-      top: '#4a4f57',
-      pattern: 'dots',
-      collar: 'button',
-      beard: 'full',
-      beardColor: '#A85A2A',
-      mouth: 'smirk',
-      prop: 'camera',
-    },
+    figure: JETHRO_FIGURE,
   },
   'darrin-icebox': {
     id: 'darrin-icebox',
@@ -921,6 +1000,205 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     // The same figure as his Town Center appearance (`darrin` above); shared
     // via the `DARRIN_FIGURE` constant so the two can't drift.
     figure: DARRIN_FIGURE,
+  },
+  // #51: the Hallway's, Team Rooms 1-4's and the Bathroom's NPCs. Names and
+  // titles from design/Characters.dc.html (Emily, Dom, Millie, Casey, Ryan and
+  // Sam are on its TITLE TBD list), figures from design/build/humans.js, and
+  // tags/`idleLines` from each Room design's own nameplates and bubbles,
+  // verbatim. A repeat appearance shares its person's figure constant and
+  // dialog line. Static bubbles are `periodS: 0`; Team Room 1's and Team
+  // Room 3's custom keyframes are re-expressed under the shared 7% show
+  // window (see each entry). Only Ian's Team Room 2 slot shows a Minigame
+  // trigger ("TALK · BUG SQUASH"); Team Room 4's Beystadium is not a
+  // Minigame in this build.
+  'michael-s': {
+    id: 'michael-s',
+    // A Penguin-kind background NPC: name, tag and line from the Hallway
+    // design's own nameplate and bubble.
+    name: 'Michael S.',
+    title: null,
+    roomId: 'office-hallway',
+    kind: 'penguin',
+    tagName: 'Michael S.',
+    dialogLine: 'standup in 5',
+    idleLines: staticLine('standup in 5'),
+    dialog: LINE_DIALOG,
+    look: WHITE_CAP_PENGUIN_LOOK,
+  },
+  emily: {
+    id: 'emily',
+    name: 'Emily Smith',
+    title: null,
+    roomId: 'office-hallway',
+    kind: 'human',
+    tagName: 'Emily Smith',
+    dialogLine: 'Ever thought about joining JG?',
+    idleLines: staticLine('Joining JG?'),
+    dialog: LINE_DIALOG,
+    figure: {
+      style: 'wavyLong',
+      hair: 'blond',
+      skin: 'fair',
+      top: '#D63C8A',
+      sleeveless: true,
+      mouth: 'smirk',
+      necklace: true,
+    },
+  },
+  'anthony-hallway': {
+    id: 'anthony-hallway',
+    name: 'Anthony Conway',
+    title: 'Director of IT',
+    roomId: 'office-hallway',
+    kind: 'human',
+    tagName: 'Anthony Conway',
+    dialogLine: 'Would you click this link? Wrong.',
+    idleLines: staticLine('Is this link safe?'),
+    dialog: LINE_DIALOG,
+    figure: ANTHONY_FIGURE,
+  },
+  'jethro-team-room-1': {
+    id: 'jethro-team-room-1',
+    name: 'Jethro Breuer',
+    title: 'Director of Digital Media',
+    roomId: 'team-room-1',
+    kind: 'human',
+    tagName: 'Jethro',
+    dialogLine: "Act natural. Camera's rolling.",
+    // `jtalk 4s`, shown from 38%: (0.38 - 0.07) * 4 = 1.24s, i.e. -2.76s.
+    idleLines: [{ text: "Act natural. Camera's rolling.", periodS: 4, delayS: -2.76 }],
+    dialog: LINE_DIALOG,
+    figure: JETHRO_FIGURE,
+  },
+  'dom-team-room-1': {
+    id: 'dom-team-room-1',
+    name: 'Dom Favata',
+    title: null,
+    roomId: 'team-room-1',
+    kind: 'human',
+    tagName: 'Dom',
+    dialogLine: 'p95 is spicy today.',
+    // `domtalk 6s`, shown from 39%: (0.39 - 0.07) * 6 = 1.92s, i.e. -4.08s.
+    idleLines: [{ text: 'you gotta be faster than that', periodS: 6, delayS: -4.08 }],
+    dialog: LINE_DIALOG,
+    // humans.js's spec; the Room design dresses him in running gear for his
+    // lap of the room, a scene-only costume the renderer doesn't draw.
+    figure: DOM_FIGURE,
+  },
+  'ian-team-room-2': {
+    id: 'ian-team-room-2',
+    name: 'Ian Ballard',
+    title: 'VP of Engineering',
+    roomId: 'team-room-2',
+    kind: 'human',
+    tagName: 'Ian',
+    dialogLine: 'Who broke CI? Be honest.',
+    idleLines: staticLine('have you installed the atlas plugin yet?'),
+    dialog: BUG_SQUASH_DIALOG,
+    figure: IAN_FIGURE,
+  },
+  'millie-team-room-3': {
+    id: 'millie-team-room-3',
+    name: 'Millie Elliott',
+    title: null,
+    roomId: 'team-room-3',
+    kind: 'human',
+    tagName: 'Millie',
+    dialogLine: 'Quick question before you go in.',
+    // The design gives her no bubble here.
+    idleLines: [],
+    dialog: LINE_DIALOG,
+    figure: MILLIE_FIGURE,
+  },
+  'casey-team-room-3': {
+    id: 'casey-team-room-3',
+    name: 'Casey Snow',
+    title: null,
+    roomId: 'team-room-3',
+    kind: 'human',
+    tagName: 'Casey',
+    dialogLine: 'Snow by name. Snowcones by trade.',
+    // `rats 10s`, shown from 80%: (0.80 - 0.07) * 10 = 7.3s, i.e. -2.7s.
+    idleLines: [{ text: 'RATS', periodS: 10, delayS: -2.7 }],
+    // The Igloo Gear stall is the Roof Deck's; here she is just gaming.
+    dialog: LINE_DIALOG,
+    figure: CASEY_FIGURE,
+  },
+  'sydney-team-room-3': {
+    id: 'sydney-team-room-3',
+    name: 'Sydney Murauskas',
+    title: 'Technical Recruiter',
+    roomId: 'team-room-3',
+    kind: 'human',
+    tagName: 'Sydney',
+    dialogLine: 'Welcome to JG HQ!',
+    idleLines: staticLine('So, open to new roles?'),
+    dialog: LINE_DIALOG,
+    figure: SYDNEY_FIGURE,
+  },
+  michael: {
+    id: 'michael',
+    name: 'Michael Prete',
+    title: 'IT Associate',
+    roomId: 'team-room-4',
+    kind: 'human',
+    tagName: 'Michael',
+    dialogLine: '3-0. Again.',
+    idleLines: staticLine('I challenge you to a Beyblade battle!'),
+    dialog: LINE_DIALOG,
+    figure: {
+      style: 'shortDark',
+      hair: 'dark',
+      skin: 'light',
+      top: '#161719',
+      jacket: '#D9534F',
+      collar: 'crew',
+      glasses: 'rect',
+      beard: 'full',
+      teeth: true,
+      prop: 'beyblade',
+    },
+  },
+  'sam-team-room-4': {
+    id: 'sam-team-room-4',
+    name: 'Sam Schantz',
+    title: null,
+    roomId: 'team-room-4',
+    kind: 'human',
+    tagName: 'Sam',
+    dialogLine: 'Have you tried turning it off?',
+    // The design gives him music notes, not a bubble.
+    idleLines: [],
+    dialog: LINE_DIALOG,
+    figure: SAM_FIGURE,
+  },
+  'ryan-team-room-4': {
+    id: 'ryan-team-room-4',
+    name: 'Ryan Shendler',
+    title: null,
+    roomId: 'team-room-4',
+    kind: 'human',
+    tagName: 'Ryan',
+    dialogLine: 'LGTM. One nit.',
+    // The design gives him no bubble here.
+    idleLines: [],
+    dialog: LINE_DIALOG,
+    figure: RYAN_FIGURE,
+  },
+  jessie: {
+    id: 'jessie',
+    // A Penguin-kind background NPC: name, tag and line from the Bathroom
+    // design's own nameplate and bubble. Spelled "Jessie" there, unlike The
+    // Melt's "Jesse", so kept a separate character.
+    name: 'Jessie',
+    title: null,
+    roomId: 'bathroom',
+    kind: 'penguin',
+    tagName: 'Jessie',
+    dialogLine: 'occupied since standup',
+    idleLines: staticLine('occupied since standup'),
+    dialog: LINE_DIALOG,
+    look: WHITE_CAP_PENGUIN_LOOK,
   },
 };
 
