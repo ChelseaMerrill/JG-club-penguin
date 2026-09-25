@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { estimateBubbleSize } from '../game/npcs/bubble-geometry';
 import { bubbleSchedule } from '../game/npcs/bubble-schedule';
-import { npcLayout } from '../game/npcs/npc-layout';
+import { estimateNameplateWidth, npcLayout } from '../game/npcs/npc-layout';
 import { devPit } from '../game/rooms/definitions/dev-pit';
 import { tileToScreen } from '../game/rooms/iso';
 import { ROOM_DEFINITIONS } from '../game/rooms/registry';
@@ -144,19 +144,44 @@ describe('NPCS', () => {
   });
 
   it(
-    'never shows two NPCs’ bubbles on top of each other: in every Room, any two lines ' +
-      'whose visible windows overlap in time have pill rects that do not intersect (#113: ' +
-      'replaces #36 round-2 item 4’s worst-case Dev Pit check now that bubbles follow the ' +
-      'design’s scale, nameplate and keyframe windows)',
+    "never shows an NPC's bubble over another NPC's bubble or nameplate while every NPC " +
+      'stands at its rest slot: any two lines whose visible windows overlap in time have ' +
+      "pill rects that don't intersect, and no line's pill ever covers another NPC's " +
+      "nameplate (#113: rest slots only; a roaming NPC's passing overlaps come from the " +
+      "designs' own paths)",
     () => {
+      interface Rect {
+        left: number;
+        right: number;
+        top: number;
+        bottom: number;
+      }
+      const intersects = (a: Rect, b: Rect): boolean =>
+        a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
       const collisions: string[] = [];
       for (const room of ROOM_DEFINITIONS) {
-        const shown = room.npcSlots.flatMap((slot) => {
+        // Penguin-kind NPCs are being removed from the Rooms (only Players
+        // appear as Penguins, PR #133), so they're left out.
+        const placed = room.npcSlots.flatMap((slot) => {
           const npc = getNpcDefinition(slot.npcId)!;
-          // Penguin-kind NPCs are being removed from the Rooms (only Players
-          // appear as Penguins, PR #133), so they're left out.
           if (npc.kind === 'penguin') return [];
-          const feet = tileToScreen(slot.tile, room.grid.origin);
+          return [{ npc, feet: tileToScreen(slot.tile, room.grid.origin) }];
+        });
+        const nameplates = placed.map(({ npc, feet }) => {
+          const layout = npcLayout(npc);
+          const width = estimateNameplateWidth(npc.tagName);
+          return {
+            npcId: npc.id,
+            tagName: npc.tagName,
+            rect: {
+              left: feet.x - width / 2,
+              right: feet.x + width / 2,
+              top: feet.y + layout.nameplateTopY,
+              bottom: feet.y + layout.nameplateBottomY,
+            },
+          };
+        });
+        const shown = placed.flatMap(({ npc, feet }) => {
           const bottom = feet.y + npcLayout(npc).bubbleBottomY + (npc.bubbleOffsetY ?? 0);
           const centerX = feet.x + (npc.bubbleOffsetX ?? 0);
           return npc.idleLines.map((line) => {
@@ -174,24 +199,38 @@ describe('NPCS', () => {
           });
         });
         for (let i = 0; i < shown.length; i += 1) {
+          const a = shown[i]!;
           for (let j = i + 1; j < shown.length; j += 1) {
-            const a = shown[i]!;
             const b = shown[j]!;
             if (a.npcId === b.npcId) continue;
-            const apart =
-              a.rect.right <= b.rect.left ||
-              b.rect.right <= a.rect.left ||
-              a.rect.bottom <= b.rect.top ||
-              b.rect.bottom <= a.rect.top;
-            if (!apart && visibleAtTheSameTime(a.line, b.line)) {
+            if (intersects(a.rect, b.rect) && visibleAtTheSameTime(a.line, b.line)) {
               collisions.push(
                 `${room.id}: ${a.npcId} "${a.line.text}" x ${b.npcId} "${b.line.text}"`,
               );
             }
           }
+          for (const plate of nameplates) {
+            if (plate.npcId === a.npcId) continue;
+            if (intersects(a.rect, plate.rect)) {
+              collisions.push(
+                `${room.id}: ${a.npcId} "${a.line.text}" x ${plate.npcId}'s nameplate "${plate.tagName}"`,
+              );
+            }
+          }
         }
       }
-      expect(collisions).toEqual([]);
+      // Overlaps the Room design itself draws at rest, kept as designed: Dev
+      // Pit's Steven's pills (`y="323.4"`, 30 tall, x 957.8-1202.2) cover the
+      // bottom 14 px of Ryan's nameplate (`<rect x="974" y="317.4"
+      // width="52" height="20">`); in-game only its bottom 4 px, below the
+      // text.
+      const drawnByTheDesign = [
+        `dev-pit: steven "Boxes and arrows. Mostly arrows." x ryan's nameplate "Ryan"`,
+        `dev-pit: steven "This diagram scales. Trust me." x ryan's nameplate "Ryan"`,
+      ];
+      expect(collisions.filter((collision) => !drawnByTheDesign.includes(collision))).toEqual([]);
+      // Each allowed overlap still happens, so a stale entry can't linger.
+      for (const allowed of drawnByTheDesign) expect(collisions).toContain(allowed);
     },
   );
 

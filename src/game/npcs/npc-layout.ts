@@ -25,12 +25,27 @@ const FIGURE_HEIGHT = 120;
 export const NAMEPLATE_HEIGHT = 20;
 const NAMEPLATE_GAP_ABOVE_FIGURE = 5;
 const BUBBLE_GAP_ABOVE_NAMEPLATE = 4;
+/**
+ * The click area (#113's approved execution plan, PR A): "a hit rect about
+ * 48 wide, from the nameplate top to feet + 5". It replaces `RoomScene.ts`'s
+ * old fixed 64x110 zone (about the figure's own width once drawn at 0.62,
+ * and it fits inside that old zone) and still contains `e2e/npcs.spec.ts`'s
+ * click near a Human's head, 70 px above the feet.
+ */
 const HIT_AREA_WIDTH = 48;
 const HIT_AREA_BELOW_FEET = 5;
+/**
+ * The Room designs size a Human's nameplate as 7.5 px per character plus 22
+ * px (Town Center's "Darrin Jahnel" is 13 * 7.5 + 22 = 119.5 px wide), a
+ * close stand-in for the rendered Libre Franklin 700 12 px text plus its
+ * padding and border.
+ */
+const NAMEPLATE_CHAR_WIDTH = 7.5;
+const NAMEPLATE_EXTRA_WIDTH = 22;
 
 /** The designs' shared `@keyframes idle`: up 3 px and back over the cycle. */
 const BOB_DISTANCE = 3;
-const DEFAULT_BOB_PERIOD_S = 3;
+const BOB_PERIOD_S = 3;
 
 export interface NpcHitArea {
   centerX: number;
@@ -81,20 +96,22 @@ export function npcLayout(npc: Pick<NpcDefinition, 'kind'>): NpcLayout {
   };
 }
 
+/** A nameplate's estimated width, for layout checks that can't measure real text. */
+export function estimateNameplateWidth(tagName: string): number {
+  return tagName.length * NAMEPLATE_CHAR_WIDTH + NAMEPLATE_EXTRA_WIDTH;
+}
+
 /**
- * The idle bob, or `null` for an NPC its design leaves still (the Kitchen's
- * Chelsea) or one with a designed motion (`npc-motions.ts`, PR #136), which
- * replaces the bob: those tracks carry the design's own bob where it has one
- * (Steven's and Ian's `idle`, the Icebox's shared `idle 1.1s`). The cycle is
- * the designs' 3 s unless the NPC carries its own `bobPeriodS`.
+ * The idle bob, or `null` for an NPC its design leaves still (`still`) or one
+ * with a designed motion (`npc-motions.ts`, PR #136), which replaces the
+ * bob: those tracks carry the design's own bob where it has one (Steven's
+ * and Ian's `idle`, the Icebox's shared `idle 1.1s`). Every other NPC bobs
+ * the designs' 3 px over 3 s.
  */
 export function npcBob(
-  npc: Pick<NpcDefinition, 'still' | 'bobPeriodS'>,
+  npc: Pick<NpcDefinition, 'still'>,
   options: { designedMotion?: boolean } = {},
 ): NpcBob | null {
   if (npc.still || options.designedMotion) return null;
-  return {
-    distance: BOB_DISTANCE,
-    periodMs: Math.round((npc.bobPeriodS ?? DEFAULT_BOB_PERIOD_S) * 1000),
-  };
+  return { distance: BOB_DISTANCE, periodMs: BOB_PERIOD_S * 1000 };
 }

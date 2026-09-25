@@ -167,8 +167,10 @@ interface NpcDefinitionBase {
    * (Kevin, Ann Marie, Josh, Casey) float their speech bubble left of their
    * own nameplate/figure centre by exactly -90px (#36 round-1 review item
    * 3c; traced directly from the Room design's own bubble-vs-nameplate x
-   * offset), and Dev Pit's Dom, one tile right of Ian, shifts his bubble
-   * clear of Ian's nameplate (see `dom`).
+   * offset), and where the Room's tile grid stands two NPCs closer than
+   * their design does, a bubble shifts clear of a neighbour's nameplate
+   * (#113: Dev Pit's Sam, the Office Hallway's Anthony; see each entry).
+   * `npcs.test.ts`'s rest-slot overlap check guards it.
    */
   bubbleOffsetX?: number;
   /**
@@ -181,15 +183,12 @@ interface NpcDefinitionBase {
    */
   bubbleOffsetY?: number;
   /**
-   * `true` for an NPC its Room design draws without the shared `idle` bob
-   * (#113: Dev Pit's Ian, Chelsea). Every other NPC bobs.
+   * `true` for an NPC its Room design draws without any idle bob (#113: the
+   * Kitchen's Chelsea, Dev Pit's Ashley, the Office Hallway's Emily and
+   * Anthony, and every NPC in Team Rooms 3 and 4). Every other NPC bobs,
+   * unless a designed motion (`npc-motions.ts`) replaces the bob.
    */
   still?: boolean;
-  /**
-   * The idle bob's cycle in seconds, when the Room design's differs from the
-   * shared 3 s (#113: the Icebox's `idle 1.1s`).
-   */
-  bobPeriodS?: number;
 }
 
 /** A Human NPC (`design/build/humans.js`'s figures), rendered by `render-npc-svg.ts`. */
@@ -221,14 +220,6 @@ const DEV_PIT_RED_MARKER: HumanFigureSpec['marker'] = {
   hand: '#E4B896',
   color: '#D63C3C',
 };
-
-/**
- * The Icebox design's faster shared bob (`animation:idle 1.1s`) for all five
- * of its NPCs (#113). While their roams run, `motions/the-icebox.ts`'s own
- * port of that same `idle` plays instead (a designed motion replaces the
- * idle bob), so this cycle only applies to an Icebox NPC without one.
- */
-const ICEBOX_BOB_PERIOD_S = 1.1;
 
 const BUG_SQUASH_DIALOG: NpcMinigameDialog = {
   kind: 'minigame',
@@ -587,6 +578,8 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     kind: 'human',
     tagName: 'Ashley',
     dialogLine: 'The chicken stays. Non-negotiable.',
+    // The Dev Pit design gives her group no `animation:` at all.
+    still: true,
     idleLines: [
       { text: 'Incoming!', periodS: 9, delayS: -4.2 },
       { text: 'Most spirited. Deal with it.', periodS: 14, delayS: -5 },
@@ -700,6 +693,11 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: 'Drawing the architecture. Again.', periodS: 20, delayS: -11 },
       { text: 'Ship it Friday. What could go wrong.', periodS: 20, delayS: -17 },
     ],
+    // Shifted right just past Steven's nameplate (#113): the grid stands
+    // him 50 px below Steven, and his wrapped "Ship it Friday..." pill (one
+    // line in the design) would otherwise cover Steven's whole nameplate.
+    // The design's own one-line pills already overlap its bottom 4 px.
+    bubbleOffsetX: 72,
     dialog: LINE_DIALOG,
     // As Ryan's: the marker is Dev Pit's only.
     figure: { ...SAM_FIGURE, marker: DEV_PIT_CYAN_MARKER },
@@ -978,7 +976,6 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: 'Standup was 4 minutes. Record.', periodS: 26, delayS: -12 },
       { text: 'Trivia time. Door stays shut.', periodS: 26, delayS: -20 },
     ],
-    bobPeriodS: ICEBOX_BOB_PERIOD_S,
     dialog: LINE_DIALOG,
     // The same figure as her Roof Deck appearance (`millie` above); shared
     // via the `MILLIE_FIGURE` constant so the two can't drift.
@@ -997,7 +994,6 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: 'Account manager mode: on.', periodS: 15, delayS: -7 },
       { text: 'Nope, that is billable.', periodS: 15, delayS: -12 },
     ],
-    bobPeriodS: ICEBOX_BOB_PERIOD_S,
     dialog: LINE_DIALOG,
     // humans.js's spec, seated with a laptop on her lap as the Room design
     // draws her (#113).
@@ -1025,7 +1021,6 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: 'Three questions and you may pass.', periodS: 26, delayS: -10 },
       { text: 'Kickoff in 4:32. Sit.', periodS: 26, delayS: -18 },
     ],
-    bobPeriodS: ICEBOX_BOB_PERIOD_S,
     dialog: LINE_DIALOG,
     figure: {
       style: 'buzz',
@@ -1052,7 +1047,6 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: 'One more for the recap.', periodS: 21, delayS: -9 },
       { text: 'Say hackathon!', periodS: 21, delayS: -16 },
     ],
-    bobPeriodS: ICEBOX_BOB_PERIOD_S,
     dialog: LINE_DIALOG,
     // The Icebox design straps a camera rig to his chest; Team Room 1's
     // doesn't, so it's this entry's own override.
@@ -1071,7 +1065,6 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: 'Serve. Grind. Grow. Inspire.', periodS: 15, delayS: -6 },
       { text: 'Who is demoing first?', periodS: 15, delayS: -11 },
     ],
-    bobPeriodS: ICEBOX_BOB_PERIOD_S,
     dialog: LINE_DIALOG,
     // The same figure as his Town Center appearance (`darrin` above); shared
     // via the `DARRIN_FIGURE` constant so the two can't drift.
@@ -1100,9 +1093,8 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     tagName: 'Emily Smith',
     dialogLine: 'Ever thought about joining JG?',
     idleLines: staticLine('Joining JG?'),
-    // One tile from Anthony, one screen row above him, and both bubbles are
-    // always shown: lifted 8 px to clear the top of his.
-    bubbleOffsetY: -8,
+    // The Hallway design draws her without any idle bob.
+    still: true,
     dialog: LINE_DIALOG,
     figure: {
       style: 'wavyLong',
@@ -1123,6 +1115,12 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     tagName: 'Anthony Conway',
     dialogLine: 'Would you click this link? Wrong.',
     idleLines: staticLine('Is this link safe?'),
+    // The design stands him 140 px right of Emily; the grid stands him one
+    // tile (50 px) away, where his always-shown bubble would cover her
+    // nameplate. Shifted right until it clears it (#113).
+    bubbleOffsetX: 90,
+    // The Hallway design draws him without any idle bob.
+    still: true,
     dialog: LINE_DIALOG,
     figure: ANTHONY_FIGURE,
   },
@@ -1180,6 +1178,8 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     dialogLine: 'Quick question before you go in.',
     // The design gives her no bubble here.
     idleLines: [],
+    // Team Room 3's design draws its NPCs without any idle bob.
+    still: true,
     dialog: LINE_DIALOG,
     figure: MILLIE_FIGURE,
   },
@@ -1194,6 +1194,8 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     // `rats 10s`, shown from 80%: (0.80 - 0.07) * 10 = 7.3s, i.e. -2.7s.
     idleLines: [{ text: 'RATS', periodS: 10, delayS: -2.7 }],
     // The Igloo Gear stall is the Roof Deck's; here she is just gaming.
+    // Team Room 3's design draws its NPCs without any idle bob.
+    still: true,
     dialog: LINE_DIALOG,
     figure: CASEY_FIGURE,
   },
@@ -1206,6 +1208,8 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     tagName: 'Sydney',
     dialogLine: 'Welcome to JG HQ!',
     idleLines: staticLine('So, open to new roles?'),
+    // Team Room 3's design draws its NPCs without any idle bob.
+    still: true,
     dialog: LINE_DIALOG,
     figure: SYDNEY_FIGURE,
   },
@@ -1218,6 +1222,8 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     tagName: 'Michael',
     dialogLine: '3-0. Again.',
     idleLines: staticLine('I challenge you to a Beyblade battle!'),
+    // Team Room 4's design draws its NPCs without any idle bob.
+    still: true,
     dialog: LINE_DIALOG,
     figure: {
       style: 'shortDark',
@@ -1242,6 +1248,8 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     dialogLine: 'Have you tried turning it off?',
     // The design gives him music notes, not a bubble.
     idleLines: [],
+    // Team Room 4's design draws its NPCs without any idle bob.
+    still: true,
     dialog: LINE_DIALOG,
     figure: SAM_FIGURE,
   },
@@ -1255,6 +1263,8 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     dialogLine: 'LGTM. One nit.',
     // The design gives him no bubble here.
     idleLines: [],
+    // Team Room 4's design draws its NPCs without any idle bob.
+    still: true,
     dialog: LINE_DIALOG,
     figure: RYAN_FIGURE,
   },

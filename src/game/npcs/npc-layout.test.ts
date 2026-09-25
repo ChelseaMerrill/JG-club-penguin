@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { NPCS } from '../../npcs/npcs';
-import { npcBob, npcLayout, npcScale } from './npc-layout';
+import { estimateNameplateWidth, npcBob, npcLayout, npcScale } from './npc-layout';
 
 // Expected values are read off the Room designs' own baked markup (feet-
 // relative, Stage px), not recomputed from the layout formula:
@@ -52,20 +52,43 @@ describe('npcLayout', () => {
   });
 });
 
+describe('estimateNameplateWidth', () => {
+  it("matches the Room designs' own Human nameplate widths", () => {
+    // `<rect width>`s from design/Room 01 Town Center.dc.html, Room 11
+    // Office Hallway.dc.html and Room 02 Dev Pit.dc.html.
+    expect(estimateNameplateWidth('Darrin Jahnel')).toBeCloseTo(119.5);
+    expect(estimateNameplateWidth('Anthony Conway')).toBeCloseTo(127);
+    expect(estimateNameplateWidth('Emily Smith')).toBeCloseTo(104.5);
+    expect(estimateNameplateWidth('Ian')).toBeCloseTo(44.5);
+  });
+});
+
 describe('npcBob', () => {
   it("bobs 3 px over the designs' 3 s idle cycle by default", () => {
     expect(npcBob({})).toEqual({ distance: 3, periodMs: 3000 });
   });
 
-  it("uses an NPC's own faster cycle (the Icebox's 1.1 s)", () => {
-    expect(npcBob({ bobPeriodS: 1.1 })).toEqual({ distance: 3, periodMs: 1100 });
-    expect(npcBob(NPCS.jethro)).toEqual({ distance: 3, periodMs: 1100 });
-  });
-
-  it('keeps the NPCs the designs leave still (the Kitchen’s Chelsea) from bobbing', () => {
+  it('keeps the NPCs their Room designs draw without an idle bob from bobbing', () => {
     expect(npcBob({ still: true })).toBeNull();
-    expect(npcBob(NPCS.chelsea)).toBeNull();
+    // Each checked against its design: no `idle` (or any other animation) on
+    // the figure in the Kitchen, Dev Pit, Office Hallway or Team Rooms 3-4.
+    const stillInTheirDesigns = [
+      'chelsea',
+      'ashley',
+      'emily',
+      'anthony-hallway',
+      'millie-team-room-3',
+      'casey-team-room-3',
+      'sydney-team-room-3',
+      'michael',
+      'sam-team-room-4',
+      'ryan-team-room-4',
+    ] as const;
+    for (const id of stillInTheirDesigns) expect(npcBob(NPCS[id]), id).toBeNull();
+    // Team Room 2's Ian bobs in his design (`bob 2.4s`), and Town Center's
+    // Jory keeps the default bob as a stand-in for her designed `jump`.
     expect(npcBob(NPCS['ian-team-room-2'])).not.toBeNull();
+    expect(npcBob(NPCS.jory)).not.toBeNull();
   });
 
   it("doesn't bob an NPC whose designed motion replaces it (Dev Pit Ian's walk, PR #136)", () => {
