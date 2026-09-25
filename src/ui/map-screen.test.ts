@@ -79,25 +79,6 @@ describe('createMapScreen', () => {
     expect(labels).toContain('15 · THE MULLET');
   });
 
-  it('a coming-soon tile is aria-disabled and shows a COMING SOON pill', () => {
-    const { q } = setup();
-
-    const icebox = q('[data-map-number="03"]');
-    expect(icebox.getAttribute('aria-disabled')).toBe('true');
-    expect(icebox.querySelector('.map-screen__pill')?.textContent).toBe('COMING SOON');
-    expect((icebox.querySelector('.map-screen__pill') as HTMLElement).hidden).toBe(false);
-  });
-
-  it('clicking a coming-soon tile does nothing: the Map stays open, no changeRoom call', () => {
-    const { q, changeRoom } = setup();
-    openMap();
-
-    q<HTMLButtonElement>('[data-map-number="03"]').click();
-
-    expect(changeRoom).not.toHaveBeenCalled();
-    expect(q('.map-screen').hidden).toBe(false);
-  });
-
   it('clicking a clickable tile closes the Map, then calls changeRoom with its roomId', () => {
     const { q, changeRoom } = setup();
     openMap();
@@ -299,5 +280,65 @@ describe('createMapScreen', () => {
     openMap();
 
     expect(overlays.current()).toBeNull();
+  });
+});
+
+describe('createMapScreen, with a COMING SOON tile mocked in (#51)', () => {
+  // The real Map loses its `roomId: null` tiles one by one as #51's Rooms
+  // land, so these tests append a made-up one to MAP_ROOMS instead of
+  // relying on any real design card staying COMING SOON. `resetModules`
+  // first, so the dynamic imports below re-resolve `./map-screen` (and
+  // `gameEvents`, which it must share with the test) against the mock.
+  async function setupWithComingSoonTile() {
+    vi.resetModules();
+    vi.doMock('./map-rooms', async (importOriginal) => {
+      const actual = await importOriginal<typeof import('./map-rooms')>();
+      return {
+        ...actual,
+        MAP_ROOMS: [
+          ...actual.MAP_ROOMS,
+          { number: '99', label: '99 · TEST ROOM', subtitle: 'NOT A REAL CARD', roomId: null },
+        ],
+      };
+    });
+    const { gameEvents: events } = await import('../contracts');
+    const { createOverlayManager: createOverlays } = await import('./hud/overlay-manager');
+    const { createMapScreen: create } = await import('./map-screen');
+
+    const root = document.createElement('div');
+    document.body.append(root);
+    const changeRoom = vi.fn<(roomId: RoomId) => void>();
+    currentMapScreen = create(root, {
+      overlays: createOverlays(),
+      changeRoom,
+      currentRoomId: () => 'town-center',
+    });
+    const q = <T extends Element = HTMLElement>(selector: string) =>
+      root.querySelector<T>(selector)!;
+    return { q, changeRoom, openMap: () => events.emit('ui:open-map') };
+  }
+
+  afterEach(() => {
+    vi.doUnmock('./map-rooms');
+    vi.resetModules();
+  });
+
+  it('a coming-soon tile is aria-disabled and shows a COMING SOON pill', async () => {
+    const { q } = await setupWithComingSoonTile();
+
+    const comingSoon = q('[data-map-number="99"]');
+    expect(comingSoon.getAttribute('aria-disabled')).toBe('true');
+    expect(comingSoon.querySelector('.map-screen__pill')?.textContent).toBe('COMING SOON');
+    expect((comingSoon.querySelector('.map-screen__pill') as HTMLElement).hidden).toBe(false);
+  });
+
+  it('clicking a coming-soon tile does nothing: the Map stays open, no changeRoom call', async () => {
+    const { q, changeRoom, openMap: open } = await setupWithComingSoonTile();
+    open();
+
+    q<HTMLButtonElement>('[data-map-number="99"]').click();
+
+    expect(changeRoom).not.toHaveBeenCalled();
+    expect(q('.map-screen').hidden).toBe(false);
   });
 });

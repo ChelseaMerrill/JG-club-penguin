@@ -66,15 +66,16 @@ test('room transitions: doors, changeRoom, HUD, reload (#15)', async ({ page }) 
     .poll(async () => (await debugInfo(page))?.roomEventLog)
     .toEqual([{ type: 'room:enter', roomId: 'town-center' }]);
 
-  // --- A disabled door (THE ICEBOX, `targetRoomId: null`) shows the
-  // "coming soon" hint and leaves the Room unchanged.
-  const icebox = townCenter.doors.find((door) => door.label === 'THE ICEBOX');
-  if (!icebox) throw new Error('expected town-center to have a THE ICEBOX door');
-  await clickStagePoint(page, doorCenter(icebox));
+  // --- A disabled door (`targetRoomId: null`) shows the "coming soon" hint
+  // and leaves the Room unchanged. Whichever Town Center door is still
+  // disabled (THE ICEBOX was, until #51 built its Room).
+  const disabledDoor = townCenter.doors.find((door) => door.targetRoomId === null);
+  if (!disabledDoor) throw new Error('expected town-center to have a disabled door');
+  await clickStagePoint(page, doorCenter(disabledDoor));
   await expect
     .poll(async () => (await debugInfo(page))?.doorReachedLog, { timeout: WALK_TIMEOUT })
-    .toEqual(expect.arrayContaining(['THE ICEBOX']));
-  await expect.poll(async () => (await debugInfo(page))?.comingSoonHint).toBe('THE ICEBOX');
+    .toEqual(expect.arrayContaining([disabledDoor.label]));
+  await expect.poll(async () => (await debugInfo(page))?.comingSoonHint).toBe(disabledDoor.label);
   expect((await debugInfo(page))?.roomId).toBe('town-center');
   await page.screenshot({ path: 'test-results/room-transitions/coming-soon-hint.png' });
 
@@ -84,7 +85,7 @@ test('room transitions: doors, changeRoom, HUD, reload (#15)', async ({ page }) 
   // the "gone" half polls generously rather than a fixed wait, so parallel
   // e2e workers' CPU contention can't flake it.
   await page.waitForTimeout(1500);
-  expect((await debugInfo(page))?.comingSoonHint).toBe('THE ICEBOX');
+  expect((await debugInfo(page))?.comingSoonHint).toBe(disabledDoor.label);
   await expect
     .poll(async () => (await debugInfo(page))?.comingSoonHint, { timeout: 15_000 })
     .toBeNull();

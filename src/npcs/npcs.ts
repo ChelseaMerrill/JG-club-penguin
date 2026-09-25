@@ -34,7 +34,15 @@ export type NpcId =
   | 'tom'
   | 'chelsea'
   | 'tonya'
-  | 'jesse';
+  | 'jesse'
+  // #51: the Icebox's NPCs. Millie, Jason and Darrin already have an npcSlot
+  // in another Room, and an NPC lives in exactly one Room (`roomId`), so
+  // each of their Icebox appearances is its own id.
+  | 'millie-icebox'
+  | 'nicole'
+  | 'jason-icebox'
+  | 'jethro'
+  | 'darrin-icebox';
 
 /**
  * Ian's Bug Squash / Chelsea's Pancake Flip trigger dialog (#36 D4; round-1
@@ -742,6 +750,143 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     ],
     dialog: LINE_DIALOG,
     look: MARKET_PENGUIN_LOOK,
+  },
+  // #51: the Icebox's five NPCs. Names/titles from design/Characters.dc.html
+  // (Millie is on its TITLE TBD list), figures from design/build/humans.js
+  // (matching the figures design/Room 03 The Icebox.dc.html bakes for them),
+  // and tags/`idleLines` from that Room design's own nameplates and
+  // `animation:say` bubbles, verbatim. None of them triggers a Minigame: the
+  // design's "ASK JETHRO FOR A PHOTO" panel is a photo mechanic outside #51.
+  'millie-icebox': {
+    id: 'millie-icebox',
+    name: 'Millie Elliott',
+    title: null,
+    roomId: 'the-icebox',
+    kind: 'human',
+    tagName: 'Millie',
+    dialogLine: 'Quick question before you go in.',
+    idleLines: [
+      { text: 'Team lead question: who owns this?', periodS: 26, delayS: -3 },
+      { text: 'Standup was 4 minutes. Record.', periodS: 26, delayS: -12 },
+      { text: 'Trivia time. Door stays shut.', periodS: 26, delayS: -20 },
+    ],
+    dialog: LINE_DIALOG,
+    // The same figure as her Roof Deck appearance (`millie` above).
+    figure: {
+      style: 'highBun',
+      hair: 'dark',
+      skin: 'med',
+      top: '#8C7A80',
+      jacket: '#1f2a4a',
+      collar: 'crew',
+      necklace: true,
+      teeth: true,
+    },
+  },
+  nicole: {
+    id: 'nicole',
+    name: 'Nicole Roberts',
+    title: 'Account Manager',
+    roomId: 'the-icebox',
+    kind: 'human',
+    tagName: 'Nicole',
+    dialogLine: "The client loved it. Next one's at 2.",
+    idleLines: [
+      { text: 'Client call in 5. Shh.', periodS: 15, delayS: -2 },
+      { text: 'Account manager mode: on.', periodS: 15, delayS: -7 },
+      { text: 'Nope, that is billable.', periodS: 15, delayS: -12 },
+    ],
+    dialog: LINE_DIALOG,
+    // humans.js's spec. The Room design also seats her on a stool with a
+    // laptop on her lap, a scene-only pose the renderer doesn't draw.
+    figure: {
+      style: 'wavyLong',
+      hair: 'lblond',
+      skin: 'fair',
+      top: '#161719',
+      sleeveless: true,
+      necklace: true,
+      teeth: true,
+    },
+  },
+  'jason-icebox': {
+    id: 'jason-icebox',
+    name: 'Jason Jahnel',
+    title: 'COO',
+    roomId: 'the-icebox',
+    kind: 'human',
+    tagName: 'Jason',
+    dialogLine: 'Answer three and you may pass.',
+    idleLines: [
+      { text: 'Stairs challenge. You are behind.', periodS: 26, delayS: -1 },
+      { text: 'Three questions and you may pass.', periodS: 26, delayS: -10 },
+      { text: 'Kickoff in 4:32. Sit.', periodS: 26, delayS: -18 },
+    ],
+    dialog: LINE_DIALOG,
+    figure: {
+      style: 'buzz',
+      hair: 'brown',
+      skin: 'fair',
+      top: '#F4F4F4',
+      pattern: 'plaid',
+      pattern2: '#8FB5D8',
+      collar: 'button',
+      glasses: 'thin',
+      teeth: true,
+    },
+  },
+  jethro: {
+    id: 'jethro',
+    name: 'Jethro Breuer',
+    title: 'Director of Digital Media',
+    roomId: 'the-icebox',
+    kind: 'human',
+    tagName: 'Jethro',
+    dialogLine: "Act natural. Camera's rolling.",
+    idleLines: [
+      { text: 'Act natural. Camera is rolling.', periodS: 21, delayS: -2 },
+      { text: 'One more for the recap.', periodS: 21, delayS: -9 },
+      { text: 'Say hackathon!', periodS: 21, delayS: -16 },
+    ],
+    dialog: LINE_DIALOG,
+    figure: {
+      style: 'short',
+      hair: 'ash',
+      skin: 'fair',
+      top: '#4a4f57',
+      pattern: 'dots',
+      collar: 'button',
+      beard: 'full',
+      beardColor: '#A85A2A',
+      mouth: 'smirk',
+      prop: 'camera',
+    },
+  },
+  'darrin-icebox': {
+    id: 'darrin-icebox',
+    name: 'Darrin Jahnel',
+    title: 'Founder & CEO',
+    roomId: 'the-icebox',
+    kind: 'human',
+    tagName: 'Darrin',
+    dialogLine: 'Show me energy.',
+    idleLines: [
+      { text: 'Show me energy.', periodS: 15, delayS: -1 },
+      { text: 'Serve. Grind. Grow. Inspire.', periodS: 15, delayS: -6 },
+      { text: 'Who is demoing first?', periodS: 15, delayS: -11 },
+    ],
+    dialog: LINE_DIALOG,
+    // The same figure as his Town Center appearance (`darrin` above).
+    figure: {
+      style: 'short',
+      hair: 'brown',
+      skin: 'fair',
+      top: '#BFD6EE',
+      jacket: '#2a2f3a',
+      collar: 'shirtLight',
+      mouth: 'flat',
+      prop: 'tieHeadband',
+    },
   },
 };
 

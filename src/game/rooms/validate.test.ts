@@ -436,11 +436,12 @@ describe('ROOM_DEFINITIONS registry', () => {
     );
 
     expect(connections).toEqual({
-      'town-center': ['dev-pit', 'roof-deck'],
-      'dev-pit': ['town-center'],
+      'town-center': ['dev-pit', 'roof-deck', 'the-icebox'],
+      'dev-pit': ['the-icebox', 'town-center'],
       'the-melt': ['roof-deck', 'town-center'],
       'roof-deck': [],
       igloo: ['town-center'],
+      'the-icebox': ['dev-pit', 'town-center'],
     });
   });
 
@@ -474,6 +475,12 @@ describe('ROOM_DEFINITIONS registry', () => {
     expect(getRoomDefinition('igloo')).toMatchObject({
       title: 'YOUR IGLOO',
       subtitle: 'PLAYER HOME · 1 PENGUIN · 1 HEXLE · 6 FURNITURE SLOTS',
+    });
+    // #51 D1: the design banner's "CONFERENCE · 604 SF · GLASS WALL ·
+    // KICKOFF IN 04:32", minus its fabricated live countdown.
+    expect(getRoomDefinition('the-icebox')).toMatchObject({
+      title: 'THE ICEBOX',
+      subtitle: 'CONFERENCE · 604 SF · GLASS WALL',
     });
   });
 });

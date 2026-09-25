@@ -204,7 +204,11 @@ export const townCenter: RoomDefinition = {
     {
       label: 'THE ICEBOX',
       hotspot: { x: 860, y: 150, ...DOOR_HOTSPOT_SIZE },
-      targetRoomId: null,
+      targetRoomId: 'the-icebox',
+      // The tile just inside the Icebox's own "TOWN CENTER" door (#16 fix 4,
+      // #51 D4): the nearest walkable tile to that door's hotspot centre in
+      // the Icebox's own grid, the same rule `reachability.test.ts` uses for
+      // a door's approach tile.
       entryTile: { col: 0, row: 0 },
     },
     {

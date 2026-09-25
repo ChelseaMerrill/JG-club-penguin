@@ -53,8 +53,10 @@ export const devPit: RoomDefinition = {
     {
       label: 'THE ICEBOX',
       hotspot: { x: 830, y: 135, ...DOOR_HOTSPOT_SIZE },
-      targetRoomId: null,
-      entryTile: { col: 0, row: 0 },
+      targetRoomId: 'the-icebox',
+      // The tile just inside the Icebox's own "DEV PIT" door (#16 fix 4, #51
+      // D4), by the same rule as the TOWN CENTER door below.
+      entryTile: { col: 9, row: 0 },
     },
     {
       label: 'TOWN CENTER',

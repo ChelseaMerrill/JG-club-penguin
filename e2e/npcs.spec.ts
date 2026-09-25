@@ -52,7 +52,7 @@ async function bootRoom(page: Page, roomId: RoomId): Promise<string[]> {
   return errors;
 }
 
-for (const roomId of ['town-center', 'dev-pit', 'the-melt', 'roof-deck'] as const) {
+for (const roomId of ['town-center', 'dev-pit', 'the-melt', 'roof-deck', 'the-icebox'] as const) {
   test(`npcs-${roomId}: NPCs show at their designed positions`, async ({ page }) => {
     const errors = await bootRoom(page, roomId);
 

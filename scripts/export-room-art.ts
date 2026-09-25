@@ -1,4 +1,4 @@
-// Exports the five prototype Room backgrounds from the design/ mirror
+// Exports the Room backgrounds from the design/ mirror
 // (see design/SYNC-LOG.md — design/ is a byte-exact mirror, never edited by
 // this script) into public/rooms/<RoomId>.png.
 //
@@ -15,8 +15,10 @@
 //      bubbles — leaving only the floor, walls, furniture and fixed props.
 //   5. Screenshots the resulting 1600x900 Stage to public/rooms/<id>.png.
 //
-// Run with `npm run export:room-art`. Rerunning after a design resync is
-// safe and idempotent (same rules, same output paths).
+// Run with `npm run export:room-art` to export every Room, or name Room ids
+// to export only those (`npm run export:room-art -- the-icebox`), so adding
+// one Room never re-encodes the others' PNGs (#51 D3). Rerunning after a
+// design resync is safe and idempotent (same rules, same output paths).
 import { chromium } from '@playwright/test';
 import { createServer } from 'node:http';
 import type { Server } from 'node:http';
@@ -46,8 +48,27 @@ const STAGE_SELECTOR = '[data-screen-label]';
 // hiding elements never lands mid-frame.
 const POST_HIDE_SETTLE_MS = 50;
 const PAGE_LOAD_TIMEOUT_MS = 15_000;
+// Page errors every design with its own logic raises harmlessly (#51): the
+// browser also runs a file's inline `<script data-dc-script>` as a classic
+// script while parsing, where its `class Component extends DCLogic` throws
+// because `DCLogic` is no global; `design/support.js` then reads that same
+// script's text and runs it itself with `DCLogic` in scope, which is the
+// run that actually drives the Room. The Icebox is the first exported Room
+// with such a script.
+const BENIGN_PAGE_ERRORS: readonly RegExp[] = [/^DCLogic is not defined$/];
 
-type RoomId = 'town-center' | 'dev-pit' | 'the-melt' | 'roof-deck' | 'igloo';
+type RoomId = 'town-center' | 'dev-pit' | 'the-melt' | 'roof-deck' | 'igloo' | 'the-icebox';
+
+// Per-Room overrides of STAGE_SELECTOR (#51 D3), for a design file whose
+// first `data-screen-label` element isn't the Stage this Room exports (e.g.
+// a file drawing several Stages). A Room not listed here uses the default.
+const STAGE_SELECTORS: Partial<Record<RoomId, string>> = {
+  // The Icebox file's only Stage element. Its label also appears a second
+  // time inside the design's own <script> (a `querySelector` string), which
+  // is text, not an element, so the default already matches just this one;
+  // named explicitly so the exported Stage is unambiguous.
+  'the-icebox': '[data-screen-label="THE ICEBOX (CONFERENCE)"]',
+};
 
 // D1: Room -> design file mapping (see the #16 execution plan comment).
 const ROOM_FILES: Record<RoomId, string> = {
@@ -56,6 +77,7 @@ const ROOM_FILES: Record<RoomId, string> = {
   'the-melt': 'Kitchen.dc.html', // RoomId `the-melt` stays; the design now calls it THE KITCHEN (#92 D1).
   'roof-deck': 'Room 05 Roof Deck.dc.html', // not the "05b ... Day" variant.
   igloo: 'Room 06 Igloo.dc.html',
+  'the-icebox': 'Room 03 The Icebox.dc.html', // #51 D1.
 };
 
 // A hide rule targets one of three shapes the design markup uses for a live
@@ -74,6 +96,12 @@ type HideRule =
   // wrapping them in their own <g>, so hiding one means walking back over
   // up to 2 preceding svg/rect/polygon siblings of the exact-matching text.
   | { kind: 'labels'; texts: string[]; comment: string }
+  // Static <text> labels whose whole character is wrapped in one plain,
+  // un-animated <g> (#51): hides the exact-matching <text>'s parent <g>, so
+  // the figure, its ground shadow, nameplate and nested speech bubbles all
+  // go with it. `labels` can't reach these: its sibling walk stops at the
+  // <g> wrapping the figure, leaving the shadow ellipse baked in.
+  | { kind: 'label-group'; texts: string[]; comment: string }
   // Exact-matching <text> elements only (#77): unlike `labels`, this never
   // touches preceding siblings, so a backing shape the <text> sits inside
   // (a hexagon badge, a banner plate) stays in the exported art -- only the
@@ -406,6 +434,80 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
         'The open shop/market side panel (CAPS/HEXLES/IGLOO/EMOTES tabs, item cards, balance) (HUD).',
     },
   ],
+  'the-icebox': [
+    // #51: every character here except the local player walks a `*Roam`
+    // loop, with its name bubble and `say` speech bubbles nested inside that
+    // animated group, so one rule per character hides all of it.
+    {
+      kind: 'animation',
+      names: ['milRoam'],
+      comment: "Millie's roaming figure, with her nested name bubble and speech bubbles.",
+    },
+    {
+      kind: 'animation',
+      names: ['nicRoam'],
+      comment:
+        "Nicole's roaming figure (seated with a laptop), with her nested name bubble and speech bubbles.",
+    },
+    {
+      kind: 'animation',
+      names: ['jasRoam'],
+      comment: "Jason's roaming figure, with his nested name bubble and speech bubbles.",
+    },
+    {
+      kind: 'animation',
+      names: ['jetRoam'],
+      comment:
+        "Jethro's roaming figure and camera rig (its flash bulb included), with his nested name bubble and speech bubbles.",
+    },
+    {
+      kind: 'animation',
+      names: ['darRoam'],
+      comment: "Darrin's roaming figure, with his nested name bubble and speech bubbles.",
+    },
+    {
+      kind: 'label-group',
+      texts: ['You'],
+      comment:
+        'The local player\'s own Penguin: a static <g> of shadow, figure, "You" nameplate and its "Wait, I blinked." bubble.',
+    },
+    {
+      kind: 'animation',
+      names: ['blink'],
+      comment: "Blinking '↙ TOWN CENTER' room-exit nav pill (HUD).",
+    },
+    {
+      kind: 'cluster',
+      anchor: '← MAP',
+      companions: ['← MAP', '03 · THE ICEBOX (CONFERENCE)'],
+      comment: 'Top-left breadcrumb nav (HUD).',
+    },
+    {
+      kind: 'cluster',
+      anchor: 'THE ICEBOX',
+      companions: ['THE ICEBOX', 'CONFERENCE · 604 SF · GLASS WALL · KICKOFF IN 04:32'],
+      comment: 'Room title/subtitle banner (HUD).',
+    },
+    {
+      kind: 'cluster',
+      anchor: 'MENU',
+      companions: ['1,250', '12 ONLINE', 'MENU', 'QUEST'],
+      comment: 'Top-right token/presence/menu/quest HUD cluster.',
+    },
+    {
+      kind: 'cluster',
+      anchor: 'ASK JETHRO FOR A PHOTO',
+      companions: ['ASK JETHRO FOR A PHOTO', 'JETHRO ALSO SNAPS ON HIS OWN'],
+      comment:
+        "The design's photo panel: the ASK JETHRO FOR A PHOTO button, its photo counter and Jethro's quote pill (HUD).",
+    },
+    {
+      kind: 'cluster',
+      anchor: 'EMOTE',
+      companions: ['EMOTE', 'SNOWBALL', 'QUESTS'],
+      comment: 'Bottom chat/action toolbar (HUD).',
+    },
+  ],
   igloo: [
     {
       kind: 'animation',
@@ -611,6 +713,29 @@ function hideLiveElements(rules: HideRule[]): void {
     }
   }
 
+  // #51: hides the plain <g> wrapping each exact-matching <text>, and fails
+  // the export loudly if a label matches nothing or sits outside such a <g>
+  // (a design resync that changed the markup), rather than silently leaving
+  // a baked character in the art.
+  function hideLabelGroups(texts: string[]): void {
+    for (const text of texts) {
+      const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+      let group: Element | null = null;
+      let node: Node | null;
+      while ((node = walker.nextNode())) {
+        const parent = node.parentElement;
+        if (node.nodeValue?.trim() === text && parent?.tagName.toLowerCase() === 'text') {
+          group = parent.parentElement;
+          break;
+        }
+      }
+      if (!group || group.tagName.toLowerCase() !== 'g') {
+        throw new Error(`label-group hide rule found no <g>-wrapped <text> for "${text}"`);
+      }
+      (group as SVGElement).style.setProperty('display', 'none', 'important');
+    }
+  }
+
   function hideCluster(anchor: string, companions: string[]): void {
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
     let node: Node | null;
@@ -643,6 +768,7 @@ function hideLiveElements(rules: HideRule[]): void {
   for (const rule of rules) {
     if (rule.kind === 'animation') hideAnimationNames(rule.names);
     else if (rule.kind === 'labels') hideLabels(rule.texts);
+    else if (rule.kind === 'label-group') hideLabelGroups(rule.texts);
     else if (rule.kind === 'text-only') hideTextOnly(rule.entries);
     else hideCluster(rule.anchor, rule.companions);
   }
@@ -658,12 +784,16 @@ async function exportRoom(
   const page = await browser.newPage({ viewport: { width: STAGE_WIDTH, height: STAGE_HEIGHT } });
 
   const pageErrors: string[] = [];
-  page.on('pageerror', (err) => pageErrors.push(err.message));
+  page.on('pageerror', (err) => {
+    if (!BENIGN_PAGE_ERRORS.some((pattern) => pattern.test(err.message))) {
+      pageErrors.push(err.message);
+    }
+  });
 
   await page.addInitScript(freezeAnimations);
   await page.goto(`http://127.0.0.1:${port}/${encodeURIComponent(file)}`, { waitUntil: 'load' });
   await page.waitForSelector('#dc-root', { timeout: PAGE_LOAD_TIMEOUT_MS });
-  const stage = page.locator(STAGE_SELECTOR);
+  const stage = page.locator(STAGE_SELECTORS[roomId] ?? STAGE_SELECTOR);
   await stage.waitFor({ state: 'visible', timeout: PAGE_LOAD_TIMEOUT_MS });
   // Let the @font-face fonts finish loading before screenshotting -- without
   // this, two runs can race a fallback-vs-real-font repaint and produce
@@ -692,14 +822,29 @@ async function exportRoom(
   return { roomId, outPath, bytes: size };
 }
 
+/**
+ * The Rooms to export: every Room when no ids are given, otherwise exactly
+ * the named ones (#51 D3). Throws on an unknown id rather than skipping it.
+ */
+function selectRoomIds(args: readonly string[]): RoomId[] {
+  const all = Object.keys(ROOM_FILES) as RoomId[];
+  if (args.length === 0) return all;
+  const unknown = args.filter((arg) => !(all as string[]).includes(arg));
+  if (unknown.length > 0) {
+    throw new Error(`Unknown Room id(s): ${unknown.join(', ')}. Known: ${all.join(', ')}`);
+  }
+  return all.filter((id) => args.includes(id));
+}
+
 async function main(): Promise<void> {
+  const roomIds = selectRoomIds(process.argv.slice(2));
   await mkdir(OUTPUT_DIR, { recursive: true });
   const { server, port } = await serveDesignDir();
   const browser = await chromium.launch();
 
   try {
     const results: Array<{ roomId: RoomId; outPath: string; bytes: number }> = [];
-    for (const roomId of Object.keys(ROOM_FILES) as RoomId[]) {
+    for (const roomId of roomIds) {
       const result = await exportRoom(browser, port, roomId);
       results.push(result);
       const kb = (result.bytes / 1024).toFixed(0);
