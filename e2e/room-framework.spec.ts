@@ -59,7 +59,7 @@ function collectErrors(page: Page): string[] {
 }
 
 /**
- * Hides the signed-out Landing page (the login card), the same way
+ * Hides the signed-out Landing page, the same way
  * `e2e/smoke.spec.ts` does, so the Room underneath is fully visible for the
  * screenshot. #13 doesn't touch auth, so every visit here is signed-out.
  */

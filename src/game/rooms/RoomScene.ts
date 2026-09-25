@@ -301,7 +301,11 @@ export class RoomScene extends Scene {
     this.cameras.main.setBackgroundColor(STAGE_BACKGROUND_COLOR);
     this.cameras.main.setScroll(0, 0);
 
-    this.drawWalls(room);
+    // The exported design art already draws the walls and floor (#16 fix 2);
+    // the procedural walls are only for the `procedural` fallback background.
+    if (room.background.kind !== 'image') {
+      this.drawWalls(room);
+    }
     this.drawBackground(room);
     this.drawDoors(room);
     this.drawProps(room);
@@ -645,10 +649,32 @@ export class RoomScene extends Scene {
     }
   }
 
+  /**
+   * Over the exported design art (#16 fix 2), the art itself already draws
+   * every door sign/doorway, so a door only needs an invisible interactive
+   * hit area for its click, not the procedural rectangle-and-label the
+   * `procedural` fallback background still draws.
+   */
   private drawDoors(room: RoomDefinition): void {
+    const isImageBackground = room.background.kind === 'image';
     for (const door of room.doors) {
       const centerX = door.hotspot.x + door.hotspot.width / 2;
       const centerY = door.hotspot.y + door.hotspot.height / 2;
+
+      // Over exported design art the door is already drawn, so the hit area
+      // is an invisible Zone (#16). Not an alpha-0 shape: Phaser drops
+      // objects that won't render from input hit-testing, so an alpha-0
+      // rectangle can never be clicked.
+      if (isImageBackground) {
+        const zone = this.add
+          .zone(centerX, centerY, door.hotspot.width, door.hotspot.height)
+          .setDepth(DOOR_DEPTH)
+          .setInteractive({ useHandCursor: true });
+        this.doorHitAreas.push({ object: zone, data: door });
+        continue;
+      }
+
+      // Procedural rough art gets the outlined rectangle and label.
       const rect = this.add.rectangle(
         centerX,
         centerY,
@@ -656,10 +682,10 @@ export class RoomScene extends Scene {
         door.hotspot.height,
         DOOR_COLOR,
       );
-      rect.setStrokeStyle(DOOR_BORDER_WIDTH, DOOR_BORDER_COLOR);
       rect.setDepth(DOOR_DEPTH);
       rect.setInteractive({ useHandCursor: true });
       this.doorHitAreas.push({ object: rect, data: door });
+      rect.setStrokeStyle(DOOR_BORDER_WIDTH, DOOR_BORDER_COLOR);
       this.add
         .text(centerX, centerY, door.label, {
           fontFamily: LABEL_FONT_FAMILY,

@@ -72,6 +72,18 @@ export interface RoomProp {
 }
 
 /**
+ * A non-door clickable target (#16 D5): the Igloo's `trophy-case` and the
+ * Roof Deck's `igloo-gear-stall`. `rect` reuses `DoorHotspot`'s shape (stage
+ * pixel coordinates); `validate.ts` checks `id` is unique within the Room and
+ * `rect` lies within the 1600x900 Stage.
+ */
+export interface RoomHotspot {
+  id: string;
+  label: string;
+  rect: DoorHotspot;
+}
+
+/**
  * A Room is data: everything `RoomScene` needs to render and validate one
  * Room, and everything #14/#15/#16/#28 need to place Penguins, NPCs and
  * furniture in it.
@@ -89,4 +101,6 @@ export interface RoomDefinition {
   npcSlots: readonly RoomNpcSlot[];
   furnitureSlots?: readonly RoomFurnitureSlot[];
   props?: readonly RoomProp[];
+  /** Non-door clickable targets (#16 D5): e.g. the Igloo's `trophy-case`. */
+  hotspots?: readonly RoomHotspot[];
 }
