@@ -37,6 +37,9 @@ export function initDevHudHook(hud: Hud): boolean {
   gameEvents.on('ui:open-creator', () => openCreatorLog.push(Date.now()));
 
   window.__hudTest = {
+    // Test-only: emits `room:enter` directly for HUD-title assertions, with
+    // no navigator/Session involved. Not a real producer — #15's
+    // `room-navigator.ts` is the only one outside tests.
     emitRoomEnter(roomId) {
       gameEvents.emit('room:enter', { roomId, entryTile: { col: 0, row: 0 } });
     },

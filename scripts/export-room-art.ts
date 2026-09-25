@@ -53,7 +53,7 @@ type RoomId = 'town-center' | 'dev-pit' | 'the-melt' | 'roof-deck' | 'igloo';
 const ROOM_FILES: Record<RoomId, string> = {
   'town-center': 'Room 01 Town Center.dc.html',
   'dev-pit': 'Room 02 Dev Pit.dc.html',
-  'the-melt': 'Room 04 Kitchen.dc.html', // The Melt is the Kitchen.
+  'the-melt': 'Kitchen.dc.html', // RoomId `the-melt` stays; the design now calls it THE KITCHEN (#92 D1).
   'roof-deck': 'Room 05 Roof Deck.dc.html', // not the "05b ... Day" variant.
   igloo: 'Room 06 Igloo.dc.html',
 };
@@ -74,6 +74,19 @@ type HideRule =
   // wrapping them in their own <g>, so hiding one means walking back over
   // up to 2 preceding svg/rect/polygon siblings of the exact-matching text.
   | { kind: 'labels'; texts: string[]; comment: string }
+  // Exact-matching <text> elements only (#77): unlike `labels`, this never
+  // touches preceding siblings, so a backing shape the <text> sits inside
+  // (a hexagon badge, a banner plate) stays in the exported art -- only the
+  // baked glyph run itself is hidden, because a live DOM overlay redraws it
+  // sharp instead (see the #77 execution plan and `src/ui/wall-text/
+  // wall-text.ts`). Matches on the element's own `transform` attribute too,
+  // not text content alone: Town Center's "SERVE" text also appears a second
+  // time (an already-hidden trophy-badge icon nested in Sydney's own
+  // `walkSyd`/`trophyShow` animation group), and the two would otherwise be
+  // ambiguous. Matching by `transform` also means a future design change
+  // that moves a label harmlessly stops matching, rather than silently
+  // hiding the wrong node.
+  | { kind: 'text-only'; entries: { text: string; transform: string }[]; comment: string }
   // HTML/DIV HUD chrome. `anchor` is a literal text string known to be
   // unique on the page; `companions` (which includes the anchor) is the
   // full set of literal strings that must all appear somewhere in the
@@ -138,6 +151,23 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
       texts: ['Front Desk', 'Welcome to JG HQ!', 'You', 'Gil · betta'],
       comment:
         'Static (non-animated) name/speech labels not wrapped in an animated group: the Front Desk receptionist (a penguin NPC) and her greeting bubble, the local player\'s "You" nameplate, and the fish tank\'s name label.',
+    },
+    {
+      kind: 'text-only',
+      // Each `transform` is copied verbatim from `design/Room 01 Town
+      // Center.dc.html`'s own five `<text transform="matrix(1 0.5 0 1 x
+      // y)">` elements (#77 D2): this is also what `RoomWallText.x`/`y`/
+      // `skewY` in `src/game/rooms/definitions/town-center.ts` were traced
+      // from.
+      entries: [
+        { text: 'CORE VALUES', transform: 'matrix(1 0.5 0 1 1045.0 217.5)' },
+        { text: 'SERVE', transform: 'matrix(1 0.5 0 1 995.0 224.0)' },
+        { text: 'GRIND', transform: 'matrix(1 0.5 0 1 1028.5 240.8)' },
+        { text: 'GROW', transform: 'matrix(1 0.5 0 1 1062.0 257.5)' },
+        { text: 'INSPIRE', transform: 'matrix(1 0.5 0 1 1095.5 274.3)' },
+      ],
+      comment:
+        'The Core Values poster\'s heading and four hexagon labels (#77): redrawn live by src/ui/wall-text/wall-text.ts, since the design bakes them at a font-size/letter-spacing that overflows their hexagons. The hexagon/banner backing shapes themselves are kept (only the exact-matching <text> is hidden, not preceding siblings) -- see the "text-only" HideRule kind above.',
     },
     {
       kind: 'cluster',
@@ -235,28 +265,40 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
     },
   ],
   'the-melt': [
-    // Every character in this Room is a flat, non-animated svg+nameplate
-    // pair (confirmed by inspection -- no CSS keyframes are applied to any
-    // figure here), so this Room has no `animation` rules for characters.
+    // #92 D3 resync: the design now names a single "Chelsea" (near the
+    // pancake station) instead of the pre-resync "Chef Chelsea"/"Chelsea
+    // Merrill" pair, and adds "Tom", a walking, coffee-obsessed NPC.
+    // Chelsea, Tonya and Jesse are still flat, non-animated svg+nameplate
+    // pairs; only Tom and every speech bubble use CSS keyframes.
     {
       kind: 'animation',
       names: ['blink'],
-      comment: "Blinking '↙ TOWN CENTER' / 'ROOF DECK ↗' room-exit nav pills (HUD).",
+      comment:
+        "Blinking '↙ TOWN CENTER' / 'ROOF DECK ↗' room-exit nav pills, and the new 'TALK · PANCAKE FLIP' / 'TALK · COFFEE RUSH' minigame prompt pills (all HUD).",
+    },
+    {
+      kind: 'animation',
+      names: ['tomWalk'],
+      comment:
+        "Tom's walking figure: unlike this Room's other NPCs, his nested name/speech bubbles all sit inside his own animated group, so this one rule hides his entire figure.",
+    },
+    {
+      kind: 'animation',
+      names: ['idle'],
+      comment:
+        "Tonya's and Jesse's subtle idle body motion (their nameplates are static -- see the labels rule below).",
+    },
+    {
+      kind: 'animation',
+      names: ['say'],
+      comment:
+        'Every speech bubble in this Room (Chelsea, Tonya, Jesse and the floating "who took my yogurt" bubble), all sharing this one keyframe.',
     },
     {
       kind: 'labels',
-      texts: [
-        'Chef Chelsea',
-        'Fresh pot!',
-        'Chelsea Merrill',
-        'Flip it NOW.',
-        'who took my yogurt',
-        'Tonya',
-        'Jesse',
-        'You',
-      ],
+      texts: ['Chelsea', 'Tonya', 'Jesse', 'You'],
       comment:
-        'Stationary NPCs/Penguins and their name/speech labels: two cook NPCs (Chef Chelsea, Chelsea Merrill) plus their bubbles, a floating "who took my yogurt" bubble, the Tonya and Jesse penguin NPCs, and the local player.',
+        'Stationary NPCs/Penguins and their nameplates: the Chelsea and Tonya/Jesse penguin NPCs, and the local player.',
     },
     {
       kind: 'cluster',
@@ -266,8 +308,8 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
     },
     {
       kind: 'cluster',
-      anchor: 'THE MELT',
-      companions: ['THE MELT', 'KITCHEN · FLOOR 5 · 4 PENGUINS HERE · COFFEE: FRESH'],
+      anchor: 'THE KITCHEN',
+      companions: ['THE KITCHEN', 'KITCHEN · FLOOR 5 · 4 PENGUINS HERE · COFFEE: FRESH'],
       comment: 'Room title/subtitle banner (HUD).',
     },
     {
@@ -464,6 +506,25 @@ function freezeAnimations(): void {
   document.addEventListener('DOMContentLoaded', attach);
 }
 
+// Runs in the browser context (page.evaluate), after the design's React
+// runtime has actually rendered the Room's `<svg>` (unlike `freezeAnimations`
+// above, which runs via `addInitScript` before any of it exists): pauses
+// every `<svg>`'s own SMIL (`<animate>`) timeline and resets it to time 0.
+// The Kitchen's oven glow (#92 round 2 nit 5) uses `<animate>`, which
+// `animation-play-state` never reaches (that CSS property only ever applies
+// to CSS animations), so without this a re-export could land on whatever
+// glow phase happened to be current when the screenshot fired.
+function freezeSmilAnimations(): void {
+  document.querySelectorAll('svg').forEach((svg) => {
+    const smilSvg = svg as SVGSVGElement & {
+      pauseAnimations?: () => void;
+      setCurrentTime?: (time: number) => void;
+    };
+    smilSvg.pauseAnimations?.();
+    smilSvg.setCurrentTime?.(0);
+  });
+}
+
 // Runs in the browser context (page.evaluate) against one Room's rules.
 function hideLiveElements(rules: HideRule[]): void {
   const CHROME_TAGS = new Set(['rect', 'polygon', 'svg', 'path', 'circle', 'ellipse', 'line']);
@@ -495,13 +556,58 @@ function hideLiveElements(rules: HideRule[]): void {
       const toHide: Element[] = [textEl];
       let sibling = textEl.previousElementSibling;
       let hops = 0;
-      while (sibling && hops < 2 && CHROME_TAGS.has(sibling.tagName.toLowerCase())) {
+      // 3, not 2 (#92 round 2 nit 5): the shared `peng()` sprite this design
+      // draws every static NPC/Penguin with is exactly four flat siblings --
+      // ellipse (ground shadow), svg (body), rect (nameplate background),
+      // text (name) -- so a 2-hop walk back from the name stopped one short,
+      // at the nameplate background, always leaving the shadow ellipse
+      // behind. Caught as Ian's shadow bleeding onto Dev Pit's desk B in the
+      // exported art; the same shape for every other static character in
+      // every Room, so the limit is raised generally rather than patched
+      // per-character. Still bounded (not unlimited) so an unrelated
+      // preceding shape of one of these tag kinds can never be swept in.
+      while (sibling && hops < 3 && CHROME_TAGS.has(sibling.tagName.toLowerCase())) {
         toHide.push(sibling);
         sibling = sibling.previousElementSibling;
         hops++;
       }
       for (const el of toHide)
         (el as HTMLElement | SVGElement).style.setProperty('display', 'none', 'important');
+    }
+  }
+
+  // #77: hides only the exact-matching <text> element itself, never any
+  // preceding sibling -- unlike `hideLabels`, which also walks back over
+  // chrome siblings to hide a whole name-plate/speech-bubble group. Matches
+  // on both text content and the element's own `transform` attribute (see
+  // the `text-only` HideRule variant's own comment for why: text content
+  // alone isn't unique enough on this page).
+  function hideTextOnly(entries: { text: string; transform: string }[]): void {
+    // #77 review round 1 nit 8: tracks which `entries` actually matched
+    // something, so a design resync that renames/moves/removes a targeted
+    // label fails the export loudly instead of silently leaving a baked
+    // label in the art that a live DOM overlay is also drawing over.
+    const matchCounts = new Map<(typeof entries)[number], number>(entries.map((e) => [e, 0]));
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    let node: Node | null;
+    while ((node = walker.nextNode())) {
+      const value = node.nodeValue ? node.nodeValue.trim() : '';
+      const el = node.parentElement;
+      if (!el) continue;
+      const match = entries.find(
+        (entry) => entry.text === value && el.getAttribute('transform') === entry.transform,
+      );
+      if (match) {
+        matchCounts.set(match, (matchCounts.get(match) ?? 0) + 1);
+        (el as HTMLElement | SVGElement).style.setProperty('display', 'none', 'important');
+      }
+    }
+    for (const [entry, count] of matchCounts) {
+      if (count === 0) {
+        throw new Error(
+          `text-only hide rule matched nothing for "${entry.text}" (transform: ${entry.transform})`,
+        );
+      }
     }
   }
 
@@ -537,6 +643,7 @@ function hideLiveElements(rules: HideRule[]): void {
   for (const rule of rules) {
     if (rule.kind === 'animation') hideAnimationNames(rule.names);
     else if (rule.kind === 'labels') hideLabels(rule.texts);
+    else if (rule.kind === 'text-only') hideTextOnly(rule.entries);
     else hideCluster(rule.anchor, rule.companions);
   }
 }
@@ -562,6 +669,9 @@ async function exportRoom(
   // this, two runs can race a fallback-vs-real-font repaint and produce
   // slightly different pixels.
   await page.evaluate(() => document.fonts.ready);
+  // Only reachable now that the design's `<svg>` actually exists (see
+  // `freezeSmilAnimations`'s own comment).
+  await page.evaluate(freezeSmilAnimations);
 
   if (pageErrors.length > 0) {
     await page.close();

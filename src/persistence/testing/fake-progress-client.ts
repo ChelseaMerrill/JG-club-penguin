@@ -66,6 +66,7 @@ export interface FakeResponses {
   upsertSlot?: { error: FakeError | null };
   recordRound?: FakeResult<unknown>;
   purchaseItem?: FakeResult<unknown>;
+  leaderboard?: FakeResult<unknown>;
 }
 
 export type LoggedCall = [op: string, ...args: unknown[]];
@@ -115,6 +116,8 @@ export function makeFakeClient(responses: FakeResponses = {}): {
   const purchaseItem =
     responses.purchaseItem ??
     ({ data: { balance: 100 }, error: null } satisfies FakeResult<unknown>);
+  const leaderboard =
+    responses.leaderboard ?? ({ data: [], error: null } satisfies FakeResult<unknown>);
 
   const client: ProgressClient = {
     from(table) {
@@ -242,6 +245,9 @@ export function makeFakeClient(responses: FakeResponses = {}): {
       }
       if (fn === 'purchase_item') {
         return Promise.resolve(purchaseItem);
+      }
+      if (fn === 'leaderboard') {
+        return Promise.resolve(leaderboard);
       }
       throw new Error(`unexpected rpc ${fn}`);
     },

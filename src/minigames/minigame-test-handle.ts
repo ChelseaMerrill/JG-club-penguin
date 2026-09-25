@@ -17,4 +17,9 @@ export interface MinigameTestHandle {
    *  isn't the loaded Minigame. Additive alongside `finishNow`, which stays
    *  `bug-squash`-only. */
   finishPancakeFlipNow(): void;
+  /** Ends a Snow Cone Stand round now, as if the shell's timer reached 0:
+   *  its 120s round is too long to play out for real in e2e. A no-op when
+   *  Snow Cone Stand isn't the loaded Minigame. Additive alongside
+   *  `finishNow`/`finishPancakeFlipNow` (issue #49). */
+  finishSnowConeStandNow(): void;
 }

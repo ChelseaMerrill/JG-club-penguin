@@ -75,6 +75,9 @@ A one-off expression a Penguin shows to everyone in its Room, picked from the ei
 **Snowball mode**
 A HUD mode where Penguins throw snowballs at each other within a Room. Stretch for the prototype.
 
+**Snow hat**
+The 10 second effect on a Penguin hit by a snowball in Snowball mode, seen by everyone in the Room. Not a hat in the Penguin look, never part of Presence, and not shown to Players who join later.
+
 ### NPCs and Minigames
 
 **NPC**
@@ -85,6 +88,9 @@ A bounded exchange between a Penguin and an NPC — either **Dialogue** (the NPC
 
 **Minigame**
 A short, timed activity launched from an NPC Interaction, such as Bug Squash in Dev Pit or Pancake Flip in The Melt. Each play is a **round**: it has a timer and a score, pays Tokens, saves the Player's **personal best** for that Minigame, and can earn a Badge. Payouts are calculated by the server, never trusted from the client.
+
+**Leaderboard**
+A per-Minigame ranking of named Players' personal bests, shown by Penguin name; ties go to whoever reached the score first. Shown on the Minigame's done screen, all-time, top 10 plus the Player's own rank when it falls outside that.
 
 **Quest**
 A tracked objective shown in the Quests panel and the HUD quest widget. Stretch for the prototype. "Task" is not part of this project's vocabulary.

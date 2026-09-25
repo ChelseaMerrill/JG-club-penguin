@@ -1,48 +1,9 @@
 import { mkdirSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
-import type { Facing, HexColor, PenguinLook, RoomId, Tile } from '../src/contracts';
-import type { RegisteredPlayer } from '../src/game/movement/registered-player';
 import type { PenguinAnim } from '../src/game/penguin/poses';
-
-// Mirrors `src/game/rooms/dev-room-hook.ts`'s debug shape (see
-// `e2e/click-to-move.spec.ts` for why this is redeclared rather than
-// imported: it reads `import.meta.env`, which the `e2e` tsconfig doesn't
-// type-check).
-interface LocalPenguinDebugInfo {
-  tile: Tile;
-  target?: Tile;
-  anim: PenguinAnim;
-  facing: Facing;
-  moving: boolean;
-  flipX: boolean;
-  lookName: string;
-  lookBody: HexColor;
-  playerId: string;
-}
-
-interface RoomDebugInfo {
-  roomId: RoomId;
-  scrollX: number;
-  scrollY: number;
-  localPenguin?: LocalPenguinDebugInfo;
-  textureListenerCount?: number;
-  npcArrivedLog?: string[];
-  doorReachedLog?: string[];
-  localPenguinMoveLog?: Tile[];
-  restartRoom?: () => void;
-  restartCount?: number;
-  penguinCount?: number;
-  remotePenguinCount?: number;
-  setRegisteredPlayer?: (player: RegisteredPlayer) => void;
-  spawnDebugPenguin?: (tile: Tile, look: PenguinLook) => void;
-}
-
-declare global {
-  interface Window {
-    __roomDebug?: RoomDebugInfo;
-  }
-}
+// The shared `window.__roomDebug` ambient type and its shape.
+import type { RoomDebugInfo } from './support/room-debug-types';
 
 const OUTPUT_DIR = 'test-results/emote-picker';
 /** Generous: covers Phaser/WebGL cold-start plus the picker's own DOM mount. */

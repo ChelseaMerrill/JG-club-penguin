@@ -69,6 +69,38 @@ export interface PurchaseResult {
 }
 
 /**
+ * One row of a Minigame's leaderboard (#70): `rank` and `bestScore` per
+ * `public.leaderboard`'s `row_number()` ordering (`best_score desc,
+ * updated_at asc, player_id asc`), `penguinName` for display, and `isMe`
+ * true on at most one row -- the caller's own, present even when it falls
+ * outside the requested row count. Producer: `public.leaderboard` (#70).
+ * Consumer: `src/minigames/minigame-leaderboard.ts`.
+ */
+export interface LeaderboardEntry {
+  rank: number;
+  penguinName: string;
+  bestScore: number;
+  isMe: boolean;
+}
+
+/** `ProgressStore.leaderboard`'s row count when `maxRows` is omitted. */
+export const LEADERBOARD_DEFAULT_ROWS = 10;
+
+/** The most rows `ProgressStore.leaderboard` will ever return for the top-N part of the board. */
+export const LEADERBOARD_MAX_ROWS = 50;
+
+/**
+ * Mirrors `public.leaderboard`'s own clamp
+ * (`least(greatest(coalesce(max_rows, 10), 1), 50)`): `undefined`/`null`
+ * become `LEADERBOARD_DEFAULT_ROWS`; anything else is floored to an integer
+ * and clamped to `[1, LEADERBOARD_MAX_ROWS]`.
+ */
+export function clampLeaderboardRows(maxRows?: number | null): number {
+  const requested = maxRows ?? LEADERBOARD_DEFAULT_ROWS;
+  return Math.min(Math.max(Math.trunc(requested), 1), LEADERBOARD_MAX_ROWS);
+}
+
+/**
  * Every way a `ProgressStore` call can fail. Mirrors the messages raised by
  * #27's `record_round` / `purchase_item` functions and its check
  * constraints, plus the look- and slot-shape errors the in-memory fake and
@@ -205,4 +237,15 @@ export interface ProgressStore {
    * out-of-range slot (only 1-6 are valid) rejects with `invalid_slot`.
    */
   setSlot(slot: IglooSlot, itemId: string | null): Promise<void>;
+
+  /**
+   * The top `maxRows` (clamped by `clampLeaderboardRows`, default
+   * `LEADERBOARD_DEFAULT_ROWS`) Players by personal best at `minigameId`,
+   * plus the caller's own row (appended, `isMe: true`) when it falls
+   * outside that count. A Player whose name is blank, or whose best is
+   * above `minigameId`'s plausibility ceiling, never appears (#70 R1/R2).
+   * Rejects with `unknown_minigame` or `not_authenticated`, or with a plain
+   * `Error` (e.g. a network failure) for anything else.
+   */
+  leaderboard(minigameId: MinigameId, maxRows?: number): Promise<LeaderboardEntry[]>;
 }

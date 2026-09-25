@@ -1,7 +1,8 @@
-import { Data, GameObjects, Scene, Scenes, type Input, type Tweens } from 'phaser';
+import { Data, GameObjects, Scene, Scenes, type Input, type Time, type Tweens } from 'phaser';
 import {
   gameEvents,
   SPAWN_ROOM_ID,
+  type Facing,
   type PenguinLook,
   type RoomId,
   type Tile,
@@ -12,6 +13,7 @@ import {
   type LocalPenguinController,
 } from '../movement/controller';
 import { nearestReachable, nearestWalkable, tilesEqual } from '../movement/pathfinding';
+import { TILE_STEP_MS } from '../movement/speed';
 import {
   resolveRegisteredLook,
   resolveRegisteredPlayerId,
@@ -38,6 +40,8 @@ import {
 import { getRoomDefinition, hasRoomDefinition } from './registry';
 import type { RoomDefinition, RoomDoor, RoomHotspot, RoomNpcSlot } from './room-definition';
 import { RoomPenguinView, type PlacePenguin } from './room-penguin-view';
+import type { SnowballView } from '../../snowball/snowball-controller';
+import { arcPoint, clampTileToGrid, type ScreenPoint } from '../../snowball/snowball-rules';
 
 export const ROOM_SCENE_KEY = 'RoomScene';
 
@@ -47,6 +51,18 @@ export const ROOM_SCENE_KEY = 'RoomScene';
  */
 export const LOCAL_PENGUIN_MOVE_EVENT = 'local-penguin:move';
 /**
+ * Scene-local event (not a contract event): fired when a walk's path is
+ * exhausted in `advanceStep`, and also when a queued move applied from that
+ * same tween's `onComplete` resolves right back to the tile the Penguin now
+ * stands on (#43 D1) — a walk genuinely in progress just ended there, so
+ * remotes still need to re-route to stop at this tile. Never fired on a
+ * queued re-route that keeps walking, nor on a plain own-tile click while
+ * already standing still (`stopCleanly`'s true no-op path). `main.ts` (#43)
+ * answers it with `roomChannel.setTile(tile, facing)`: one Presence track
+ * per arrival, never per step or frame.
+ */
+export const LOCAL_PENGUIN_ARRIVED_EVENT = 'local-penguin:arrived';
+/**
  * Scene-local event (#14 D5, not a contract event): fired on arrival at a
  * door's approach tile. #15 calls `changeRoom(door.targetRoomId)` from it.
  * A disabled door (`targetRoomId: null`) still fires this; #15 owns the
@@ -54,8 +70,25 @@ export const LOCAL_PENGUIN_MOVE_EVENT = 'local-penguin:move';
  */
 export const DOOR_REACHED_EVENT = 'door:reached';
 
+/**
+ * Scene-local event (#53, not a contract event): a left-click while aiming
+ * in Snowball mode, at the reticle's (grid-clamped) Tile. `main.ts` answers
+ * it with the snowball controller's `throwAt(target)`. Attach once, like the
+ * other scene-local events: `this.events` survives every restart.
+ */
+export const SNOWBALL_THROW_EVENT = 'snowball:aim-throw';
+
+export interface SnowballThrowRequestEvent {
+  target: Tile;
+}
+
 export interface LocalPenguinMoveEvent {
   target: Tile;
+}
+
+export interface LocalPenguinArrivedEvent {
+  tile: Tile;
+  facing: Facing;
 }
 
 export interface DoorReachedEvent {
@@ -83,6 +116,7 @@ const WALL_DEPTH = -1;
 const FLOOR_DEPTH = -1;
 const DOOR_DEPTH = 0;
 const DOOR_LABEL_DEPTH = 1;
+const DOOR_HINT_DEPTH = 2;
 
 // A hotspot (e.g. the Igloo's Trophy Case) shares the door's depth tier and
 // procedural fallback styling (#16 D5/#42): both are non-walking clickable
@@ -100,6 +134,33 @@ const DOOR_LABEL_FONT_SIZE = '14px';
 const NPC_LABEL_FONT_SIZE = '12px';
 const NPC_LABEL_OFFSET_Y = -30;
 
+// #15 D3/A4: a disabled door's (`targetRoomId: null`) "COMING SOON" hint, in
+// the Stage's own display font (`--font-game-display`, `style.css`).
+const DOOR_HINT_FONT_FAMILY = "'Bumbastika', sans-serif";
+const DOOR_HINT_FONT_SIZE = '22px';
+const DOOR_HINT_STROKE_COLOR = '#0a0b0d';
+const DOOR_HINT_STROKE_THICKNESS = 4;
+const DOOR_HINT_TEXT = 'COMING SOON';
+/** How long the "coming soon" hint stays up (#15 D3). */
+export const DOOR_HINT_DURATION_MS = 2000;
+
+// Snowball mode (#53), after `design/Club JenGuin HUD Menus.dc.html`'s
+// HUD-SNOWBALL screen: cyan reticle ellipse + ticks on the aimed Tile, a
+// dashed white preview arc from the local Penguin, and the cursor hint under
+// the reticle. Drawn above every Room object and Penguin (tile depths top
+// out near 10^4).
+const SNOWBALL_DEPTH = 1_000_000;
+const SNOWBALL_CYAN = 0x00bdff;
+const SNOWBALL_WHITE = 0xf4f4f4;
+const SNOWBALL_OUTLINE = 0x0c4b5f;
+/** Arcs start at chest height, this far above the feet point every `SnowballView` point is. */
+const SNOWBALL_CHEST_OFFSET_Y = 60;
+const SNOWBALL_PREVIEW_SEGMENTS = 28;
+/** How long a splat stays up before it has faded out (#53 D2: ~400 ms). */
+const SNOWBALL_SPLAT_MS = 400;
+const SNOWBALL_HINT_TEXT = 'CLICK TO THROW · RIGHT-CLICK TO CANCEL';
+const SNOWBALL_HINT_OFFSET_Y = 56;
+
 const NPC_RADIUS = 18;
 const NPC_COLOR = 0x00bdff;
 
@@ -110,10 +171,6 @@ const FURNITURE_COLOR = 0x0c4b5f;
 const PROP_WIDTH = 32;
 const PROP_HEIGHT = 32;
 const PROP_COLOR = 0x3a3d42;
-
-/** Tiles per second the local Penguin walks at (#14 D3). */
-const TILE_SPEED = 4;
-const TILE_STEP_MS = 1000 / TILE_SPEED;
 
 /** The registry key #14/`src/auth/player.ts`'s `bindPlayer` sets/removes. */
 const PLAYER_REGISTRY_KEY = 'player';
@@ -166,11 +223,12 @@ export interface RoomSceneData {
  * `scene.restart(data)` (#15) should treat Phaser's `Scenes.Events.CREATE`
  * (fired once `create()` finishes) as the "Room is ready" signal, not the
  * synchronous return of `start`/`restart` itself. Listeners for
- * `LOCAL_PENGUIN_MOVE_EVENT`/`DOOR_REACHED_EVENT` should be attached to
- * `scene.events` exactly once, right after the Scene is first created: the
- * same `RoomScene` instance (and its `events` emitter) is reused across a
- * `scene.restart()`, so a listener attached once keeps receiving events
- * after every later restart without needing to be re-attached.
+ * `LOCAL_PENGUIN_MOVE_EVENT`/`LOCAL_PENGUIN_ARRIVED_EVENT`/`DOOR_REACHED_EVENT`
+ * should be attached to `scene.events` exactly once, right after the Scene
+ * is first created: the same `RoomScene` instance (and its `events`
+ * emitter) is reused across a `scene.restart()`, so a listener attached once
+ * keeps receiving events after every later restart without needing to be
+ * re-attached.
  *
  * `penguins` (#28) draws the Room channel's *remote* Penguins with the #31
  * renderer; the local Penguin is this scene's own (#14), not the view's.
@@ -199,9 +257,52 @@ export class RoomScene extends Scene {
   private npcArrivedLog: string[] = [];
   private doorReachedLog: string[] = [];
   private localPenguinMoveLog: Tile[] = [];
+  /** Tile per `LOCAL_PENGUIN_ARRIVED_EVENT` emission, oldest first (#43 D1). */
+  private localPenguinArrivedLog: Tile[] = [];
   private debugPenguins: Penguin[] = [];
   /** Persists across restarts (never reset in `init()`); see `restartCount` on `RoomDebugInfo`. */
   private restartCount = 0;
+  /** The "coming soon" hint currently shown for a disabled door (#15 D3), or `null`. Not reset in `init()`: `cleanup()` (SHUTDOWN) always clears it first. */
+  private comingSoonHint: {
+    door: RoomDoor;
+    text: GameObjects.Text;
+    timer: Time.TimerEvent;
+  } | null = null;
+
+  // --- Snowball mode (#53) -- all reset by `init()`/`cleanup()`, since this
+  // instance survives every `scene.restart()` (v4 change 10).
+  /** True between `create()` and SHUTDOWN: `snowball` view calls are no-ops otherwise. */
+  private live = false;
+  private aiming = false;
+  /** The aimed Tile, or `null` while not aiming, before the first pointer move, or after a right-click cancel. */
+  private reticleTile: Tile | null = null;
+  private reticleGraphics: GameObjects.Graphics | null = null;
+  private reticleHint: GameObjects.Text | null = null;
+  private readonly snowballArcs = new Map<
+    string,
+    { ball: GameObjects.Arc; tween: Tweens.Tween; to: ScreenPoint }
+  >();
+  private readonly snowballSplats = new Map<string, GameObjects.Graphics>();
+
+  /**
+   * The #53 `SnowballView` the snowball controller draws through: the local
+   * Penguin is this scene's own, remote Penguins are `penguins`'. Every call
+   * is a no-op while the scene is not running (mid-restart or shut down).
+   */
+  readonly snowball: SnowballView = {
+    localPoint: () => this.localFeetPoint(),
+    remotePoint: (playerId) => (this.live ? this.penguins.pointOf(playerId) : null),
+    shownRemoteIds: () => (this.live ? this.penguins.shownRemoteIds() : []),
+    tileToPoint: (tile) => (this.room ? tileToScreen(tile, this.room.grid.origin) : { x: 0, y: 0 }),
+    drawArc: (throwId, from, to, durationMs) => this.drawSnowballArc(throwId, from, to, durationMs),
+    showSplat: (throwId, point) => this.showSnowballSplat(throwId, point),
+    setRemoteSnowHat: (playerId, on) => {
+      if (this.live) this.penguins.setSnowHat(playerId, on);
+    },
+    setLocalSnowHat: (on) => {
+      if (this.live) this.penguin?.setSnowHat(on);
+    },
+  };
 
   /** A stable reference so `cleanup` can `off` exactly what `create` `on`'d. */
   private readonly handlePointerDown = (
@@ -209,6 +310,17 @@ export class RoomScene extends Scene {
     currentlyOver: GameObjects.GameObject[],
   ): void => {
     this.onPointerDown(pointer, currentlyOver);
+  };
+
+  /** Moves the Snowball reticle with the pointer while aiming (#53). */
+  private readonly handlePointerMove = (pointer: Input.Pointer): void => {
+    if (!this.aiming) return;
+    this.aimAt(pointer);
+  };
+
+  /** Right-click cancels the aim rather than opening the browser menu, only while aiming (#53 D6). */
+  private readonly handleContextMenu = (event: Event): void => {
+    if (this.aiming) event.preventDefault();
   };
 
   /**
@@ -231,6 +343,9 @@ export class RoomScene extends Scene {
   /** A stable reference so a scene restart's fresh `create()` re-registers cleanly. */
   private readonly cleanup = (): void => {
     this.input.off('pointerdown', this.handlePointerDown);
+    this.input.off('pointermove', this.handlePointerMove);
+    this.game.canvas?.removeEventListener('contextmenu', this.handleContextMenu);
+    this.resetSnowballState();
     this.registry.events.off(Data.Events.SET_DATA, this.handleRegistrySetData);
     this.registry.events.off(
       Data.Events.CHANGE_DATA_KEY + PLAYER_REGISTRY_KEY,
@@ -247,6 +362,7 @@ export class RoomScene extends Scene {
     this.queuedMove = null;
     this.debugPenguins.forEach((debugPenguin) => debugPenguin.destroy());
     this.debugPenguins = [];
+    this.clearComingSoonHint();
   };
 
   constructor() {
@@ -271,12 +387,70 @@ export class RoomScene extends Scene {
     this.npcArrivedLog = [];
     this.doorReachedLog = [];
     this.localPenguinMoveLog = [];
+    this.localPenguinArrivedLog = [];
     this.debugPenguins = [];
+    this.resetSnowballState();
   }
 
   /** Resolves once the first `create()` has run. */
   whenReady(): Promise<void> {
     return this.readyPromise;
+  }
+
+  /**
+   * Resolves once the *next* restart's `create()` finishes — unlike
+   * `whenReady()`, which only ever resolves for the very first one. #15's
+   * navigator calls this right after `showRoom()` (deferred by Phaser to its
+   * own scene-transition tick, so subscribing here is never too late) and
+   * awaits it before emitting `room:enter`.
+   */
+  whenNextReady(): Promise<void> {
+    return new Promise((resolve) => {
+      this.events.once(Scenes.Events.CREATE, () => resolve());
+    });
+  }
+
+  /**
+   * Registers `handler` for every door the local Penguin reaches, enabled or
+   * disabled alike (#15 D3). Call once: `this.events` (and any listener
+   * already attached to it) survives every `scene.restart()`, so calling
+   * this again on a later Room change would only stack a duplicate.
+   */
+  onDoorReached(handler: (door: RoomDoor) => void): void {
+    this.events.on(DOOR_REACHED_EVENT, ({ door }: DoorReachedEvent) => handler(door));
+  }
+
+  /**
+   * Shows the "COMING SOON" hint for a disabled door (#15 D3/A4) near its
+   * hotspot for `DOOR_HINT_DURATION_MS`, replacing any hint already shown
+   * rather than stacking two.
+   */
+  showComingSoonHint(door: RoomDoor): void {
+    this.clearComingSoonHint();
+    const centerX = door.hotspot.x + door.hotspot.width / 2;
+    const centerY = door.hotspot.y + door.hotspot.height / 2;
+    const text = this.add
+      .text(centerX, centerY, DOOR_HINT_TEXT, {
+        fontFamily: DOOR_HINT_FONT_FAMILY,
+        fontSize: DOOR_HINT_FONT_SIZE,
+        color: LABEL_TEXT_COLOR,
+        stroke: DOOR_HINT_STROKE_COLOR,
+        strokeThickness: DOOR_HINT_STROKE_THICKNESS,
+      })
+      .setOrigin(0.5)
+      .setDepth(DOOR_HINT_DEPTH);
+    const timer = this.time.delayedCall(DOOR_HINT_DURATION_MS, () => {
+      text.destroy();
+      this.comingSoonHint = null;
+    });
+    this.comingSoonHint = { door, text, timer };
+  }
+
+  private clearComingSoonHint(): void {
+    if (!this.comingSoonHint) return;
+    this.comingSoonHint.timer.remove();
+    this.comingSoonHint.text.destroy();
+    this.comingSoonHint = null;
   }
 
   /** The Room currently shown (or being restarted into). */
@@ -286,13 +460,16 @@ export class RoomScene extends Scene {
 
   /**
    * Restarts this scene to show `roomId` (a Room change). A no-op for the
-   * Room already shown, and for a Room with no `RoomDefinition` yet (#16),
-   * which leaves the current Room's art on screen. Returns whether it switched.
-   * The local Penguin spawns at `entryTile` when given, else at the Room's
-   * `spawnTile` (#14's `init`).
+   * Room already shown, unless `force` (#15 review round 1: `enterSpawnRoom`
+   * passes `true` so a repeat Session-start still truly restarts and
+   * respawns even when the Room already showing happens to be Town Center,
+   * e.g. after a dev `?room=` override), and always a no-op for a Room with
+   * no `RoomDefinition` yet (#16), which leaves the current Room's art on
+   * screen. Returns whether it switched. The local Penguin spawns at
+   * `entryTile` when given, else at the Room's `spawnTile` (#14's `init`).
    */
-  showRoom(roomId: RoomId, entryTile?: Tile): boolean {
-    if (roomId === this.roomId || !hasRoomDefinition(roomId)) return false;
+  showRoom(roomId: RoomId, entryTile?: Tile, force = false): boolean {
+    if ((roomId === this.roomId && !force) || !hasRoomDefinition(roomId)) return false;
     this.roomId = roomId;
     this.scene.restart({ roomId, entryTile } satisfies RoomSceneData);
     return true;
@@ -327,6 +504,21 @@ export class RoomScene extends Scene {
     this.spawnLocalPenguin(room);
 
     this.input.on('pointerdown', this.handlePointerDown);
+    this.input.on('pointermove', this.handlePointerMove);
+    this.game.canvas?.addEventListener('contextmenu', this.handleContextMenu);
+    this.reticleGraphics = this.add.graphics().setDepth(SNOWBALL_DEPTH).setVisible(false);
+    this.reticleHint = this.add
+      .text(0, 0, SNOWBALL_HINT_TEXT, {
+        fontFamily: "'Anton', sans-serif",
+        fontSize: '12px',
+        color: '#00BDFF',
+        backgroundColor: 'rgba(22,23,25,0.92)',
+        padding: { x: 14, y: 8 },
+      })
+      .setLetterSpacing(2)
+      .setOrigin(0.5, 0)
+      .setDepth(SNOWBALL_DEPTH)
+      .setVisible(false);
     this.registry.events.on(Data.Events.SET_DATA, this.handleRegistrySetData);
     this.registry.events.on(
       Data.Events.CHANGE_DATA_KEY + PLAYER_REGISTRY_KEY,
@@ -337,14 +529,18 @@ export class RoomScene extends Scene {
 
     // The remote Penguins (#28). Phaser destroys them with its display list
     // on shutdown; `detach()` only forgets them, so nothing is destroyed twice.
-    this.penguins.attach(placePenguinsIn(this), room.grid.origin);
+    this.penguins.attach(placePenguinsIn(this), room.grid.origin, room.walkable);
     this.events.once(Scenes.Events.SHUTDOWN, () => this.penguins.detach());
 
+    this.live = true;
     if (HOOKS_ENABLED) this.publishRoomDebug();
     this.resolveReady();
   }
 
   update(): void {
+    // The local Penguin may still be finishing a walk when aiming starts:
+    // keep the preview arc anchored to where it is drawn.
+    if (this.aiming && this.reticleTile) this.drawReticle();
     if (HOOKS_ENABLED) this.publishRoomDebug();
   }
 
@@ -371,10 +567,13 @@ export class RoomScene extends Scene {
       npcArrivedLog: this.npcArrivedLog,
       doorReachedLog: this.doorReachedLog,
       localPenguinMoveLog: this.localPenguinMoveLog,
+      comingSoonHint: this.comingSoonHint?.door.label ?? null,
+      localPenguinArrivedLog: this.localPenguinArrivedLog,
       restartRoom: () => this.scene.restart(),
       restartCount: this.restartCount,
       penguinCount: this.countPenguinContainers((name) => name !== REMOTE_PENGUIN_NAME),
       remotePenguinCount: this.countPenguinContainers((name) => name === REMOTE_PENGUIN_NAME),
+      remotePenguins: this.penguins.debugRemotePenguins(),
       setRegisteredPlayer: (player) => this.registry.set(PLAYER_REGISTRY_KEY, player),
       spawnDebugPenguin: (tile, look) => this.spawnDebugPenguin(tile, look),
     });
@@ -443,6 +642,160 @@ export class RoomScene extends Scene {
     return true;
   }
 
+  // --- Snowball mode (#53) ---------------------------------------------------
+
+  /**
+   * Turns aiming on or off (#53 D6). While on, clicks throw instead of
+   * moving; the reticle appears on the next pointer move. Off hides the
+   * reticle, preview arc and cursor hint. `init()` resets it to off, so a
+   * Room change always starts outside the mode.
+   */
+  setAiming(on: boolean): void {
+    this.aiming = on;
+    if (!on) this.cancelAim();
+  }
+
+  /** The aimed Tile, or `null` (not aiming, not yet moved, or cancelled): `window.__snowballDebug.reticle`. */
+  snowballReticle(): Tile | null {
+    return this.reticleTile;
+  }
+
+  /** Whether the local Penguin is drawing its snow hat right now (`__snowballDebug.snowHats[own].rendered`). */
+  localHasSnowHat(): boolean {
+    return this.live && (this.penguin?.hasSnowHat() ?? false);
+  }
+
+  private localFeetPoint(): ScreenPoint {
+    const container = this.penguin?.container;
+    return container ? { x: container.x, y: container.y } : { x: 0, y: 0 };
+  }
+
+  /** Snaps the reticle to the pointer's Tile, clamped to the Room grid (walkability not required, #53 D8). */
+  private aimAt(pointer: Input.Pointer): Tile | null {
+    const room = this.room;
+    if (!room) return null;
+    const hovered = screenToTile({ x: pointer.x, y: pointer.y }, room.grid.origin);
+    this.reticleTile = clampTileToGrid(hovered, room.grid);
+    this.drawReticle();
+    return this.reticleTile;
+  }
+
+  private cancelAim(): void {
+    this.reticleTile = null;
+    this.reticleGraphics?.clear().setVisible(false);
+    this.reticleHint?.setVisible(false);
+  }
+
+  private drawReticle(): void {
+    const room = this.room;
+    const graphics = this.reticleGraphics;
+    const tile = this.reticleTile;
+    if (!room || !graphics || !tile) return;
+    const at = tileToScreen(tile, room.grid.origin);
+    const feet = this.localFeetPoint();
+    const from = { x: feet.x, y: feet.y - SNOWBALL_CHEST_OFFSET_Y };
+
+    graphics.clear().setVisible(true);
+    // Dashed preview arc: every other segment of the same Bezier a throw flies.
+    graphics.lineStyle(3, SNOWBALL_WHITE, 0.9);
+    for (let i = 0; i < SNOWBALL_PREVIEW_SEGMENTS; i += 2) {
+      const a = arcPoint(from, at, i / SNOWBALL_PREVIEW_SEGMENTS);
+      const b = arcPoint(from, at, (i + 1) / SNOWBALL_PREVIEW_SEGMENTS);
+      graphics.lineBetween(a.x, a.y, b.x, b.y);
+    }
+    graphics.fillStyle(SNOWBALL_WHITE, 1);
+    graphics.fillCircle(from.x, from.y, 6);
+    // Reticle: outer ring, soft inner fill, four ticks.
+    graphics.lineStyle(3, SNOWBALL_CYAN, 1);
+    graphics.strokeEllipse(at.x, at.y, 92, 46);
+    graphics.fillStyle(SNOWBALL_CYAN, 0.35);
+    graphics.fillEllipse(at.x, at.y, 44, 22);
+    graphics.lineBetween(at.x, at.y - 34, at.x, at.y - 48);
+    graphics.lineBetween(at.x, at.y + 34, at.x, at.y + 48);
+    graphics.lineBetween(at.x - 54, at.y, at.x - 68, at.y);
+    graphics.lineBetween(at.x + 54, at.y, at.x + 68, at.y);
+
+    const hint = this.reticleHint;
+    if (hint) {
+      hint.setPosition(at.x, at.y + SNOWBALL_HINT_OFFSET_Y).setVisible(true);
+      graphics.lineStyle(2, SNOWBALL_CYAN, 1);
+      graphics.strokeRect(hint.x - hint.width / 2, hint.y, hint.width, hint.height);
+    }
+  }
+
+  /** A thrown snowball flying `from` (a feet point; drawn from chest height) to `to` over `durationMs` (#53 D2). */
+  private drawSnowballArc(
+    throwId: string,
+    from: ScreenPoint,
+    to: ScreenPoint,
+    durationMs: number,
+  ): void {
+    if (!this.live) return;
+    this.stopSnowballArc(throwId);
+    const start = { x: from.x, y: from.y - SNOWBALL_CHEST_OFFSET_Y };
+    const ball = this.add
+      .circle(start.x, start.y, 9, SNOWBALL_WHITE)
+      .setStrokeStyle(2, SNOWBALL_OUTLINE)
+      .setDepth(SNOWBALL_DEPTH);
+    const tween = this.tweens.addCounter({
+      from: 0,
+      to: 1,
+      duration: durationMs,
+      onUpdate: (counter: Tweens.Tween) => {
+        const point = arcPoint(start, to, counter.getValue() ?? 0);
+        ball.setPosition(point.x, point.y);
+      },
+      onComplete: () => {
+        // Landing always shows a splat, on every screen watching the throw.
+        this.showSnowballSplat(throwId, to);
+      },
+    });
+    this.snowballArcs.set(throwId, { ball, tween, to });
+  }
+
+  private stopSnowballArc(throwId: string): void {
+    const arc = this.snowballArcs.get(throwId);
+    if (!arc) return;
+    this.snowballArcs.delete(throwId);
+    arc.tween.stop();
+    arc.ball.destroy();
+  }
+
+  /** Cuts `throwId`'s arc (if still flying) to one splat at `point`, replacing any splat it already showed. */
+  private showSnowballSplat(throwId: string, point: ScreenPoint): void {
+    if (!this.live) return;
+    this.stopSnowballArc(throwId);
+    this.snowballSplats.get(throwId)?.destroy();
+    const splat = this.add.graphics().setDepth(SNOWBALL_DEPTH);
+    splat.fillStyle(SNOWBALL_WHITE, 1);
+    splat.fillEllipse(point.x, point.y, 60, 24);
+    splat.fillCircle(point.x - 20, point.y - 8, 6);
+    splat.fillCircle(point.x + 18, point.y - 9, 7);
+    splat.fillCircle(point.x, point.y - 14, 5);
+    this.snowballSplats.set(throwId, splat);
+    this.tweens.add({
+      targets: splat,
+      alpha: 0,
+      duration: SNOWBALL_SPLAT_MS,
+      onComplete: () => {
+        splat.destroy();
+        if (this.snowballSplats.get(throwId) === splat) this.snowballSplats.delete(throwId);
+      },
+    });
+  }
+
+  /** Drops every snowball effect and aim (#53 v4 change 10). Phaser destroys the objects themselves on shutdown. */
+  private resetSnowballState(): void {
+    this.live = false;
+    this.aiming = false;
+    this.reticleTile = null;
+    this.reticleGraphics = null;
+    this.reticleHint = null;
+    for (const arc of this.snowballArcs.values()) arc.tween.stop();
+    this.snowballArcs.clear();
+    this.snowballSplats.clear();
+  }
+
   private spawnLocalPenguin(room: RoomDefinition): void {
     const registered = this.registry.get(PLAYER_REGISTRY_KEY) as RegisteredPlayer | undefined;
     const look = resolveRegisteredLook(registered);
@@ -478,6 +831,25 @@ export class RoomScene extends Scene {
   private onPointerDown(pointer: Input.Pointer, currentlyOver: GameObjects.GameObject[]): void {
     const room = this.room;
     if (!room) return;
+
+    // #53 D8: a right-click while aiming cancels the aim (the reticle and
+    // preview hide until the next pointer move) but keeps the mode on;
+    // nothing is thrown or moved. Outside the mode it keeps today's behaviour.
+    if (pointer.button === 2 && this.aiming) {
+      this.cancelAim();
+      return;
+    }
+
+    // #53 v4 change 2: while aiming, every click throws at the reticle Tile;
+    // NPC, door, hotspot and tile clicks are all suppressed.
+    if (this.aiming) {
+      const target = this.aimAt(pointer);
+      if (target) {
+        const event: SnowballThrowRequestEvent = { target };
+        this.events.emit(SNOWBALL_THROW_EVENT, event);
+      }
+      return;
+    }
 
     const npcHit = this.npcHitAreas.find((hit) => currentlyOver.includes(hit.object));
     if (npcHit) {
@@ -555,14 +927,23 @@ export class RoomScene extends Scene {
   /**
    * Resolves `target` against the Penguin's current tile via
    * `nearestReachable` (#14 review fix 2) and either starts walking there,
-   * or stops cleanly with no path logged/emitted: either because the
-   * resolved target already *is* the tile the Penguin stands on (review fix
-   * 6's own-tile click, and fix 2's case where nothing reachable is any
-   * closer to an unreachable target than staying put), or — defensively,
-   * since `nearestReachable` only ever returns a tile connected to the
-   * Penguin's own tile — because `moveTo` still failed.
+   * or stops cleanly: either because the resolved target already *is* the
+   * tile the Penguin stands on (review fix 6's own-tile click, and fix 2's
+   * case where nothing reachable is any closer to an unreachable target
+   * than staying put), or — defensively, since `nearestReachable` only ever
+   * returns a tile connected to the Penguin's own tile — because `moveTo`
+   * still failed. A plain click resolving to the standing tile logs and
+   * emits nothing; `options.continuingWalk` (set only when `advanceStep`'s
+   * tween `onComplete` applies a queued move, #43 D1) still logs the move
+   * and emits both `LOCAL_PENGUIN_MOVE_EVENT`/`LOCAL_PENGUIN_ARRIVED_EVENT`,
+   * since a walk that was genuinely in progress just ended here and remotes
+   * need to re-route to stop at this tile.
    */
-  private applyMoveTo(target: Tile, onArrive?: () => void): void {
+  private applyMoveTo(
+    target: Tile,
+    onArrive?: () => void,
+    options?: { continuingWalk?: boolean },
+  ): void {
     const controller = this.controller;
     const room = this.room;
     if (!controller || !room) return;
@@ -571,6 +952,14 @@ export class RoomScene extends Scene {
 
     if (tilesEqual(reachableTarget, controller.state.tile)) {
       this.stopCleanly(controller);
+      if (options?.continuingWalk) {
+        const tile = controller.state.tile;
+        const facing = controller.state.facing;
+        this.localPenguinMoveLog.push(tile);
+        const moveEvent: LocalPenguinMoveEvent = { target: tile };
+        this.events.emit(LOCAL_PENGUIN_MOVE_EVENT, moveEvent);
+        this.emitArrived(tile, facing);
+      }
       // Already standing on an NPC's interaction tile or a door's approach
       // tile: that still counts as arriving, so clicking an NPC you're next
       // to opens its dialog (#36) and clicking the door you're at uses it
@@ -600,6 +989,13 @@ export class RoomScene extends Scene {
     this.pendingArrival = null;
   }
 
+  /** Logs and emits `LOCAL_PENGUIN_ARRIVED_EVENT` for an arrival at `tile`/`facing` (#43 D1). */
+  private emitArrived(tile: Tile, facing: Facing): void {
+    this.localPenguinArrivedLog.push(tile);
+    const event: LocalPenguinArrivedEvent = { tile, facing };
+    this.events.emit(LOCAL_PENGUIN_ARRIVED_EVENT, event);
+  }
+
   private spawnDebugPenguin(tile: Tile, look: PenguinLook): void {
     const room = this.room;
     if (!room) return;
@@ -619,6 +1015,7 @@ export class RoomScene extends Scene {
     if (!next) {
       penguin.idle();
       this.currentAnim = this.currentLook.emote;
+      this.emitArrived(controller.state.tile, controller.state.facing);
       const arrive = this.pendingArrival;
       this.pendingArrival = null;
       arrive?.();
@@ -654,7 +1051,7 @@ export class RoomScene extends Scene {
         const queued = this.queuedMove;
         if (queued) {
           this.queuedMove = null;
-          this.applyMoveTo(queued.target, queued.onArrive);
+          this.applyMoveTo(queued.target, queued.onArrive, { continuingWalk: true });
           return;
         }
 
@@ -855,22 +1252,72 @@ export class RoomScene extends Scene {
  * Places #31 Penguins (figure, name tag, idle animation) in `scene`, for
  * `RoomPenguinView`'s remote Penguins. Each is named `REMOTE_PENGUIN_NAME`
  * so the debug hook can count remote and local Penguins apart.
+ *
+ * `step` (#43) tweens one tile step at `TILE_STEP_MS`, the same pace and
+ * `onUpdate` depth-sorting technique the local walk's own tween uses;
+ * `moveTo`/`step`/`destroy` all stop any tween already in flight, so a
+ * re-route, a Presence snap, or a Room teardown never leaves a stray tween
+ * driving a Penguin nobody is walking.
  */
 function placePenguinsIn(scene: Scene): PlacePenguin {
   return (look, point, depth, facing) => {
     const penguin = createPenguin(scene, point.x, point.y, look, { facing });
     penguin.container.setName(REMOTE_PENGUIN_NAME);
     penguin.container.setDepth(depth);
+
+    let activeTween: Tweens.Tween | null = null;
+    let pendingResolve: (() => void) | null = null;
+
+    function stopActiveStep(): void {
+      if (activeTween) {
+        activeTween.stop();
+        activeTween = null;
+      }
+      const resolve = pendingResolve;
+      pendingResolve = null;
+      resolve?.();
+    }
+
     return {
       setLook: (next) => penguin.setLook(next),
       setFacing: (next) => penguin.setFacing(next),
       moveTo: (next, nextDepth) => {
+        stopActiveStep();
         penguin.container.setPosition(next.x, next.y);
         penguin.container.setDepth(nextDepth);
       },
+      walk: () => penguin.walk(),
+      idle: () => penguin.idle(),
+      step: (next, durationMs, depthAt) => {
+        stopActiveStep();
+        return new Promise<void>((resolve) => {
+          pendingResolve = resolve;
+          activeTween = scene.tweens.add({
+            targets: penguin.container,
+            x: next.x,
+            y: next.y,
+            duration: durationMs,
+            onUpdate: (tween: Tweens.Tween) => {
+              penguin.container.setDepth(depthAt(tween.progress));
+            },
+            onComplete: () => {
+              activeTween = null;
+              const resolveFn = pendingResolve;
+              pendingResolve = null;
+              resolveFn?.();
+            },
+          });
+        });
+      },
       say: (text) => penguin.say(text),
       play: (anim) => penguin.play(anim),
-      destroy: () => penguin.destroy(),
+      setSnowHat: (on) => penguin.setSnowHat(on),
+      hasSnowHat: () => penguin.hasSnowHat(),
+      point: () => ({ x: penguin.container.x, y: penguin.container.y }),
+      destroy: () => {
+        stopActiveStep();
+        penguin.destroy();
+      },
     };
   };
 }

@@ -1,9 +1,22 @@
 import './style.css';
 import { loadEnv } from './env';
 import { startGame, whenSceneReady } from './game/main';
-import type { RoomScene } from './game/rooms/RoomScene';
+import {
+  LOCAL_PENGUIN_ARRIVED_EVENT,
+  LOCAL_PENGUIN_MOVE_EVENT,
+  SNOWBALL_THROW_EVENT,
+  type LocalPenguinArrivedEvent,
+  type LocalPenguinMoveEvent,
+  type RoomScene,
+  type SnowballThrowRequestEvent,
+} from './game/rooms/RoomScene';
 import type { RoomPenguinView } from './game/rooms/room-penguin-view';
-import { createStubRoomDriver } from './game/stub-rooms';
+import { createRoomNavigator, type RoomNavigator } from './game/rooms/room-navigator';
+import {
+  HOOKS_ENABLED,
+  registerRoomDebugNavigatorHooks,
+  type RoomDebugEventLogEntry,
+} from './game/rooms/dev-room-hook';
 import { getSupabaseClient } from './auth/supabase-client';
 import { startAuth, toAuthClient } from './auth/auth-session';
 import { bindPlayer, type Player } from './auth/player';
@@ -15,6 +28,14 @@ import { createHud } from './ui/hud/hud';
 import { initDevHudHook } from './ui/hud/dev-hud-hook';
 import { getRoomDefinition } from './game/rooms/registry';
 import { createDebugOverlay, isDebugEnabled } from './ui/debug-overlay';
+import { createWallText, type WallText } from './ui/wall-text/wall-text';
+import {
+  createCoreValuesCard,
+  CORE_VALUES_OVERLAY_ID,
+  type CoreValuesCard,
+} from './ui/wall-text/core-values-card';
+import { resolveRoomIdFromLocation } from './game/rooms/dev-room-hook';
+import { CORE_VALUES_POSTER_HOTSPOT_ID } from './game/rooms/definitions/town-center';
 import {
   createRoomChannel,
   type PublicBroadcastEvent,
@@ -29,7 +50,6 @@ import {
   type ChatController,
 } from './chat/chat-controller';
 import { exposeChatDebug } from './chat/dev-chat-hook';
-import { SPAWN_ROOM_ID, type EmoteId, type PenguinLook, type RoomBroadcastMap } from './contracts';
 import {
   createEmoteController,
   type EmoteController,
@@ -37,6 +57,13 @@ import {
   type EmotePenguinView,
 } from './emotes/emote-controller';
 import { EMOTE_TO_ANIM } from './emotes/emote-rules';
+import { createSnowballController, type SnowballController } from './snowball/snowball-controller';
+import {
+  exposeSnowballDebug,
+  type SnowballThrowLogEntry,
+  type SnowHatDebugInfo,
+} from './snowball/dev-snowball-hook';
+import { DEFAULT_LOOK, type EmoteId, type PenguinLook, type RoomBroadcastMap } from './contracts';
 import { createInMemoryProgressStore } from './persistence/in-memory-progress-store';
 import type { ProgressStore } from './persistence/progress-store';
 import { createActiveProgressStore, createProgressSession } from './persistence/progress-session';
@@ -47,11 +74,14 @@ import {
 import { createMinigameLauncher } from './minigames/minigame-launcher';
 import { createDefaultMinigameRegistry } from './minigames/minigame-registry';
 import { initDevMinigameHook } from './minigames/dev-minigame-hook';
+import { devLeaderboardSeed } from './minigames/dev-leaderboard-seed';
 import { MINIGAME_OVERLAY_ID } from './minigames/minigame-shell';
 import { createPenguinCreator } from './ui/penguin-creator';
 import { createPenguinEditor } from './penguin/penguin-editor';
 import { initDevCreatorHook } from './penguin/dev-creator-hook';
 import { createTrophyCase, TROPHY_CASE_OVERLAY_ID } from './ui/trophy-case';
+import { createMapScreen } from './ui/map-screen';
+import { createMarket, MARKET_OVERLAY_ID } from './ui/market';
 import { wireBadgeToast } from './ui/badge-toast';
 
 // Fail fast on a missing or malformed .env before anything boots.
@@ -61,14 +91,7 @@ const game = startGame();
 mountStage(game);
 const client = getSupabaseClient();
 const realtime = toRealtimeClient(client);
-const rooms = createStubRoomDriver(gameEvents);
 const uiLayer = getUiLayer();
-
-/** The signed-in Player's Room channel, and the Player it belongs to. */
-let roomChannel: RoomChannel | null = null;
-let channelPlayerId: string | null = null;
-/** The signed-in Player's chat controller (#44), recreated alongside `roomChannel` each session. */
-let chatController: ChatController | null = null;
 
 /**
  * A stable `EmoteRoomChannel` (#47), unlike `ChatRoomChannel`: an Emote must
@@ -100,6 +123,55 @@ const emoteChannel: EmoteRoomChannel = {
   },
 };
 
+// Assigned once `hud`/`creator` exist below (`coreValuesCard` needs
+// `hud.overlays`; the guard needs `creator.isOpen()`); `tryOpenCoreValuesCard`
+// only reads them when the button is actually clicked, well after boot
+// finishes, the same forward-reference pattern `onSignOut`'s `auth`
+// reference below relies on.
+let coreValuesCard: CoreValuesCard | null = null;
+
+/**
+ * True only while a Room Session is running (set alongside `channelPlayerId`
+ * in `startSession`/`endSession`) (#77 review round 1 fix 2): the condition
+ * `tryOpenCoreValuesCard` and the poster button's own `tabIndex`/`inert`
+ * gate on, so there's nothing to open (and nothing focusable/announced)
+ * before a Session exists or after it ends.
+ */
+let sessionActive = false;
+
+function setSessionActive(active: boolean): void {
+  sessionActive = active;
+  wallText.setSessionActive(active);
+}
+
+/**
+ * Opens the Core Values card, unless there's no Session yet or the Penguin
+ * Creator is open (#77 review round 1 fix 2) -- shared by the wall poster's
+ * own DOM button (`onPosterClick` below) and `RoomScene`'s Phaser-side
+ * hotspot hit-area for the same spot (the `hotspot:click` listener further
+ * down, nit 5), so both paths gate the same way.
+ */
+function tryOpenCoreValuesCard(): void {
+  if (!sessionActive || creator.isOpen()) return;
+  coreValuesCard?.open();
+}
+
+// Mounted before the login overlay and HUD (#77 D3) so it always paints
+// below them in `#ui`'s DOM-order stacking. The initial render matches
+// whatever Room `RoomScene` itself boots into (#77 review round 1 fix 1):
+// `RoomScene` reads `?room=` via this same `resolveRoomIdFromLocation`, not
+// always `SPAWN_ROOM_ID`, so this overlay would otherwise show Town Center's
+// poster text/button over a different Room in dev/e2e.
+const wallText: WallText = createWallText(uiLayer, {
+  resolve: (roomId) => getRoomDefinition(roomId).wallText ?? [],
+  resolvePosterHotspot: (roomId) =>
+    getRoomDefinition(roomId).hotspots?.find(
+      (hotspot) => hotspot.id === CORE_VALUES_POSTER_HOTSPOT_ID,
+    ),
+  onPosterClick: () => tryOpenCoreValuesCard(),
+  initialRoomId: resolveRoomIdFromLocation(window.location),
+});
+
 /**
  * The Room scene and its Penguin view, once `RoomScene.create()` has first run.
  *
@@ -110,7 +182,16 @@ const emoteChannel: EmoteRoomChannel = {
  */
 let roomScene: RoomScene | null = null;
 let penguins: RoomPenguinView | null = null;
-/** Built once `sceneReady` resolves (below), so it's ready before any sign-in. */
+/**
+ * The one producer of `room:leave`/`room:enter` (#15 A1, replacing #28's
+ * `stub-rooms.ts` wholesale). Built once the Scene exists, since it restarts
+ * `RoomScene` directly; every caller below (`startSession`, `endSession`,
+ * the debug overlay, the HUD) is only ever reachable once a Session has
+ * started, which itself waits on `sceneReady` first, so `roomNavigator` is
+ * always set by the time any of them runs.
+ */
+let roomNavigator: RoomNavigator | null = null;
+/** Built once `sceneReady` resolves (below), so it's ready before any sign-in (#47). */
 let emoteController: EmoteController | null = null;
 const sceneReady = whenSceneReady(game).then((scene) => {
   roomScene = scene;
@@ -119,8 +200,71 @@ const sceneReady = whenSceneReady(game).then((scene) => {
     channel: emoteChannel,
     view: composeEmoteView(scene.penguins),
   });
+  roomNavigator = createRoomNavigator({
+    scene: {
+      showRoom: (roomId, entryTile, force) => scene.showRoom(roomId, entryTile, force),
+      whenNextReady: () => scene.whenNextReady(),
+      onDoorReached: (handler) => scene.onDoorReached(handler),
+      showComingSoonHint: (door) => scene.showComingSoonHint(door),
+    },
+    events: gameEvents,
+    hasPlayer: () => Boolean(game.registry.get('player')),
+  });
+
+  // Test-only: `window.__roomDebug.changeRoom`/`roomEventLog` (#15 D6),
+  // gated the same way `RoomScene`'s own debug hook is, so neither the
+  // listeners nor the ever-growing log exist in a production build.
+  if (HOOKS_ENABLED) {
+    const roomEventLog: RoomDebugEventLogEntry[] = [];
+    gameEvents.on('room:leave', ({ roomId }) => {
+      roomEventLog.push({ type: 'room:leave', roomId });
+    });
+    gameEvents.on('room:enter', ({ roomId }) => {
+      roomEventLog.push({ type: 'room:enter', roomId });
+    });
+    registerRoomDebugNavigatorHooks({
+      changeRoom: (roomId) => {
+        void roomNavigator?.changeRoom(roomId);
+      },
+      roomEventLog,
+    });
+  }
+
+  // #43: attached once (the same Scene instance and its `events` emitter are
+  // reused across every `showRoom` restart). A local walk's start/re-route
+  // broadcasts `move`; its arrival (never a queued re-route, never an
+  // own-tile no-op) tracks the Presence tile once, not per step or frame.
+  scene.events.on(LOCAL_PENGUIN_MOVE_EVENT, (event: LocalPenguinMoveEvent) => {
+    roomChannel?.send('move', { target: event.target }).catch((err: unknown) => {
+      console.error('[main] move broadcast failed', err);
+    });
+  });
+  scene.events.on(LOCAL_PENGUIN_ARRIVED_EVENT, (event: LocalPenguinArrivedEvent) => {
+    roomChannel?.setTile(event.tile, event.facing);
+  });
+  // #53: a click while aiming. A 0-ammo click resolves `false` and does
+  // nothing at all (no throw, no move: the scene already suppressed it).
+  scene.events.on(SNOWBALL_THROW_EVENT, ({ target }: SnowballThrowRequestEvent) => {
+    const controller = snowballController;
+    if (!controller || !snowballMode) return;
+    void controller.throwAt(target).then((sent) => {
+      if (sent && HOOKS_ENABLED) snowballThrowLog.push({ target, at: Date.now() });
+    });
+  });
   return scene.penguins;
 });
+
+/** The signed-in Player's Room channel, and the Player it belongs to. */
+let roomChannel: RoomChannel | null = null;
+let channelPlayerId: string | null = null;
+/** The signed-in Player's chat controller (#44), recreated alongside `roomChannel` each session. */
+let chatController: ChatController | null = null;
+/** The signed-in Player's Snowball mode controller (#53), created and stopped alongside `chatController`. */
+let snowballController: SnowballController | null = null;
+/** Whether Snowball mode is on (#53 D6): only ever during a Session. */
+let snowballMode = false;
+/** Test-only (`__snowballDebug.throwLog`): every acknowledged throw, pushed only when `HOOKS_ENABLED`. */
+const snowballThrowLog: SnowballThrowLogEntry[] = [];
 // Bumped on every sign-in and sign-out, so an in-flight sign-in that loses a
 // race with a later sign-out (or a newer sign-in) never creates a stray
 // Room channel.
@@ -137,7 +281,9 @@ let pendingPrevious: RoomChannel | null = null;
 const debugOverlay = isDebugEnabled()
   ? createDebugOverlay(uiLayer, {
       onEnterRoom: (roomId) => {
-        if (channelPlayerId) rooms.enter(roomId, channelPlayerId);
+        // Only works during a Session (#15 A5): before one starts,
+        // `channelPlayerId` is unset and there is nothing to navigate.
+        if (channelPlayerId) void roomNavigator?.changeRoom(roomId);
       },
       onSetLook: (look) => {
         roomChannel?.setLook(look);
@@ -147,14 +293,6 @@ const debugOverlay = isDebugEnabled()
       },
     })
   : null;
-
-// Shows the entered Room in `RoomScene` (a no-op for a Room with no
-// `RoomDefinition` yet). The local Penguin spawns at the Room's `spawnTile`:
-// the stub entry tile (`stub-rooms.ts`) is not checked against the Room's
-// walkable mask, so it only feeds the Room channel's Presence payload.
-gameEvents.on('room:enter', ({ roomId }) => {
-  roomScene?.showRoom(roomId);
-});
 
 /**
  * Applies a look loaded from or saved through the Penguin Creator everywhere
@@ -260,21 +398,64 @@ async function stopChannel(channel: RoomChannel): Promise<void> {
 }
 
 /**
+ * Turns Snowball mode on or off everywhere at once (#53 D6): the scene's
+ * aiming and the HUD's button and panel. Refused (stays off) outside a
+ * Session. Exits on a Room change, sign-out, and any HUD overlay opening.
+ */
+function setSnowballMode(on: boolean): void {
+  const next = on && snowballController !== null && roomScene !== null;
+  snowballMode = next;
+  roomScene?.setAiming(next);
+  hud.setSnowballMode(next);
+}
+
+/**
+ * Takes every snow hat graphic down (#53 D4): the controller clears its own
+ * hat state on a Room change or `stop()` without calling back into the
+ * view, so the render side is cleared here too, and no hat outlives the
+ * Room or Session it was thrown in.
+ */
+function clearSnowHatGraphics(): void {
+  roomScene?.snowball.setLocalSnowHat(false);
+  penguins?.clearSnowHats();
+}
+
+/** `__snowballDebug.snowHats`: the controller's timing, with `rendered` read from the real Penguins. */
+function debugSnowHats(): Record<string, SnowHatDebugInfo> {
+  const result: Record<string, SnowHatDebugInfo> = {};
+  const controller = snowballController;
+  if (!controller) return result;
+  for (const [playerId, hat] of controller.snowHats()) {
+    const rendered =
+      playerId === channelPlayerId
+        ? (roomScene?.localHasSnowHat() ?? false)
+        : (penguins?.hasSnowHat(playerId) ?? false);
+    result[playerId] = { appliedAt: hat.appliedAt, until: hat.until, rendered };
+  }
+  return result;
+}
+
+/**
  * The synchronous half of leaving a Session (sign-out, or a sign-in as a
- * different Player): emits `room:leave` via `rooms.reset()` and clears every
- * remote Penguin view. Returns the Room channel still to stop.
+ * different Player): emits `room:leave` via `leaveForSignOut()` and clears
+ * every remote Penguin view. Returns the Room channel still to stop.
  */
 function endSession(): RoomChannel | null {
   signInGeneration += 1;
   const channel = roomChannel;
-  rooms.reset();
+  roomNavigator?.leaveForSignOut();
   roomChannel = null;
   channelPlayerId = null;
+  setSessionActive(false);
   chatController?.stop();
   chatController = null;
   // `emoteController` (#47) is a boot-time singleton (see its declaration
   // above), never stopped: its `onRoomChange` forwarding above already
   // clears every active Emote once the real Room channel reports the leave.
+  setSnowballMode(false);
+  snowballController?.stop();
+  snowballController = null;
+  clearSnowHatGraphics();
   penguins?.clear();
   debugOverlay?.clear();
   debugOverlay?.setCurrentRoom(null);
@@ -293,6 +474,7 @@ async function startSession(player: Player, previous: RoomChannel | null): Promi
   if (generation !== signInGeneration) return;
 
   channelPlayerId = player.id;
+  setSessionActive(true);
   debugOverlay?.setOwnLook(player.look);
 
   const channel = createRoomChannel({
@@ -317,10 +499,61 @@ async function startSession(player: Player, previous: RoomChannel | null): Promi
   channel.onRoomChange((roomId) => {
     for (const handler of emoteRoomChangeHandlers) handler(roomId);
   });
+  const scene = roomScene;
+  if (scene) {
+    const snowball = createSnowballController({
+      channel,
+      view: scene.snowball,
+      playerId: player.id,
+    });
+    snowballController = snowball;
+    const ammo = snowball.ammo();
+    hud.setSnowballAmmo(ammo.count, ammo.capacity);
+    snowball.onAmmoChange(({ count, capacity }) => hud.setSnowballAmmo(count, capacity));
+  }
   channel.onRoomChange((roomId) => debugOverlay?.setCurrentRoom(roomId));
+  // #53: a Room change leaves Snowball mode and drops every snow hat graphic.
+  channel.onRoomChange(() => {
+    setSnowballMode(false);
+    clearSnowHatGraphics();
+  });
   channel.onSubscribedChange((subscribed) => debugOverlay?.setSubscribed(subscribed));
+  // #43: a remote Player's click-to-move walks their Penguin the same way
+  // ours does, rather than snapping it forward.
+  channel.on('move', ({ playerId, target }) => {
+    view.walkTo(playerId, target);
+  });
 
-  rooms.enter(SPAWN_ROOM_ID, player.id);
+  // After the Room channel exists (#15 A2), so it sees the first `room:enter`
+  // and joins Presence.
+  void roomNavigator?.enterSpawnRoom();
+}
+
+/**
+ * Test-only: with `?asPlayer` in the URL and either a dev server
+ * (`import.meta.env.DEV`) or the Playwright preview server
+ * (`VITE_E2E_HOOKS=true`), binds a fixture Player to the registry and enters
+ * the spawn Room through the real navigator, with no auth and no Room
+ * channel (#15 D6/A6): e2e specs that need `room:enter` gated on a
+ * registered Player, without signing in through Google. Waits for
+ * `sceneReady` first, since the navigator doesn't exist until then. Both env
+ * checks are direct `import.meta.env.*` reads, so Vite strips this
+ * function's body from a production build, matching the other dev hooks.
+ */
+function initDevAsPlayerHook(): boolean {
+  if (!HOOKS_ENABLED) return false;
+  if (!new URLSearchParams(window.location.search).has('asPlayer')) return false;
+
+  const fixturePlayer: Player = {
+    id: 'e2e-fixture-player',
+    displayName: 'E2E Fixture Player',
+    look: DEFAULT_LOOK,
+  };
+  bindPlayer(game.registry, fixturePlayer);
+  void sceneReady.then(() => {
+    void roomNavigator?.enterSpawnRoom();
+  });
+  return true;
 }
 
 const overlay = createLoginOverlay(uiLayer, {
@@ -343,7 +576,7 @@ function resolveRoomTitle(roomId: RoomId): { title: string; subtitle: string } {
 const hud = createHud(getUiLayer(), {
   resolveRoomTitle,
   onIgloo: () => {
-    // #15 changeRoom('igloo'); a no-op until then.
+    void roomNavigator?.changeRoom('igloo');
   },
   onSignOut: () => {
     void auth.signOut();
@@ -355,7 +588,34 @@ const hud = createHud(getUiLayer(), {
   onEmotePick: (emoteId: EmoteId) => {
     void emoteController?.send(emoteId);
   },
+  onSnowballToggle: (on) => setSnowballMode(on),
 });
+
+// #53 D8/N8: any HUD overlay opening (Creator, Minigame, Trophy Case,
+// Market, MENU, the Map) leaves Snowball mode.
+hud.overlays.onOpen(() => setSnowballMode(false));
+
+exposeSnowballDebug(() => ({
+  mode: snowballMode,
+  ammo: snowballController?.ammo().count ?? 0,
+  reticle: roomScene?.snowballReticle() ?? null,
+  snowHats: debugSnowHats(),
+  throwLog: [...snowballThrowLog],
+}));
+
+// The Map (#33): reproduces design/Club JenGuin Map.dc.html, self-wiring the
+// HUD's MAP button (`ui:open-map`) and `hud.overlays` internally.
+createMapScreen(uiLayer, {
+  overlays: hud.overlays,
+  changeRoom: (roomId) => {
+    void roomNavigator?.changeRoom(roomId);
+  },
+  currentRoomId: () => roomNavigator?.currentRoomId() ?? null,
+});
+
+// #77 D7: registers with the same shared `OverlayManager` MENU uses, so
+// opening one closes the other and Escape closes whichever is open.
+coreValuesCard = createCoreValuesCard(getUiLayer(), hud.overlays);
 
 const progress = createProgressSession({ registry: game.registry, emitter: gameEvents });
 
@@ -367,8 +627,27 @@ const progress = createProgressSession({ registry: game.registry, emitter: gameE
 // with `not_authenticated`.
 const e2eHooksEnabled = import.meta.env.DEV || import.meta.env.VITE_E2E_HOOKS === 'true';
 const devFallbackStore: ProgressStore | null = e2eHooksEnabled
-  ? createInMemoryProgressStore({ emitter: gameEvents })
+  ? createInMemoryProgressStore({ emitter: gameEvents, ...devLeaderboardSeed() })
   : null;
+
+declare global {
+  interface Window {
+    /** Test-only (#77 review round 1 fix 2); see the assignment below. */
+    __wallTextTest?: { setSessionActive: (active: boolean) => void };
+  }
+}
+
+// Test-only (#77 review round 1 fix 2): e2e can't complete a real Google
+// sign-in, so this flips `sessionActive` directly, letting a spec exercise
+// the poster button's real guarded click path (and produce its own
+// screenshots) without a Session. Deliberately its own tiny hook, not folded
+// into `?hud`/`?creator`/`?minigame` or #15's own upcoming `?asPlayer` hook,
+// so the two stay conflict-free. Gated and named exactly like the existing
+// hooks; Vite's static replacement strips this block from a production
+// build the same way it does `initDevHudHook`'s own body.
+if (e2eHooksEnabled) {
+  window.__wallTextTest = { setSessionActive };
+}
 
 // Built once at boot for the long-lived consumers below; every call forwards
 // to the signed-in Player's Supabase store (#34), or to the dev fallback.
@@ -393,6 +672,34 @@ gameEvents.on('hotspot:click', ({ hotspotId }) => {
   if (hotspotId !== 'trophy-case') return;
   hud.overlays.open(TROPHY_CASE_OVERLAY_ID, () => trophyCase.close());
   void trophyCase.open();
+});
+
+// The Roof Deck Market's Igloo Gear stall (#40): Casey's own NPC dialog
+// (#36) isn't merged yet, so this hotspot opens the Market panel directly;
+// `market.open()` is public so #36 can later open the same panel from
+// Casey's dialog instead. Reloads `store.loadAll()` on every open, same as
+// the Trophy Case.
+const market = createMarket(uiLayer, {
+  store: progressStore,
+  onClose: () => hud.overlays.close(MARKET_OVERLAY_ID),
+});
+
+gameEvents.on('hotspot:click', ({ hotspotId }) => {
+  if (hotspotId !== 'igloo-gear-stall') return;
+  hud.overlays.open(MARKET_OVERLAY_ID, () => market.close());
+  void market.open();
+});
+
+// #77 review round 1 nit 5: RoomScene builds a Phaser-side hit-area for
+// every `RoomDefinition.hotspots` entry, including this one, the same way it
+// does for the Trophy Case and the Igloo Gear stall above -- without this
+// listener that zone was dead (never reachable in practice, since the DOM
+// `.wall-text__poster` button normally covers the same rect and wins every
+// hit-test, but dead code left lying around all the same). Goes through the
+// same `tryOpenCoreValuesCard` guard as the button itself.
+gameEvents.on('hotspot:click', ({ hotspotId }) => {
+  if (hotspotId !== CORE_VALUES_POSTER_HOTSPOT_ID) return;
+  tryOpenCoreValuesCard();
 });
 
 // A toast "wherever the Player is" for every earned Badge (#42), not just
@@ -433,8 +740,9 @@ const penguinEditor = createPenguinEditor({
 });
 
 // After `penguinEditor` exists; see the note on `devHudActive` above.
-const devCreatorActive = initDevCreatorHook(penguinEditor);
-const devHookActive = devHudActive || devMinigameActive || devCreatorActive;
+const devCreatorActive = initDevCreatorHook(penguinEditor, progressStore);
+const devAsPlayerActive = initDevAsPlayerHook();
+const devHookActive = devHudActive || devMinigameActive || devCreatorActive || devAsPlayerActive;
 
 gameEvents.on('ui:open-creator', () => {
   penguinEditor.edit();
@@ -446,8 +754,15 @@ const auth = startAuth({
     // A repeat sign-in event for the same Player keeps the Session and the
     // look already loaded for it.
     if (currentPlayer?.id === player.id) return;
-    // A different Player while a Session exists: leave it first.
-    const previous = currentPlayer ? endSession() : null;
+    // A different Player while a Session exists: leave it first, and take
+    // down the previous Player's HUD rather than leaving it showing over the
+    // next Player's sign-in gate (#75 review round 1).
+    const isAccountSwitch = currentPlayer !== null;
+    const previous = isAccountSwitch ? endSession() : null;
+    if (isAccountSwitch) {
+      hud.overlays.close(MINIGAME_OVERLAY_ID);
+      hud.hide();
+    }
     currentPlayer = player;
     // `room:enter` fires only after `registry.player` is set.
     bindPlayer(game.registry, player);
@@ -462,7 +777,13 @@ const auth = startAuth({
       }),
     );
     if (devHookActive) {
-      void startSession(player, previous);
+      // #75 review round 1: `player.look.name` is always '' here (a real
+      // sign-in's look only ever gains a name later, once progress loads
+      // through `penguinEditor`), so a Session can never legitimately start
+      // on this path for a real sign-in. Hook mode (`?hud`, `?minigame`,
+      // `?creator`) never exercises real auth in e2e, so this is a no-op in
+      // practice; it's kept only so a real `SIGNED_IN` doesn't slip an
+      // unnamed Player into a Session.
       return;
     }
     overlay.showSignedIn();
@@ -475,19 +796,34 @@ const auth = startAuth({
   },
   onSignedOut: () => {
     currentPlayer = null;
-    // Per `src/contracts/rooms.ts`, `room:leave` comes before `bindPlayer(null)`.
-    const channel = endSession();
-    bindPlayer(game.registry, null);
-    progress.stop();
-    if (channel) void stopChannel(channel);
-    if (pendingPrevious) void stopChannel(pendingPrevious);
-    pendingPrevious = null;
+    // Only #15's `?asPlayer` owns `registry.player`/the Session itself
+    // outside the normal auth flow; the real, always-eventually-fired
+    // session-less signed-out signal must not clobber either one out from
+    // under it. `?hud`/`?creator`/`?minigame` never touch `registry.player`
+    // or start a real Session themselves, so this cleanup still runs for
+    // them exactly as it did before #15 (review round 1 narrowed this from
+    // the broader `devHookActive`, which incorrectly skipped it for them too).
+    if (!devAsPlayerActive) {
+      // Per `src/contracts/rooms.ts`, `room:leave` comes before `bindPlayer(null)`.
+      const channel = endSession();
+      bindPlayer(game.registry, null);
+      progress.stop();
+      if (channel) void stopChannel(channel);
+      if (pendingPrevious) void stopChannel(pendingPrevious);
+      pendingPrevious = null;
+    }
+    // Every dev hook (including `?asPlayer`) owns its own UI state; the real
+    // signed-out signal must not reach back in and hide/reset it (`dev-hud-
+    // hook.ts`'s own doc comment covers why: `hud.show()` already ran
+    // synchronously, and this signal always arrives later).
     if (devHookActive) return;
     penguinEditor.playerSignedOut();
     // Quits any in-progress round (no `recordRound`) rather than leaving it
     // open behind a signed-out session.
     hud.overlays.close(MINIGAME_OVERLAY_ID);
     hud.overlays.close(TROPHY_CASE_OVERLAY_ID);
+    hud.overlays.close(MARKET_OVERLAY_ID);
+    hud.overlays.close(CORE_VALUES_OVERLAY_ID);
     overlay.showSignedOut();
     hud.hide();
   },
