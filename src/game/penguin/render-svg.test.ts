@@ -112,6 +112,31 @@ describe('renderPenguinSvg', () => {
     expect(svg).not.toContain(SLEEPY_EYE_PATH);
   });
 
+  // #92 D4: the JG CAP's geometry, copied verbatim from `design/Penguin
+  // Creator.dc.html` L59 (an independent source, not `render-svg.ts`
+  // itself), so this fails if the renderer's cap ever drifts from the
+  // design's own crown/brim/seam/button paths.
+  const DESIGN_JG_CAP_CROWN_D = 'M34 24 C36 6 84 6 86 24 Z';
+  const DESIGN_JG_CAP_BACK_BRIM_D = 'M34 24 L86 24 C86 27 82 29 74 30 L46 30 C38 29 34 27 34 24 Z';
+  const DESIGN_JG_CAP_FRONT_BRIM_D = 'M58 24 L102 26 C104 28 102 32 98 33 L60 29 Z';
+  const DESIGN_JG_CAP_SEAM_D = 'M60 8 L60 24';
+  const DESIGN_JG_CAP_BUTTON_POINTS = '60,11 65,14 65,20 60,23 55,20 55,14';
+
+  it("the JG CAP hat matches the design's crown, brim, seam and button paths (#92 D4)", () => {
+    const svg = renderPenguinSvg({ ...DEFAULT_LOOK, hat: 'JG CAP' });
+    expect(svg).toContain(`d="${DESIGN_JG_CAP_CROWN_D}"`);
+    expect(svg).toContain(`d="${DESIGN_JG_CAP_BACK_BRIM_D}"`);
+    expect(svg).toContain(`d="${DESIGN_JG_CAP_FRONT_BRIM_D}"`);
+    expect(svg).toContain(`d="${DESIGN_JG_CAP_SEAM_D}"`);
+    expect(svg).toContain(`points="${DESIGN_JG_CAP_BUTTON_POINTS}"`);
+    expect(svg).toContain('stroke-width="2.5"');
+    expect(svg).toContain('stroke-linejoin="round"');
+    // The "JG" crown label is baked to path outlines (#62's SVG-as-texture
+    // rule), not a live `<text>` element.
+    expect(svg).not.toContain('<text');
+    expect(svg).toContain(PENGUIN_TEXT_PATHS.jgCap.d);
+  });
+
   it("a custom look's SVG carries its own colours for body, belly, beak, feet and cap", () => {
     const look: PenguinLook = {
       ...DEFAULT_LOOK,
@@ -329,6 +354,27 @@ describe('resolvePenguinColors (#79 D1/D2)', () => {
     }
   });
 
+  // #92 round 2 nit 4: the JG CAP's "JG" label sits on the badge polygon
+  // (filled with `capOutline`), not on the cap itself, so it's checked
+  // against `capOutline`, the same two-sided rule as every other resolved
+  // colour -- including every official CAP_COLORS swatch (`#D63C3C` named
+  // explicitly in review) and the `#808080` custom probe, both already in
+  // `caps` above.
+  it('every cap colour: capLabel is two-sided against the resolved capOutline (badge)', () => {
+    for (const cap of caps) {
+      const resolved = resolvePenguinColors({ ...DEFAULT_LOOK, cap });
+
+      if (reachesMinContrast(EYE_WHITE, [resolved.capOutline])) {
+        expect(resolved.capLabel).toBe(EYE_WHITE);
+      } else {
+        expect(resolved.capLabel).not.toBe(EYE_WHITE);
+      }
+      expect(contrastRatio(resolved.capLabel, resolved.capOutline)).toBeGreaterThanOrEqual(
+        MIN_CONTRAST,
+      );
+    }
+  });
+
   it("every belly colour (official swatch or custom), against DEFAULT_LOOK's body: bellyRim, the painted (blended) pattern ink, and the PIXEL HEART/SNOWFLAKE rims are two-sided", () => {
     const body = DEFAULT_LOOK.body;
     for (const belly of bodies) {
@@ -465,6 +511,16 @@ describe('renderPenguinSvg colour contrast (#79)', () => {
 // never `git stash`, which is shared across worktrees -- and running the
 // unmodified old renderer there; see
 // `src/game/penguin/__fixtures__/pre-79-golden.json`.
+//
+// Every JG-CAP-bearing entry (`hat:JG CAP` itself, plus every `pattern:*`,
+// `eyes:*` and `laugh:*` entry -- `DEFAULT_LOOK.hat` is `'JG CAP'`, so all of
+// them draw it) was regenerated for #92 D4's cap redraw: not a fresh capture
+// from `5ddaaae` (that commit predates the redraw and never drew this
+// geometry), but a call to the *current* `renderPenguinSvgWithColors` +
+// `preContrastFixColors` -- the exact call each `it` below makes -- so the
+// fixture and the assertion can never drift apart. The other four `hat:*`
+// entries (SNORKEL/HEADPHONES/WAR WEEK BAND/NONE, which override the hat
+// away from JG CAP) are untouched real `5ddaaae` captures.
 describe('renderPenguinSvgWithColors + preContrastFixColors: pre-#79 golden fixture (#79 review round 1 nit 2a)', () => {
   const FIXTURE_POSE = { anim: 'WADDLE', frame: 0 } as const;
   const FIXTURE_OPTIONS = { idPrefix: 'fixture' };
@@ -539,6 +595,7 @@ const MARKER_COLORS: ResolvedPenguinColors = {
   beakRim: '#888888',
   feetRim: '#999999',
   capOutline: '#aaaaaa',
+  capLabel: '#eeeeee',
   headphoneBand: '#bbbbbb',
   snorkelRim: '#cccccc',
   warWeekFill: '#dddddd',
@@ -557,6 +614,7 @@ const FIELD_CASES: Array<{ field: keyof ResolvedPenguinColors; overrides: Partia
     { field: 'beakRim', overrides: {} },
     { field: 'feetRim', overrides: {} },
     { field: 'capOutline', overrides: { hat: 'JG CAP' } },
+    { field: 'capLabel', overrides: { hat: 'JG CAP' } },
     { field: 'headphoneBand', overrides: { hat: 'HEADPHONES' } },
     { field: 'snorkelRim', overrides: { hat: 'SNORKEL' } },
     { field: 'warWeekFill', overrides: { hat: 'WAR WEEK BAND' } },

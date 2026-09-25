@@ -87,6 +87,30 @@ function checkHotspotsInStage(room: RoomDefinition, errors: RoomValidationError[
 }
 
 /**
+ * A `wallText` block's anchor must sit within the Stage and its `maxWidth`
+ * must be positive (#77 D2) -- a non-positive `maxWidth` could never fit any
+ * label, so it's always a mistake.
+ */
+function checkWallTextInStage(room: RoomDefinition, errors: RoomValidationError[]): void {
+  for (const block of room.wallText ?? []) {
+    const withinStage =
+      block.x >= 0 && block.x <= GAME_WIDTH && block.y >= 0 && block.y <= GAME_HEIGHT;
+    if (!withinStage) {
+      errors.push({
+        roomId: room.id,
+        message: `wall text "${block.id}" anchor { x: ${block.x}, y: ${block.y} } is outside the ${GAME_WIDTH}x${GAME_HEIGHT} Stage`,
+      });
+    }
+    if (!(block.maxWidth > 0)) {
+      errors.push({
+        roomId: room.id,
+        message: `wall text "${block.id}" maxWidth ${block.maxWidth} must be greater than 0`,
+      });
+    }
+  }
+}
+
+/**
  * Checks the invariants #13's acceptance criteria name: unique ids; a
  * walkable spawn tile; a `walkable` mask shaped exactly `grid.rows` x
  * `grid.columns`; NPC/furniture/prop slots in bounds; and doors that either
@@ -108,6 +132,7 @@ export function validateRoomDefinitions(rooms: readonly RoomDefinition[]): RoomV
     checkWalkableMaskShape(room, errors);
     checkSlotsInBounds(room, errors);
     checkHotspotsInStage(room, errors);
+    checkWallTextInStage(room, errors);
 
     if (!isWalkable(room, room.spawnTile)) {
       errors.push({

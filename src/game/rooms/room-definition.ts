@@ -1,4 +1,4 @@
-import type { RoomId, Tile } from '../../contracts';
+import type { HexColor, RoomId, Tile } from '../../contracts';
 
 /**
  * A Room's art. `procedural` is drawn by `RoomScene` from `walkable` in the
@@ -84,6 +84,31 @@ export interface RoomHotspot {
 }
 
 /**
+ * DOM-rendered Room signage text (#77 D2): drawn as live `<span>`s in `#ui`
+ * (`src/ui/wall-text/wall-text.ts`) instead of baked into the Room's exported
+ * PNG, so it always renders sharp with the page's own web fonts regardless of
+ * window size -- unlike an SVG-as-image texture, which can't use a web font
+ * once flattened to a raster background.
+ *
+ * `x`/`y` are the Stage pixel anchor the design's own
+ * `<text transform="matrix(1 skewY 0 1 x y)" text-anchor="middle">` used, so
+ * `wall-text.ts` centres the DOM text on this same anchor both axes. `skewY`
+ * is that same matrix's shear factor (the wall's own isometric slant).
+ * `maxWidth` is the widest (Stage px) this label may measure before it
+ * overflows its backing shape -- see each Room definition's own comment for
+ * how it derived that number from the design's hexagon/backing polygon.
+ */
+export interface RoomWallText {
+  id: string;
+  text: string;
+  x: number;
+  y: number;
+  colour: HexColor;
+  maxWidth: number;
+  skewY: number;
+}
+
+/**
  * A Room is data: everything `RoomScene` needs to render and validate one
  * Room, and everything #14/#15/#16/#28 need to place Penguins, NPCs and
  * furniture in it.
@@ -103,4 +128,6 @@ export interface RoomDefinition {
   props?: readonly RoomProp[];
   /** Non-door clickable targets (#16 D5): e.g. the Igloo's `trophy-case`. */
   hotspots?: readonly RoomHotspot[];
+  /** DOM-rendered wall/signage text (#77 D2): e.g. Town Center's Core Values poster. */
+  wallText?: readonly RoomWallText[];
 }

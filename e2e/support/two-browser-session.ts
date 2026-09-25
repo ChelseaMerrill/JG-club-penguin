@@ -3,7 +3,8 @@ import { expect, type Page } from '@playwright/test';
 /** Boot, sign-in and the first Room channel join, before any per-test budget starts. */
 export const READY_TIMEOUT = 15_000;
 
-function decodeJwtSub(token: string): string {
+/** Decodes a Supabase access token's `sub` claim: the Player id. */
+export function decodeJwtSub(token: string): string {
   const payload = token.split('.')[1];
   const json = Buffer.from(payload, 'base64url').toString('utf8');
   return (JSON.parse(json) as { sub: string }).sub;
