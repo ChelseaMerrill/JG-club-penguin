@@ -1,4 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
+// From `player-penguin-scale.ts`, not `penguin-sprite.ts` (which imports
+// `phaser` as a runtime value): Playwright loads this spec file under plain
+// Node, where importing `phaser` throws (`window is not defined`).
+import { PLAYER_PENGUIN_SCALE } from '../src/game/penguin/player-penguin-scale';
 import { townCenter } from '../src/game/rooms/definitions/town-center';
 import { tileToScreen } from '../src/game/rooms/iso';
 import { GAME_HEIGHT, GAME_WIDTH } from '../src/game/stage-size';
@@ -13,9 +17,12 @@ const BOOT_TIMEOUT = 15_000;
 // Scaled by `PLAYER_PENGUIN_SCALE` (#131: in-Room Player Penguins now draw
 // at the design's 0.58 scale), so the crop stays tight enough for the cap to
 // still be legible in the screenshot rather than dominated by empty space.
-const PENGUIN_CROP_HALF_WIDTH = 52; // 90 * 0.58
-const PENGUIN_CROP_ABOVE = 93; // 160 * 0.58
-const PENGUIN_CROP_BELOW = 23; // 40 * 0.58
+const PENGUIN_CROP_HALF_WIDTH = 90 * PLAYER_PENGUIN_SCALE;
+const PENGUIN_CROP_ABOVE = 160 * PLAYER_PENGUIN_SCALE;
+// The name tag is anchored under the feet (not off the sprite's frame), so it
+// never scales with `PLAYER_PENGUIN_SCALE`; halving this crop with the other
+// two would clip the tag out of frame.
+const PENGUIN_CROP_BELOW = 40;
 
 /** Fails the test on any uncaught page error or console error. */
 function collectErrors(page: Page): string[] {

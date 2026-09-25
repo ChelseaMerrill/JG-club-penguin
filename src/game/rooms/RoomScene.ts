@@ -844,7 +844,10 @@ export class RoomScene extends Scene {
       graphics.lineBetween(a.x, a.y, b.x, b.y);
     }
     graphics.fillStyle(SNOWBALL_WHITE, 1);
-    graphics.fillCircle(from.x, from.y, 6);
+    // Scaled by PLAYER_PENGUIN_SCALE (#131 review fix): this dot sits at the
+    // thrower's chest, so it shrinks with the smaller figure; the reticle
+    // ellipse/ticks below stay tile-sized and unscaled.
+    graphics.fillCircle(from.x, from.y, 6 * PLAYER_PENGUIN_SCALE);
     // Reticle: outer ring, soft inner fill, four ticks.
     graphics.lineStyle(3, SNOWBALL_CYAN, 1);
     graphics.strokeEllipse(at.x, at.y, 92, 46);
@@ -873,8 +876,11 @@ export class RoomScene extends Scene {
     if (!this.live) return;
     this.stopSnowballArc(throwId);
     const start = { x: from.x, y: from.y - SNOWBALL_CHEST_OFFSET_Y };
+    // Radius scaled by PLAYER_PENGUIN_SCALE (#131 review fix): a snowball
+    // thrown by a smaller Penguin is itself smaller; the landing splat stays
+    // tile-sized and unscaled.
     const ball = this.add
-      .circle(start.x, start.y, 9, SNOWBALL_WHITE)
+      .circle(start.x, start.y, 9 * PLAYER_PENGUIN_SCALE, SNOWBALL_WHITE)
       .setStrokeStyle(2, SNOWBALL_OUTLINE)
       .setDepth(SNOWBALL_DEPTH);
     const tween = this.tweens.addCounter({
