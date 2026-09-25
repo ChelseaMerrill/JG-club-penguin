@@ -57,6 +57,7 @@ import {
 import { createMinigameLauncher } from './minigames/minigame-launcher';
 import { createDefaultMinigameRegistry } from './minigames/minigame-registry';
 import { initDevMinigameHook } from './minigames/dev-minigame-hook';
+import { devLeaderboardSeed } from './minigames/dev-leaderboard-seed';
 import { MINIGAME_OVERLAY_ID } from './minigames/minigame-shell';
 import { createPenguinCreator } from './ui/penguin-creator';
 import { createPenguinEditor } from './penguin/penguin-editor';
@@ -449,7 +450,7 @@ const progress = createProgressSession({ registry: game.registry, emitter: gameE
 // with `not_authenticated`.
 const e2eHooksEnabled = import.meta.env.DEV || import.meta.env.VITE_E2E_HOOKS === 'true';
 const devFallbackStore: ProgressStore | null = e2eHooksEnabled
-  ? createInMemoryProgressStore({ emitter: gameEvents })
+  ? createInMemoryProgressStore({ emitter: gameEvents, ...devLeaderboardSeed() })
   : null;
 
 declare global {

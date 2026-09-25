@@ -21,6 +21,7 @@ import {
   emptySlots,
   isProgressErrorCode,
   type IglooSlot,
+  type LeaderboardEntry,
   type ProgressSnapshot,
   type ProgressStore,
   type PurchaseResult,
@@ -46,6 +47,7 @@ async function getSharedDb(): Promise<PGliteInterface> {
   await db.exec(readSqlFile('supabase', 'tests', 'local-supabase-stub.sql'));
   await db.exec(readSqlFile('supabase', 'migrations', '20260924000000_players.sql'));
   await db.exec(readSqlFile('supabase', 'migrations', '20260924010000_saved_progress.sql'));
+  await db.exec(readSqlFile('supabase', 'migrations', '20260924020000_leaderboard.sql'));
   sharedDb = db;
   return db;
 }
@@ -279,7 +281,28 @@ function createSqlProgressStore(db: PGliteInterface, playerId: string): Progress
     });
   }
 
-  return { loadAll, saveLook, recordRound, purchase, setSlot };
+  async function leaderboard(
+    minigameId: MinigameId,
+    maxRows?: number,
+  ): Promise<LeaderboardEntry[]> {
+    return runAsPlayer(async (tx) => {
+      const res =
+        maxRows === undefined
+          ? await tx.query<LeaderboardRow>('select * from public.leaderboard($1)', [minigameId])
+          : await tx.query<LeaderboardRow>('select * from public.leaderboard($1, $2)', [
+              minigameId,
+              maxRows,
+            ]);
+      return res.rows.map((row) => ({
+        rank: row.rank,
+        penguinName: row.penguin_name,
+        bestScore: row.best_score,
+        isMe: row.is_me,
+      }));
+    });
+  }
+
+  return { loadAll, saveLook, recordRound, purchase, setSlot, leaderboard };
 }
 
 /** Builds a fresh Player (a new `auth.users` row) against the shared PGlite database. */
@@ -312,5 +335,216 @@ export async function createPgliteProgressStoreHarness(): Promise<ProgressStoreH
         [seconds, playerId],
       );
     },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// #70 leaderboard fixture: a handful of extra Players with directly-set
+// `minigame_bests` rows (bypassing `record_round`, which never lets a
+// non-winning round overwrite `updated_at`), plus an `anon`-role runner for
+// A1b's denial check. Test-only; only `sql-leaderboard.test.ts` imports this.
+// ---------------------------------------------------------------------------
+
+/** One row of `public.leaderboard`'s result, as PGlite returns it. */
+export interface LeaderboardRow {
+  rank: number;
+  penguin_name: string;
+  best_score: number;
+  is_me: boolean;
+}
+
+export interface PgliteLeaderboardFixture {
+  /** A fresh Player (a new `auth.users` + `players` row) named `penguinName`
+   *  (written directly, bypassing `saveLook`'s client-side validation, so a
+   *  test can give it a name `validateLook` would itself reject -- e.g. one
+   *  made only of invisible characters). Returns the new Player's id. */
+  addPlayer(penguinName: string): Promise<string>;
+  /** Directly upserts `playerId`'s `minigame_bests` row for `minigameId`,
+   *  with `updated_at` set to `secondsAgo` seconds before the database's own
+   *  `now()` -- deterministic, real-clock-independent control over D2's
+   *  tie-break, the same way `advanceSeconds` controls the round interval
+   *  above. */
+  setBestReachedAt(
+    playerId: string,
+    minigameId: MinigameId,
+    bestScore: number,
+    secondsAgo: number,
+  ): Promise<void>;
+  /** Calls `public.leaderboard(minigameId, maxRows)` as `playerId` (signed
+   *  in, `role = authenticated`). Omitting `maxRows` exercises the SQL
+   *  function's own default. */
+  leaderboardAs(
+    playerId: string,
+    minigameId: MinigameId,
+    maxRows?: number | null,
+  ): Promise<LeaderboardRow[]>;
+  /** Runs `sql` as `anon` (no `sub` claim at all), for A1b: `public.leaderboard`
+   *  is revoked from `anon`, so this is expected to reject with `42501`. */
+  asAnon<T>(sql: string, params?: unknown[]): Promise<{ rows: T[] }>;
+  /** The current highest `best_score` under `minigameId` (0 if none), so a
+   *  test can seed scores relative to it (`max + N`) and stay above whatever
+   *  earlier tests in this shared database already wrote for that id --
+   *  the same "live-data-tolerant" technique R3's hosted proof uses. */
+  maxBestScore(minigameId: MinigameId): Promise<number>;
+  /** Calls `public.record_round` as `playerId`, for A1: seeding a
+   *  leaderboard test's bests through the real payout/best-tracking
+   *  function, not by writing `minigame_bests` directly. */
+  recordRoundAs(
+    playerId: string,
+    minigameId: MinigameId,
+    score: number,
+    stats: Record<string, number>,
+  ): Promise<void>;
+  /** Re-applies the leaderboard migration file, for A1e (must rerun cleanly). */
+  rerunMigration(): Promise<void>;
+  /** Runs a single parameterized `sql` statement as the unrestricted
+   *  (postgres) role -- for A2's `pg_proc`/`has_function_privilege`
+   *  introspection, which isn't a signed-in Player's own query. */
+  runSql<T>(sql: string, params?: unknown[]): Promise<{ rows: T[] }>;
+  /** Runs `sql` (one or more `;`-separated statements, e.g. a whole proof
+   *  file: a function definition followed by a `select` from it) as the
+   *  unrestricted (postgres) role, returning one `Results` per statement --
+   *  for A1f, whose interesting rows are the final `select`'s. */
+  execSql<T>(sql: string): Promise<Array<{ rows: T[] }>>;
+  /** Runs a single parameterized `sql` statement as `playerId` (signed in,
+   *  `role = authenticated`), with no client-side `where player_id = ...`
+   *  of its own -- unlike every `ProgressStore` query, which always filters
+   *  by the caller's own id regardless of RLS and so can never actually
+   *  prove RLS is doing anything. For A1e: a bare `select count(*) from
+   *  public.minigame_bests where player_id <> $1` run this way only reads 0
+   *  rows because RLS itself narrows the table, not because the query asked
+   *  it to. */
+  runSqlAs<T>(playerId: string, sql: string, params?: unknown[]): Promise<{ rows: T[] }>;
+}
+
+export async function createPgliteLeaderboardFixture(): Promise<PgliteLeaderboardFixture> {
+  const db = await getSharedDb();
+
+  async function addPlayer(penguinName: string): Promise<string> {
+    const playerId = randomUUID();
+    await db.query('insert into auth.users (id) values ($1)', [playerId]);
+    await db.transaction(async (tx) => {
+      await tx.query("select set_config('request.jwt.claim.sub', $1, true)", [playerId]);
+      await tx.query('set local role authenticated');
+      await tx.query('insert into public.players (id) values ($1) on conflict (id) do nothing', [
+        playerId,
+      ]);
+    });
+    // Written directly as the unrestricted (postgres) role: some fixture
+    // names (invisible-only) would themselves be rejected by
+    // `validateLook`/the client-side check every real save path enforces,
+    // even though #27's own `players_penguin_name_check` (leading/trailing
+    // *ASCII* whitespace only) allows them through -- which is exactly R1's
+    // point.
+    await db.query('update public.players set penguin_name = $1 where id = $2', [
+      penguinName,
+      playerId,
+    ]);
+    return playerId;
+  }
+
+  async function setBestReachedAt(
+    playerId: string,
+    minigameId: MinigameId,
+    bestScore: number,
+    secondsAgo: number,
+  ): Promise<void> {
+    await db.query(
+      `insert into public.minigame_bests (player_id, minigame_id, best_score, updated_at)
+       values ($1, $2, $3, now() - make_interval(secs => $4))
+       on conflict (player_id, minigame_id) do update
+         set best_score = excluded.best_score, updated_at = excluded.updated_at`,
+      [playerId, minigameId, bestScore, secondsAgo],
+    );
+  }
+
+  async function leaderboardAs(
+    playerId: string,
+    minigameId: MinigameId,
+    maxRows?: number | null,
+  ): Promise<LeaderboardRow[]> {
+    return db.transaction(async (tx) => {
+      await tx.query("select set_config('request.jwt.claim.sub', $1, true)", [playerId]);
+      await tx.query('set local role authenticated');
+      const res =
+        maxRows === undefined
+          ? await tx.query<LeaderboardRow>('select * from public.leaderboard($1)', [minigameId])
+          : await tx.query<LeaderboardRow>('select * from public.leaderboard($1, $2)', [
+              minigameId,
+              maxRows,
+            ]);
+      return res.rows;
+    });
+  }
+
+  async function asAnon<T>(sql: string, params: unknown[] = []): Promise<{ rows: T[] }> {
+    return db.transaction(async (tx) => {
+      await tx.query("select set_config('request.jwt.claim.sub', '', true)");
+      await tx.query('set local role anon');
+      return tx.query<T>(sql, params);
+    });
+  }
+
+  async function maxBestScore(minigameId: MinigameId): Promise<number> {
+    const res = await db.query<{ max: number | null }>(
+      'select max(best_score) as max from public.minigame_bests where minigame_id = $1',
+      [minigameId],
+    );
+    return res.rows[0]?.max ?? 0;
+  }
+
+  async function recordRoundAs(
+    playerId: string,
+    minigameId: MinigameId,
+    score: number,
+    stats: Record<string, number>,
+  ): Promise<void> {
+    await db.transaction(async (tx) => {
+      await tx.query("select set_config('request.jwt.claim.sub', $1, true)", [playerId]);
+      await tx.query('set local role authenticated');
+      await tx.query('select public.record_round($1, $2, $3::jsonb)', [
+        minigameId,
+        score,
+        JSON.stringify(stats),
+      ]);
+    });
+  }
+
+  async function rerunMigration(): Promise<void> {
+    await db.exec(readSqlFile('supabase', 'migrations', '20260924020000_leaderboard.sql'));
+  }
+
+  async function runSql<T>(sql: string, params: unknown[] = []): Promise<{ rows: T[] }> {
+    return db.query<T>(sql, params);
+  }
+
+  async function execSql<T>(sql: string): Promise<Array<{ rows: T[] }>> {
+    const results = await db.exec(sql);
+    return results as unknown as Array<{ rows: T[] }>;
+  }
+
+  async function runSqlAs<T>(
+    playerId: string,
+    sql: string,
+    params: unknown[] = [],
+  ): Promise<{ rows: T[] }> {
+    return db.transaction(async (tx) => {
+      await tx.query("select set_config('request.jwt.claim.sub', $1, true)", [playerId]);
+      await tx.query('set local role authenticated');
+      return tx.query<T>(sql, params);
+    });
+  }
+
+  return {
+    addPlayer,
+    setBestReachedAt,
+    leaderboardAs,
+    asAnon,
+    maxBestScore,
+    recordRoundAs,
+    rerunMigration,
+    runSql,
+    execSql,
+    runSqlAs,
   };
 }
