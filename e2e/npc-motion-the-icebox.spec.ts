@@ -18,6 +18,14 @@ const PROOF_ROOT = 'test-results/npc-motion-the-icebox';
 const HIT_ZONE_OFFSET_Y = -50;
 /** All five of this Room's NPCs roam a loop around their slot point. */
 const MOVING_NPCS = ['millie-icebox', 'nicole', 'jason', 'jethro', 'darrin-icebox'];
+/**
+ * Phaser clamps each frame's delta to 16.7ms for its first 120 frames (its
+ * TimeStep `panicMax` cool-down), and NPC motions run on that game clock. On a
+ * slow frame rate (software WebGL on a loaded machine) the clock then runs
+ * far behind the wall clock, so a spec polls, up to this long, for an NPC to
+ * move rather than sampling it on a fixed wall-clock schedule.
+ */
+const MOTION_TIMEOUT = 45_000;
 
 test.use({ viewport: { width: 1600, height: 900 } });
 
@@ -72,24 +80,24 @@ async function bootTheIcebox(page: Page): Promise<string[]> {
 }
 
 test('every Icebox NPC roams its designed loop around its slot point', async ({ page }) => {
+  test.slow();
   const dir = proofDir('npcs-move');
   const errors = await bootTheIcebox(page);
 
   for (const id of MOVING_NPCS) expect((await npc(page, id)).moving).toBe(true);
 
   const start = await npc(page, 'jason');
-  const seen = [start];
   for (let shot = 1; shot <= 4; shot += 1) {
     await page.waitForTimeout(1_500);
-    seen.push(await npc(page, 'jason'));
     await page.screenshot({ path: `${dir}/t${shot * 1.5}s.png` });
   }
-  // jasRoam heads toward translate(100px, 65px) first: down and right.
-  // jasRoam holds at each waypoint for a few percent of its 26s loop, so two
-  // of these five samples can legitimately land in the same hold.
-  expect(new Set(seen.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`)).size).toBeGreaterThan(1);
-  const last = seen[seen.length - 1];
-  expect(last.x).not.toBeCloseTo(start.x);
+  // jasRoam holds at his slot point for the first 12% of its 26s loop, then
+  // heads toward translate(100px, 65px): down and right. Poll on the game
+  // clock (see MOTION_TIMEOUT) for him to leave his slot point that way.
+  await expect
+    .poll(async () => (await npc(page, 'jason')).x - start.x, { timeout: MOTION_TIMEOUT })
+    .toBeGreaterThan(1);
+  expect((await npc(page, 'jason')).y).toBeGreaterThan(start.y);
 
   // A close-up of each roaming NPC, to check its bubble/name tag stay put.
   for (const id of MOVING_NPCS) {
@@ -106,6 +114,7 @@ test('every Icebox NPC roams its designed loop around its slot point', async ({ 
 test('clicking a roaming Jason pauses him, opens his dialog, and closing it resumes his loop', async ({
   page,
 }) => {
+  test.slow();
   const dir = proofDir('click-pauses');
   const errors = await bootTheIcebox(page);
 
@@ -134,15 +143,16 @@ test('clicking a roaming Jason pauses him, opens his dialog, and closing it resu
   await dialog.locator('.npc-dialog__close').click();
   await expect(dialog).toBeHidden();
   await expect.poll(async () => (await npc(page, 'jason')).moving).toBe(true);
-  // jasRoam holds at each waypoint for a few seconds of its 26s loop: poll
-  // rather than a fixed wait, in case the pause landed inside one.
+  // jasRoam holds at each waypoint for a few seconds of its 26s loop: poll on
+  // the game clock (see MOTION_TIMEOUT) rather than a fixed wait, in case the
+  // pause landed inside one.
   await expect
     .poll(
       async () => {
         const p = await npc(page, 'jason');
         return p.x !== pausedAt.x || p.y !== pausedAt.y;
       },
-      { timeout: 8_000 },
+      { timeout: MOTION_TIMEOUT },
     )
     .toBe(true);
   await page.screenshot({ path: `${dir}/resumed.png` });
