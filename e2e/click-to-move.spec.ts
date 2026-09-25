@@ -4,6 +4,7 @@ import { townCenter } from '../src/game/rooms/definitions/town-center';
 import { tileToScreen } from '../src/game/rooms/iso';
 import { GAME_HEIGHT, GAME_WIDTH } from '../src/game/stage-size';
 import type { RoomDebugInfo } from './support/room-debug-types';
+import { TILE_STEP_MS } from '../src/game/movement/speed';
 
 /** Generous: the very first poll also waits out Phaser/WebGL's cold-start init. */
 const BOOT_TIMEOUT = 15_000;
@@ -72,6 +73,7 @@ test('click-to-move', async ({ page }) => {
   const spawnInfo = await debugInfo(page);
   expect(spawnInfo?.localPenguin).toMatchObject({ tile: spawnTile, moving: false, anim: 'WADDLE' });
   expect(spawnInfo?.localPenguinMoveLog).toEqual([]);
+  expect(spawnInfo?.localPenguinArrivedLog).toEqual([]);
 
   // --- No keyboard movement (#14 D6): only pointer clicks move the Penguin.
   for (const key of ['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'w', 'a', 's', 'd']) {
@@ -88,6 +90,7 @@ test('click-to-move', async ({ page }) => {
   const afterOwnTileClick = await debugInfo(page);
   expect(afterOwnTileClick?.localPenguin).toMatchObject({ tile: spawnTile, moving: false });
   expect(afterOwnTileClick?.localPenguinMoveLog).toEqual([]);
+  expect(afterOwnTileClick?.localPenguinArrivedLog).toEqual([]);
 
   // --- Click a far walkable tile: shortest path, WALK anim while moving,
   // idle on arrival, and the move log grows by one, recording that target
@@ -106,6 +109,43 @@ test('click-to-move', async ({ page }) => {
   await expect
     .poll(async () => (await debugInfo(page))?.localPenguin, { timeout: LONG_WALK_TIMEOUT })
     .toMatchObject({ tile: farTile, moving: false, anim: 'WADDLE' });
+  // Exactly one arrival, at the far tile, for this one completed walk (#43 D1).
+  expect((await debugInfo(page))?.localPenguinArrivedLog).toEqual([farTile]);
+
+  // --- R1 (#43 D1): a click that lands while walking, on the very tile the
+  // current in-flight step is about to arrive at, still ends the walk with
+  // an arrival — the queued move resolves to the tile the Penguin now
+  // stands on, but a walk was genuinely in progress until this resolved, so
+  // remotes still need to re-route to stop here. Walked entirely along Town
+  // Center's row 5, fully walkable end to end (#16), so the path from col 2
+  // to col 6 is a deterministic straight line and the tile one step along it
+  // is always {col: 3, row: 5}.
+  const r1WalkStart: Tile = { col: 2, row: 5 };
+  const r1NextTile: Tile = { col: 3, row: 5 };
+  const r1FarTarget: Tile = { col: 6, row: 5 };
+
+  await clickStagePoint(page, tileToScreen(r1WalkStart, origin));
+  await expect
+    .poll(async () => (await debugInfo(page))?.localPenguin, { timeout: LONG_WALK_TIMEOUT })
+    .toMatchObject({ tile: r1WalkStart, moving: false });
+
+  const arrivalsBeforeR1 = (await debugInfo(page))?.localPenguinArrivedLog?.length ?? 0;
+
+  await clickStagePoint(page, tileToScreen(r1FarTarget, origin));
+  await expect.poll(async () => (await debugInfo(page))?.localPenguin?.moving).toBe(true);
+
+  // Clicked well within the first 250ms-per-tile step, so it queues instead
+  // of applying immediately, and lands exactly when that first step's tween
+  // completes and arrives at {3,5}.
+  await page.waitForTimeout(TILE_STEP_MS / 3);
+  await clickStagePoint(page, tileToScreen(r1NextTile, origin));
+
+  await expect
+    .poll(async () => (await debugInfo(page))?.localPenguin, { timeout: LONG_WALK_TIMEOUT })
+    .toMatchObject({ tile: r1NextTile, moving: false });
+  expect((await debugInfo(page))?.localPenguinArrivedLog?.length).toBe(arrivalsBeforeR1 + 1);
+  expect((await debugInfo(page))?.localPenguinArrivedLog?.at(-1)).toEqual(r1NextTile);
+  expect((await debugInfo(page))?.localPenguinMoveLog?.at(-1)).toEqual(r1NextTile);
 
   // --- Click an off-grid point: snaps to the nearest walkable tile.
   // Stage (800, 100) -- 150px above the grid origin -- inverts to tile
@@ -135,11 +175,14 @@ test('click-to-move', async ({ page }) => {
   const rerouteFirstTarget: Tile = { col: 11, row: 9 };
   const rerouteSecondTarget: Tile = { col: 11, row: 0 };
   const logBeforeReroute = (await debugInfo(page))?.localPenguinMoveLog?.length ?? 0;
+  const arrivalsBeforeReroute = (await debugInfo(page))?.localPenguinArrivedLog?.length ?? 0;
   await clickStagePoint(page, tileToScreen(rerouteFirstTarget, origin));
   await expect.poll(async () => (await debugInfo(page))?.localPenguin?.moving).toBe(true);
   await expect
     .poll(async () => (await debugInfo(page))?.localPenguinMoveLog?.length)
     .toBe(logBeforeReroute + 1);
+  // Still walking toward the first target: no arrival yet.
+  expect((await debugInfo(page))?.localPenguinArrivedLog?.length).toBe(arrivalsBeforeReroute);
 
   await clickStagePoint(page, tileToScreen(rerouteSecondTarget, origin));
   await expect
@@ -148,10 +191,17 @@ test('click-to-move', async ({ page }) => {
     })
     .toBe(logBeforeReroute + 2);
   expect((await debugInfo(page))?.localPenguinMoveLog?.at(-1)).toEqual(rerouteSecondTarget);
+  // The re-route itself queued mid-walk: still no arrival for the
+  // interrupted first target.
+  expect((await debugInfo(page))?.localPenguinArrivedLog?.length).toBe(arrivalsBeforeReroute);
 
   await expect
     .poll(async () => (await debugInfo(page))?.localPenguin, { timeout: LONG_WALK_TIMEOUT })
     .toMatchObject({ tile: rerouteSecondTarget, moving: false });
+  // Exactly one arrival now that the re-routed walk actually ended, at its
+  // own (re-routed) target, not the first target it was interrupted before.
+  expect((await debugInfo(page))?.localPenguinArrivedLog?.length).toBe(arrivalsBeforeReroute + 1);
+  expect((await debugInfo(page))?.localPenguinArrivedLog?.at(-1)).toEqual(rerouteSecondTarget);
 
   // --- Walking toward decreasing col (screen x) faces the Penguin left, and
   // mirrors its sprite (`flipX`, #14 review fix 8). The Penguin is currently
@@ -213,7 +263,9 @@ test('click-to-move', async ({ page }) => {
     .toMatchObject({ tile: doorApproachTile, moving: false });
   expect((await debugInfo(page))?.doorReachedLog).toContain(door.label);
 
-  // The Penguin and its name tag, visible at rest.
+  // The Penguin, visible at rest. Its look is still `DEFAULT_LOOK` here
+  // (the name is set below), so the World's name gate (#75) hides the name
+  // tag: no placeholder for an unnamed Penguin.
   await page.evaluate(() => document.fonts.ready);
   await page.screenshot({ path: 'test-results/click-to-move/screenshot.png' });
 

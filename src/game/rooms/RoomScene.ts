@@ -2,6 +2,7 @@ import { Data, GameObjects, Scene, Scenes, type Input, type Time, type Tweens } 
 import {
   gameEvents,
   SPAWN_ROOM_ID,
+  type Facing,
   type PenguinLook,
   type RoomId,
   type Tile,
@@ -12,6 +13,7 @@ import {
   type LocalPenguinController,
 } from '../movement/controller';
 import { nearestReachable, nearestWalkable, tilesEqual } from '../movement/pathfinding';
+import { TILE_STEP_MS } from '../movement/speed';
 import {
   resolveRegisteredLook,
   resolveRegisteredPlayerId,
@@ -47,6 +49,18 @@ export const ROOM_SCENE_KEY = 'RoomScene';
  */
 export const LOCAL_PENGUIN_MOVE_EVENT = 'local-penguin:move';
 /**
+ * Scene-local event (not a contract event): fired when a walk's path is
+ * exhausted in `advanceStep`, and also when a queued move applied from that
+ * same tween's `onComplete` resolves right back to the tile the Penguin now
+ * stands on (#43 D1) — a walk genuinely in progress just ended there, so
+ * remotes still need to re-route to stop at this tile. Never fired on a
+ * queued re-route that keeps walking, nor on a plain own-tile click while
+ * already standing still (`stopCleanly`'s true no-op path). `main.ts` (#43)
+ * answers it with `roomChannel.setTile(tile, facing)`: one Presence track
+ * per arrival, never per step or frame.
+ */
+export const LOCAL_PENGUIN_ARRIVED_EVENT = 'local-penguin:arrived';
+/**
  * Scene-local event (#14 D5, not a contract event): fired on arrival at a
  * door's approach tile. #15 calls `changeRoom(door.targetRoomId)` from it.
  * A disabled door (`targetRoomId: null`) still fires this; #15 owns the
@@ -56,6 +70,11 @@ export const DOOR_REACHED_EVENT = 'door:reached';
 
 export interface LocalPenguinMoveEvent {
   target: Tile;
+}
+
+export interface LocalPenguinArrivedEvent {
+  tile: Tile;
+  facing: Facing;
 }
 
 export interface DoorReachedEvent {
@@ -122,10 +141,6 @@ const PROP_WIDTH = 32;
 const PROP_HEIGHT = 32;
 const PROP_COLOR = 0x3a3d42;
 
-/** Tiles per second the local Penguin walks at (#14 D3). */
-const TILE_SPEED = 4;
-const TILE_STEP_MS = 1000 / TILE_SPEED;
-
 /** The registry key #14/`src/auth/player.ts`'s `bindPlayer` sets/removes. */
 const PLAYER_REGISTRY_KEY = 'player';
 
@@ -177,11 +192,12 @@ export interface RoomSceneData {
  * `scene.restart(data)` (#15) should treat Phaser's `Scenes.Events.CREATE`
  * (fired once `create()` finishes) as the "Room is ready" signal, not the
  * synchronous return of `start`/`restart` itself. Listeners for
- * `LOCAL_PENGUIN_MOVE_EVENT`/`DOOR_REACHED_EVENT` should be attached to
- * `scene.events` exactly once, right after the Scene is first created: the
- * same `RoomScene` instance (and its `events` emitter) is reused across a
- * `scene.restart()`, so a listener attached once keeps receiving events
- * after every later restart without needing to be re-attached.
+ * `LOCAL_PENGUIN_MOVE_EVENT`/`LOCAL_PENGUIN_ARRIVED_EVENT`/`DOOR_REACHED_EVENT`
+ * should be attached to `scene.events` exactly once, right after the Scene
+ * is first created: the same `RoomScene` instance (and its `events`
+ * emitter) is reused across a `scene.restart()`, so a listener attached once
+ * keeps receiving events after every later restart without needing to be
+ * re-attached.
  *
  * `penguins` (#28) draws the Room channel's *remote* Penguins with the #31
  * renderer; the local Penguin is this scene's own (#14), not the view's.
@@ -210,6 +226,8 @@ export class RoomScene extends Scene {
   private npcArrivedLog: string[] = [];
   private doorReachedLog: string[] = [];
   private localPenguinMoveLog: Tile[] = [];
+  /** Tile per `LOCAL_PENGUIN_ARRIVED_EVENT` emission, oldest first (#43 D1). */
+  private localPenguinArrivedLog: Tile[] = [];
   private debugPenguins: Penguin[] = [];
   /** Persists across restarts (never reset in `init()`); see `restartCount` on `RoomDebugInfo`. */
   private restartCount = 0;
@@ -289,6 +307,7 @@ export class RoomScene extends Scene {
     this.npcArrivedLog = [];
     this.doorReachedLog = [];
     this.localPenguinMoveLog = [];
+    this.localPenguinArrivedLog = [];
     this.debugPenguins = [];
   }
 
@@ -414,7 +433,7 @@ export class RoomScene extends Scene {
 
     // The remote Penguins (#28). Phaser destroys them with its display list
     // on shutdown; `detach()` only forgets them, so nothing is destroyed twice.
-    this.penguins.attach(placePenguinsIn(this), room.grid.origin);
+    this.penguins.attach(placePenguinsIn(this), room.grid.origin, room.walkable);
     this.events.once(Scenes.Events.SHUTDOWN, () => this.penguins.detach());
 
     if (HOOKS_ENABLED) this.publishRoomDebug();
@@ -449,10 +468,12 @@ export class RoomScene extends Scene {
       doorReachedLog: this.doorReachedLog,
       localPenguinMoveLog: this.localPenguinMoveLog,
       comingSoonHint: this.comingSoonHint?.door.label ?? null,
+      localPenguinArrivedLog: this.localPenguinArrivedLog,
       restartRoom: () => this.scene.restart(),
       restartCount: this.restartCount,
       penguinCount: this.countPenguinContainers((name) => name !== REMOTE_PENGUIN_NAME),
       remotePenguinCount: this.countPenguinContainers((name) => name === REMOTE_PENGUIN_NAME),
+      remotePenguins: this.penguins.debugRemotePenguins(),
       setRegisteredPlayer: (player) => this.registry.set(PLAYER_REGISTRY_KEY, player),
       spawnDebugPenguin: (tile, look) => this.spawnDebugPenguin(tile, look),
     });
@@ -602,14 +623,23 @@ export class RoomScene extends Scene {
   /**
    * Resolves `target` against the Penguin's current tile via
    * `nearestReachable` (#14 review fix 2) and either starts walking there,
-   * or stops cleanly with no path logged/emitted: either because the
-   * resolved target already *is* the tile the Penguin stands on (review fix
-   * 6's own-tile click, and fix 2's case where nothing reachable is any
-   * closer to an unreachable target than staying put), or — defensively,
-   * since `nearestReachable` only ever returns a tile connected to the
-   * Penguin's own tile — because `moveTo` still failed.
+   * or stops cleanly: either because the resolved target already *is* the
+   * tile the Penguin stands on (review fix 6's own-tile click, and fix 2's
+   * case where nothing reachable is any closer to an unreachable target
+   * than staying put), or — defensively, since `nearestReachable` only ever
+   * returns a tile connected to the Penguin's own tile — because `moveTo`
+   * still failed. A plain click resolving to the standing tile logs and
+   * emits nothing; `options.continuingWalk` (set only when `advanceStep`'s
+   * tween `onComplete` applies a queued move, #43 D1) still logs the move
+   * and emits both `LOCAL_PENGUIN_MOVE_EVENT`/`LOCAL_PENGUIN_ARRIVED_EVENT`,
+   * since a walk that was genuinely in progress just ended here and remotes
+   * need to re-route to stop at this tile.
    */
-  private applyMoveTo(target: Tile, onArrive?: () => void): void {
+  private applyMoveTo(
+    target: Tile,
+    onArrive?: () => void,
+    options?: { continuingWalk?: boolean },
+  ): void {
     const controller = this.controller;
     const room = this.room;
     if (!controller || !room) return;
@@ -618,6 +648,14 @@ export class RoomScene extends Scene {
 
     if (tilesEqual(reachableTarget, controller.state.tile)) {
       this.stopCleanly(controller);
+      if (options?.continuingWalk) {
+        const tile = controller.state.tile;
+        const facing = controller.state.facing;
+        this.localPenguinMoveLog.push(tile);
+        const moveEvent: LocalPenguinMoveEvent = { target: tile };
+        this.events.emit(LOCAL_PENGUIN_MOVE_EVENT, moveEvent);
+        this.emitArrived(tile, facing);
+      }
       // Already standing on an NPC's interaction tile or a door's approach
       // tile: that still counts as arriving, so clicking an NPC you're next
       // to opens its dialog (#36) and clicking the door you're at uses it
@@ -647,6 +685,13 @@ export class RoomScene extends Scene {
     this.pendingArrival = null;
   }
 
+  /** Logs and emits `LOCAL_PENGUIN_ARRIVED_EVENT` for an arrival at `tile`/`facing` (#43 D1). */
+  private emitArrived(tile: Tile, facing: Facing): void {
+    this.localPenguinArrivedLog.push(tile);
+    const event: LocalPenguinArrivedEvent = { tile, facing };
+    this.events.emit(LOCAL_PENGUIN_ARRIVED_EVENT, event);
+  }
+
   private spawnDebugPenguin(tile: Tile, look: PenguinLook): void {
     const room = this.room;
     if (!room) return;
@@ -666,6 +711,7 @@ export class RoomScene extends Scene {
     if (!next) {
       penguin.idle();
       this.currentAnim = this.currentLook.emote;
+      this.emitArrived(controller.state.tile, controller.state.facing);
       const arrive = this.pendingArrival;
       this.pendingArrival = null;
       arrive?.();
@@ -701,7 +747,7 @@ export class RoomScene extends Scene {
         const queued = this.queuedMove;
         if (queued) {
           this.queuedMove = null;
-          this.applyMoveTo(queued.target, queued.onArrive);
+          this.applyMoveTo(queued.target, queued.onArrive, { continuingWalk: true });
           return;
         }
 
@@ -902,21 +948,68 @@ export class RoomScene extends Scene {
  * Places #31 Penguins (figure, name tag, idle animation) in `scene`, for
  * `RoomPenguinView`'s remote Penguins. Each is named `REMOTE_PENGUIN_NAME`
  * so the debug hook can count remote and local Penguins apart.
+ *
+ * `step` (#43) tweens one tile step at `TILE_STEP_MS`, the same pace and
+ * `onUpdate` depth-sorting technique the local walk's own tween uses;
+ * `moveTo`/`step`/`destroy` all stop any tween already in flight, so a
+ * re-route, a Presence snap, or a Room teardown never leaves a stray tween
+ * driving a Penguin nobody is walking.
  */
 function placePenguinsIn(scene: Scene): PlacePenguin {
   return (look, point, depth, facing) => {
     const penguin = createPenguin(scene, point.x, point.y, look, { facing });
     penguin.container.setName(REMOTE_PENGUIN_NAME);
     penguin.container.setDepth(depth);
+
+    let activeTween: Tweens.Tween | null = null;
+    let pendingResolve: (() => void) | null = null;
+
+    function stopActiveStep(): void {
+      if (activeTween) {
+        activeTween.stop();
+        activeTween = null;
+      }
+      const resolve = pendingResolve;
+      pendingResolve = null;
+      resolve?.();
+    }
+
     return {
       setLook: (next) => penguin.setLook(next),
       setFacing: (next) => penguin.setFacing(next),
       moveTo: (next, nextDepth) => {
+        stopActiveStep();
         penguin.container.setPosition(next.x, next.y);
         penguin.container.setDepth(nextDepth);
       },
+      walk: () => penguin.walk(),
+      idle: () => penguin.idle(),
+      step: (next, durationMs, depthAt) => {
+        stopActiveStep();
+        return new Promise<void>((resolve) => {
+          pendingResolve = resolve;
+          activeTween = scene.tweens.add({
+            targets: penguin.container,
+            x: next.x,
+            y: next.y,
+            duration: durationMs,
+            onUpdate: (tween: Tweens.Tween) => {
+              penguin.container.setDepth(depthAt(tween.progress));
+            },
+            onComplete: () => {
+              activeTween = null;
+              const resolveFn = pendingResolve;
+              pendingResolve = null;
+              resolveFn?.();
+            },
+          });
+        });
+      },
       say: (text) => penguin.say(text),
-      destroy: () => penguin.destroy(),
+      destroy: () => {
+        stopActiveStep();
+        penguin.destroy();
+      },
     };
   };
 }

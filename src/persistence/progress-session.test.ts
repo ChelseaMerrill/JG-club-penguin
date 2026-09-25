@@ -203,7 +203,12 @@ describe('createProgressSession', () => {
     it('recordRound updates tokens, adds the badge, and records a new best', async () => {
       const { registry, wrapped } = await setup();
 
-      const result = await wrapped.recordRound('bug-squash', 520, { squashed: 520 });
+      const result = await wrapped.recordRound('bug-squash', 520, {
+        score: 520,
+        squashed: 520,
+        bestCombo: 0,
+        escaped: 0,
+      });
 
       const snapshot = registry.get(PROGRESS_KEY) as ProgressSnapshot;
       expect(snapshot.tokens).toBe(result.balance);
@@ -229,8 +234,18 @@ describe('createProgressSession', () => {
       await session.start(PLAYER, store);
       const wrapped = registry.get(PROGRESS_STORE_KEY) as ProgressStore;
 
-      await wrapped.recordRound('bug-squash', 520, { squashed: 520 });
-      await wrapped.recordRound('bug-squash', 520, { squashed: 520 });
+      await wrapped.recordRound('bug-squash', 520, {
+        score: 520,
+        squashed: 520,
+        bestCombo: 0,
+        escaped: 0,
+      });
+      await wrapped.recordRound('bug-squash', 520, {
+        score: 520,
+        squashed: 520,
+        bestCombo: 0,
+        escaped: 0,
+      });
 
       const snapshot = registry.get(PROGRESS_KEY) as ProgressSnapshot;
       expect(snapshot.badges).toEqual(['exterminator']);
@@ -239,7 +254,12 @@ describe('createProgressSession', () => {
 
     it('purchase updates tokens and appends the owned item', async () => {
       const { registry, wrapped } = await setup();
-      await wrapped.recordRound('bug-squash', 520, { squashed: 520 });
+      await wrapped.recordRound('bug-squash', 520, {
+        score: 520,
+        squashed: 520,
+        bestCombo: 0,
+        escaped: 0,
+      });
 
       const result = await wrapped.purchase('beanbag');
 
@@ -250,7 +270,12 @@ describe('createProgressSession', () => {
 
     it('setSlot moves an item between slots and empties on null', async () => {
       const { registry, wrapped } = await setup();
-      await wrapped.recordRound('bug-squash', 520, { squashed: 520 });
+      await wrapped.recordRound('bug-squash', 520, {
+        score: 520,
+        squashed: 520,
+        bestCombo: 0,
+        escaped: 0,
+      });
       await wrapped.purchase('beanbag');
 
       await wrapped.setSlot(1, 'beanbag');

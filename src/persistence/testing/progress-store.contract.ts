@@ -123,7 +123,9 @@ export function describeProgressStoreContract(
       ).rejects.toMatchObject({ code: 'round_too_soon' });
 
       // Bug Squash's interval is independent of Pancake Flip's.
-      await expect(store.recordRound('bug-squash', 10, { squashed: 1 })).resolves.toMatchObject({
+      await expect(
+        store.recordRound('bug-squash', 10, { score: 10, squashed: 1, bestCombo: 0, escaped: 0 }),
+      ).resolves.toMatchObject({
         tokensAwarded: 1,
       });
 
@@ -150,7 +152,12 @@ export function describeProgressStoreContract(
     it('Bug Squash: a score of 520 pays floor(score / 10), earns Exterminator, and updates the balance', async () => {
       const { store } = await makeHarness();
 
-      const result = await store.recordRound('bug-squash', 520, { squashed: 520 });
+      const result = await store.recordRound('bug-squash', 520, {
+        score: 520,
+        squashed: 520,
+        bestCombo: 0,
+        escaped: 0,
+      });
 
       expect(result.tokensAwarded).toBe(52);
       expect(result.badgeEarned).toBe(true);
@@ -160,18 +167,33 @@ export function describeProgressStoreContract(
     it('reports newBest true on the first round and false on a lower one', async () => {
       const { store, advanceSeconds } = await makeHarness();
 
-      const first = await store.recordRound('bug-squash', 100, { squashed: 100 });
+      const first = await store.recordRound('bug-squash', 100, {
+        score: 100,
+        squashed: 100,
+        bestCombo: 0,
+        escaped: 0,
+      });
       expect(first.newBest).toBe(true);
 
       await advanceSeconds(60);
-      const second = await store.recordRound('bug-squash', 50, { squashed: 50 });
+      const second = await store.recordRound('bug-squash', 50, {
+        score: 50,
+        squashed: 50,
+        bestCombo: 0,
+        escaped: 0,
+      });
       expect(second.newBest).toBe(false);
     });
 
     it('does not record a first round scoring 0 as a personal best', async () => {
       const { store } = await makeHarness();
 
-      const result = await store.recordRound('bug-squash', 0, { squashed: 0 });
+      const result = await store.recordRound('bug-squash', 0, {
+        score: 0,
+        squashed: 0,
+        bestCombo: 0,
+        escaped: 0,
+      });
       expect(result.newBest).toBe(false);
       expect((await store.loadAll()).bests['bug-squash']).toBeUndefined();
     });
@@ -236,7 +258,9 @@ export function describeProgressStoreContract(
     it('rejects a negative score as invalid_score', async () => {
       const { store } = await makeHarness();
 
-      await expect(store.recordRound('bug-squash', -1, { squashed: 0 })).rejects.toMatchObject({
+      await expect(
+        store.recordRound('bug-squash', -1, { score: 0, squashed: 0, bestCombo: 0, escaped: 0 }),
+      ).rejects.toMatchObject({
         code: 'invalid_score',
       });
     });
@@ -244,7 +268,9 @@ export function describeProgressStoreContract(
     it('rejects a non-integer score as invalid_score', async () => {
       const { store } = await makeHarness();
 
-      await expect(store.recordRound('bug-squash', 10.5, { squashed: 0 })).rejects.toMatchObject({
+      await expect(
+        store.recordRound('bug-squash', 10.5, { score: 0, squashed: 0, bestCombo: 0, escaped: 0 }),
+      ).rejects.toMatchObject({
         code: 'invalid_score',
       });
     });
@@ -326,7 +352,12 @@ export function describeProgressStoreContract(
       const look: PenguinLook = { ...DEFAULT_LOOK, name: 'Chilly' };
 
       await store.saveLook(look);
-      const round = await store.recordRound('bug-squash', 520, { squashed: 520 });
+      const round = await store.recordRound('bug-squash', 520, {
+        score: 520,
+        squashed: 520,
+        bestCombo: 0,
+        escaped: 0,
+      });
       const purchaseResult = await store.purchase('beanbag');
       await store.setSlot(1, 'beanbag');
 
@@ -444,9 +475,19 @@ export function describeProgressStoreContract(
     it('a small honest round shortly after the previous one is paid in full', async () => {
       const { store, advanceSeconds } = await makeHarness();
 
-      await store.recordRound('bug-squash', 100, { squashed: 10 });
+      await store.recordRound('bug-squash', 100, {
+        score: 100,
+        squashed: 10,
+        bestCombo: 0,
+        escaped: 0,
+      });
       await advanceSeconds(30);
-      const result = await store.recordRound('bug-squash', 400, { squashed: 40 });
+      const result = await store.recordRound('bug-squash', 400, {
+        score: 400,
+        squashed: 40,
+        bestCombo: 0,
+        escaped: 0,
+      });
       // floor(250 * 30 / 60) = 125 allowed; 400 / 10 = 40 earned.
       expect(result.tokensAwarded).toBe(40);
     });

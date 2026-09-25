@@ -88,11 +88,21 @@ test('deployed-progress-restore', async ({ page }, testInfo) => {
 
   let roundResult;
   try {
-    roundResult = await store.recordRound('bug-squash', 600, { squashed: 600 });
+    roundResult = await store.recordRound('bug-squash', 600, {
+      score: 600,
+      squashed: 600,
+      bestCombo: 0,
+      escaped: 0,
+    });
   } catch (err) {
     if (err instanceof ProgressStoreError && err.code === 'round_too_soon') {
       await new Promise((resolve) => setTimeout(resolve, 11_000));
-      roundResult = await store.recordRound('bug-squash', 600, { squashed: 600 });
+      roundResult = await store.recordRound('bug-squash', 600, {
+        score: 600,
+        squashed: 600,
+        bestCombo: 0,
+        escaped: 0,
+      });
     } else {
       throw err;
     }

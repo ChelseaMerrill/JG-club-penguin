@@ -28,6 +28,15 @@ export interface LocalPenguinDebugInfo {
   playerId: string;
 }
 
+/** One remote Penguin's movement state (#43). */
+export interface RemotePenguinDebugInfo {
+  playerId: string;
+  tile: Tile;
+  moving: boolean;
+  placedTile: Tile;
+  walkStartedAt?: number;
+}
+
 /** One `room:leave`/`room:enter` #15's navigator has emitted, in emission order. */
 export interface RoomDebugEventLogEntry {
   type: 'room:leave' | 'room:enter';
@@ -43,10 +52,12 @@ export interface RoomDebugInfo {
   npcArrivedLog?: string[];
   doorReachedLog?: string[];
   localPenguinMoveLog?: Tile[];
+  localPenguinArrivedLog?: Tile[];
   restartRoom?: () => void;
   restartCount?: number;
   penguinCount?: number;
   remotePenguinCount?: number;
+  remotePenguins?: RemotePenguinDebugInfo[];
   setRegisteredPlayer?: (player: RegisteredPlayer) => void;
   spawnDebugPenguin?: (tile: Tile, look: PenguinLook) => void;
   comingSoonHint?: string | null;

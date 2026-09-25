@@ -187,11 +187,20 @@ describe('createSupabaseProgressStore', () => {
       emitter.on('badge:earned', ({ badgeId }) => badgeEvents.push(badgeId));
       const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID, emitter });
 
-      const result = await store.recordRound('bug-squash', 520, { squashed: 520 });
+      const result = await store.recordRound('bug-squash', 520, {
+        score: 520,
+        squashed: 520,
+        bestCombo: 0,
+        escaped: 0,
+      });
 
       expect(calls).toContainEqual([
         'rpc.record_round',
-        { minigame_id: 'bug-squash', score: 520, stats: { squashed: 520 } },
+        {
+          minigame_id: 'bug-squash',
+          score: 520,
+          stats: { score: 520, squashed: 520, bestCombo: 0, escaped: 0 },
+        },
       ]);
       expect(result).toEqual({
         tokensAwarded: 52,
@@ -215,7 +224,12 @@ describe('createSupabaseProgressStore', () => {
       emitter.on('badge:earned', ({ badgeId }) => badgeEvents.push(badgeId));
       const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID, emitter });
 
-      await store.recordRound('bug-squash', 520, { squashed: 520 });
+      await store.recordRound('bug-squash', 520, {
+        score: 520,
+        squashed: 520,
+        bestCombo: 0,
+        escaped: 0,
+      });
 
       expect(badgeEvents).toEqual([MINIGAME_RULES['bug-squash'].badgeId]);
       expect(badgeEvents).toEqual(['exterminator']);
@@ -230,7 +244,14 @@ describe('createSupabaseProgressStore', () => {
       emitter.on('ui:toast', ({ message }) => messages.push(message));
       const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID, emitter });
 
-      await expect(store.recordRound('bug-squash', 520, { squashed: 520 })).rejects.toMatchObject({
+      await expect(
+        store.recordRound('bug-squash', 520, {
+          score: 520,
+          squashed: 520,
+          bestCombo: 0,
+          escaped: 0,
+        }),
+      ).rejects.toMatchObject({
         code: 'round_too_soon',
       });
       expect(messages).toEqual(['Slow down! Try again in a few seconds']);
@@ -242,7 +263,14 @@ describe('createSupabaseProgressStore', () => {
       });
       const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID });
 
-      await expect(store.recordRound('bug-squash', 520, { squashed: 520 })).rejects.toMatchObject({
+      await expect(
+        store.recordRound('bug-squash', 520, {
+          score: 520,
+          squashed: 520,
+          bestCombo: 0,
+          escaped: 0,
+        }),
+      ).rejects.toMatchObject({
         code: 'invalid_score',
       });
     });
@@ -253,7 +281,12 @@ describe('createSupabaseProgressStore', () => {
       });
       const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID });
 
-      const rejection = store.recordRound('bug-squash', 520, { squashed: 520 });
+      const rejection = store.recordRound('bug-squash', 520, {
+        score: 520,
+        squashed: 520,
+        bestCombo: 0,
+        escaped: 0,
+      });
       await expect(rejection).rejects.toThrow('connection reset');
       await expect(rejection).rejects.not.toBeInstanceOf(ProgressStoreError);
     });
@@ -267,7 +300,14 @@ describe('createSupabaseProgressStore', () => {
       emitter.on('ui:toast', ({ message }) => messages.push(message));
       const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID, emitter });
 
-      await expect(store.recordRound('bug-squash', 520, { squashed: 520 })).rejects.toThrow();
+      await expect(
+        store.recordRound('bug-squash', 520, {
+          score: 520,
+          squashed: 520,
+          bestCombo: 0,
+          escaped: 0,
+        }),
+      ).rejects.toThrow();
       expect(messages).toEqual(["Couldn't reach the server. Your progress wasn't saved."]);
     });
   });
@@ -418,7 +458,14 @@ describe('createSupabaseProgressStore', () => {
       });
       const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID });
 
-      await expect(store.recordRound('bug-squash', 520, { squashed: 520 })).resolves.toBeDefined();
+      await expect(
+        store.recordRound('bug-squash', 520, {
+          score: 520,
+          squashed: 520,
+          bestCombo: 0,
+          escaped: 0,
+        }),
+      ).resolves.toBeDefined();
     });
 
     it('still rejects on failure, without throwing while emitting a toast', async () => {
