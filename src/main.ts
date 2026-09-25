@@ -14,6 +14,7 @@ import {
 } from './game/rooms/RoomScene';
 import type { RoomPenguinView } from './game/rooms/room-penguin-view';
 import { createRoomNavigator, type RoomNavigator } from './game/rooms/room-navigator';
+import { ROOM_FLOORS } from './game/rooms/floors';
 import {
   HOOKS_ENABLED,
   registerRoomDebugNavigatorHooks,
@@ -85,6 +86,7 @@ import { createNpcDialog } from './ui/npc-dialog/npc-dialog';
 import { recordNpcTalked, recordOpenStall } from './game/rooms/dev-room-hook';
 import { createTrophyCase, TROPHY_CASE_OVERLAY_ID } from './ui/trophy-case';
 import { createMapScreen } from './ui/map-screen';
+import { createElevatorScreen } from './ui/elevator-screen';
 import { createMarket, MARKET_OVERLAY_ID } from './ui/market';
 import { createIglooEditor, type IglooEditor } from './ui/igloo-editor';
 import { wireBadgeToast } from './ui/badge-toast';
@@ -104,6 +106,18 @@ mountStage(game);
 const client = getSupabaseClient();
 const realtime = toRealtimeClient(client);
 const uiLayer = getUiLayer();
+
+/**
+ * The Elevator loading screen (#52 D6): shown by `roomNavigator` below for
+ * any `changeRoom` that crosses a floor (doors, the Map, the HUD's IGLOO
+ * button, and `__roomDebug.changeRoom` alike, since they all go through the
+ * one navigator). Mounted once at boot, hidden until the first floor
+ * crossing; deliberately never registered with `hud.overlays` (no Escape, no
+ * close button -- it isn't dismissible).
+ */
+const elevatorScreen = createElevatorScreen(uiLayer, {
+  resolveFloor: (roomId) => ROOM_FLOORS[roomId],
+});
 
 /**
  * A stable `EmoteRoomChannel` (#47), unlike `ChatRoomChannel`: an Emote must
@@ -223,6 +237,7 @@ const sceneReady = whenSceneReady(game).then((scene) => {
     },
     events: gameEvents,
     hasPlayer: () => Boolean(game.registry.get('player')),
+    transitionScreen: elevatorScreen,
   });
 
   // Test-only: `window.__roomDebug.changeRoom`/`roomEventLog` (#15 D6),

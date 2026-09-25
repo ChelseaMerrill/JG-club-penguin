@@ -20,6 +20,7 @@ export interface HumanFigureSpec {
     | 'short'
     | 'spiky'
     | 'shortDark'
+    | 'buzz'
     | 'sideSwept'
     | 'wavyLong'
     | 'curlyLong'
@@ -32,7 +33,7 @@ export interface HumanFigureSpec {
   top?: string;
   /** An open-front jacket/vest over the shirt, when given. */
   jacket?: string;
-  pattern?: 'stripes' | 'dots';
+  pattern?: 'stripes' | 'plaid' | 'dots';
   pattern2?: string;
   sleeveless?: boolean;
   collar?: 'button' | 'polo' | 'zip' | 'crew' | 'shirtLight';
@@ -55,7 +56,8 @@ export interface HumanFigureSpec {
     | 'laptop'
     | 'clipboard'
     | 'chicken'
-    | 'hobbyhorse';
+    | 'hobbyhorse'
+    | 'camera';
 }
 
 const SKIN: Record<NonNullable<HumanFigureSpec['skin']>, string> = {
@@ -135,6 +137,15 @@ function renderHumanFigure(spec: HumanFigureSpec, idPrefix: string): string {
       o += `<rect x="34" y="${y}" width="52" height="3.5" fill="${spec.pattern2 ?? '#F4F4F4'}" clip-path="url(#${id}t)"></rect>`;
     }
   }
+  if (spec.pattern === 'plaid') {
+    const plaid = spec.pattern2 ?? '#8FB5D8';
+    for (let y = 70; y < 110; y += 9) {
+      o += `<rect x="34" y="${y}" width="52" height="2" fill="${plaid}" clip-path="url(#${id}t)" opacity=".8"></rect>`;
+    }
+    for (let x = 38; x < 86; x += 9) {
+      o += `<rect x="${x}" y="66" width="2" height="44" fill="${plaid}" clip-path="url(#${id}t)" opacity=".8"></rect>`;
+    }
+  }
   if (spec.pattern === 'dots') {
     for (let y = 71; y < 108; y += 7) {
       for (let x = 38; x < 86; x += 7) {
@@ -196,6 +207,9 @@ function renderHumanFigure(spec: HumanFigureSpec, idPrefix: string): string {
   }
   if (style === 'shortDark') {
     o += `<path d="M35 34 C32 14 48 8 62 10 C78 12 88 18 85 34 C80 24 40 22 35 34 Z" fill="${hc}" stroke="${OUTLINE}" stroke-width="2.5"></path>`;
+  }
+  if (style === 'buzz') {
+    o += `<path d="M37 30 C40 20 50 16 60 16 C70 16 80 20 83 30 C76 26 44 26 37 30 Z" fill="${hc}" opacity=".55"></path>`;
   }
   if (style === 'sideSwept') {
     o += `<path d="M35 36 C33 16 50 10 66 12 C80 14 86 22 85 34 C78 30 70 22 60 26 C52 30 44 34 35 36 Z" fill="${hc}" stroke="${OUTLINE}" stroke-width="2.5"></path>`;
@@ -315,6 +329,9 @@ function renderHumanFigure(spec: HumanFigureSpec, idPrefix: string): string {
   }
   if (spec.prop === 'clipboard') {
     o += `<rect x="86" y="82" width="18" height="24" rx="2" fill="#d9dcdf" stroke="${OUTLINE}" stroke-width="2"></rect><rect x="92" y="79" width="6" height="5" fill="${OUTLINE}"></rect><path d="M90 90 h10 M90 95 h10 M90 100 h6" stroke="${OUTLINE}" stroke-width="1.5"></path>`;
+  }
+  if (spec.prop === 'camera') {
+    o += `<rect x="84" y="82" width="26" height="18" rx="3" fill="#161719" stroke="${OUTLINE}" stroke-width="2"></rect><rect x="90" y="78" width="10" height="5" rx="1" fill="#161719" stroke="${OUTLINE}" stroke-width="1.5"></rect><circle cx="97" cy="91" r="6" fill="#0a3d4d" stroke="#00BDFF" stroke-width="2"></circle><circle cx="97" cy="91" r="2.5" fill="#00BDFF"></circle><rect x="104" y="85" width="3" height="3" fill="#D63C3C"></rect>`;
   }
   if (spec.prop === 'chicken') {
     o += `<ellipse cx="20" cy="98" rx="11" ry="9" fill="#F2C12E" stroke="${OUTLINE}" stroke-width="2"></ellipse><path d="M14 90 Q10 74 18 70 Q24 76 22 90" fill="#F2C12E" stroke="${OUTLINE}" stroke-width="2"></path><circle cx="19" cy="73" r="6" fill="#F2C12E" stroke="${OUTLINE}" stroke-width="2"></circle><polygon points="24,73 32,75 24,77" fill="#E07A2F"></polygon><path d="M17 67 q2 -6 5 0 q2 -5 4 1" fill="#D63C3C"></path><circle cx="21" cy="72" r="1.3" fill="#161719"></circle><path d="M8 106 l-4 6 M12 106 l-2 7" stroke="#E07A2F" stroke-width="2.5" stroke-linecap="round"></path>`;

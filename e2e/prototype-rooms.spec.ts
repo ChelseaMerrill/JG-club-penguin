@@ -3,6 +3,7 @@ import { computeDebugOverlay, type DebugOverlayMarker } from '../src/game/rooms/
 import { devPit } from '../src/game/rooms/definitions/dev-pit';
 import { igloo } from '../src/game/rooms/definitions/igloo';
 import { roofDeck } from '../src/game/rooms/definitions/roof-deck';
+import { theIcebox } from '../src/game/rooms/definitions/the-icebox';
 import { theMelt } from '../src/game/rooms/definitions/the-melt';
 import { townCenter } from '../src/game/rooms/definitions/town-center';
 import type { RoomDefinition } from '../src/game/rooms/room-definition';
@@ -21,6 +22,7 @@ const ROOM_DEFINITIONS: Record<RoomId, RoomDefinition> = {
   'the-melt': theMelt,
   'roof-deck': roofDeck,
   igloo,
+  'the-icebox': theIcebox,
 };
 
 /** Fails the test on any uncaught page error or console error. */

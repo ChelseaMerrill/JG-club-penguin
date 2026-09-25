@@ -58,6 +58,59 @@ describe('renderNpcSvg', () => {
     expect(svg).toContain('fill="#abcdef"');
   });
 
+  // #51: the Icebox's Jason and Jethro use three `humans.js` options the
+  // earlier Rooms never needed. Expected markup is copied from the figures
+  // `design/Room 03 The Icebox.dc.html` bakes for them.
+  it("draws humans.js's buzz cut as a translucent cap of the hair colour", () => {
+    const svg = renderNpcSvg({ style: 'buzz', hair: 'brown', skin: 'fair' });
+    assertValidSvg(svg);
+    expect(svg).toContain(
+      '<path d="M37 30 C40 20 50 16 60 16 C70 16 80 20 83 30 C76 26 44 26 37 30 Z" fill="#5e4128" opacity=".55">',
+    );
+  });
+
+  it("draws humans.js's plaid shirt pattern as clipped horizontal and vertical stripes", () => {
+    const svg = renderNpcSvg(
+      { top: '#F4F4F4', pattern: 'plaid', pattern2: '#8FB5D8' },
+      { idPrefix: 'plaid' },
+    );
+    const doc = assertValidSvg(svg);
+    const stripes = [...doc.querySelectorAll('rect[clip-path="url(#npc-plaidt)"]')];
+    const horizontal = stripes.filter((rect) => rect.getAttribute('width') === '52');
+    const vertical = stripes.filter((rect) => rect.getAttribute('height') === '44');
+    expect(horizontal.map((rect) => rect.getAttribute('y'))).toEqual([
+      '70',
+      '79',
+      '88',
+      '97',
+      '106',
+    ]);
+    expect(vertical.map((rect) => rect.getAttribute('x'))).toEqual([
+      '38',
+      '47',
+      '56',
+      '65',
+      '74',
+      '83',
+    ]);
+    for (const rect of stripes) {
+      expect(rect.getAttribute('fill')).toBe('#8FB5D8');
+      expect(rect.getAttribute('opacity')).toBe('.8');
+    }
+  });
+
+  it("draws humans.js's camera prop, lens and red record light included", () => {
+    const svg = renderNpcSvg({ prop: 'camera' });
+    assertValidSvg(svg);
+    expect(svg).toContain(
+      '<rect x="84" y="82" width="26" height="18" rx="3" fill="#161719" stroke="#0C4B5F" stroke-width="2">',
+    );
+    expect(svg).toContain(
+      '<circle cx="97" cy="91" r="6" fill="#0a3d4d" stroke="#00BDFF" stroke-width="2">',
+    );
+    expect(svg).toContain('<rect x="104" y="85" width="3" height="3" fill="#D63C3C">');
+  });
+
   it("never draws a <text> element (an SVG loaded as a Phaser texture can't use page web fonts)", () => {
     for (const figure of humanFigures) {
       expect(renderNpcSvg(figure)).not.toContain('<text');

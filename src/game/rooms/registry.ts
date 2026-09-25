@@ -2,18 +2,20 @@ import type { RoomId } from '../../contracts';
 import { devPit } from './definitions/dev-pit';
 import { igloo } from './definitions/igloo';
 import { roofDeck } from './definitions/roof-deck';
+import { theIcebox } from './definitions/the-icebox';
 import { theMelt } from './definitions/the-melt';
 import { townCenter } from './definitions/town-center';
 import type { RoomDefinition } from './room-definition';
 import { assertValidRoomDefinitions } from './validate';
 
-/** All five prototype Rooms, traced from the designs (#16). */
+/** Every Room, traced from the designs: #16's five prototype Rooms, then #51's. */
 export const ROOM_DEFINITIONS: readonly RoomDefinition[] = [
   townCenter,
   devPit,
   theMelt,
   roofDeck,
   igloo,
+  theIcebox,
 ];
 
 // Fails fast on a broken RoomDefinition in dev (`npm run dev`) and test

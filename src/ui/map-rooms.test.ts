@@ -1,6 +1,18 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ROOM_DEFINITIONS } from '../game/rooms/registry';
-import { isMapTileClickable, MAP_ROOMS } from './map-rooms';
+import { isMapTileClickable, MAP_ROOMS, type MapRoomTile } from './map-rooms';
+
+/**
+ * A made-up COMING SOON tile (#51): the real Map loses its `roomId: null`
+ * tiles one by one as #51's Rooms land, so the "not clickable" branch is
+ * pinned to this fixture instead of to any real design card.
+ */
+const COMING_SOON_TILE: MapRoomTile = {
+  number: '99',
+  label: '99 · TEST ROOM',
+  subtitle: 'NOT A REAL CARD',
+  roomId: null,
+};
 
 describe('MAP_ROOMS', () => {
   it('has the 14 design tiles, in the design document order', () => {
@@ -45,10 +57,9 @@ describe('MAP_ROOMS', () => {
 
   it('is clickable only when the tile names a RoomId with a registered RoomDefinition', () => {
     const townCenter = MAP_ROOMS.find((tile) => tile.number === '01')!;
-    const icebox = MAP_ROOMS.find((tile) => tile.number === '03')!;
 
     expect(isMapTileClickable(townCenter)).toBe(true);
-    expect(isMapTileClickable(icebox)).toBe(false);
+    expect(isMapTileClickable(COMING_SOON_TILE)).toBe(false);
   });
 
   it('gives every registered RoomDefinition exactly one clickable Map tile', () => {
