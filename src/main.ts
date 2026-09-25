@@ -57,6 +57,7 @@ import {
 import { createMinigameLauncher } from './minigames/minigame-launcher';
 import { createDefaultMinigameRegistry } from './minigames/minigame-registry';
 import { initDevMinigameHook } from './minigames/dev-minigame-hook';
+import { devLeaderboardSeed } from './minigames/dev-leaderboard-seed';
 import { MINIGAME_OVERLAY_ID } from './minigames/minigame-shell';
 import { createPenguinCreator } from './ui/penguin-creator';
 import { createPenguinEditor } from './penguin/penguin-editor';
@@ -64,6 +65,7 @@ import { initDevCreatorHook } from './penguin/dev-creator-hook';
 import { createNpcDialog } from './ui/npc-dialog/npc-dialog';
 import { recordNpcTalked, recordOpenStall } from './game/rooms/dev-room-hook';
 import { createTrophyCase, TROPHY_CASE_OVERLAY_ID } from './ui/trophy-case';
+import { createMapScreen } from './ui/map-screen';
 import { createMarket, MARKET_OVERLAY_ID } from './ui/market';
 import { wireBadgeToast } from './ui/badge-toast';
 
@@ -417,9 +419,6 @@ const hud = createHud(getUiLayer(), {
   onIgloo: () => {
     void roomNavigator?.changeRoom('igloo');
   },
-  onReturnToTownCenter: () => {
-    void roomNavigator?.changeRoom('town-center');
-  },
   onSignOut: () => {
     void auth.signOut();
   },
@@ -427,6 +426,16 @@ const hud = createHud(getUiLayer(), {
   // session's sign-in load finishes (#34).
   initialBalance: 0,
   onChatSend: (text) => chatController?.send(text) ?? Promise.resolve(false),
+});
+
+// The Map (#33): reproduces design/Club JenGuin Map.dc.html, self-wiring the
+// HUD's MAP button (`ui:open-map`) and `hud.overlays` internally.
+createMapScreen(uiLayer, {
+  overlays: hud.overlays,
+  changeRoom: (roomId) => {
+    void roomNavigator?.changeRoom(roomId);
+  },
+  currentRoomId: () => roomNavigator?.currentRoomId() ?? null,
 });
 
 // #77 D7: registers with the same shared `OverlayManager` MENU uses, so
@@ -443,7 +452,7 @@ const progress = createProgressSession({ registry: game.registry, emitter: gameE
 // with `not_authenticated`.
 const e2eHooksEnabled = import.meta.env.DEV || import.meta.env.VITE_E2E_HOOKS === 'true';
 const devFallbackStore: ProgressStore | null = e2eHooksEnabled
-  ? createInMemoryProgressStore({ emitter: gameEvents })
+  ? createInMemoryProgressStore({ emitter: gameEvents, ...devLeaderboardSeed() })
   : null;
 
 declare global {

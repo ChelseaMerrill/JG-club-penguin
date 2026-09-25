@@ -14,12 +14,6 @@ export interface HudDeps {
   resolveRoomTitle: (roomId: RoomId) => RoomTitle;
   /** #15 D5: `navigator.changeRoom('igloo')`. */
   onIgloo: () => void;
-  /**
-   * #15 plan amendment: `navigator.changeRoom('town-center')`, from the MENU
-   * panel's RETURN TO TOWN CENTER item. Temporary: remove this item (and this
-   * dependency) once the Map (#33) and any added doors cover every dead end.
-   */
-  onReturnToTownCenter: () => void;
   /** The existing `auth.signOut`. */
   onSignOut: () => void;
   /** 0 until #34's progress session loads the saved balance via `tokens:changed`. */
@@ -105,25 +99,11 @@ export function createHud(layer: HTMLElement, deps: HudDeps): Hud {
   menuPanel.className = 'hud__menu-panel';
   menuPanel.hidden = true;
 
-  // Temporary (#15 plan amendment): guarantees no Room is a dead end before
-  // the Map (#33) and any added doors cover every dead end. Hidden while
-  // already in Town Center (`setRoom` below); remove this item once #33
-  // and/or new doors make it redundant. Reuses `.hud__menu-signout`'s look.
-  const returnToTownCenterButton = document.createElement('button');
-  returnToTownCenterButton.type = 'button';
-  returnToTownCenterButton.className = 'hud__menu-return-to-town-center';
-  returnToTownCenterButton.textContent = 'RETURN TO TOWN CENTER';
-  returnToTownCenterButton.addEventListener('click', () => {
-    overlays.close(MENU_OVERLAY_ID);
-    closeMenu();
-    deps.onReturnToTownCenter();
-  });
-
   const signOutButton = document.createElement('button');
   signOutButton.type = 'button';
   signOutButton.className = 'hud__menu-signout';
   signOutButton.textContent = 'Sign out';
-  menuPanel.append(returnToTownCenterButton, signOutButton);
+  menuPanel.append(signOutButton);
 
   function closeMenu(): void {
     menuPanel.hidden = true;
@@ -207,8 +187,10 @@ export function createHud(layer: HTMLElement, deps: HudDeps): Hud {
   mapButton.className = 'hud__button hud__button--bottom hud__button--map';
   mapButton.textContent = 'MAP';
   mapButton.addEventListener('click', () => {
-    // Closing MENU first keeps one overlay open at a time (#32 D6) even
-    // though the Map itself isn't wired up yet.
+    // Closes MENU directly (#32 D6) rather than relying on the Map (#33) to
+    // do it: the Map's own `ui:open-map` handler only calls
+    // `overlays.open` when a Session is active, so this is what actually
+    // closes MENU on the rare click before one has started.
     overlays.close(MENU_OVERLAY_ID);
     gameEvents.emit('ui:open-map');
   });
@@ -258,7 +240,6 @@ export function createHud(layer: HTMLElement, deps: HudDeps): Hud {
     const { title, subtitle } = deps.resolveRoomTitle(roomId);
     titleEl.textContent = title;
     subtitleEl.textContent = subtitle;
-    returnToTownCenterButton.hidden = roomId === SPAWN_ROOM_ID;
   }
 
   // Every Session starts in Town Center (#32 D3/#15), so the HUD shows that

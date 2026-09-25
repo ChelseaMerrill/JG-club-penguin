@@ -9,7 +9,6 @@ function setup(overrides: Partial<HudDeps> = {}) {
   const root = document.createElement('div');
   document.body.append(root);
   const onIgloo = vi.fn();
-  const onReturnToTownCenter = vi.fn();
   const onSignOut = vi.fn();
   const resolveRoomTitle = vi.fn((roomId: RoomId): RoomTitle => ({
     title: roomId.toUpperCase(),
@@ -19,7 +18,6 @@ function setup(overrides: Partial<HudDeps> = {}) {
   const deps: HudDeps = {
     resolveRoomTitle,
     onIgloo,
-    onReturnToTownCenter,
     onSignOut,
     initialBalance: 0,
     onChatSend,
@@ -27,7 +25,7 @@ function setup(overrides: Partial<HudDeps> = {}) {
   };
   const hud = createHud(root, deps);
   currentHud = hud;
-  return { root, hud, onIgloo, onReturnToTownCenter, onSignOut, resolveRoomTitle, onChatSend };
+  return { root, hud, onIgloo, onSignOut, resolveRoomTitle, onChatSend };
 }
 
 beforeEach(() => {
@@ -155,6 +153,16 @@ describe('createHud', () => {
     expect(menuPanel().hidden).toBe(true);
   });
 
+  it('the MENU panel has exactly the Sign out button (RETURN TO TOWN CENTER removed, #33 D7/review round 1 fix 3)', () => {
+    const { root } = setup();
+
+    const buttonClasses = [...root.querySelectorAll('.hud__menu-panel button')].map(
+      (button) => button.className,
+    );
+
+    expect(buttonClasses).toEqual(['hud__menu-signout']);
+  });
+
   it('Sign out in the MENU panel calls the injected onSignOut and closes the menu', () => {
     const { root, onSignOut } = setup();
 
@@ -162,32 +170,6 @@ describe('createHud', () => {
     (root.querySelector('.hud__menu-signout') as HTMLButtonElement).click();
 
     expect(onSignOut).toHaveBeenCalledTimes(1);
-    expect((root.querySelector('.hud__menu-panel') as HTMLElement).hidden).toBe(true);
-  });
-
-  it('RETURN TO TOWN CENTER is hidden in Town Center and shown elsewhere, tracked from room:enter', () => {
-    const { root } = setup();
-    const returnButton = () =>
-      root.querySelector('.hud__menu-return-to-town-center') as HTMLElement;
-
-    expect(returnButton().hidden).toBe(true);
-
-    gameEvents.emit('room:enter', { roomId: 'dev-pit', entryTile: { col: 0, row: 0 } });
-    expect(returnButton().hidden).toBe(false);
-
-    gameEvents.emit('room:enter', { roomId: 'town-center', entryTile: { col: 0, row: 0 } });
-    expect(returnButton().hidden).toBe(true);
-  });
-
-  it('RETURN TO TOWN CENTER calls the injected onReturnToTownCenter and closes MENU', () => {
-    const onReturnToTownCenter = vi.fn();
-    const { root } = setup({ onReturnToTownCenter });
-    gameEvents.emit('room:enter', { roomId: 'dev-pit', entryTile: { col: 0, row: 0 } });
-
-    (root.querySelector('.hud__button--menu') as HTMLButtonElement).click();
-    (root.querySelector('.hud__menu-return-to-town-center') as HTMLButtonElement).click();
-
-    expect(onReturnToTownCenter).toHaveBeenCalledTimes(1);
     expect((root.querySelector('.hud__menu-panel') as HTMLElement).hidden).toBe(true);
   });
 

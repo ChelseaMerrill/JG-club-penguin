@@ -1,0 +1,104 @@
+/* The Minigame done screen's leaderboard panel (#70). Compact rows (~26px)
+   so the whole board plus the shell's SAVING/SCORE/Badge rows and QUIT
+   button still fit inside the done screen's 720px column on the 1600x900
+   Stage. Uses the JG design tokens from src/style.css; never redeclares
+   them. */
+
+/* The shell's mount point (`minigame-shell.ts`'s `doneLeaderboard`) sits
+   between the done screen's Badge/error rows and its actions row, inside a
+   centered flex column (`.minigame__done`); it needs an explicit stretch to
+   span that 720px column instead of shrinking to its content. */
+.minigame__done-leaderboard {
+  align-self: stretch;
+}
+
+.minigame-leaderboard {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.minigame-leaderboard__title {
+  font: 400 11px var(--font-display);
+  letter-spacing: 0.2em;
+  color: var(--fg-muted);
+  text-align: left;
+}
+
+.minigame-leaderboard__body {
+  display: flex;
+  flex-direction: column;
+  /* 11 rows (top 10 + an appended own row) at 26px plus one 20px gap =
+     306px; 312px leaves a little headroom. Without `flex-shrink: 0` below,
+     a flex column this full would compress every row to fit `max-height`
+     instead of actually overflowing into the scrollbar (round 2 red-team,
+     2026-09-25). */
+  max-height: 312px;
+  overflow-y: auto;
+  border: 2px solid var(--jg-secondary);
+  background: var(--jg-dark-inlay);
+}
+
+/* loading / empty / error: a single centered line inside .__body's textContent. */
+.minigame-leaderboard[data-state='loading'] .minigame-leaderboard__body,
+.minigame-leaderboard[data-state='empty'] .minigame-leaderboard__body,
+.minigame-leaderboard[data-state='error'] .minigame-leaderboard__body {
+  align-items: center;
+  justify-content: center;
+  padding: 14px;
+  font: 400 12px var(--font-display);
+  letter-spacing: 0.08em;
+  color: var(--fg-muted);
+}
+
+.minigame-leaderboard__row {
+  display: grid;
+  grid-template-columns: 32px 1fr auto;
+  align-items: center;
+  gap: 10px;
+  height: 26px;
+  flex-shrink: 0;
+  padding: 0 10px;
+  font: 400 13px var(--font-display);
+  color: var(--fg-primary);
+}
+
+.minigame-leaderboard__row[data-me='true'] {
+  background: rgba(var(--jg-secondary-rgb), 0.35);
+  color: var(--jg-primary);
+}
+
+.minigame-leaderboard__rank {
+  color: var(--fg-muted);
+  text-align: left;
+}
+
+.minigame-leaderboard__row[data-me='true'] .minigame-leaderboard__rank {
+  color: var(--jg-primary);
+}
+
+.minigame-leaderboard__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+  /* R1: an untrusted, arbitrary-direction name never drags neighboring
+     rank/score text along with it. */
+  unicode-bidi: isolate;
+}
+
+.minigame-leaderboard__score {
+  font-family: var(--font-game-display);
+  text-align: right;
+}
+
+.minigame-leaderboard__gap {
+  height: 20px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--fg-muted);
+  letter-spacing: 0.3em;
+}
