@@ -18,7 +18,11 @@ export type BadgeId = 'exterminator' | 'breakfast-club' | 'barista' | 'brain-fre
  * until they're built.
  */
 export interface MinigameStatsMap {
-  'bug-squash': { squashed: number };
+  /** #38's done-screen fields: `score` duplicates `MinigameCompleted.score`
+   *  (and `end()`'s own `score` return) so a `stats`-only consumer (e.g. a
+   *  future leaderboard) never needs the sibling field to make sense of a
+   *  round. `bestCombo` is the best combo multiplier reached (1-4). */
+  'bug-squash': { score: number; squashed: number; bestCombo: number; escaped: number };
   'pancake-flip': {
     golden: number;
     flipNow: number;
