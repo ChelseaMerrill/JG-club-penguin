@@ -62,16 +62,21 @@ export const PENGUIN_NAME_MAX = 16;
 export const UNNAMED_PENGUIN = 'Unnamed Penguin';
 
 /**
- * Control, bidi and zero-width characters stripped from a name before it is
- * validated or shown: C0 controls, DEL/C1 controls, zero-width space through
- * right-to-left mark, bidi embedding/override controls, isolates, and BOM.
- * Shared by `src/penguin/look.ts` (`normalizeName`, `validatePenguinName`)
- * and `src/realtime/room-channel.ts` (`sanitizeName`), so a name made only of
- * invisible characters can never validate as non-empty (#75 red-team R2-1).
+ * Control, bidi, zero-width and other invisible/default-ignorable
+ * characters stripped from a name before it is validated or shown: C0
+ * controls, DEL/C1 controls, the explicit zero-width/bidi/BOM ranges below,
+ * every Unicode `Default_Ignorable_Code_Point` and format (`Cf`) character
+ * (variation selectors, joiners, language tags, and more), plus a few
+ * invisible-by-rendering code points neither property reliably covers: the
+ * Hangul filler characters (U+115F, U+1160, U+3164, U+FFA0) and the blank
+ * Braille pattern (U+2800). Shared by `src/penguin/look.ts`
+ * (`normalizeName`, `validatePenguinName`) and `src/realtime/room-channel.ts`
+ * (`sanitizeName`), so a name made only of invisible characters can never
+ * validate as non-empty (#75 red-team R2-1; widened in review round 1).
  */
 export const UNSAFE_NAME_CHARS_RE =
   // eslint-disable-next-line no-control-regex
-  /[\u0000-\u001F\u007F-\u009F\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g;
+  /[\u0000-\u001F\u007F-\u009F\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF\u115F\u1160\u3164\uFFA0\u2800\p{Default_Ignorable_Code_Point}\p{Cf}]/gu;
 
 /**
  * Producer: #35 Creator (saved via #34). Consumers: #31 renderer, #28

@@ -83,6 +83,19 @@ describe('validatePenguinName', () => {
     expect(validatePenguinName(' ‮ ')).toEqual({ ok: false, reason: 'empty' });
   });
 
+  it.each([
+    ['HANGUL FILLER U+3164', 'ㅤ'],
+    ['WORD JOINER U+2060', '⁠'],
+    ['SOFT HYPHEN U+00AD', '­'],
+    ['ARABIC LETTER MARK U+061C', '؜'],
+    ['BRAILLE PATTERN BLANK U+2800', '⠀'],
+    ['VARIATION SELECTOR-16 U+FE0F', '️'],
+    ['TAG DIGIT ZERO U+E0020', '󠀠'],
+  ])('rejects %s alone, or wrapped in spaces, as empty (review round 1)', (_label, char) => {
+    expect(validatePenguinName(char)).toEqual({ ok: false, reason: 'empty' });
+    expect(validatePenguinName(` ${char} `)).toEqual({ ok: false, reason: 'empty' });
+  });
+
   it(`accepts exactly ${PENGUIN_NAME_MAX} code points`, () => {
     const name = 'x'.repeat(PENGUIN_NAME_MAX);
     expect(validatePenguinName(name)).toEqual({ ok: true, name });
