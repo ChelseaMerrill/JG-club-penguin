@@ -151,7 +151,7 @@ test('Team Room 2: clicking Ian arrives, opens his dialog, and GRAB THE HAMMER o
 /**
  * Clicking near Ian's head (not just his own tile centre) still opens his
  * dialog (#36 round-1 review item 6): the hit `Zone` covers roughly
- * feet-105..feet+5, so a click well above the tile centre -- toward the
+ * feet-99..feet+5 (`npc-layout.ts`'s `hitArea`, from the nameplate's top), so a click well above the tile centre -- toward the
  * figure's head, not its feet -- must still land on it.
  */
 test("Dev Pit: clicking near Ian's head (not just his feet) still opens his dialog", async ({
@@ -160,7 +160,7 @@ test("Dev Pit: clicking near Ian's head (not just his feet) still opens his dial
   const errors = await bootRoom(page, 'dev-pit');
 
   const ian = await npc(page, 'ian');
-  // Comfortably inside the hit zone's feet-105..feet+5 vertical range,
+  // Comfortably inside the hit zone's feet-99..feet+5 vertical range,
   // clearly above the tile centre (toward the head, not the feet).
   const headPoint = { x: ian.x, y: ian.y - 70 };
 

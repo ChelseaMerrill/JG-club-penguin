@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { DEFAULT_LOOK, type PenguinLook, type Tile } from '../src/contracts';
 import { npcInteractionTile } from '../src/game/movement/targets';
+import { npcLayout } from '../src/game/npcs/npc-layout';
 import { townCenter } from '../src/game/rooms/definitions/town-center';
 import { screenToTile, tileToScreen } from '../src/game/rooms/iso';
 import { GAME_HEIGHT, GAME_WIDTH } from '../src/game/stage-size';
@@ -222,7 +223,7 @@ test('click-to-move', async ({ page }) => {
   // Darrin (#113) roams a designed loop around Town Center, so -- unlike
   // this test's earlier tile clicks -- both his own click target and his
   // interaction tile move with him. Click the centre of his click target
-  // (`NPC_HIT_ZONE_OFFSET_Y` above his live feet, so a few frames of walking
+  // (`npcLayout`'s `hitArea.centerY` from his live feet, so a few frames of walking
   // between reading his point and the click landing can't carry the target
   // off the pointer), then wait for the click to pause him and compute the
   // expected interaction tile from where he actually stopped, the same way
@@ -235,7 +236,7 @@ test('click-to-move', async ({ page }) => {
     if (!state) throw new Error(`no __roomDebug.npcs entry for ${npc.npcId}`);
     return state;
   }
-  const NPC_HIT_ZONE_OFFSET_Y = -50;
+  const NPC_HIT_ZONE_OFFSET_Y = npcLayout({ kind: 'human' }).hitArea.centerY;
 
   const beforeClick = await npcState();
   await clickStagePoint(page, { x: beforeClick.x, y: beforeClick.y + NPC_HIT_ZONE_OFFSET_Y });
