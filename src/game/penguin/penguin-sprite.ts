@@ -23,6 +23,32 @@ const NAME_TAG_PADDING_Y = 6;
 // Small gap below the feet anchor before the name tag starts.
 const NAME_TAG_GAP = 8;
 
+// Chat speech bubble (#44 review fix F10): the exact per-Room speech-bubble
+// markup (a `sayJory` bubble) in `design/Room 01 Town Center.dc.html` line 45
+// is `<rect ... fill="#F4F4F4"/>` with
+// `<text font-family="Libre Franklin, sans-serif" font-weight="700"
+// font-size="13" fill="#161719">`. Its background is `#F4F4F4` (a very light
+// grey, not literal `#FFFFFF`), matching this file's design_handoff README
+// paraphrase ("white rounded pills") closely enough that this ticket adopts
+// this room's literal SVG value rather than the paraphrase's pure white.
+// Font-size is adjusted from `14px` to the design's exact `13px`; padding
+// isn't independently specified by the design (only the pill's overall
+// width/height for one specific string), so it stays as previously tuned.
+const BUBBLE_BG = 0xf4f4f4;
+const BUBBLE_TEXT_COLOR = '#161719';
+const BUBBLE_FONT_FAMILY = 'Libre Franklin, sans-serif';
+const BUBBLE_FONT_WEIGHT = '700';
+const BUBBLE_FONT_SIZE = '13px';
+const BUBBLE_PADDING_X = 14;
+const BUBBLE_PADDING_Y = 8;
+const BUBBLE_MAX_WIDTH = 260;
+// Gap above the sprite's own top edge (the sprite's top edge sits at
+// `-(PENGUIN_ORIGIN.y + PENGUIN_FRAME_PADDING_Y)` in container space,
+// regardless of frame size, since that's exactly what the feet-anchor
+// origin fraction cancels out to).
+const BUBBLE_GAP = 10;
+const BUBBLE_ANCHOR_Y = -(PENGUIN_ORIGIN.y + PENGUIN_FRAME_PADDING_Y) - BUBBLE_GAP;
+
 /** Phaser's always-present built-in placeholder texture. */
 const PLACEHOLDER_TEXTURE_KEY = '__DEFAULT';
 
@@ -32,6 +58,8 @@ export interface Penguin {
   walk(): void;
   setFacing(facing: Facing): void;
   setLook(look: PenguinLook): void;
+  /** Shows a chat speech bubble above the Penguin's head, or clears it (`null`) (#44). */
+  say(text: string | null): void;
   destroy(): void;
 }
 
@@ -93,7 +121,26 @@ export function createPenguin(
   });
   nameText.setOrigin(0.5, 0);
 
-  const container = scene.add.container(x, y, [sprite, pill, nameText]);
+  // Chat speech bubble (#44): hidden until the first `say(text)`. Phaser's
+  // `Text` never interprets its string as markup, so an unsafe message (e.g.
+  // `<script>...`) always renders as the literal characters.
+  const bubblePill = new GameObjects.Graphics(scene);
+  const bubbleText = new GameObjects.Text(scene, 0, BUBBLE_ANCHOR_Y - BUBBLE_PADDING_Y, '', {
+    fontFamily: BUBBLE_FONT_FAMILY,
+    fontStyle: BUBBLE_FONT_WEIGHT,
+    fontSize: BUBBLE_FONT_SIZE,
+    color: BUBBLE_TEXT_COLOR,
+    align: 'center',
+    // `useAdvancedWrap` wraps mid-word when a single word (e.g. a 120-char
+    // string with no spaces, chat's own max length) is wider than the pill,
+    // rather than overflowing it (#44 review fix F10).
+    wordWrap: { width: BUBBLE_MAX_WIDTH - BUBBLE_PADDING_X * 2, useAdvancedWrap: true },
+  });
+  bubbleText.setOrigin(0.5, 1);
+  bubblePill.setVisible(false);
+  bubbleText.setVisible(false);
+
+  const container = scene.add.container(x, y, [sprite, pill, nameText, bubblePill, bubbleText]);
 
   function clearPendingListener(): void {
     if (pendingKey !== null && pendingListener !== null) {
@@ -126,6 +173,24 @@ export function createPenguin(
     pill.fillRoundedRect(-width / 2, NAME_TAG_GAP, width, height, height / 2);
   }
   redrawNameTag();
+
+  function redrawBubble(text: string | null): void {
+    if (text === null) {
+      bubblePill.setVisible(false);
+      bubbleText.setVisible(false);
+      bubbleText.setText('');
+      bubblePill.clear();
+      return;
+    }
+    bubbleText.setText(text);
+    bubbleText.setVisible(true);
+    bubblePill.setVisible(true);
+    const width = Math.min(bubbleText.width, BUBBLE_MAX_WIDTH) + BUBBLE_PADDING_X * 2;
+    const height = bubbleText.height + BUBBLE_PADDING_Y * 2;
+    bubblePill.clear();
+    bubblePill.fillStyle(BUBBLE_BG, 1);
+    bubblePill.fillRoundedRect(-width / 2, BUBBLE_ANCHOR_Y - height, width, height, height / 2);
+  }
 
   function applyFrame(): void {
     const key = penguinTextureKey(currentHash, currentAnim, currentFrame);
@@ -186,6 +251,9 @@ export function createPenguin(
       ensurePenguinTextures(scene, next);
       redrawNameTag();
       play(wasWalking ? 'WALK' : next.emote);
+    },
+    say(text: string | null) {
+      redrawBubble(text);
     },
     destroy() {
       destroyed = true;

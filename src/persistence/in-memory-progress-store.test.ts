@@ -29,7 +29,12 @@ describe('createInMemoryProgressStore event emission', () => {
     emitter.on('tokens:changed', ({ balance }) => balances.push(balance));
     const store = createInMemoryProgressStore({ emitter });
 
-    const result = await store.recordRound('bug-squash', 520, { squashed: 520 });
+    const result = await store.recordRound('bug-squash', 520, {
+      score: 520,
+      squashed: 520,
+      bestCombo: 0,
+      escaped: 0,
+    });
 
     expect(balances).toEqual([result.balance]);
   });
@@ -52,9 +57,19 @@ describe('createInMemoryProgressStore event emission', () => {
     let currentMs = 0;
     const store = createInMemoryProgressStore({ emitter, now: () => currentMs });
 
-    await store.recordRound('bug-squash', 520, { squashed: 520 });
+    await store.recordRound('bug-squash', 520, {
+      score: 520,
+      squashed: 520,
+      bestCombo: 0,
+      escaped: 0,
+    });
     currentMs += 60_000;
-    await store.recordRound('bug-squash', 520, { squashed: 520 });
+    await store.recordRound('bug-squash', 520, {
+      score: 520,
+      squashed: 520,
+      bestCombo: 0,
+      escaped: 0,
+    });
 
     expect(badgeEvents).toEqual(['exterminator']);
   });
@@ -62,7 +77,9 @@ describe('createInMemoryProgressStore event emission', () => {
   it('works without an emitter', async () => {
     const store = createInMemoryProgressStore();
 
-    await expect(store.recordRound('bug-squash', 520, { squashed: 520 })).resolves.toBeDefined();
+    await expect(
+      store.recordRound('bug-squash', 520, { score: 520, squashed: 520, bestCombo: 0, escaped: 0 }),
+    ).resolves.toBeDefined();
     await expect(store.purchase('beanbag')).resolves.toBeDefined();
   });
 });

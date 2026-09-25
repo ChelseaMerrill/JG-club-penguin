@@ -21,6 +21,15 @@ export interface PresencePayload {
 }
 
 /**
+ * Chat text length limit (#44): the HUD chat field's `maxlength`, and the
+ * length a longer message is cut to before sending rather than rejected
+ * outright. The single copy `src/realtime/room-channel.ts` (wire validation)
+ * and `src/chat/` (the field and its rules) both use, instead of two copies
+ * silently drifting apart.
+ */
+export const CHAT_TEXT_MAX = 120;
+
+/**
  * Producer/consumer: #28 bus; #43, #44.
  */
 export interface RoomBroadcastMap {
