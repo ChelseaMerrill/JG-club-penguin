@@ -115,7 +115,10 @@ export function createNpcDialog(root: HTMLElement, deps: NpcDialogDeps): NpcDial
 
   function close(): void {
     panel.hidden = true;
+    const closedNpcId = openNpcId;
     openNpcId = null;
+    // #113: a roaming NPC paused for this dialog resumes its loop.
+    if (closedNpcId !== null) gameEvents.emit('npc:dialog-closed', { npcId: closedNpcId });
     const restoreTo = previouslyFocused;
     previouslyFocused = null;
     restoreTo?.focus();

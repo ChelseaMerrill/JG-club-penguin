@@ -1,4 +1,5 @@
 import { GameObjects, Textures, type Scene, type Time, type Tweens } from 'phaser';
+import type { NpcMotionSpec } from '../../npcs/npc-motions';
 import type { NpcBubbleLine, NpcDefinition } from '../../npcs/npcs';
 import { penguinFeetOrigin } from '../penguin/render-svg';
 import { NPC_BUBBLE_LAYER } from '../rooms/iso';
@@ -71,10 +72,27 @@ const BOB_DURATION_MS = 900;
 
 export interface NpcSprite {
   readonly container: GameObjects.Container;
+  /**
+   * The figure (and any #113 prop layers) inside `container`, with its own
+   * origin at the feet: the layer a designed in-place motion transforms, so
+   * the name tag below it stays upright, as in the Room designs.
+   */
+  readonly figure: GameObjects.Container;
+  /** Moves the NPC (figure, name tag and speech bubble) to `(x, y)`, sorted at `depth` (#113). */
+  setPoint(x: number, y: number, depth: number): void;
   destroy(): void;
 }
 
-function prefersReducedMotion(): boolean {
+export interface NpcSpriteOptions {
+  /**
+   * The NPC's designed motion (#113), when it has one: it replaces the idle
+   * bob, and `replaceFigureProp` draws the figure without its own prop.
+   * Ignored under reduced motion, which keeps today's still NPC.
+   */
+  motion?: NpcMotionSpec;
+}
+
+export function prefersReducedMotion(): boolean {
   return typeof window !== 'undefined' && typeof window.matchMedia === 'function'
     ? window.matchMedia('(prefers-reduced-motion: reduce)').matches
     : false;
@@ -104,14 +122,18 @@ export function createNpcSprite(
   y: number,
   npc: NpcDefinition,
   depth: number,
+  options: NpcSpriteOptions = {},
 ): NpcSprite {
   const origin = penguinFeetOrigin();
+  const reducedMotion = prefersReducedMotion();
+  const motion = reducedMotion ? undefined : options.motion;
+  const hasDesignedMotion = Boolean(motion?.path || motion?.figure || motion?.props?.length);
 
   const sprite = new GameObjects.Sprite(scene, 0, 0, PLACEHOLDER_TEXTURE_KEY);
   sprite.setOrigin(origin.x, origin.y);
 
   let spriteDestroyed = false;
-  const key = ensureNpcTexture(scene, npc);
+  const key = ensureNpcTexture(scene, npc, { omitProp: motion?.replaceFigureProp === true });
   if (scene.textures.exists(key)) {
     sprite.setTexture(key);
   } else {
@@ -161,7 +183,8 @@ export function createNpcSprite(
     NAME_TAG_HEIGHT / 2,
   );
 
-  const container = scene.add.container(x, y, [sprite, namePill, nameText]);
+  const figure = new GameObjects.Container(scene, 0, 0, [sprite]);
+  const container = scene.add.container(x, y, [figure, namePill, nameText]);
   container.setDepth(depth);
 
   // --- Speech bubble: a separate top-layer pair, not a container child. ---
@@ -188,8 +211,18 @@ export function createNpcSprite(
   bubbleGraphics.setAlpha(0);
   bubbleText.setAlpha(0);
 
-  const bubbleX = x + (npc.bubbleOffsetX ?? 0);
-  const bubbleBottomY = y + HEAD_TOP_OFFSET_Y + (npc.bubbleOffsetY ?? 0) - SPEECH_BUBBLE_GAP;
+  // Bubble geometry is laid out relative to the NPC's feet, then placed at
+  // its current point, so a roaming NPC (#113) carries its bubble along.
+  const bubbleX = npc.bubbleOffsetX ?? 0;
+  const bubbleBottomY = HEAD_TOP_OFFSET_Y + (npc.bubbleOffsetY ?? 0) - SPEECH_BUBBLE_GAP;
+  let bubbleTextY = 0;
+  let pointX = x;
+  let pointY = y;
+
+  function placeBubble(): void {
+    bubbleGraphics.setPosition(pointX, pointY);
+    bubbleText.setPosition(pointX + bubbleX, pointY + bubbleTextY);
+  }
 
   function layoutBubble(text: string): void {
     bubbleText.setText(text);
@@ -197,7 +230,7 @@ export function createNpcSprite(
     const bubbleHeight = bubbleText.height + SPEECH_BUBBLE_PADDING_Y * 2;
     const bubbleTopY = bubbleBottomY - bubbleHeight;
 
-    // The tail points at the NPC's own x (`x`, unshifted by `bubbleOffsetX`),
+    // The tail points at the NPC's own x (local 0, unshifted by `bubbleOffsetX`),
     // not the bubble's own (possibly nudged) centre `bubbleX` (#36 round-2
     // review item 4): a Roof Deck vendor's or Dev Pit's nudged-apart bubble
     // otherwise drew its tail off in empty space rather than at its speaker.
@@ -205,7 +238,7 @@ export function createNpcSprite(
     // pokes out past a heavily-offset bubble's rounded corners.
     const tailMin = bubbleX - bubbleWidth / 2 + SPEECH_BUBBLE_POINTER_HALF_WIDTH;
     const tailMax = bubbleX + bubbleWidth / 2 - SPEECH_BUBBLE_POINTER_HALF_WIDTH;
-    const tailX = Math.min(Math.max(x, tailMin), tailMax);
+    const tailX = Math.min(Math.max(0, tailMin), tailMax);
 
     bubbleGraphics.clear();
     bubbleGraphics.fillStyle(SPEECH_BUBBLE_BG, 1);
@@ -224,7 +257,8 @@ export function createNpcSprite(
       tailX,
       bubbleBottomY + SPEECH_BUBBLE_POINTER_HEIGHT,
     );
-    bubbleText.setPosition(bubbleX, bubbleTopY + SPEECH_BUBBLE_PADDING_Y);
+    bubbleTextY = bubbleTopY + SPEECH_BUBBLE_PADDING_Y;
+    placeBubble();
   }
 
   let bubbleFadeTween: Tweens.Tween | null = null;
@@ -268,7 +302,7 @@ export function createNpcSprite(
   }
 
   const isStaticDesign = npc.idleLines[0]?.periodS === 0;
-  if (prefersReducedMotion() || isStaticDesign) {
+  if (reducedMotion || isStaticDesign) {
     const firstLine = npc.idleLines[0];
     if (firstLine) {
       layoutBubble(firstLine.text);
@@ -280,7 +314,7 @@ export function createNpcSprite(
   }
 
   let bobTween: Tweens.Tween | null = null;
-  if (!prefersReducedMotion()) {
+  if (!reducedMotion && !hasDesignedMotion) {
     bobTween = scene.tweens.add({
       targets: sprite,
       y: -BOB_DISTANCE,
@@ -293,6 +327,16 @@ export function createNpcSprite(
 
   return {
     container,
+    figure,
+    setPoint(nextX, nextY, nextDepth) {
+      pointX = nextX;
+      pointY = nextY;
+      container.setPosition(nextX, nextY);
+      container.setDepth(nextDepth);
+      bubbleGraphics.setDepth(NPC_BUBBLE_LAYER + nextDepth);
+      bubbleText.setDepth(NPC_BUBBLE_LAYER + nextDepth);
+      placeBubble();
+    },
     destroy() {
       bobTween?.stop();
       bubbleFadeTween?.stop();

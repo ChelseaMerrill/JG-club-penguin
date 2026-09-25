@@ -11,6 +11,7 @@ import {
 import type { RegisteredPlayer } from '../movement/registered-player';
 import type { PenguinAnim } from '../penguin';
 import type { RemotePenguinDebugInfo } from './room-penguin-view';
+import type { NpcMotionDebugInfo } from '../npcs/room-npc-motions';
 
 /**
  * Gates every hook in this module. `true` in local `npm run dev` and in the
@@ -151,6 +152,12 @@ export interface RoomDebugInfo {
    * Room with no `furnitureSlots` (every Room but the Igloo).
    */
   furniture?: Record<string, string | null>;
+  /**
+   * Every NPC in the Room by npcId (#113): where its feet are on the Stage
+   * right now, whether it is walking its designed path (`moving`), and
+   * whether a click paused it (`paused`).
+   */
+  npcs?: Record<string, NpcMotionDebugInfo>;
 }
 
 declare global {

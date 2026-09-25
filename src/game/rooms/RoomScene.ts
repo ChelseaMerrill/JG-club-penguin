@@ -20,8 +20,11 @@ import {
   type RegisteredPlayer,
 } from '../movement/registered-player';
 import { doorApproachTile, npcInteractionTile } from '../movement/targets';
+import { getNpcMotion } from '../../npcs/npc-motions';
 import { getNpcDefinition } from '../../npcs/npcs';
+import { NpcClickPause } from '../npcs/npc-motion';
 import { createNpcSprite, type NpcSprite } from '../npcs/npc-sprite';
+import { RoomNpcMotions } from '../npcs/room-npc-motions';
 import { createPenguin, type Penguin, type PenguinAnim } from '../penguin';
 import { GAME_HEIGHT, GAME_WIDTH } from '../stage-size';
 import { planBackgroundDraw } from './background';
@@ -301,6 +304,12 @@ export class RoomScene extends Scene {
   private npcHitAreas: HitArea<RoomNpcSlot>[] = [];
   private doorHitAreas: HitArea<RoomDoor>[] = [];
   private npcSprites: NpcSprite[] = [];
+  /** #113: the Room's NPC motions, and the click-to-pause rule for roaming NPCs. Rebuilt by every `create()`. */
+  private npcMotions: RoomNpcMotions | null = null;
+  private npcClickPause: NpcClickPause | null = null;
+  /** The `onArrive` of the latest NPC click (#113), to tell whether that walk is still pending. */
+  private npcArrival: (() => void) | null = null;
+  private unsubscribeNpcDialog: (() => void)[] = [];
   private hotspotHitAreas: HitArea<RoomHotspot>[] = [];
   /** Only populated while `furnitureEditMode` is on (#41). */
   private furnitureSlotHitAreas: HitArea<RoomFurnitureSlot>[] = [];
@@ -421,6 +430,12 @@ export class RoomScene extends Scene {
     this.debugPenguins = [];
     this.npcSprites.forEach((npcSprite) => npcSprite.destroy());
     this.npcSprites = [];
+    this.unsubscribeNpcDialog.forEach((unsubscribe) => unsubscribe());
+    this.unsubscribeNpcDialog = [];
+    this.npcMotions?.destroy();
+    this.npcMotions = null;
+    this.npcClickPause = null;
+    this.npcArrival = null;
     this.clearComingSoonHint();
   };
 
@@ -454,6 +469,10 @@ export class RoomScene extends Scene {
     this.localPenguinArrivedLog = [];
     this.debugPenguins = [];
     this.npcSprites = [];
+    this.npcMotions = null;
+    this.npcClickPause = null;
+    this.npcArrival = null;
+    this.unsubscribeNpcDialog = [];
     this.resetSnowballState();
   }
 
@@ -606,6 +625,13 @@ export class RoomScene extends Scene {
     this.drawHotspots(room);
     this.drawProps(room);
     this.renderFurniture(room);
+    this.npcMotions = new RoomNpcMotions(this, room.grid.origin);
+    const npcClickPause = new NpcClickPause(this.npcMotions);
+    this.npcClickPause = npcClickPause;
+    this.unsubscribeNpcDialog = [
+      gameEvents.on('npc:talked', ({ npcId }) => npcClickPause.dialogOpened(npcId)),
+      gameEvents.on('npc:dialog-closed', ({ npcId }) => npcClickPause.dialogClosed(npcId)),
+    ];
     this.drawNpcs(room);
     this.spawnLocalPenguin(room);
 
@@ -643,10 +669,17 @@ export class RoomScene extends Scene {
     this.resolveReady();
   }
 
-  update(): void {
+  update(_time: number, delta: number): void {
     // The local Penguin may still be finishing a walk when aiming starts:
     // keep the preview arc anchored to where it is drawn.
     if (this.aiming && this.reticleTile) this.drawReticle();
+    this.npcMotions?.update(delta);
+    const npcArrival = this.npcArrival;
+    this.npcClickPause?.settle({
+      arrivalPending:
+        npcArrival !== null &&
+        (this.pendingArrival === npcArrival || this.queuedMove?.onArrive === npcArrival),
+    });
     if (HOOKS_ENABLED) this.publishRoomDebug();
   }
 
@@ -685,6 +718,7 @@ export class RoomScene extends Scene {
       setRegisteredPlayer: (player) => this.registry.set(PLAYER_REGISTRY_KEY, player),
       spawnDebugPenguin: (tile, look) => this.spawnDebugPenguin(tile, look),
       furniture: this.debugFurniture(),
+      npcs: this.npcMotions?.debug(),
     });
   }
 
@@ -1024,12 +1058,21 @@ export class RoomScene extends Scene {
     this.startMoveTo(nearestWalkable(room.walkable, tile));
   }
 
+  /**
+   * #113: a roaming NPC pauses where it is, and the Penguin walks to the
+   * nearest walkable tile next to that point instead of its slot tile.
+   */
   private handleNpcClick(npc: RoomNpcSlot, room: RoomDefinition): void {
-    const target = npcInteractionTile(room.walkable, npc);
-    this.startMoveTo(target, () => {
+    this.npcClickPause?.clicked(npc.npcId);
+    const point = this.npcMotions?.roams(npc.npcId) ? this.npcMotions.point(npc.npcId) : undefined;
+    const standing = point ? { ...npc, tile: screenToTile(point, room.grid.origin) } : npc;
+    const target = npcInteractionTile(room.walkable, standing);
+    const onArrive = (): void => {
       this.npcArrivedLog.push(npc.npcId);
       gameEvents.emit('npc:arrived', { npcId: npc.npcId });
-    });
+    };
+    this.npcArrival = onArrive;
+    this.startMoveTo(target, onArrive);
   }
 
   private handleDoorClick(door: RoomDoor, room: RoomDefinition): void {
@@ -1480,7 +1523,8 @@ export class RoomScene extends Scene {
       const point = tileToScreen(slot.tile, room.grid.origin);
       const depth = depthForTile(slot.tile);
 
-      const npcSprite = createNpcSprite(this, point.x, point.y, npc, depth);
+      const motion = getNpcMotion(npc.id);
+      const npcSprite = createNpcSprite(this, point.x, point.y, npc, depth, { motion });
       npcSprite.container.setName(NPC_CONTAINER_NAME);
       this.npcSprites.push(npcSprite);
 
@@ -1489,6 +1533,17 @@ export class RoomScene extends Scene {
         .setDepth(depth)
         .setInteractive({ useHandCursor: true });
       this.npcHitAreas.push({ object: zone, data: slot });
+      // #113: its designed motion (if any) moves the sprite and this zone together.
+      this.npcMotions?.add(
+        {
+          npcId: slot.npcId,
+          sprite: npcSprite,
+          zone,
+          zoneOffsetY: NPC_HIT_ZONE_OFFSET_Y,
+          rest: point,
+        },
+        motion,
+      );
     }
   }
 }

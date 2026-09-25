@@ -108,6 +108,13 @@ export interface GameEventMap extends RoomEventMap {
   /** Producer: #14. Consumer: #36. */
   'npc:arrived': { npcId: string };
   /**
+   * The NPC dialog for `npcId` closed, however it closed (close button,
+   * Escape, an action button, a Room change). Producer: #36's NPC dialog
+   * (#113). Consumer: `RoomScene` (#113), which resumes a roaming NPC it
+   * paused for that dialog.
+   */
+  'npc:dialog-closed': { npcId: string };
+  /**
    * A `RoomHotspot` was clicked (e.g. the Igloo's `trophy-case`). Producer:
    * `RoomScene` (#16 D5's `hotspots`, wired by #42). Consumer: `main.ts`
    * (#42), which opens the matching overlay for a known `hotspotId`.

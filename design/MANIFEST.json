@@ -5,11 +5,15 @@
   "synced": "2026-09-25",
   "synced_by": "milliehime",
   "snapshot": "Club JenGuin logo directions.zip",
-  "plan_id": "7f1d152274be",
+  "plan_id": "b98436c5f966",
   "files": {
+    "Canvas.dc.html": {
+      "sha256": "d3a65cc8ce0e759849eaa1ca985d0fbc49bafb3212f9029731ca08d1bda42293",
+      "bytes": 206
+    },
     "Characters.dc.html": {
-      "sha256": "6a357a2adf750ce56651c90ddbfa39fec7e3bfb085588638d0d3bb44fdcd1dff",
-      "bytes": 129060
+      "sha256": "b528613f243c27fe373e47bab588e74a033e22f54974cfe94ab4bd8a8a2ff22d",
+      "bytes": 138210
     },
     "Club JenGuin HUD Menus.dc.html": {
       "sha256": "999e57e9ebed139788bc64eede5c0372780fad75f7aed7420e76d29c49417c2d",

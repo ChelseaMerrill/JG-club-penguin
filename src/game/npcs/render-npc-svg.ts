@@ -359,9 +359,21 @@ let nextId = 0;
 export function renderNpcSvg(spec: HumanFigureSpec, options: { idPrefix?: string } = {}): string {
   nextId += 1;
   const idPrefix = options.idPrefix ?? `auto-${nextId}`;
-  const figure = renderHumanFigure(spec, idPrefix);
+  return inNpcFrame(renderHumanFigure(spec, idPrefix));
+}
 
+/**
+ * Renders one of #113's NPC prop layers (design markup in the figure's own
+ * 120x130 viewBox units, e.g. Anthony's rod) as a standalone SVG in the
+ * same padded frame as `renderNpcSvg`, so the two textures line up when
+ * both are anchored at the feet.
+ */
+export function renderNpcPropSvg(markup: string): string {
+  return inNpcFrame(markup);
+}
+
+function inNpcFrame(content: string): string {
   const minX = -PENGUIN_FRAME_PADDING_X;
   const minY = -PENGUIN_FRAME_PADDING_Y;
-  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${minX} ${minY} ${PENGUIN_FRAME_WIDTH} ${PENGUIN_FRAME_HEIGHT}" width="${PENGUIN_FRAME_WIDTH}" height="${PENGUIN_FRAME_HEIGHT}">${figure}</svg>`;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${minX} ${minY} ${PENGUIN_FRAME_WIDTH} ${PENGUIN_FRAME_HEIGHT}" width="${PENGUIN_FRAME_WIDTH}" height="${PENGUIN_FRAME_HEIGHT}">${content}</svg>`;
 }
