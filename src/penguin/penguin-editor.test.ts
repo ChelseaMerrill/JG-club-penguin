@@ -236,6 +236,83 @@ describe('createPenguinEditor', () => {
     expect(onReady).toHaveBeenCalledTimes(1);
   });
 
+  it('on submit after a load error, a reload that succeeds but is still unnamed saves the submitted look instead (review round 1)', async () => {
+    const inner = createInMemoryProgressStore();
+    const store = {
+      loadAll: vi
+        .fn()
+        .mockRejectedValueOnce(new ProgressStoreError('not_authenticated'))
+        .mockImplementation(() => inner.loadAll()),
+      saveLook: vi.fn(inner.saveLook.bind(inner)),
+    };
+    const { editor, onReady, onLookChanged, creator } = setup(store);
+    await editor.playerSignedIn();
+
+    await editor.submit(saved);
+
+    expect(store.saveLook).toHaveBeenCalledWith(saved);
+    expect(onLookChanged).toHaveBeenCalledWith(saved);
+    expect(creator.close).toHaveBeenCalled();
+    expect(onReady).toHaveBeenCalledTimes(1);
+  });
+
+  it('a second submit while the load-failure retry is in flight is a no-op: one saveLook, one onReady (review round 1)', async () => {
+    let finishReload: () => void = () => {};
+    const inner = createInMemoryProgressStore();
+    const store = {
+      loadAll: vi
+        .fn()
+        .mockRejectedValueOnce(new ProgressStoreError('not_authenticated'))
+        .mockImplementation(
+          () =>
+            new Promise<Awaited<ReturnType<ProgressStore['loadAll']>>>((resolve) => {
+              finishReload = () => void inner.loadAll().then(resolve);
+            }),
+        ),
+      saveLook: vi.fn(inner.saveLook.bind(inner)),
+    };
+    const { editor, onReady, onLookChanged } = setup(store);
+    await editor.playerSignedIn();
+
+    const first = editor.submit(saved);
+    const second = editor.submit(saved);
+    finishReload();
+    await Promise.all([first, second]);
+
+    expect(store.saveLook).toHaveBeenCalledTimes(1);
+    expect(store.saveLook).toHaveBeenCalledWith(saved);
+    expect(onLookChanged).toHaveBeenCalledTimes(1);
+    expect(onReady).toHaveBeenCalledTimes(1);
+  });
+
+  it('a sign-out during the load-failure retry reload drops the result (review round 1)', async () => {
+    let finishReload: () => void = () => {};
+    const inner = await returningStore();
+    const store = {
+      loadAll: vi
+        .fn()
+        .mockRejectedValueOnce(new ProgressStoreError('not_authenticated'))
+        .mockImplementation(
+          () =>
+            new Promise<Awaited<ReturnType<ProgressStore['loadAll']>>>((resolve) => {
+              finishReload = () => void inner.loadAll().then(resolve);
+            }),
+        ),
+      saveLook: vi.fn(inner.saveLook.bind(inner)),
+    };
+    const { editor, onReady, onLookChanged } = setup(store);
+    await editor.playerSignedIn();
+
+    const done = editor.submit(saved);
+    editor.playerSignedOut();
+    finishReload();
+    await done;
+
+    expect(onReady).not.toHaveBeenCalled();
+    expect(onLookChanged).not.toHaveBeenCalled();
+    expect(store.saveLook).not.toHaveBeenCalled();
+  });
+
   it('drops a load that finishes after the Player signed out', async () => {
     let finishLoad: () => void = () => {};
     const inner = await returningStore();

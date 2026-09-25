@@ -37,6 +37,11 @@ function messageOf(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
 
+/** A profile the Player can enter the World with: created, and validly named (#75). */
+function isCompleteProfile(snapshot: ProgressSnapshot): boolean {
+  return snapshot.profileCreatedAt !== null && isNamedLook(snapshot.look);
+}
+
 /**
  * The name gate (#75): the Penguin Creator is the only way into the World.
  * On sign-in it loads saved progress: a Player who has never completed the
@@ -60,6 +65,10 @@ export function createPenguinEditor(options: PenguinEditorOptions): PenguinEdito
   let look: PenguinLook | null = null;
   let loadFailed = false;
   let generation = 0;
+  // Guards the `loadFailed` retry in `submit()` (review round 1): a second
+  // submit while the reload is in flight is a no-op rather than racing a
+  // second `store.loadAll()`/save.
+  let retryInFlight = false;
   // Tracks whether *this* editor currently has the Creator open, so
   // `playerSignedIn`'s account-switch close (#75 R2-3) is a no-op when there
   // is nothing to close, rather than calling `creator.close()` on every
@@ -78,7 +87,11 @@ export function createPenguinEditor(options: PenguinEditorOptions): PenguinEdito
     creator.close();
   }
 
-  /** The `OverlayManager`'s own close callback (Escape, or another overlay opening): it has already dropped the overlay, so this only syncs local state and the Creator's own DOM. */
+  /**
+   * The `OverlayManager`'s own close callback (Escape, or another overlay
+   * opening): it has already dropped the overlay, so this only syncs local
+   * state and the Creator's own DOM.
+   */
   function handleOverlayClosed(): void {
     creatorOpen = false;
     creator.close();
@@ -112,6 +125,7 @@ export function createPenguinEditor(options: PenguinEditorOptions): PenguinEdito
       signedIn = true;
       look = null;
       loadFailed = false;
+      retryInFlight = false;
       const loadGeneration = ++generation;
       let snapshot: ProgressSnapshot;
       try {
@@ -126,7 +140,7 @@ export function createPenguinEditor(options: PenguinEditorOptions): PenguinEdito
         return;
       }
       if (loadGeneration !== generation) return;
-      if (snapshot.profileCreatedAt === null || !isNamedLook(snapshot.look)) {
+      if (!isCompleteProfile(snapshot)) {
         openCreator(snapshot.look, false);
         return;
       }
@@ -138,6 +152,7 @@ export function createPenguinEditor(options: PenguinEditorOptions): PenguinEdito
       signedIn = false;
       look = null;
       loadFailed = false;
+      retryInFlight = false;
       generation += 1;
       closeCreator();
     },
@@ -159,14 +174,26 @@ export function createPenguinEditor(options: PenguinEditorOptions): PenguinEdito
       const saveGeneration = generation;
 
       if (loadFailed) {
+        // A second submit while this reload is in flight is a no-op (review
+        // round 1): otherwise two quick submits could each race their own
+        // reload and save.
+        if (retryInFlight) return;
+        retryInFlight = true;
+        creator.setSaving(true);
         let reloaded: ProgressSnapshot | null;
         try {
           reloaded = await store.loadAll();
         } catch {
           reloaded = null;
         }
-        if (saveGeneration !== generation) return;
-        if (reloaded && reloaded.profileCreatedAt !== null && isNamedLook(reloaded.look)) {
+        if (saveGeneration !== generation) {
+          retryInFlight = false;
+          creator.setSaving(false);
+          return;
+        }
+        if (reloaded && isCompleteProfile(reloaded)) {
+          retryInFlight = false;
+          creator.setSaving(false);
           loadFailed = false;
           look = reloaded.look;
           onLookChanged(look);
@@ -174,6 +201,7 @@ export function createPenguinEditor(options: PenguinEditorOptions): PenguinEdito
           onReady();
           return;
         }
+        retryInFlight = false;
         // Still nothing usable: fall through and save the submitted look.
       }
 
