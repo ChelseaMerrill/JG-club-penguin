@@ -683,7 +683,10 @@ body {
   display: none;
 }
 
-.hud__menu-signout {
+/* `.hud__menu-return-to-town-center` (#15 plan amendment, temporary until
+   the Map (#33) and any added doors cover every dead end) shares this look. */
+.hud__menu-signout,
+.hud__menu-return-to-town-center {
   height: 36px;
   padding: 0 16px;
   border: none;
@@ -692,6 +695,10 @@ body {
   letter-spacing: 0.08em;
   color: var(--fg-primary);
   cursor: pointer;
+}
+
+.hud__menu-return-to-town-center[hidden] {
+  display: none;
 }
 
 .hud__bottom-bar {
