@@ -11,6 +11,8 @@ import {
   PATTERNS,
   type PenguinLook,
 } from '../../contracts';
+import { contrastRatio, MIN_CONTRAST } from './contrast';
+import { BACKDROP } from './palette';
 import { PENGUIN_ANIMS, PENGUIN_FRAMES } from './poses';
 import {
   PENGUIN_FRAME_HEIGHT,
@@ -20,6 +22,7 @@ import {
   PENGUIN_VIEWBOX_HEIGHT,
   PENGUIN_VIEWBOX_WIDTH,
   renderPenguinSvg,
+  resolvePenguinColors,
 } from './render-svg';
 import { PENGUIN_TEXT_PATHS } from './text-paths';
 
@@ -202,5 +205,190 @@ describe('renderPenguinSvg', () => {
     expect(idA).not.toBe(idB);
     expect(idA).toContain('cell-a');
     expect(idB).toContain('cell-b');
+  });
+});
+
+// #79's own custom-colour probes, distinct from every official swatch.
+const CUSTOM_COLORS = ['#808080', '#1a3a4a', '#ffffff', '#00bdff'] as const;
+
+describe('resolvePenguinColors (#79 D1/D2)', () => {
+  const bodies = [...BODY_COLORS, ...CUSTOM_COLORS];
+  const caps = [...CAP_COLORS, ...CUSTOM_COLORS];
+  const beaks = [...BEAK_COLORS, ...CUSTOM_COLORS];
+  const feetOptions = [...FEET_COLORS, ...CUSTOM_COLORS];
+
+  it("every body x cap x beak x feet combination resolves a colour or rim that reaches 3:1 against each part's surface, for every official swatch and the custom colours (#79 acceptance criteria)", () => {
+    for (const body of bodies) {
+      for (const cap of caps) {
+        for (const beak of beaks) {
+          for (const feet of feetOptions) {
+            const look: PenguinLook = { ...DEFAULT_LOOK, body, cap, beak, feet };
+            const resolved = resolvePenguinColors(look);
+
+            // Body/arm outline: always against the body; also against
+            // BACKDROP whenever the body itself doesn't already clear it
+            // (#79 execution plan table, row 1).
+            expect(contrastRatio(resolved.bodyOutline, body)).toBeGreaterThanOrEqual(MIN_CONTRAST);
+            if (contrastRatio(body, BACKDROP) < MIN_CONTRAST) {
+              expect(contrastRatio(resolved.bodyOutline, BACKDROP)).toBeGreaterThanOrEqual(
+                MIN_CONTRAST,
+              );
+            }
+
+            // Beak: against the body.
+            if (contrastRatio(beak, body) < MIN_CONTRAST) {
+              expect(resolved.beakRim).not.toBeNull();
+              expect(contrastRatio(resolved.beakRim!, body)).toBeGreaterThanOrEqual(MIN_CONTRAST);
+            }
+
+            // Feet: against BACKDROP.
+            if (contrastRatio(feet, BACKDROP) < MIN_CONTRAST) {
+              expect(resolved.feetRim).not.toBeNull();
+              expect(contrastRatio(resolved.feetRim!, BACKDROP)).toBeGreaterThanOrEqual(
+                MIN_CONTRAST,
+              );
+            }
+
+            // Eyes: ROUND/SLEEPY/WINK's whites and STAR's polygons, against
+            // the body.
+            if (contrastRatio('#F4F4F4', body) < MIN_CONTRAST) {
+              expect(resolved.eyeWhiteRim).not.toBeNull();
+              expect(contrastRatio(resolved.eyeWhiteRim!, body)).toBeGreaterThanOrEqual(
+                MIN_CONTRAST,
+              );
+            }
+            if (contrastRatio('#00BDFF', body) < MIN_CONTRAST) {
+              expect(resolved.eyeStarRim).not.toBeNull();
+              expect(contrastRatio(resolved.eyeStarRim!, body)).toBeGreaterThanOrEqual(
+                MIN_CONTRAST,
+              );
+            }
+
+            // Hat outline / JG badge fill: against the cap.
+            expect(contrastRatio(resolved.capOutline, cap)).toBeGreaterThanOrEqual(MIN_CONTRAST);
+
+            // WAR WEEK BAND text fill: against the cap.
+            expect(contrastRatio(resolved.warWeekFill, cap)).toBeGreaterThanOrEqual(MIN_CONTRAST);
+
+            // Headphone band: against the body (and BACKDROP, as for the
+            // body outline).
+            expect(contrastRatio(resolved.headphoneBand, body)).toBeGreaterThanOrEqual(
+              MIN_CONTRAST,
+            );
+            if (contrastRatio(body, BACKDROP) < MIN_CONTRAST) {
+              expect(contrastRatio(resolved.headphoneBand, BACKDROP)).toBeGreaterThanOrEqual(
+                MIN_CONTRAST,
+              );
+            }
+
+            // Snorkel frame: against the body.
+            if (contrastRatio('#00BDFF', body) < MIN_CONTRAST) {
+              expect(resolved.snorkelRim).not.toBeNull();
+              expect(contrastRatio(resolved.snorkelRim!, body)).toBeGreaterThanOrEqual(
+                MIN_CONTRAST,
+              );
+            }
+          }
+        }
+      }
+    }
+  });
+
+  it('every belly colour (official swatch or custom) resolves a belly rim and pattern ink that reach 3:1, for every body colour', () => {
+    for (const body of bodies) {
+      for (const belly of bodies) {
+        const look: PenguinLook = { ...DEFAULT_LOOK, body, belly };
+        const resolved = resolvePenguinColors(look);
+
+        if (contrastRatio(belly, body) < MIN_CONTRAST) {
+          expect(resolved.bellyRim).not.toBeNull();
+          expect(contrastRatio(resolved.bellyRim!, belly)).toBeGreaterThanOrEqual(MIN_CONTRAST);
+          expect(contrastRatio(resolved.bellyRim!, body)).toBeGreaterThanOrEqual(MIN_CONTRAST);
+        }
+        expect(contrastRatio(resolved.patternInk, belly)).toBeGreaterThanOrEqual(MIN_CONTRAST);
+
+        if (contrastRatio('#00BDFF', belly) < MIN_CONTRAST) {
+          expect(resolved.pixelHeartRim).not.toBeNull();
+          expect(contrastRatio(resolved.pixelHeartRim!, belly)).toBeGreaterThanOrEqual(
+            MIN_CONTRAST,
+          );
+          expect(resolved.snowflakeRim).not.toBeNull();
+          expect(contrastRatio(resolved.snowflakeRim!, belly)).toBeGreaterThanOrEqual(MIN_CONTRAST);
+        }
+      }
+    }
+  });
+});
+
+describe('renderPenguinSvg colour contrast (#79)', () => {
+  it('a teal body (#0C4B5F) now gets a non-teal outline in the SVG, reaching 3:1 against the teal body', () => {
+    const look: PenguinLook = { ...DEFAULT_LOOK, body: '#0C4B5F' };
+    const resolved = resolvePenguinColors(look);
+    const svg = renderPenguinSvg(look);
+
+    expect(resolved.bodyOutline).not.toBe('#0C4B5F');
+    expect(contrastRatio(resolved.bodyOutline, '#0C4B5F')).toBeGreaterThanOrEqual(MIN_CONTRAST);
+    expect(svg).toContain(
+      `fill="#0C4B5F" stroke="${resolved.bodyOutline}" stroke-width="6"></path>`,
+    );
+  });
+
+  it('a white body (#F4F4F4) gets a rim on the (also white, #F4F4F4) belly', () => {
+    const look: PenguinLook = { ...DEFAULT_LOOK, body: '#F4F4F4' };
+    const resolved = resolvePenguinColors(look);
+    const svg = renderPenguinSvg(look);
+
+    expect(resolved.bellyRim).not.toBeNull();
+    expect(contrastRatio(resolved.bellyRim!, '#F4F4F4')).toBeGreaterThanOrEqual(MIN_CONTRAST);
+    expect(svg).toContain(
+      `fill="#F4F4F4" stroke="${resolved.bellyRim}" stroke-width="1.5"></path><g clip-path`,
+    );
+  });
+
+  // #79's own rule table makes the default body/arm outline colour (STROKE)
+  // and the default ROUND/SLEEPY/WINK eye colour (EYE_WHITE) impossible to
+  // both clear 3:1 against any single body colour: STROKE only clears 3:1
+  // against a body lighter than ~28% relative luminance, while EYE_WHITE
+  // only clears 3:1 against a body darker than ~27% (verified by an
+  // exhaustive sweep of the RGB cube, not just the official swatches) --
+  // ranges that never overlap. So no PenguinLook's SVG is entirely
+  // untouched by #79; every body colour needs either the outline or an eye
+  // rim fixed. This look is the closest thing to "a passing look": every
+  // *other* governed rule (outline, belly, beak, feet) already clears 3:1
+  // on the design's own colours, and only the eye-white rim -- structurally
+  // unavoidable for this body, not a bug -- is added.
+  it('is byte-identical to the pre-#79 render for a look whose outline, belly, beak and feet rules already clear 3:1; only the (structurally unavoidable, see above) eye-white rim differs', () => {
+    const look: PenguinLook = {
+      ...DEFAULT_LOOK,
+      body: '#F2C12E',
+      belly: '#0C4B5F',
+      beak: '#0C4B5F',
+      feet: '#F2C12E',
+      hat: 'NONE',
+      pattern: 'PLAIN',
+      eyes: 'ROUND',
+    };
+    const resolved = resolvePenguinColors(look);
+
+    // Confirms this look isn't a coincidence: every rule but the eye-white
+    // rim already passes on its own design colour.
+    expect(resolved.bodyOutline).toBe('#0C4B5F');
+    expect(resolved.bellyRim).toBeNull();
+    expect(resolved.beakRim).toBeNull();
+    expect(resolved.feetRim).toBeNull();
+    expect(resolved.eyeWhiteRim).not.toBeNull();
+
+    const svg = renderPenguinSvg(look, { anim: 'WADDLE', frame: 0 }, { idPrefix: 'golden' });
+
+    // Captured from `5ddaaae` (pre-#79) for this exact look/pose/idPrefix.
+    const PRE_79_SVG =
+      '<svg xmlns="http://www.w3.org/2000/svg" viewBox="-70 -30 260 190" width="260" height="190"><g transform="rotate(-5 60 130) translate(0 0)"><defs><clipPath id="penguin-belly-golden"><path d="M60 40 C46 40 38 62 38 84 C38 102 48 112 60 112 C72 112 82 102 82 84 C82 62 74 40 60 40 Z"></path></clipPath></defs><path d="M60 14 C30 14 22 50 22 82 C22 106 40 118 60 118 C80 118 98 106 98 82 C98 50 90 14 60 14 Z" fill="#F2C12E" stroke="#0C4B5F" stroke-width="6"></path><path d="M60 40 C46 40 38 62 38 84 C38 102 48 112 60 112 C72 112 82 102 82 84 C82 62 74 40 60 40 Z" fill="#0C4B5F"></path><g clip-path="url(#penguin-belly-golden)"></g><g><circle cx="50" cy="34" r="4.5" fill="#F4F4F4"></circle><circle cx="70" cy="34" r="4.5" fill="#F4F4F4"></circle><circle cx="51" cy="34" r="2" fill="#161719"></circle><circle cx="71" cy="34" r="2" fill="#161719"></circle></g><path d="M50 44 L70 44 L60 54 Z" fill="#0C4B5F"></path><path d="M40 116 L26 124 L52 122 Z" fill="#F2C12E"></path><path d="M80 116 L94 124 L68 122 Z" fill="#F2C12E"></path><g transform="rotate(0 26 62)"><path d="M24 60 C10 78 12 96 26 100 Z" fill="#F2C12E" stroke="#0C4B5F" stroke-width="4"></path></g><g transform="rotate(0 94 62)"><path d="M96 60 C110 78 108 96 94 100 Z" fill="#F2C12E" stroke="#0C4B5F" stroke-width="4"></path></g></g></svg>';
+
+    const expectedSvg = PRE_79_SVG.replace(
+      '<circle cx="50" cy="34" r="4.5" fill="#F4F4F4"></circle><circle cx="70" cy="34" r="4.5" fill="#F4F4F4"></circle>',
+      `<circle cx="50" cy="34" r="4.5" fill="#F4F4F4" stroke="${resolved.eyeWhiteRim}" stroke-width="1.5"></circle><circle cx="70" cy="34" r="4.5" fill="#F4F4F4" stroke="${resolved.eyeWhiteRim}" stroke-width="1.5"></circle>`,
+    );
+
+    expect(svg).toBe(expectedSvg);
   });
 });

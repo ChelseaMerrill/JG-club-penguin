@@ -15,3 +15,10 @@ export const ACCENT = '#00BDFF';
 export const SEAT_FILL = '#3a4046';
 export const SNORKEL_MASK = '#F2C12E';
 export const SNORKEL_LENS = '#BFE3F0';
+
+/**
+ * The Creator's `--stage-bg` and the dark Room floors (#79 D1). The surface
+ * a silhouette (feet) and, when the body itself doesn't clear
+ * `MIN_CONTRAST` against it, the body outline are checked against.
+ */
+export const BACKDROP = '#0e1013';
