@@ -22,14 +22,22 @@ const NAME_TAG_PADDING_Y = 6;
 // Small gap below the feet anchor before the name tag starts.
 const NAME_TAG_GAP = 8;
 
-// Chat speech bubble (#44): "white rounded pills with dark Libre Franklin
-// bold text" per design/design_handoff_club_jenguin/README.md's common room
-// anatomy notes.
+// Chat speech bubble (#44 review fix F10): the exact per-Room speech-bubble
+// markup (a `sayJory` bubble) in `design/Room 01 Town Center.dc.html` line 45
+// is `<rect ... fill="#F4F4F4"/>` with
+// `<text font-family="Libre Franklin, sans-serif" font-weight="700"
+// font-size="13" fill="#161719">`. Its background is `#F4F4F4` (a very light
+// grey, not literal `#FFFFFF`), matching this file's design_handoff README
+// paraphrase ("white rounded pills") closely enough that this ticket adopts
+// this room's literal SVG value rather than the paraphrase's pure white.
+// Font-size is adjusted from `14px` to the design's exact `13px`; padding
+// isn't independently specified by the design (only the pill's overall
+// width/height for one specific string), so it stays as previously tuned.
 const BUBBLE_BG = 0xf4f4f4;
 const BUBBLE_TEXT_COLOR = '#161719';
 const BUBBLE_FONT_FAMILY = 'Libre Franklin, sans-serif';
 const BUBBLE_FONT_WEIGHT = '700';
-const BUBBLE_FONT_SIZE = '14px';
+const BUBBLE_FONT_SIZE = '13px';
 const BUBBLE_PADDING_X = 14;
 const BUBBLE_PADDING_Y = 8;
 const BUBBLE_MAX_WIDTH = 260;
@@ -122,7 +130,10 @@ export function createPenguin(
     fontSize: BUBBLE_FONT_SIZE,
     color: BUBBLE_TEXT_COLOR,
     align: 'center',
-    wordWrap: { width: BUBBLE_MAX_WIDTH - BUBBLE_PADDING_X * 2 },
+    // `useAdvancedWrap` wraps mid-word when a single word (e.g. a 120-char
+    // string with no spaces, chat's own max length) is wider than the pill,
+    // rather than overflowing it (#44 review fix F10).
+    wordWrap: { width: BUBBLE_MAX_WIDTH - BUBBLE_PADDING_X * 2, useAdvancedWrap: true },
   });
   bubbleText.setOrigin(0.5, 1);
   bubblePill.setVisible(false);

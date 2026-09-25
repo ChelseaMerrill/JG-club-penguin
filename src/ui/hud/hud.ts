@@ -142,11 +142,22 @@ export function createHud(layer: HTMLElement, deps: HudDeps): Hud {
   chatInput.addEventListener('keydown', (event) => {
     event.stopPropagation();
     if (event.key !== 'Enter') return;
+    // An IME composition's confirming Enter (e.g. finishing a CJK candidate)
+    // must not submit; browsers that don't set `isComposing` mark it with
+    // the legacy keyCode 229 instead (#44 review fix F6).
+    if (event.isComposing || event.keyCode === 229) return;
     event.preventDefault();
     const text = chatInput.value;
-    void deps.onChatSend(text).then((accepted) => {
-      if (accepted) chatInput.value = '';
-    });
+    void deps
+      .onChatSend(text)
+      .then((accepted) => {
+        // Only clear a field the Player hasn't since typed something new
+        // into while the send was pending (#44 review fix F7).
+        if (accepted && chatInput.value === text) chatInput.value = '';
+      })
+      .catch(() => {
+        // Treat a rejected send as not accepted: keep the typed text.
+      });
   });
 
   chatSlot.append(chatInput);

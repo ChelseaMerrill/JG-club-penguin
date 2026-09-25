@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { gameEvents, type RoomId } from '../../contracts';
+import { CHAT_TEXT_MAX, gameEvents, type RoomId } from '../../contracts';
 import { createHud, type Hud, type HudDeps } from './hud';
 import type { RoomTitle } from './room-titles';
 
@@ -176,7 +176,7 @@ describe('createHud', () => {
     const { root } = setup();
     const input = root.querySelector('.hud__chat-input') as HTMLInputElement;
 
-    expect(input.maxLength).toBe(120);
+    expect(input.maxLength).toBe(CHAT_TEXT_MAX);
     expect(input.placeholder).toBe('Say something...');
   });
 
@@ -207,6 +207,65 @@ describe('createHud', () => {
     await Promise.resolve();
 
     expect(input.value).toBe('too fast');
+  });
+
+  it('a rejected send is treated as not accepted and keeps the typed text (#44 review fix F7)', async () => {
+    const onChatSend = vi.fn(() => Promise.reject(new Error('network down')));
+    const { root } = setup({ onChatSend });
+    const input = root.querySelector('.hud__chat-input') as HTMLInputElement;
+
+    input.value = 'still here';
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(input.value).toBe('still here');
+  });
+
+  it('text typed while a send is pending survives an accepted ack for the older text (#44 review fix F7)', async () => {
+    let resolveSend!: (accepted: boolean) => void;
+    const onChatSend = vi.fn(() => new Promise<boolean>((resolve) => (resolveSend = resolve)));
+    const { root } = setup({ onChatSend });
+    const input = root.querySelector('.hud__chat-input') as HTMLInputElement;
+
+    input.value = 'first message';
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+
+    // The Player keeps typing while the first send is still pending.
+    input.value = 'a second, newer message';
+    resolveSend(true);
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(input.value).toBe('a second, newer message');
+  });
+
+  it('Enter during IME composition does not submit (isComposing)', () => {
+    const onChatSend = vi.fn(() => Promise.resolve(true));
+    const { root } = setup({ onChatSend });
+    const input = root.querySelector('.hud__chat-input') as HTMLInputElement;
+
+    input.value = 'still composing';
+    input.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, isComposing: true }),
+    );
+
+    expect(onChatSend).not.toHaveBeenCalled();
+  });
+
+  it('Enter during IME composition does not submit (legacy keyCode 229)', () => {
+    const onChatSend = vi.fn(() => Promise.resolve(true));
+    const { root } = setup({ onChatSend });
+    const input = root.querySelector('.hud__chat-input') as HTMLInputElement;
+
+    input.value = 'still composing';
+    input.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, keyCode: 229 }),
+    );
+
+    expect(onChatSend).not.toHaveBeenCalled();
   });
 
   it('a non-Enter keydown in the chat field never reaches a window keydown listener', () => {

@@ -102,12 +102,21 @@ function showLocalPenguin(): void {
 }
 
 /**
- * Wraps `view` to also publish every bubble it shows/clears to
- * `window.__chatDebug` (#44), keyed by Player id (`getPlayerId()` for the
- * local Penguin's own bubble, since `RoomPenguinView.sayLocal` has no
+ * Wraps `view` to also publish every bubble it *actually shows* (never merely
+ * requests) to `window.__chatDebug` (#44), keyed by Player id (`getPlayerId()`
+ * for the local Penguin's own bubble, since `RoomPenguinView.sayLocal` has no
  * playerId to key by).
+ *
+ * `say`/`sayLocal` publish only off `view`'s own return value (#44 review fix
+ * F1): a placed Penguin that never received the call (already gone, or not
+ * yet placed) never gets a stale debug entry. A remote Penguin removed,
+ * cleared, or re-placed on a Room-change `attach` outside `say`/`sayLocal`
+ * altogether is instead covered by `view.onBubbleChange`, which the concrete
+ * `RoomPenguinView` (`src/game/rooms/room-penguin-view.ts`) fires for exactly
+ * those cases; wiring it here (rather than requiring it in `ChatBubbleView`)
+ * keeps the chat controller's own seam narrow.
  */
-function composeChatView(view: ChatBubbleView, getPlayerId: () => string | null): ChatBubbleView {
+function composeChatView(view: RoomPenguinView, getPlayerId: () => string | null): ChatBubbleView {
   const bubbles: Record<string, string> = {};
 
   function setBubble(playerId: string, text: string | null): void {
@@ -116,15 +125,19 @@ function composeChatView(view: ChatBubbleView, getPlayerId: () => string | null)
     exposeChatDebug({ ...bubbles });
   }
 
+  view.onBubbleChange = (playerId, text) => setBubble(playerId, text);
+
   return {
     say(playerId, text) {
-      view.say(playerId, text);
-      setBubble(playerId, text);
+      const shown = view.say(playerId, text);
+      if (shown) setBubble(playerId, text);
+      return shown;
     },
     sayLocal(text) {
-      view.sayLocal(text);
+      const shown = view.sayLocal(text);
       const playerId = getPlayerId();
-      if (playerId) setBubble(playerId, text);
+      if (shown && playerId) setBubble(playerId, text);
+      return shown;
     },
   };
 }

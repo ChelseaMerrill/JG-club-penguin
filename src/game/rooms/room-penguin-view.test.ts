@@ -183,12 +183,12 @@ describe('RoomPenguinView', () => {
     const { stage, view } = attachedView();
     view.upsert(payload({ playerId: 'player-b' }));
 
-    view.say('player-b', 'hello there');
-    view.say('never-shown', 'ignored');
+    expect(view.say('player-b', 'hello there')).toBe(true);
+    expect(view.say('never-shown', 'ignored')).toBe(false);
 
     expect(stage.live()[0].bubble).toBe('hello there');
 
-    view.say('player-b', null);
+    expect(view.say('player-b', null)).toBe(true);
 
     expect(stage.live()[0].bubble).toBeNull();
   });
@@ -197,18 +197,70 @@ describe('RoomPenguinView', () => {
     const { stage, view } = attachedView();
     view.showLocal(payload({ playerId: 'player-a' }));
 
-    view.sayLocal('hi');
+    expect(view.sayLocal('hi')).toBe(true);
 
     expect(stage.live()[0].bubble).toBe('hi');
 
-    view.sayLocal(null);
+    expect(view.sayLocal(null)).toBe(true);
 
     expect(stage.live()[0].bubble).toBeNull();
   });
 
-  it('sayLocal is a no-op while the local Penguin is not shown', () => {
+  it('sayLocal is a no-op (returns false) while the local Penguin is not shown', () => {
     const { view } = attachedView();
 
-    expect(() => view.sayLocal('hi')).not.toThrow();
+    expect(view.sayLocal('hi')).toBe(false);
+  });
+
+  it('notifies onBubbleChange(playerId, null) when a remote Penguin is removed (#44 review fix F1)', () => {
+    const { view } = attachedView();
+    const changes: Array<[string, string | null]> = [];
+    view.onBubbleChange = (playerId, text) => changes.push([playerId, text]);
+    view.upsert(payload({ playerId: 'player-b' }));
+    view.say('player-b', 'hello there');
+
+    view.remove('player-b');
+
+    expect(changes).toEqual([['player-b', null]]);
+  });
+
+  it('notifies onBubbleChange(playerId, null) for every shown Penguin on clear() (#44 review fix F1)', () => {
+    const { view } = attachedView();
+    const changes: Array<[string, string | null]> = [];
+    view.upsert(payload({ playerId: 'player-b' }));
+    view.showLocal(payload({ playerId: 'player-a', tile: { col: 4, row: 4 } }));
+    view.say('player-b', 'hi');
+    view.onBubbleChange = (playerId, text) => changes.push([playerId, text]);
+
+    view.clear();
+
+    expect(changes).toEqual(
+      expect.arrayContaining([
+        ['player-b', null],
+        ['player-a', null],
+      ]),
+    );
+  });
+
+  it('notifies onBubbleChange(playerId, null) for every placed Penguin on detach() (#44 review fix F1)', () => {
+    const { view } = attachedView();
+    const changes: Array<[string, string | null]> = [];
+    view.upsert(payload({ playerId: 'player-b' }));
+    view.say('player-b', 'hi');
+    view.onBubbleChange = (playerId, text) => changes.push([playerId, text]);
+
+    view.detach();
+
+    expect(changes).toEqual([['player-b', null]]);
+  });
+
+  it('never notifies onBubbleChange for a Player never shown', () => {
+    const { view } = attachedView();
+    const changes: Array<[string, string | null]> = [];
+    view.onBubbleChange = (playerId, text) => changes.push([playerId, text]);
+
+    view.remove('never-shown');
+
+    expect(changes).toEqual([]);
   });
 });

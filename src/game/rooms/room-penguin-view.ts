@@ -59,6 +59,17 @@ export class RoomPenguinView implements RemotePenguinView {
   private readonly payloads = new Map<PenguinKey, PresencePayload>();
   private readonly placed = new Map<PenguinKey, PlacedPenguin>();
 
+  /**
+   * Notified with the real playerId whenever a Penguin that might have been
+   * showing a chat bubble is removed or re-placed *outside* `say`/`sayLocal`
+   * (`remove`/`clear`/a Room-change `detach`) (#44 review fix F1). Fired
+   * unconditionally on removal — harmless if that Penguin never had a bubble
+   * showing, since callers treat it as an idempotent clear — so a debug
+   * snapshot keyed off `say`/`sayLocal`'s own return value never lingers
+   * stale for a Penguin that's since gone.
+   */
+  onBubbleChange: ((playerId: string, text: string | null) => void) | null = null;
+
   constructor(options: RoomPenguinViewOptions = {}) {
     this.search = options.search ?? window.location.search;
   }
@@ -73,6 +84,7 @@ export class RoomPenguinView implements RemotePenguinView {
   /** Forgets the current scene's Penguins without destroying them: the scene is tearing them down itself. */
   detach(): void {
     this.attachment = null;
+    for (const key of this.placed.keys()) this.notifyBubbleCleared(key);
     this.placed.clear();
   }
 
@@ -95,14 +107,27 @@ export class RoomPenguinView implements RemotePenguinView {
     this.show(LOCAL_KEY, p);
   }
 
-  /** Shows (or clears, given `null`) a chat speech bubble above a remote Penguin (#44). No-op for a Player not currently shown. */
-  say(playerId: string, text: string | null): void {
-    this.placed.get(playerId)?.say(text);
+  /**
+   * Shows (or clears, given `null`) a chat speech bubble above a remote
+   * Penguin (#44). No-op for a Player not currently shown. Returns whether a
+   * placed Penguin actually received the call (#44 review fix F1): the
+   * source of truth for a debug snapshot of bubbles actually rendered,
+   * rather than merely requested.
+   */
+  say(playerId: string, text: string | null): boolean {
+    return this.sayAt(playerId, text);
   }
 
-  /** Shows (or clears, given `null`) a chat speech bubble above the local Penguin (#44). No-op while it isn't shown. */
-  sayLocal(text: string | null): void {
-    this.placed.get(LOCAL_KEY)?.say(text);
+  /** Shows (or clears, given `null`) a chat speech bubble above the local Penguin (#44). No-op (returns `false`) while it isn't shown. */
+  sayLocal(text: string | null): boolean {
+    return this.sayAt(LOCAL_KEY, text);
+  }
+
+  private sayAt(key: PenguinKey, text: string | null): boolean {
+    const placed = this.placed.get(key);
+    if (!placed) return false;
+    placed.say(text);
+    return true;
   }
 
   private show(key: PenguinKey, p: PresencePayload): void {
@@ -133,8 +158,15 @@ export class RoomPenguinView implements RemotePenguinView {
   }
 
   private hide(key: PenguinKey): void {
+    this.notifyBubbleCleared(key);
     this.placed.get(key)?.destroy();
     this.placed.delete(key);
     this.payloads.delete(key);
+  }
+
+  /** Calls `onBubbleChange(playerId, null)` for `key`, if it has a real playerId and is currently placed. */
+  private notifyBubbleCleared(key: PenguinKey): void {
+    const playerId = this.payloads.get(key)?.playerId;
+    if (playerId) this.onBubbleChange?.(playerId, null);
   }
 }

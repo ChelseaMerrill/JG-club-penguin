@@ -3,6 +3,7 @@ import {
   CHAT_BUBBLE_LIFETIME_MS,
   createChatController,
   type ChatBubbleView,
+  type ChatRoomChannel,
 } from './chat-controller';
 import { CHAT_RATE_LIMIT_MS } from './chat-rate-gate';
 
@@ -65,8 +66,43 @@ function createFakeChannel() {
         roomChangeHandlers.add(handler);
         return () => roomChangeHandlers.delete(handler);
       },
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } as any,
+    } as unknown as ChatRoomChannel,
+  };
+}
+
+/**
+ * A fake `ChatRoomChannel` whose `send()` doesn't resolve until the test
+ * calls `resolve()`, so a test can trigger a Room change or `stop()` while a
+ * send is still in flight (#44 review fix F4/F5).
+ */
+function createDeferredChannel() {
+  const roomChangeHandlers = new Set<RoomChangeHandler>();
+  const chatHandlers = new Set<(payload: ChatPayload) => void>();
+  let resolveSend: ((ok: boolean) => void) | null = null;
+
+  return {
+    emitRoomChange(roomId: string | null): void {
+      for (const handler of roomChangeHandlers) handler(roomId);
+    },
+    resolve(ok: boolean): void {
+      resolveSend?.(ok);
+      resolveSend = null;
+    },
+    channel: {
+      send() {
+        return new Promise<boolean>((resolve) => {
+          resolveSend = resolve;
+        });
+      },
+      on(_type: 'chat', handler: (payload: ChatPayload) => void) {
+        chatHandlers.add(handler);
+        return () => chatHandlers.delete(handler);
+      },
+      onRoomChange(handler: RoomChangeHandler) {
+        roomChangeHandlers.add(handler);
+        return () => roomChangeHandlers.delete(handler);
+      },
+    } as unknown as ChatRoomChannel,
   };
 }
 
@@ -78,9 +114,11 @@ function createFakeView(): { view: ChatBubbleView; calls: Array<[string, string 
     view: {
       say(playerId, text) {
         calls.push([playerId, text]);
+        return true;
       },
       sayLocal(text) {
         calls.push(['local', text]);
+        return true;
       },
     },
   };
@@ -189,7 +227,7 @@ describe('createChatController', () => {
     expect(calls).toEqual([['p2', 'hi there']]);
   });
 
-  it("receiver drops a sender's second message arriving within 1s of the first", () => {
+  it("receiver drops a sender's second message arriving under 800ms after the first", () => {
     const fakeChannel = createFakeChannel();
     const { view, calls } = createFakeView();
     const clock = clockFrom(0);
@@ -202,15 +240,15 @@ describe('createChatController', () => {
     expect(calls).toEqual([['p2', 'first']]);
   });
 
-  it('accepts a message arriving after the rate-limit window for that sender', () => {
+  it("receiver accepts a sender's second message arriving 950ms after the first (#44 review fix F9: tolerates jitter past the 800ms receive window, still under the sender's own 1000ms send gate)", () => {
     const fakeChannel = createFakeChannel();
     const { view, calls } = createFakeView();
     const clock = clockFrom(0);
     createChatController({ channel: fakeChannel.channel, view, now: clock.now });
 
     fakeChannel.emitChat({ playerId: 'p2', text: 'first', sentAt: 0 });
-    clock.advance(CHAT_RATE_LIMIT_MS);
-    fakeChannel.emitChat({ playerId: 'p2', text: 'second', sentAt: CHAT_RATE_LIMIT_MS });
+    clock.advance(950);
+    fakeChannel.emitChat({ playerId: 'p2', text: 'second', sentAt: 950 });
 
     expect(calls).toEqual([
       ['p2', 'first'],
@@ -334,5 +372,67 @@ describe('createChatController', () => {
 
     fakeChannel.emitChat({ playerId: 'p2', text: 'after stop', sentAt: 0 });
     expect(calls).toEqual([['p2', null]]);
+  });
+
+  it('send() after stop() resolves false without sending (#44 review fix F5)', async () => {
+    const fakeChannel = createFakeChannel();
+    const { view } = createFakeView();
+    const controller = createChatController({ channel: fakeChannel.channel, view });
+
+    controller.stop();
+    const accepted = await controller.send('hello');
+
+    expect(accepted).toBe(false);
+    expect(fakeChannel.sendCalls).toEqual([]);
+  });
+
+  it('an ack that resolves after a Room change shows no local bubble (#44 review fix F4)', async () => {
+    const deferred = createDeferredChannel();
+    const { view, calls } = createFakeView();
+    const controller = createChatController({ channel: deferred.channel, view });
+
+    const pending = controller.send('hello');
+    deferred.emitRoomChange('dev-pit');
+    deferred.resolve(true);
+    const accepted = await pending;
+
+    expect(accepted).toBe(true);
+    expect(calls).toEqual([]);
+  });
+
+  it('an ack that resolves after stop() shows no bubble and arms no timer (#44 review fix F5)', async () => {
+    const deferred = createDeferredChannel();
+    const { view, calls } = createFakeView();
+    const timer = createManualTimer();
+    const controller = createChatController({
+      channel: deferred.channel,
+      view,
+      setTimeout: timer.setTimeout,
+      clearTimeout: timer.clearTimeout,
+    });
+
+    const pending = controller.send('hello');
+    controller.stop();
+    deferred.resolve(true);
+    const accepted = await pending;
+
+    expect(accepted).toBe(true);
+    expect(calls).toEqual([]);
+    expect(timer.scheduled).toEqual([]);
+  });
+
+  it('a channel-refused send resets the sender rate gate so an immediate retry is allowed (#44 review fix F8)', async () => {
+    const fakeChannel = createFakeChannel();
+    fakeChannel.setSendResult(false);
+    const { view } = createFakeView();
+    const controller = createChatController({ channel: fakeChannel.channel, view });
+
+    const first = await controller.send('one');
+    fakeChannel.setSendResult(true);
+    const second = await controller.send('two');
+
+    expect(first).toBe(false);
+    expect(second).toBe(true);
+    expect(fakeChannel.sendCalls).toEqual([{ text: 'one' }, { text: 'two' }]);
   });
 });

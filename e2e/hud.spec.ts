@@ -146,7 +146,7 @@ test('hud-chat-field-stays-in-hud', async ({ page }) => {
 
   const input = page.locator('.hud__chat-input');
   await input.click();
-  await input.type('hello there', { delay: 10 });
+  await input.pressSequentially('hello there', { delay: 10 });
 
   expect(await page.evaluate(() => window.canvasPointerDowns)).toBe(0);
 

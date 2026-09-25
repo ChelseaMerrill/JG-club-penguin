@@ -6,13 +6,21 @@ import { hasTestUsers, passwordSessionState } from './support/password-session';
 const AUTH_STATE_A = process.env.AUTH_STATE_A;
 const AUTH_STATE_B = process.env.AUTH_STATE_B;
 
-const OUTPUT_DIR = 'test-results/chat-bubble';
+const BUBBLE_OUTPUT_DIR = 'test-results/chat-bubble';
+const OTHER_ROOM_OUTPUT_DIR = 'test-results/chat-two-browsers';
 /** A budget for another browser to see a chat broadcast (#44 AC1: "a few seconds"). */
 const CHAT_SYNC_TIMEOUT = 5000;
 /** Comfortably clears the #44 ~1 message/second rate limit between distinct sends. */
 const RATE_LIMIT_CLEARANCE_MS = 1100;
-/** Comfortably past chat's 5000ms bubble lifetime, so a would-be late arrival has had time to show. */
-const BUBBLE_LIFETIME_CLEARANCE_MS = 4000;
+/**
+ * The window a leaked message would have to arrive in, after B has left A's
+ * Room, if the negative (other-Room) check were wrong (#44 review fix F3):
+ * not "past the bubble's lifetime" (there's no bubble to expire — the
+ * message must never arrive at all), just a generous wait sampled
+ * repeatedly rather than checked once at the end.
+ */
+const LEAK_CHECK_WINDOW_MS = 3000;
+const LEAK_SAMPLE_INTERVAL_MS = 250;
 /** Boot, sign-in and the first Room channel join, before the budget starts. */
 const READY_TIMEOUT = 15_000;
 
@@ -32,10 +40,10 @@ async function readOwnPlayerId(page: Page): Promise<string> {
   return decodeJwtSub(accessToken);
 }
 
-/** Waits until the page is in Town Center with its Room channel joined. */
-async function waitUntilJoined(page: Page): Promise<void> {
+/** Waits until `page` is in `roomId` with its Room channel joined. */
+async function waitUntilJoined(page: Page, roomId = 'town-center'): Promise<void> {
   const overlay = page.locator('.debug-overlay');
-  await expect(overlay).toHaveAttribute('data-current-room', 'town-center', {
+  await expect(overlay).toHaveAttribute('data-current-room', roomId, {
     timeout: READY_TIMEOUT,
   });
   await expect(overlay).toHaveAttribute('data-subscribed', 'true', { timeout: READY_TIMEOUT });
@@ -56,8 +64,39 @@ async function sendChat(page: Page, text: string): Promise<void> {
   await input.press('Enter');
 }
 
-async function localStorageKeys(page: Page): Promise<string[]> {
-  return page.evaluate(() => Object.keys(localStorage).sort());
+/** A snapshot of every key and value in both Web Storages (chat must touch neither, #44). */
+type StorageSnapshot = Record<string, string>;
+
+async function storageSnapshot(
+  page: Page,
+): Promise<{ local: StorageSnapshot; session: StorageSnapshot }> {
+  return page.evaluate(() => ({
+    local: { ...localStorage },
+    session: { ...sessionStorage },
+  }));
+}
+
+/**
+ * Asserts `after` matches `before` in both Web Storages, except that a
+ * `sb-*-auth-token` entry may legitimately change value (a Supabase token
+ * refresh can land mid-test) without failing the assertion; any other
+ * changed, added, or removed key still fails it.
+ */
+function assertStorageUnchanged(
+  before: { local: StorageSnapshot; session: StorageSnapshot },
+  after: { local: StorageSnapshot; session: StorageSnapshot },
+): void {
+  for (const kind of ['local', 'session'] as const) {
+    const beforeKeys = { ...before[kind] };
+    const afterKeys = { ...after[kind] };
+    for (const key of Object.keys(beforeKeys)) {
+      if (/^sb-.*-auth-token$/.test(key) && key in afterKeys) {
+        delete beforeKeys[key];
+        delete afterKeys[key];
+      }
+    }
+    expect(afterKeys, `${kind}Storage changed`).toEqual(beforeKeys);
+  }
 }
 
 test('chat-two-browsers', async ({ browser, baseURL }) => {
@@ -71,8 +110,10 @@ test('chat-two-browsers', async ({ browser, baseURL }) => {
   const stateA = haveStateFiles ? AUTH_STATE_A : await passwordSessionState('A', origin);
   const stateB = haveStateFiles ? AUTH_STATE_B : await passwordSessionState('B', origin);
 
-  rmSync(OUTPUT_DIR, { recursive: true, force: true });
-  mkdirSync(OUTPUT_DIR, { recursive: true });
+  rmSync(BUBBLE_OUTPUT_DIR, { recursive: true, force: true });
+  mkdirSync(BUBBLE_OUTPUT_DIR, { recursive: true });
+  rmSync(OTHER_ROOM_OUTPUT_DIR, { recursive: true, force: true });
+  mkdirSync(OTHER_ROOM_OUTPUT_DIR, { recursive: true });
 
   const contextA = await browser.newContext({ storageState: stateA });
   const contextB = await browser.newContext({ storageState: stateB });
@@ -96,16 +137,22 @@ test('chat-two-browsers', async ({ browser, baseURL }) => {
       timeout: READY_TIMEOUT,
     });
 
-    // A sends; B's __chatDebug shows A's text within a few seconds.
+    // Baseline both pages' full Web Storage state before the first send
+    // (#44 review fix F11): chat is live-only and must never persist.
+    const storageBeforeA = await storageSnapshot(pageA);
+    const storageBeforeB = await storageSnapshot(pageB);
+
+    // A sends; B's __chatDebug shows A's text within a few seconds. Since
+    // `__chatDebug` is now sourced from bubbles actually rendered (#44
+    // review fix F1), this also proves the bubble itself is on screen
+    // before the AC3 screenshot below.
     await sendChat(pageA, 'hello from A');
     await expect
       .poll(async () => (await chatDebug(pageB))?.[idA], { timeout: CHAT_SYNC_TIMEOUT })
       .toBe('hello from A');
 
-    await pageB.screenshot({ path: path.join(OUTPUT_DIR, 'screenshot.png') }).catch(() => {});
+    await pageB.screenshot({ path: path.join(BUBBLE_OUTPUT_DIR, 'screenshot.png') });
 
-    // A's own localStorage is untouched by sending (chat is live-only, never persisted).
-    const keysBefore = await localStorageKeys(pageA);
     await new Promise((resolve) => setTimeout(resolve, RATE_LIMIT_CLEARANCE_MS));
 
     // An unsafe payload renders literally (never parsed as markup) on both
@@ -123,19 +170,33 @@ test('chat-two-browsers', async ({ browser, baseURL }) => {
       undefined,
     );
 
-    const keysAfter = await localStorageKeys(pageA);
-    expect(keysAfter).toEqual(keysBefore);
-
     await new Promise((resolve) => setTimeout(resolve, RATE_LIMIT_CLEARANCE_MS));
 
-    // B moves to Dev Pit; a later message from A (still in Town Center)
-    // never reaches B, in the debug snapshot or otherwise.
+    // B moves to Dev Pit; wait until B has actually left Town Center and
+    // (re)joined Dev Pit's channel before A sends again (#44 review fix F3),
+    // rather than inferring it from `__chatDebug` going empty.
     await pageB.click('button[data-room="dev-pit"]');
-    await expect.poll(async () => (await chatDebug(pageB)) ?? {}).toEqual({});
+    await waitUntilJoined(pageB, 'dev-pit');
 
+    // A's next message (still in Town Center) must never reach B, in the
+    // debug snapshot or otherwise: sample repeatedly across the whole
+    // window instead of checking once at the end, so a message that arrives
+    // and is later cleared can't slip past a single end-of-window check.
     await sendChat(pageA, 'should not arrive');
-    await new Promise((resolve) => setTimeout(resolve, BUBBLE_LIFETIME_CLEARANCE_MS));
-    expect((await chatDebug(pageB))?.[idA]).toBeUndefined();
+    const leakCheckDeadline = Date.now() + LEAK_CHECK_WINDOW_MS;
+    while (Date.now() < leakCheckDeadline) {
+      expect((await chatDebug(pageB))?.[idA]).toBeUndefined();
+      await new Promise((resolve) => setTimeout(resolve, LEAK_SAMPLE_INTERVAL_MS));
+    }
+
+    await pageB.screenshot({ path: path.join(OTHER_ROOM_OUTPUT_DIR, 'other-room.png') });
+
+    // Neither page's Web Storage changed across the whole run (#44 review
+    // fix F11), aside from a legitimate Supabase auth-token refresh.
+    const storageAfterA = await storageSnapshot(pageA);
+    const storageAfterB = await storageSnapshot(pageB);
+    assertStorageUnchanged(storageBeforeA, storageAfterA);
+    assertStorageUnchanged(storageBeforeB, storageAfterB);
   } finally {
     await contextA.close();
     await contextB.close();
