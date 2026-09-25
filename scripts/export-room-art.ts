@@ -568,6 +568,62 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
   ],
 };
 
+// Art fixes: geometry corrections applied to the rendered design before
+// the screenshot, for flaws in the design itself that the byte-exact
+// design/ mirror can't be edited to fix (see design/SYNC-LOG.md). Each fix
+// finds its element by an exact `points` attribute of one of its polygons
+// and fails the export if that polygon is missing, so a design resync that
+// moves or fixes the shape stops the export instead of nudging the wrong
+// thing.
+type ArtFix = {
+  // The exact `points` of a polygon inside the element to move.
+  points: string;
+  // How many levels to climb from that polygon to the element to move
+  // (0 = the polygon itself).
+  up: number;
+  // Offset in Stage pixels, applied as an SVG `transform="translate(...)"`.
+  dx: number;
+  dy: number;
+  comment: string;
+};
+
+const ART_FIXES: Partial<Record<RoomId, ArtFix[]>> = {
+  'the-melt': [
+    {
+      points: '736.0,183.0 800.0,215.0 750.0,240.0 686.0,208.0',
+      up: 1,
+      // One iso step along the back counter is (+50, +25). The oven's
+      // left edge sits at iso a = -1.08 (a = 0 is the left wall plane
+      // through the back corner at (800, 250)), so it drew about a tile
+      // through the wall. Moving it +1.08 steps (+54, +27) puts its left
+      // edge flush on the wall, over the counter's first tile.
+      dx: 54,
+      dy: 27,
+      comment: "The oven/stove at the back counter's left end, which poked through the left wall.",
+    },
+  ],
+};
+
+// Runs in the browser context (page.evaluate) against one Room's fixes.
+function applyArtFixes(fixes: ArtFix[]): void {
+  for (const fix of fixes) {
+    const matches = Array.from(document.querySelectorAll('polygon')).filter(
+      (p) => p.getAttribute('points') === fix.points,
+    );
+    if (matches.length !== 1) {
+      throw new Error(
+        `art fix expected exactly one polygon with points "${fix.points}", found ${matches.length}`,
+      );
+    }
+    let el: Element | null = matches[0] ?? null;
+    for (let i = 0; i < fix.up && el; i++) el = el.parentElement;
+    if (!el) throw new Error(`art fix could not climb ${fix.up} level(s) from "${fix.points}"`);
+    const existing = el.getAttribute('transform');
+    const offset = `translate(${fix.dx} ${fix.dy})`;
+    el.setAttribute('transform', existing ? `${offset} ${existing}` : offset);
+  }
+}
+
 const MIME_TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -890,6 +946,7 @@ async function exportRoom(
   }
 
   await page.evaluate(hideLiveElements, rules);
+  await page.evaluate(applyArtFixes, ART_FIXES[roomId] ?? []);
   await page.waitForTimeout(POST_HIDE_SETTLE_MS);
 
   const outPath = path.join(OUTPUT_DIR, `${roomId}.png`);

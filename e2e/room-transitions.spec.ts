@@ -72,19 +72,29 @@ test('room transitions: doors, changeRoom, HUD, reload (#15)', async ({ page }) 
   const disabledDoor = townCenter.doors.find((door) => door.targetRoomId === null);
   if (!disabledDoor) throw new Error('expected town-center to have a disabled door');
   await clickStagePoint(page, doorCenter(disabledDoor));
+  // Fast, fixed-interval polls: the default backoff (up to 1 s between
+  // checks) could notice the hint up to a second late, eating most of its
+  // 2 s window before the "still shown" check below.
   await expect
-    .poll(async () => (await debugInfo(page))?.doorReachedLog, { timeout: WALK_TIMEOUT })
+    .poll(async () => (await debugInfo(page))?.doorReachedLog, {
+      timeout: WALK_TIMEOUT,
+      intervals: [50],
+    })
     .toEqual(expect.arrayContaining([disabledDoor.label]));
-  await expect.poll(async () => (await debugInfo(page))?.comingSoonHint).toBe(disabledDoor.label);
+  await expect
+    .poll(async () => (await debugInfo(page))?.comingSoonHint, { intervals: [50] })
+    .toBe(disabledDoor.label);
+  const hintSeenAt = Date.now();
   expect((await debugInfo(page))?.roomId).toBe('town-center');
   await page.screenshot({ path: 'test-results/room-transitions/coming-soon-hint.png' });
 
   // DOOR_HINT_DURATION_MS (`RoomScene.ts`) is 2000ms: still shown partway
   // through that window, then gone. The "still shown" half is a strict,
-  // point-in-time check (it would catch the hint disappearing too early);
-  // the "gone" half polls generously rather than a fixed wait, so parallel
-  // e2e workers' CPU contention can't flake it.
-  await page.waitForTimeout(1500);
+  // point-in-time check 1.5 s after the hint was first seen (it would catch
+  // the hint disappearing too early); the "gone" half polls generously
+  // rather than a fixed wait, so parallel e2e workers' CPU contention can't
+  // flake it.
+  await page.waitForTimeout(Math.max(0, 1500 - (Date.now() - hintSeenAt)));
   expect((await debugInfo(page))?.comingSoonHint).toBe(disabledDoor.label);
   await expect
     .poll(async () => (await debugInfo(page))?.comingSoonHint, { timeout: 15_000 })
