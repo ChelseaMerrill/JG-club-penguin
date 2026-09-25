@@ -1,9 +1,7 @@
 import { mkdirSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
-import type { Facing, HexColor, PenguinLook, RoomId, Tile } from '../src/contracts';
-import type { RegisteredPlayer } from '../src/game/movement/registered-player';
-import type { PenguinAnim } from '../src/game/penguin/poses';
+import type { Tile } from '../src/contracts';
 import { townCenter } from '../src/game/rooms/definitions/town-center';
 import { tileToScreen } from '../src/game/rooms/iso';
 import { GAME_HEIGHT, GAME_WIDTH } from '../src/game/stage-size';
@@ -13,57 +11,7 @@ import {
   readOwnPlayerId,
   waitUntilJoined,
 } from './support/two-browser-session';
-
-// Mirrors `src/game/rooms/dev-room-hook.ts`'s `RoomDebugInfo` (see the note
-// in `e2e/click-to-move.spec.ts`: importing it directly drags in
-// `import.meta.env`, which the `e2e` tsconfig doesn't type-check). Kept
-// identical, field for field, to every other redeclaration in this
-// directory: TypeScript's global `Window` augmentation requires every
-// redeclaration of `__roomDebug` to resolve to the same type.
-interface LocalPenguinDebugInfo {
-  tile: Tile;
-  target?: Tile;
-  anim: PenguinAnim;
-  facing: Facing;
-  moving: boolean;
-  flipX: boolean;
-  lookName: string;
-  lookBody: HexColor;
-  playerId: string;
-}
-
-interface RemotePenguinDebugInfo {
-  playerId: string;
-  tile: Tile;
-  moving: boolean;
-  placedTile: Tile;
-  walkStartedAt?: number;
-}
-
-interface RoomDebugInfo {
-  roomId: RoomId;
-  scrollX: number;
-  scrollY: number;
-  localPenguin?: LocalPenguinDebugInfo;
-  textureListenerCount?: number;
-  npcArrivedLog?: string[];
-  doorReachedLog?: string[];
-  localPenguinMoveLog?: Tile[];
-  localPenguinArrivedLog?: Tile[];
-  restartRoom?: () => void;
-  restartCount?: number;
-  penguinCount?: number;
-  remotePenguinCount?: number;
-  remotePenguins?: RemotePenguinDebugInfo[];
-  setRegisteredPlayer?: (player: RegisteredPlayer) => void;
-  spawnDebugPenguin?: (tile: Tile, look: PenguinLook) => void;
-}
-
-declare global {
-  interface Window {
-    __roomDebug?: RoomDebugInfo;
-  }
-}
+import type { RemotePenguinDebugInfo, RoomDebugInfo } from './support/room-debug-types';
 
 const OUTPUT_DIR = 'test-results/movement-sync';
 const VIDEO_DIR = 'playwright-output/movement-sync-videos';

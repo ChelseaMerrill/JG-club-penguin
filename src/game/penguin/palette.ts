@@ -15,3 +15,20 @@ export const ACCENT = '#00BDFF';
 export const SEAT_FILL = '#3a4046';
 export const SNORKEL_MASK = '#F2C12E';
 export const SNORKEL_LENS = '#BFE3F0';
+
+/**
+ * The Creator's `--stage-bg` and the dark Room floors (#79 D1). The surface
+ * a silhouette (feet) and, when the body itself doesn't clear
+ * `MIN_CONTRAST` against it, the body outline are checked against.
+ *
+ * A simplification, noted for #79 review round 1 nit 10: in the Creator
+ * itself (`design/Penguin Creator.dc.html`), the figure doesn't sit on flat
+ * `#0e1013` -- it sits on a 45%-opacity black shadow ellipse and, behind
+ * that, a 35%-opacity `#0C4B5F` (teal) hexagon, both painted over the
+ * `#0e1013` page background. The real, composited backdrop right behind the
+ * Penguin is therefore a touch lighter and more teal-tinted than this flat
+ * value (which direction that shifts a given contrast check depends on
+ * whether the checked colour is itself light or dark), not the exact
+ * colour every pixel behind the figure actually is.
+ */
+export const BACKDROP = '#0e1013';

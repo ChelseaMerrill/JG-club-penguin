@@ -9,7 +9,12 @@ import {
   type RoomScene,
 } from './game/rooms/RoomScene';
 import type { RoomPenguinView } from './game/rooms/room-penguin-view';
-import { createStubRoomDriver } from './game/stub-rooms';
+import { createRoomNavigator, type RoomNavigator } from './game/rooms/room-navigator';
+import {
+  HOOKS_ENABLED,
+  registerRoomDebugNavigatorHooks,
+  type RoomDebugEventLogEntry,
+} from './game/rooms/dev-room-hook';
 import { getSupabaseClient } from './auth/supabase-client';
 import { startAuth, toAuthClient } from './auth/auth-session';
 import { bindPlayer, type Player } from './auth/player';
@@ -33,7 +38,7 @@ import {
   type ChatController,
 } from './chat/chat-controller';
 import { exposeChatDebug } from './chat/dev-chat-hook';
-import { SPAWN_ROOM_ID, type PenguinLook } from './contracts';
+import { DEFAULT_LOOK, type PenguinLook } from './contracts';
 import { createInMemoryProgressStore } from './persistence/in-memory-progress-store';
 import type { ProgressStore } from './persistence/progress-store';
 import { createActiveProgressStore, createProgressSession } from './persistence/progress-session';
@@ -60,7 +65,6 @@ const game = startGame();
 mountStage(game);
 const client = getSupabaseClient();
 const realtime = toRealtimeClient(client);
-const rooms = createStubRoomDriver(gameEvents);
 const uiLayer = getUiLayer();
 
 /**
@@ -73,9 +77,48 @@ const uiLayer = getUiLayer();
  */
 let roomScene: RoomScene | null = null;
 let penguins: RoomPenguinView | null = null;
+/**
+ * The one producer of `room:leave`/`room:enter` (#15 A1, replacing #28's
+ * `stub-rooms.ts` wholesale). Built once the Scene exists, since it restarts
+ * `RoomScene` directly; every caller below (`startSession`, `endSession`,
+ * the debug overlay, the HUD) is only ever reachable once a Session has
+ * started, which itself waits on `sceneReady` first, so `roomNavigator` is
+ * always set by the time any of them runs.
+ */
+let roomNavigator: RoomNavigator | null = null;
 const sceneReady = whenSceneReady(game).then((scene) => {
   roomScene = scene;
   penguins = scene.penguins;
+  roomNavigator = createRoomNavigator({
+    scene: {
+      showRoom: (roomId, entryTile, force) => scene.showRoom(roomId, entryTile, force),
+      whenNextReady: () => scene.whenNextReady(),
+      onDoorReached: (handler) => scene.onDoorReached(handler),
+      showComingSoonHint: (door) => scene.showComingSoonHint(door),
+    },
+    events: gameEvents,
+    hasPlayer: () => Boolean(game.registry.get('player')),
+  });
+
+  // Test-only: `window.__roomDebug.changeRoom`/`roomEventLog` (#15 D6),
+  // gated the same way `RoomScene`'s own debug hook is, so neither the
+  // listeners nor the ever-growing log exist in a production build.
+  if (HOOKS_ENABLED) {
+    const roomEventLog: RoomDebugEventLogEntry[] = [];
+    gameEvents.on('room:leave', ({ roomId }) => {
+      roomEventLog.push({ type: 'room:leave', roomId });
+    });
+    gameEvents.on('room:enter', ({ roomId }) => {
+      roomEventLog.push({ type: 'room:enter', roomId });
+    });
+    registerRoomDebugNavigatorHooks({
+      changeRoom: (roomId) => {
+        void roomNavigator?.changeRoom(roomId);
+      },
+      roomEventLog,
+    });
+  }
+
   // #43: attached once (the same Scene instance and its `events` emitter are
   // reused across every `showRoom` restart). A local walk's start/re-route
   // broadcasts `move`; its arrival (never a queued re-route, never an
@@ -112,7 +155,9 @@ let pendingPrevious: RoomChannel | null = null;
 const debugOverlay = isDebugEnabled()
   ? createDebugOverlay(uiLayer, {
       onEnterRoom: (roomId) => {
-        if (channelPlayerId) rooms.enter(roomId, channelPlayerId);
+        // Only works during a Session (#15 A5): before one starts,
+        // `channelPlayerId` is unset and there is nothing to navigate.
+        if (channelPlayerId) void roomNavigator?.changeRoom(roomId);
       },
       onSetLook: (look) => {
         roomChannel?.setLook(look);
@@ -122,14 +167,6 @@ const debugOverlay = isDebugEnabled()
       },
     })
   : null;
-
-// Shows the entered Room in `RoomScene` (a no-op for a Room with no
-// `RoomDefinition` yet). The local Penguin spawns at the Room's `spawnTile`:
-// the stub entry tile (`stub-rooms.ts`) is not checked against the Room's
-// walkable mask, so it only feeds the Room channel's Presence payload.
-gameEvents.on('room:enter', ({ roomId }) => {
-  roomScene?.showRoom(roomId);
-});
 
 /**
  * Applies a look loaded from or saved through the Penguin Creator everywhere
@@ -215,13 +252,13 @@ async function stopChannel(channel: RoomChannel): Promise<void> {
 
 /**
  * The synchronous half of leaving a Session (sign-out, or a sign-in as a
- * different Player): emits `room:leave` via `rooms.reset()` and clears every
- * remote Penguin view. Returns the Room channel still to stop.
+ * different Player): emits `room:leave` via `leaveForSignOut()` and clears
+ * every remote Penguin view. Returns the Room channel still to stop.
  */
 function endSession(): RoomChannel | null {
   signInGeneration += 1;
   const channel = roomChannel;
-  rooms.reset();
+  roomNavigator?.leaveForSignOut();
   roomChannel = null;
   channelPlayerId = null;
   chatController?.stop();
@@ -266,7 +303,36 @@ async function startSession(player: Player, previous: RoomChannel | null): Promi
     view.walkTo(playerId, target);
   });
 
-  rooms.enter(SPAWN_ROOM_ID, player.id);
+  // After the Room channel exists (#15 A2), so it sees the first `room:enter`
+  // and joins Presence.
+  void roomNavigator?.enterSpawnRoom();
+}
+
+/**
+ * Test-only: with `?asPlayer` in the URL and either a dev server
+ * (`import.meta.env.DEV`) or the Playwright preview server
+ * (`VITE_E2E_HOOKS=true`), binds a fixture Player to the registry and enters
+ * the spawn Room through the real navigator, with no auth and no Room
+ * channel (#15 D6/A6): e2e specs that need `room:enter` gated on a
+ * registered Player, without signing in through Google. Waits for
+ * `sceneReady` first, since the navigator doesn't exist until then. Both env
+ * checks are direct `import.meta.env.*` reads, so Vite strips this
+ * function's body from a production build, matching the other dev hooks.
+ */
+function initDevAsPlayerHook(): boolean {
+  if (!HOOKS_ENABLED) return false;
+  if (!new URLSearchParams(window.location.search).has('asPlayer')) return false;
+
+  const fixturePlayer: Player = {
+    id: 'e2e-fixture-player',
+    displayName: 'E2E Fixture Player',
+    look: DEFAULT_LOOK,
+  };
+  bindPlayer(game.registry, fixturePlayer);
+  void sceneReady.then(() => {
+    void roomNavigator?.enterSpawnRoom();
+  });
+  return true;
 }
 
 const overlay = createLoginOverlay(uiLayer, {
@@ -289,7 +355,10 @@ function resolveRoomTitle(roomId: RoomId): { title: string; subtitle: string } {
 const hud = createHud(getUiLayer(), {
   resolveRoomTitle,
   onIgloo: () => {
-    // #15 changeRoom('igloo'); a no-op until then.
+    void roomNavigator?.changeRoom('igloo');
+  },
+  onReturnToTownCenter: () => {
+    void roomNavigator?.changeRoom('town-center');
   },
   onSignOut: () => {
     void auth.signOut();
@@ -393,7 +462,8 @@ const penguinEditor = createPenguinEditor({
 
 // After `penguinEditor` exists; see the note on `devHudActive` above.
 const devCreatorActive = initDevCreatorHook(penguinEditor, progressStore);
-const devHookActive = devHudActive || devMinigameActive || devCreatorActive;
+const devAsPlayerActive = initDevAsPlayerHook();
+const devHookActive = devHudActive || devMinigameActive || devCreatorActive || devAsPlayerActive;
 
 gameEvents.on('ui:open-creator', () => {
   penguinEditor.edit();
@@ -447,13 +517,26 @@ const auth = startAuth({
   },
   onSignedOut: () => {
     currentPlayer = null;
-    // Per `src/contracts/rooms.ts`, `room:leave` comes before `bindPlayer(null)`.
-    const channel = endSession();
-    bindPlayer(game.registry, null);
-    progress.stop();
-    if (channel) void stopChannel(channel);
-    if (pendingPrevious) void stopChannel(pendingPrevious);
-    pendingPrevious = null;
+    // Only #15's `?asPlayer` owns `registry.player`/the Session itself
+    // outside the normal auth flow; the real, always-eventually-fired
+    // session-less signed-out signal must not clobber either one out from
+    // under it. `?hud`/`?creator`/`?minigame` never touch `registry.player`
+    // or start a real Session themselves, so this cleanup still runs for
+    // them exactly as it did before #15 (review round 1 narrowed this from
+    // the broader `devHookActive`, which incorrectly skipped it for them too).
+    if (!devAsPlayerActive) {
+      // Per `src/contracts/rooms.ts`, `room:leave` comes before `bindPlayer(null)`.
+      const channel = endSession();
+      bindPlayer(game.registry, null);
+      progress.stop();
+      if (channel) void stopChannel(channel);
+      if (pendingPrevious) void stopChannel(pendingPrevious);
+      pendingPrevious = null;
+    }
+    // Every dev hook (including `?asPlayer`) owns its own UI state; the real
+    // signed-out signal must not reach back in and hide/reset it (`dev-hud-
+    // hook.ts`'s own doc comment covers why: `hud.show()` already ran
+    // synchronously, and this signal always arrives later).
     if (devHookActive) return;
     penguinEditor.playerSignedOut();
     // Quits any in-progress round (no `recordRound`) rather than leaving it
