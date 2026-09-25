@@ -38,7 +38,10 @@ export interface HudDeps {
    * Asks to enter (`true`) or leave (`false`) Snowball mode (#53). The HUD
    * never flips its own mode: the caller decides, then reports the outcome
    * through `Hud.setSnowballMode`. Entering first closes MENU and is refused
-   * outright (no call) while any other HUD overlay is open.
+   * outright (no call) while any other HUD overlay is open, or while ammo
+   * (`setSnowballAmmo`) is 0 (#109). Escape also asks to leave (`false`)
+   * whenever the mode is on (#109); in practice that's always while no HUD
+   * overlay is open, since opening one already turns the mode off.
    */
   onSnowballToggle?: (on: boolean) => void;
   /**
@@ -218,17 +221,56 @@ export function createHud(layer: HTMLElement, deps: HudDeps): Hud {
   snowballButton.className = 'hud__button hud__button--bottom hud__button--snowball';
   snowballButton.textContent = 'SNOWBALL';
   let snowballMode = false;
+  // #109: whether there's ammo to enter with. Starts `true` (permissive)
+  // since a real Session always reports the full bucket via
+  // `setSnowballAmmo` before the button is reachable; only an explicit 0
+  // count refuses entry.
+  let hasSnowballAmmo = true;
   snowballButton.addEventListener('click', () => {
     if (snowballMode) {
       deps.onSnowballToggle?.(false);
       return;
     }
-    // As MAP does: MENU closes first (#32 D6). Any other overlay (Creator,
-    // Minigame, Trophy Case, Market) refuses the mode outright (#53 v4 #12).
+    // As MAP does: MENU closes first (#32 D6), even at 0 ammo (#109), so the
+    // button still closes MENU while it's shown disabled.
     overlays.close(MENU_OVERLAY_ID);
     closeMenu();
+    // #109: refuse to enter with 0 ammo (the button stays off); the Player
+    // re-enters once ammo refills.
+    if (!hasSnowballAmmo) return;
+    // Any other overlay (Creator, Minigame, Trophy Case, Market) refuses the
+    // mode outright (#53 v4 #12).
     if (overlays.current() !== null) return;
     deps.onSnowballToggle?.(true);
+  });
+
+  // #109: Escape leaves Snowball mode. In practice this only ever fires
+  // while no HUD overlay is open: opening one already turns the mode off
+  // (`unsubscribeSnowballOnOverlayOpen` below), so by the time one is open
+  // here, `snowballMode` is already `false` and this is a no-op; a
+  // still-open overlay's own Escape handling (`overlays`' `keydown`
+  // listener, registered above) closes it exactly as before #109. Escape
+  // pressed inside the chat field never reaches here: the field's own
+  // `keydown` listener stops propagation for every key, including Escape
+  // (#44 D3), so focusing the field and pressing Escape neither exits
+  // Snowball mode nor closes an overlay — intentional, existing behavior.
+  function handleSnowballEscape(event: KeyboardEvent): void {
+    if (event.key !== 'Escape') return;
+    if (!snowballMode) return;
+    deps.onSnowballToggle?.(false);
+  }
+  window.addEventListener('keydown', handleSnowballEscape);
+
+  // #109: any HUD overlay opening (MENU here; PENGUIN/MAP/the Creator/a
+  // Minigame/etc. via their own `hud.overlays.open` calls) also leaves
+  // Snowball mode. Owned here rather than solely by `main.ts`'s own
+  // `hud.overlays.onOpen(() => setSnowballMode(false))` wiring, so Escape's
+  // "no overlay is open" invariant above holds without depending on the
+  // caller remembering to wire it; `main.ts`'s copy stays harmless and
+  // idempotent alongside this one (`setSnowballMode(false)` while already
+  // off is a no-op).
+  const unsubscribeSnowballOnOverlayOpen = overlays.onOpen(() => {
+    if (snowballMode) deps.onSnowballToggle?.(false);
   });
 
   const mapButton = document.createElement('button');
@@ -312,7 +354,20 @@ export function createHud(layer: HTMLElement, deps: HudDeps): Hud {
   snowballHint.textContent = 'Hit a penguin: they get a snow hat for 10s.';
   snowballPanel.append(snowballTitle, snowballAmmo, snowballDivider, snowballHint);
 
+  // #109: SNOWBALL shows disabled (dimmed, `aria-disabled`) while off ammo
+  // and the mode is off, cleared the moment either changes. Deliberately not
+  // the native `disabled` attribute: the button must still be clickable to
+  // close MENU (see the click handler above).
+  function updateSnowballButtonDisabled(): void {
+    const disabled = !snowballMode && !hasSnowballAmmo;
+    snowballButton.classList.toggle('hud__button--disabled', disabled);
+    if (disabled) snowballButton.setAttribute('aria-disabled', 'true');
+    else snowballButton.removeAttribute('aria-disabled');
+  }
+
   function setSnowballAmmo(count: number, capacity: number): void {
+    hasSnowballAmmo = count > 0;
+    updateSnowballButtonDisabled();
     const pips: HTMLElement[] = [];
     for (let i = 0; i < capacity; i += 1) {
       const pip = document.createElement('span');
@@ -327,6 +382,7 @@ export function createHud(layer: HTMLElement, deps: HudDeps): Hud {
     snowballMode = on;
     snowballPanel.hidden = !on;
     snowballButton.classList.toggle('hud__button--active', on);
+    updateSnowballButtonDisabled();
   }
 
   root.append(titleBlock, topRight, questSlot, menuPanel, snowballPanel, bottomBar, toastEl);
@@ -380,6 +436,8 @@ export function createHud(layer: HTMLElement, deps: HudDeps): Hud {
       unsubscribeRoomEnter();
       unsubscribeTokens();
       unsubscribeToast();
+      window.removeEventListener('keydown', handleSnowballEscape);
+      unsubscribeSnowballOnOverlayOpen();
       if (toastTimer !== null) clearTimeout(toastTimer);
       overlays.destroy();
       emotePicker.destroy();

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { Tile } from '../contracts';
 import {
   createSnowballController,
@@ -135,6 +135,44 @@ function createDeferredChannel() {
   };
 }
 
+/**
+ * A fake channel supporting multiple concurrent in-flight
+ * `send('snowball:throw', ...)` calls, each independently resolvable by
+ * call order index — for tests overlapping several throws before any of
+ * them resolves.
+ */
+function createMultiDeferredChannel() {
+  const roomChangeHandlers = new Set<RoomChangeHandler>();
+  const throwSends: ThrowPayload[] = [];
+  const pending: Array<(ok: boolean) => void> = [];
+
+  return {
+    throwSends,
+    pending,
+    resolve(index: number, ok: boolean): void {
+      pending[index]?.(ok);
+    },
+    emitRoomChange(roomId: string | null): void {
+      for (const handler of roomChangeHandlers) handler(roomId);
+    },
+    channel: {
+      send(_type: 'snowball:throw', payload: unknown) {
+        throwSends.push(payload as ThrowPayload);
+        return new Promise<boolean>((resolve) => {
+          pending.push(resolve);
+        });
+      },
+      on() {
+        return () => {};
+      },
+      onRoomChange(handler: RoomChangeHandler) {
+        roomChangeHandlers.add(handler);
+        return () => roomChangeHandlers.delete(handler);
+      },
+    } as unknown as SnowballRoomChannel,
+  };
+}
+
 /** A fake `SnowballView`: fixed points per playerId/Tile, recording every call. */
 function createFakeView(): {
   view: SnowballView;
@@ -197,7 +235,10 @@ function createFakeView(): {
 const LOCAL_ID = 'local-1';
 
 function createController(
-  fakeChannel: ReturnType<typeof createFakeChannel> | ReturnType<typeof createDeferredChannel>,
+  fakeChannel:
+    | ReturnType<typeof createFakeChannel>
+    | ReturnType<typeof createDeferredChannel>
+    | ReturnType<typeof createMultiDeferredChannel>,
   fakeView: ReturnType<typeof createFakeView>,
   extra: Partial<{
     now: () => number;
@@ -336,6 +377,118 @@ describe('createSnowballController: throwAt', () => {
 
     expect(firstResult).toBe(false);
     expect(controller.ammo().count).toBe(1);
+  });
+});
+
+describe('createSnowballController: onAmmoEmptied (#109)', () => {
+  it('fires once the throw that empties a full bucket has been sent', async () => {
+    const fakeChannel = createFakeChannel();
+    const fakeView = createFakeView();
+    const timer = createManualTimer();
+    const controller = createController(fakeChannel, fakeView, {
+      setTimeout: timer.setTimeout,
+      clearTimeout: timer.clearTimeout,
+    });
+    const emptied = vi.fn();
+    controller.onAmmoEmptied(emptied);
+
+    await controller.throwAt({ col: 0, row: 0 }); // 3 -> 2
+    expect(emptied).not.toHaveBeenCalled();
+    await controller.throwAt({ col: 0, row: 0 }); // 2 -> 1
+    expect(emptied).not.toHaveBeenCalled();
+    await controller.throwAt({ col: 0, row: 0 }); // 1 -> 0: the signal
+
+    expect(emptied).toHaveBeenCalledTimes(1);
+    expect(controller.ammo().count).toBe(0);
+  });
+
+  it('sends two throws OK then rejects the third (1 -> 0): refunds to 1, no fire', async () => {
+    const fakeChannel = createFakeChannel();
+    const fakeView = createFakeView();
+    const timer = createManualTimer();
+    const controller = createController(fakeChannel, fakeView, {
+      setTimeout: timer.setTimeout,
+      clearTimeout: timer.clearTimeout,
+    });
+    const emptied = vi.fn();
+    controller.onAmmoEmptied(emptied);
+
+    await controller.throwAt({ col: 0, row: 0 }); // 3 -> 2, sent
+    await controller.throwAt({ col: 0, row: 0 }); // 2 -> 1, sent
+    fakeChannel.setThrowSendResult(false);
+    const result = await controller.throwAt({ col: 0, row: 0 }); // would be 1 -> 0, but rejected
+
+    expect(result).toBe(false);
+    expect(controller.ammo().count).toBe(1); // refunded, not left at 0
+    expect(emptied).not.toHaveBeenCalled();
+  });
+
+  it('three overlapping pending sends: fires once, only for the reservation that emptied the bucket', async () => {
+    const multi = createMultiDeferredChannel();
+    const fakeView = createFakeView();
+    const timer = createManualTimer();
+    let nextId = 0;
+    const controller = createController(multi, fakeView, {
+      setTimeout: timer.setTimeout,
+      clearTimeout: timer.clearTimeout,
+      generateThrowId: () => `t${nextId++}`,
+    });
+    const emptied = vi.fn();
+    controller.onAmmoEmptied(emptied);
+
+    const first = controller.throwAt({ col: 0, row: 0 }); // reserves 3 -> 2
+    const second = controller.throwAt({ col: 0, row: 0 }); // reserves 2 -> 1
+    const third = controller.throwAt({ col: 0, row: 0 }); // reserves 1 -> 0: this one should fire
+
+    expect(multi.pending).toHaveLength(3);
+    expect(controller.ammo().count).toBe(0);
+
+    // Resolve out of reservation order to prove the fire is tied to which
+    // reservation emptied the bucket, not to resolution order.
+    multi.resolve(1, true);
+    expect(await second).toBe(true);
+    expect(emptied).not.toHaveBeenCalled();
+
+    multi.resolve(2, true);
+    expect(await third).toBe(true);
+    expect(emptied).toHaveBeenCalledTimes(1);
+
+    multi.resolve(0, true);
+    expect(await first).toBe(true);
+    expect(emptied).toHaveBeenCalledTimes(1);
+
+    // The reservation that emptied the bucket still draws its arc normally.
+    expect(fakeView.calls.drawArc.map((call) => call.throwId)).toEqual(
+      expect.arrayContaining(['t0', 't1', 't2']),
+    );
+  });
+
+  it('stop() while a send is in flight: no fire even though that reservation emptied the bucket', async () => {
+    const deferred = createDeferredChannel();
+    const fakeView = createFakeView();
+    const timer = createManualTimer();
+    const controller = createController(deferred, fakeView, {
+      setTimeout: timer.setTimeout,
+      clearTimeout: timer.clearTimeout,
+    });
+    const emptied = vi.fn();
+    controller.onAmmoEmptied(emptied);
+
+    const first = controller.throwAt({ col: 0, row: 0 });
+    deferred.resolve(true);
+    await first;
+    const second = controller.throwAt({ col: 0, row: 0 });
+    deferred.resolve(true);
+    await second;
+    expect(controller.ammo().count).toBe(1);
+
+    const pending = controller.throwAt({ col: 0, row: 0 }); // reserves 1 -> 0, send in flight
+    controller.stop();
+    deferred.resolve(true);
+    const result = await pending;
+
+    expect(result).toBe(true); // send resolved true; stop() intervened first
+    expect(emptied).not.toHaveBeenCalled();
   });
 });
 
