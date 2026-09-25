@@ -3,6 +3,7 @@ import { MINIGAME_RULES } from '../persistence/minigame-rules';
 import type { Hud } from '../ui/hud/hud';
 import type { LaunchedMinigame, MinigameLauncher } from './minigame-launcher';
 import type { MinigameTestHandle } from './minigame-test-handle';
+import type { PancakeFlipTestHooks } from './pancake-flip/pancake-flip';
 import type { StubMinigameTestHooks } from './stub-minigame';
 
 declare global {
@@ -17,6 +18,10 @@ function hasStubHooks(value: unknown): value is StubMinigameTestHooks {
     typeof (value as Partial<StubMinigameTestHooks>).debugSetScore === 'function' &&
     typeof (value as Partial<StubMinigameTestHooks>).debugFinishNow === 'function'
   );
+}
+
+function hasPancakeFlipHooks(value: unknown): value is PancakeFlipTestHooks {
+  return !!value && typeof (value as Partial<PancakeFlipTestHooks>).debugFinishNow === 'function';
 }
 
 /** True when `value` is one of `MINIGAME_RULES`'s registered ids. */
@@ -63,6 +68,12 @@ export function initDevMinigameHook(hud: Hud, launcher: MinigameLauncher): boole
     },
     finishNow() {
       if (hasStubHooks(hooks)) hooks.debugFinishNow();
+    },
+    finishPancakeFlipNow() {
+      // Gated on the requested id, not just the hook shape: Bug Squash's
+      // own `debugFinishNow` would otherwise also match
+      // `hasPancakeFlipHooks`'s duck-typing.
+      if (rawId === 'pancake-flip' && hasPancakeFlipHooks(hooks)) hooks.debugFinishNow();
     },
   };
 

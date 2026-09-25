@@ -11,5 +11,7 @@ playwright-output/
 .claude/worktrees/
 .claude/atlas-state/
 # atlas-v3:gitignore:end
+# Playwright storage state may contain a live Supabase refresh token; never commit it.
+.auth/
 # Test evidence is local only; it is not committed (docs/agents/testing.md).
 test-results/
