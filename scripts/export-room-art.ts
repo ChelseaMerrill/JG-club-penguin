@@ -65,8 +65,12 @@ type HideRule =
   // Elements whose inline style plays one of these CSS @keyframes. Used for
   // moving/blinking figures and props; hiding a character's outer wrapper
   // also hides anything the design nests inside it (name bubble, held
-  // props, etc.) for free.
-  | { kind: 'animation'; names: string[]; comment: string }
+  // props, etc.) for free. `except` (#100) protects elements that would
+  // otherwise match by shared animation name but must stay in the art: any
+  // element that is, contains, or is contained by a node matching one of
+  // these selectors is skipped, in either direction (an `except` target can
+  // sit above *or* below the candidate element in the tree).
+  | { kind: 'animation'; names: string[]; except?: string[]; comment: string }
   // Static (non-animated) SVG <text> labels — name plates and speech
   // bubbles. The design draws each as a flat, ungrouped run of sibling
   // elements (an optional character <svg>, then a <rect> background, then
@@ -299,6 +303,11 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
     {
       kind: 'animation',
       names: ['idle'],
+      // #100: the new KITCHEN floor arrow's own outer wrapper also plays
+      // `idle` (a gentle float, not a vendor's body motion); without this
+      // exception it would be swept up whole -- arrow, shadow and label
+      // alike -- by this rule meant for Kevin/Ann Marie/Josh/Casey.
+      except: ["a[href='Kitchen.dc.html']"],
       comment: 'Subtle idle motion inside stationary vendor NPCs (Kevin, Ann Marie, Josh, Casey).',
     },
     {
@@ -342,6 +351,11 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
     {
       kind: 'animation',
       names: ['blink'],
+      // #100: the new KITCHEN floor arrow's own polygon group also plays
+      // `blink` (it's a real, in-scene door-equivalent, meant to stay in
+      // the art); without this exception it would be hidden alongside the
+      // unrelated HUD nav pill below, which shares the same keyframe name.
+      except: ["a[href='Kitchen.dc.html']"],
       comment: "Blinking '↙ ELEVATOR · STAIRS · KITCHEN' room-exit nav pill (HUD).",
     },
     {
@@ -499,17 +513,26 @@ function freezeSmilAnimations(): void {
 function hideLiveElements(rules: HideRule[]): void {
   const CHROME_TAGS = new Set(['rect', 'polygon', 'svg', 'path', 'circle', 'ellipse', 'line']);
 
-  function hideAnimationNames(names: string[]): void {
+  function hideAnimationNames(names: string[], except: string[] = []): void {
     const wanted = new Set(names);
+    // Elements matching an `except` selector, plus every one of their
+    // ancestors and descendants (#100): a protected node can sit either
+    // above the candidate element (e.g. the Kitchen arrow's own `idle`
+    // wrapper is an *ancestor* of the `<a>` it protects) or below it (the
+    // arrow's inner `blink` group is a *descendant* of that same `<a>`), so
+    // both directions are checked with `Node.contains`.
+    const protectedEls = except.length > 0 ? Array.from(document.querySelectorAll(except.join(','))) : [];
+    const isProtected = (el: Element): boolean =>
+      protectedEls.some((p) => p === el || p.contains(el) || el.contains(p));
     document.querySelectorAll<HTMLElement | SVGElement>('[style]').forEach((el) => {
       const raw = el.getAttribute('style') ?? '';
       if (!raw.includes('animation')) return;
       const animationName = getComputedStyle(el).animationName;
       if (!animationName || animationName === 'none') return;
       const active = animationName.split(',').map((n) => n.trim());
-      if (active.some((n) => wanted.has(n))) {
-        el.style.setProperty('display', 'none', 'important');
-      }
+      if (!active.some((n) => wanted.has(n))) return;
+      if (isProtected(el)) return;
+      el.style.setProperty('display', 'none', 'important');
     });
   }
 
@@ -576,7 +599,7 @@ function hideLiveElements(rules: HideRule[]): void {
   }
 
   for (const rule of rules) {
-    if (rule.kind === 'animation') hideAnimationNames(rule.names);
+    if (rule.kind === 'animation') hideAnimationNames(rule.names, rule.except);
     else if (rule.kind === 'labels') hideLabels(rule.texts);
     else hideCluster(rule.anchor, rule.companions);
   }
