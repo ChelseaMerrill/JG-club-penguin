@@ -122,7 +122,7 @@ describe('renderPenguinSvg', () => {
   const DESIGN_JG_CAP_SEAM_D = 'M60 8 L60 24';
   const DESIGN_JG_CAP_BUTTON_POINTS = '60,11 65,14 65,20 60,23 55,20 55,14';
 
-  it('the JG CAP hat matches the design\'s crown, brim, seam and button paths (#92 D4)', () => {
+  it("the JG CAP hat matches the design's crown, brim, seam and button paths (#92 D4)", () => {
     const svg = renderPenguinSvg({ ...DEFAULT_LOOK, hat: 'JG CAP' });
     expect(svg).toContain(`d="${DESIGN_JG_CAP_CROWN_D}"`);
     expect(svg).toContain(`d="${DESIGN_JG_CAP_BACK_BRIM_D}"`);
