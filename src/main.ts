@@ -4,9 +4,11 @@ import { startGame, whenSceneReady } from './game/main';
 import {
   LOCAL_PENGUIN_ARRIVED_EVENT,
   LOCAL_PENGUIN_MOVE_EVENT,
+  SNOWBALL_THROW_EVENT,
   type LocalPenguinArrivedEvent,
   type LocalPenguinMoveEvent,
   type RoomScene,
+  type SnowballThrowRequestEvent,
 } from './game/rooms/RoomScene';
 import type { RoomPenguinView } from './game/rooms/room-penguin-view';
 import { createRoomNavigator, type RoomNavigator } from './game/rooms/room-navigator';
@@ -38,6 +40,12 @@ import {
   type ChatController,
 } from './chat/chat-controller';
 import { exposeChatDebug } from './chat/dev-chat-hook';
+import { createSnowballController, type SnowballController } from './snowball/snowball-controller';
+import {
+  exposeSnowballDebug,
+  type SnowballThrowLogEntry,
+  type SnowHatDebugInfo,
+} from './snowball/dev-snowball-hook';
 import { DEFAULT_LOOK, type PenguinLook } from './contracts';
 import { createInMemoryProgressStore } from './persistence/in-memory-progress-store';
 import type { ProgressStore } from './persistence/progress-store';
@@ -130,6 +138,15 @@ const sceneReady = whenSceneReady(game).then((scene) => {
   scene.events.on(LOCAL_PENGUIN_ARRIVED_EVENT, (event: LocalPenguinArrivedEvent) => {
     roomChannel?.setTile(event.tile, event.facing);
   });
+  // #53: a click while aiming. A 0-ammo click resolves `false` and does
+  // nothing at all (no throw, no move: the scene already suppressed it).
+  scene.events.on(SNOWBALL_THROW_EVENT, ({ target }: SnowballThrowRequestEvent) => {
+    const controller = snowballController;
+    if (!controller || !snowballMode) return;
+    void controller.throwAt(target).then((sent) => {
+      if (sent && HOOKS_ENABLED) snowballThrowLog.push({ target, at: Date.now() });
+    });
+  });
   return scene.penguins;
 });
 
@@ -138,6 +155,12 @@ let roomChannel: RoomChannel | null = null;
 let channelPlayerId: string | null = null;
 /** The signed-in Player's chat controller (#44), recreated alongside `roomChannel` each session. */
 let chatController: ChatController | null = null;
+/** The signed-in Player's Snowball mode controller (#53), created and stopped alongside `chatController`. */
+let snowballController: SnowballController | null = null;
+/** Whether Snowball mode is on (#53 D6): only ever during a Session. */
+let snowballMode = false;
+/** Test-only (`__snowballDebug.throwLog`): every acknowledged throw, pushed only when `HOOKS_ENABLED`. */
+const snowballThrowLog: SnowballThrowLogEntry[] = [];
 // Bumped on every sign-in and sign-out, so an in-flight sign-in that loses a
 // race with a later sign-out (or a newer sign-in) never creates a stray
 // Room channel.
@@ -250,6 +273,44 @@ async function stopChannel(channel: RoomChannel): Promise<void> {
 }
 
 /**
+ * Turns Snowball mode on or off everywhere at once (#53 D6): the scene's
+ * aiming and the HUD's button and panel. Refused (stays off) outside a
+ * Session. Exits on a Room change, sign-out, and any HUD overlay opening.
+ */
+function setSnowballMode(on: boolean): void {
+  const next = on && snowballController !== null && roomScene !== null;
+  snowballMode = next;
+  roomScene?.setAiming(next);
+  hud.setSnowballMode(next);
+}
+
+/**
+ * Takes every snow hat graphic down (#53 D4): the controller clears its own
+ * hat state on a Room change or `stop()` without calling back into the
+ * view, so the render side is cleared here too, and no hat outlives the
+ * Room or Session it was thrown in.
+ */
+function clearSnowHatGraphics(): void {
+  roomScene?.snowball.setLocalSnowHat(false);
+  penguins?.clearSnowHats();
+}
+
+/** `__snowballDebug.snowHats`: the controller's timing, with `rendered` read from the real Penguins. */
+function debugSnowHats(): Record<string, SnowHatDebugInfo> {
+  const result: Record<string, SnowHatDebugInfo> = {};
+  const controller = snowballController;
+  if (!controller) return result;
+  for (const [playerId, hat] of controller.snowHats()) {
+    const rendered =
+      playerId === channelPlayerId
+        ? (roomScene?.localHasSnowHat() ?? false)
+        : (penguins?.hasSnowHat(playerId) ?? false);
+    result[playerId] = { appliedAt: hat.appliedAt, until: hat.until, rendered };
+  }
+  return result;
+}
+
+/**
  * The synchronous half of leaving a Session (sign-out, or a sign-in as a
  * different Player): emits `room:leave` via `leaveForSignOut()` and clears
  * every remote Penguin view. Returns the Room channel still to stop.
@@ -262,6 +323,10 @@ function endSession(): RoomChannel | null {
   channelPlayerId = null;
   chatController?.stop();
   chatController = null;
+  setSnowballMode(false);
+  snowballController?.stop();
+  snowballController = null;
+  clearSnowHatGraphics();
   penguins?.clear();
   debugOverlay?.clear();
   debugOverlay?.setCurrentRoom(null);
@@ -294,7 +359,24 @@ async function startSession(player: Player, previous: RoomChannel | null): Promi
     channel,
     view: composeChatView(view, () => channelPlayerId),
   });
+  const scene = roomScene;
+  if (scene) {
+    const snowball = createSnowballController({
+      channel,
+      view: scene.snowball,
+      playerId: player.id,
+    });
+    snowballController = snowball;
+    const ammo = snowball.ammo();
+    hud.setSnowballAmmo(ammo.count, ammo.capacity);
+    snowball.onAmmoChange(({ count, capacity }) => hud.setSnowballAmmo(count, capacity));
+  }
   channel.onRoomChange((roomId) => debugOverlay?.setCurrentRoom(roomId));
+  // #53: a Room change leaves Snowball mode and drops every snow hat graphic.
+  channel.onRoomChange(() => {
+    setSnowballMode(false);
+    clearSnowHatGraphics();
+  });
   channel.onSubscribedChange((subscribed) => debugOverlay?.setSubscribed(subscribed));
   // #43: a remote Player's click-to-move walks their Penguin the same way
   // ours does, rather than snapping it forward.
@@ -366,7 +448,20 @@ const hud = createHud(getUiLayer(), {
   // session's sign-in load finishes (#34).
   initialBalance: 0,
   onChatSend: (text) => chatController?.send(text) ?? Promise.resolve(false),
+  onSnowballToggle: (on) => setSnowballMode(on),
 });
+
+// #53 D8/N8: any HUD overlay opening (Creator, Minigame, Trophy Case,
+// Market, MENU, the Map) leaves Snowball mode.
+hud.overlays.onOpen(() => setSnowballMode(false));
+
+exposeSnowballDebug(() => ({
+  mode: snowballMode,
+  ammo: snowballController?.ammo().count ?? 0,
+  reticle: roomScene?.snowballReticle() ?? null,
+  snowHats: debugSnowHats(),
+  throwLog: [...snowballThrowLog],
+}));
 
 const progress = createProgressSession({ registry: game.registry, emitter: gameEvents });
 

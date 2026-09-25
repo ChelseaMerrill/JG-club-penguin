@@ -49,6 +49,14 @@ const BUBBLE_MAX_WIDTH = 260;
 const BUBBLE_GAP = 10;
 const BUBBLE_ANCHOR_Y = -(PENGUIN_ORIGIN.y + PENGUIN_FRAME_PADDING_Y) - BUBBLE_GAP;
 
+// Snow hat (#53 D4): a transient 10 s effect on a hit Penguin, never a `Hat`
+// of the Penguin look. Drawn as the design's HUD-SNOWBALL splat mound (a
+// wide ellipse topped by three lumps, `#F4F4F4`), sat on the head: the
+// frame's unpadded top edge, `PENGUIN_ORIGIN.y` above the feet anchor.
+const SNOW_HAT_COLOR = 0xf4f4f4;
+const SNOW_HAT_OUTLINE = 0x0c4b5f;
+const SNOW_HAT_Y = -PENGUIN_ORIGIN.y + 14;
+
 /** Phaser's always-present built-in placeholder texture. */
 const PLACEHOLDER_TEXTURE_KEY = '__DEFAULT';
 
@@ -60,6 +68,10 @@ export interface Penguin {
   setLook(look: PenguinLook): void;
   /** Shows a chat speech bubble above the Penguin's head, or clears it (`null`) (#44). */
   say(text: string | null): void;
+  /** Draws or removes the transient #53 snow hat on the head. */
+  setSnowHat(on: boolean): void;
+  /** Whether the snow hat is drawn right now (the hat child's `visible`). */
+  hasSnowHat(): boolean;
   destroy(): void;
 }
 
@@ -152,7 +164,24 @@ export function createPenguin(
   bubblePill.setVisible(false);
   bubbleText.setVisible(false);
 
-  const container = scene.add.container(x, y, [sprite, pill, nameText, bubblePill, bubbleText]);
+  const snowHat = new GameObjects.Graphics(scene);
+  snowHat.lineStyle(2, SNOW_HAT_OUTLINE, 1);
+  snowHat.fillStyle(SNOW_HAT_COLOR, 1);
+  snowHat.fillEllipse(0, SNOW_HAT_Y, 60, 24);
+  snowHat.strokeEllipse(0, SNOW_HAT_Y, 60, 24);
+  snowHat.fillCircle(-20, SNOW_HAT_Y - 8, 6);
+  snowHat.fillCircle(18, SNOW_HAT_Y - 9, 7);
+  snowHat.fillCircle(0, SNOW_HAT_Y - 14, 5);
+  snowHat.setVisible(false);
+
+  const container = scene.add.container(x, y, [
+    sprite,
+    snowHat,
+    pill,
+    nameText,
+    bubblePill,
+    bubbleText,
+  ]);
 
   function clearPendingListener(): void {
     if (pendingKey !== null && pendingListener !== null) {
@@ -275,6 +304,12 @@ export function createPenguin(
     },
     say(text: string | null) {
       redrawBubble(text);
+    },
+    setSnowHat(on: boolean) {
+      if (!destroyed) snowHat.setVisible(on);
+    },
+    hasSnowHat() {
+      return !destroyed && snowHat.visible;
     },
     destroy() {
       destroyed = true;

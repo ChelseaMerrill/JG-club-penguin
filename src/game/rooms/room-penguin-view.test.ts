@@ -21,6 +21,8 @@ interface ShownPenguin {
   /** How many times `walk` has been called: a re-routed walk must call it once, not restart it per step (#43 D3). */
   walkCalls: number;
   bubble: string | null;
+  /** Whether the #53 snow hat is currently drawn on it. */
+  snowHat: boolean;
 }
 
 /** One `step()` call the fake stage recorded, with a manual resolver. */
@@ -65,6 +67,7 @@ function createFakeStage() {
       setFacingCalls: 0,
       walkCalls: 0,
       bubble: null,
+      snowHat: false,
     };
     placed.push(shown);
 
@@ -127,6 +130,11 @@ function createFakeStage() {
       say: (text) => {
         shown.bubble = text;
       },
+      setSnowHat: (on) => {
+        shown.snowHat = on;
+      },
+      hasSnowHat: () => shown.snowHat,
+      point: () => shown.point,
       destroy: () => {
         interruptPendingStep?.();
         shown.destroyed = true;
@@ -851,5 +859,122 @@ describe('RoomPenguinView', () => {
     view.remove('never-shown');
 
     expect(changes).toEqual([]);
+  });
+
+  describe('snow hats and screen points (#53)', () => {
+    it('setSnowHat draws the snow hat on a shown remote Penguin and hasSnowHat reads it back', () => {
+      const { stage, view } = attachedView();
+      view.upsert(payload({ playerId: 'player-b' }));
+
+      expect(view.setSnowHat('player-b', true)).toBe(true);
+      expect(stage.live()[0].snowHat).toBe(true);
+      expect(view.hasSnowHat('player-b')).toBe(true);
+
+      expect(view.setSnowHat('player-b', false)).toBe(true);
+      expect(stage.live()[0].snowHat).toBe(false);
+      expect(view.hasSnowHat('player-b')).toBe(false);
+    });
+
+    it('setSnowHat is a no-op (returns false) for a Player not shown, and never reaches the local Penguin', () => {
+      const { stage, view } = attachedView();
+      view.showLocal(payload({ playerId: 'player-a', tile: { col: 4, row: 4 } }));
+
+      expect(view.setSnowHat('never-shown', true)).toBe(false);
+      expect(view.setSnowHat('player-a', true)).toBe(false);
+      expect(view.hasSnowHat('never-shown')).toBe(false);
+      expect(stage.live()[0].snowHat).toBe(false);
+    });
+
+    it('a Presence look update keeps the snow hat on the same Penguin', () => {
+      const { stage, view } = attachedView();
+      view.upsert(payload({ playerId: 'player-b' }));
+      view.setSnowHat('player-b', true);
+
+      view.upsert(payload({ playerId: 'player-b', look: { ...PEBBLE, body: '#3A4046' } }));
+
+      expect(stage.placed).toHaveLength(1);
+      expect(view.hasSnowHat('player-b')).toBe(true);
+    });
+
+    it('remove() drops the snow hat: the Player shown again later has none', () => {
+      const { stage, view } = attachedView();
+      view.upsert(payload({ playerId: 'player-b' }));
+      view.setSnowHat('player-b', true);
+
+      view.remove('player-b');
+      view.upsert(payload({ playerId: 'player-b' }));
+
+      expect(stage.live()).toHaveLength(1);
+      expect(stage.live()[0].snowHat).toBe(false);
+      expect(view.hasSnowHat('player-b')).toBe(false);
+    });
+
+    it('clear() drops every snow hat (sign-out)', () => {
+      const { view } = attachedView();
+      view.upsert(payload({ playerId: 'player-b' }));
+      view.setSnowHat('player-b', true);
+
+      view.clear();
+
+      expect(view.hasSnowHat('player-b')).toBe(false);
+      expect(view.shownRemoteIds()).toEqual([]);
+    });
+
+    it('a Room change (detach, then attach) never carries a snow hat into the next Room', () => {
+      const { view } = attachedView();
+      view.upsert(payload({ playerId: 'player-b' }));
+      view.setSnowHat('player-b', true);
+
+      view.detach();
+      expect(view.hasSnowHat('player-b')).toBe(false);
+
+      const nextStage = createFakeStage();
+      view.attach(nextStage.place, OTHER_ORIGIN, FULLY_WALKABLE);
+
+      expect(nextStage.live()).toHaveLength(1);
+      expect(nextStage.live()[0].snowHat).toBe(false);
+      expect(view.hasSnowHat('player-b')).toBe(false);
+    });
+
+    it('clearSnowHats() takes the snow hat off every shown remote Penguin', () => {
+      const { stage, view } = attachedView();
+      view.upsert(payload({ playerId: 'player-b' }));
+      view.upsert(payload({ playerId: 'player-c', tile: { col: 1, row: 1 } }));
+      view.setSnowHat('player-b', true);
+      view.setSnowHat('player-c', true);
+
+      view.clearSnowHats();
+
+      expect(stage.live().map((p) => p.snowHat)).toEqual([false, false]);
+    });
+
+    it('shownRemoteIds lists only the remote Players currently placed, never the local Penguin', () => {
+      const { view } = attachedView();
+      view.showLocal(payload({ playerId: 'player-a', tile: { col: 4, row: 4 } }));
+      view.upsert(payload({ playerId: 'player-b' }));
+      view.upsert(payload({ playerId: 'player-c', tile: { col: 1, row: 1 } }));
+
+      expect([...view.shownRemoteIds()].sort()).toEqual(['player-b', 'player-c']);
+
+      view.detach();
+      expect(view.shownRemoteIds()).toEqual([]);
+    });
+
+    it("pointOf reads the placed Penguin's current screen point, following a walk step by step", async () => {
+      const { stage, view } = attachedView();
+      view.showLocal(payload({ playerId: 'player-a', tile: { col: 4, row: 4 } }));
+      view.upsert(payload({ playerId: 'player-b', tile: { col: 3, row: 5 } }));
+
+      // Tile {3,5}'s centre, as the first test in this file works out.
+      expect(view.pointOf('player-b')).toEqual({ x: 700, y: 475 });
+      expect(view.pointOf('player-a')).toBeNull();
+      expect(view.pointOf('never-shown')).toBeNull();
+
+      view.walkTo('player-b', { col: 4, row: 5 });
+      await stage.resolveNextStep();
+
+      // Tile {4,5}: north corner (800 + (4-5)*50, 250 + 9*25) = (750, 475), centre 25px lower.
+      expect(view.pointOf('player-b')).toEqual({ x: 750, y: 500 });
+    });
   });
 });

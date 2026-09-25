@@ -639,6 +639,83 @@ body {
   color: var(--fg-primary);
 }
 
+/* SNOWBALL (#53, design HUD-SNOWBALL): white while Snowball mode is on. */
+.hud__button--snowball.hud__button--active {
+  background: var(--jg-light);
+  color: var(--jg-dark);
+}
+
+/* Snowball mode's bottom-centre panel (#53, design HUD-SNOWBALL). Read-only:
+   `pointer-events: none` so it never swallows a throw click on the canvas
+   underneath (v4 change 9); the reticle's cursor hint is drawn in Phaser. */
+.hud__snowball-panel {
+  position: absolute;
+  left: 50%;
+  bottom: 100px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 12px 20px;
+  background: rgba(var(--jg-dark-rgb), 0.94);
+  border: 3px solid var(--jg-secondary);
+  box-shadow: 0 8px 0 var(--jg-secondary);
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.hud__snowball-panel[hidden] {
+  display: none;
+}
+
+.hud__snowball-title {
+  font-family: var(--font-game-display);
+  font-size: 22px;
+  line-height: 1;
+  color: var(--jg-primary);
+  -webkit-text-stroke: 4px var(--jg-secondary);
+  paint-order: stroke fill;
+}
+
+.hud__snowball-ammo,
+.hud__snowball-pips {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hud__snowball-pip {
+  width: 22px;
+  height: 22px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  background: transparent;
+  border: 2px solid var(--jg-dark-2);
+}
+
+.hud__snowball-pip--full {
+  background: var(--jg-light);
+  border-color: var(--jg-light);
+}
+
+.hud__snowball-ammo-text {
+  margin-left: 6px;
+  font: 400 12px var(--font-display);
+  letter-spacing: 0.16em;
+  color: var(--jg-inactive);
+}
+
+.hud__snowball-divider {
+  width: 2px;
+  height: 28px;
+  background: var(--jg-secondary);
+}
+
+.hud__snowball-hint {
+  font: 700 13px var(--font-body);
+  color: var(--fg-primary);
+}
+
 /* Debug overlay (stand-in for #15/#33/#35), mounted only under `?debug`.
    Stage pixels: on the left, below the HUD's Room title block and above its
    bottom bar (which starts at 900 - 28 - 52 = 820px), so it never sits under

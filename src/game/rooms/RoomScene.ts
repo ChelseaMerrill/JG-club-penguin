@@ -40,6 +40,8 @@ import {
 import { getRoomDefinition, hasRoomDefinition } from './registry';
 import type { RoomDefinition, RoomDoor, RoomHotspot, RoomNpcSlot } from './room-definition';
 import { RoomPenguinView, type PlacePenguin } from './room-penguin-view';
+import type { SnowballView } from '../../snowball/snowball-controller';
+import { arcPoint, clampTileToGrid, type ScreenPoint } from '../../snowball/snowball-rules';
 
 export const ROOM_SCENE_KEY = 'RoomScene';
 
@@ -67,6 +69,18 @@ export const LOCAL_PENGUIN_ARRIVED_EVENT = 'local-penguin:arrived';
  * "coming soon" handling for that case.
  */
 export const DOOR_REACHED_EVENT = 'door:reached';
+
+/**
+ * Scene-local event (#53, not a contract event): a left-click while aiming
+ * in Snowball mode, at the reticle's (grid-clamped) Tile. `main.ts` answers
+ * it with the snowball controller's `throwAt(target)`. Attach once, like the
+ * other scene-local events: `this.events` survives every restart.
+ */
+export const SNOWBALL_THROW_EVENT = 'snowball:aim-throw';
+
+export interface SnowballThrowRequestEvent {
+  target: Tile;
+}
 
 export interface LocalPenguinMoveEvent {
   target: Tile;
@@ -129,6 +143,23 @@ const DOOR_HINT_STROKE_THICKNESS = 4;
 const DOOR_HINT_TEXT = 'COMING SOON';
 /** How long the "coming soon" hint stays up (#15 D3). */
 export const DOOR_HINT_DURATION_MS = 2000;
+
+// Snowball mode (#53), after `design/Club JenGuin HUD Menus.dc.html`'s
+// HUD-SNOWBALL screen: cyan reticle ellipse + ticks on the aimed Tile, a
+// dashed white preview arc from the local Penguin, and the cursor hint under
+// the reticle. Drawn above every Room object and Penguin (tile depths top
+// out near 10^4).
+const SNOWBALL_DEPTH = 1_000_000;
+const SNOWBALL_CYAN = 0x00bdff;
+const SNOWBALL_WHITE = 0xf4f4f4;
+const SNOWBALL_OUTLINE = 0x0c4b5f;
+/** Arcs start at chest height, this far above the feet point every `SnowballView` point is. */
+const SNOWBALL_CHEST_OFFSET_Y = 60;
+const SNOWBALL_PREVIEW_SEGMENTS = 28;
+/** How long a splat stays up before it has faded out (#53 D2: ~400 ms). */
+const SNOWBALL_SPLAT_MS = 400;
+const SNOWBALL_HINT_TEXT = 'CLICK TO THROW · RIGHT-CLICK TO CANCEL';
+const SNOWBALL_HINT_OFFSET_Y = 56;
 
 const NPC_RADIUS = 18;
 const NPC_COLOR = 0x00bdff;
@@ -238,12 +269,58 @@ export class RoomScene extends Scene {
     timer: Time.TimerEvent;
   } | null = null;
 
+  // --- Snowball mode (#53) -- all reset by `init()`/`cleanup()`, since this
+  // instance survives every `scene.restart()` (v4 change 10).
+  /** True between `create()` and SHUTDOWN: `snowball` view calls are no-ops otherwise. */
+  private live = false;
+  private aiming = false;
+  /** The aimed Tile, or `null` while not aiming, before the first pointer move, or after a right-click cancel. */
+  private reticleTile: Tile | null = null;
+  private reticleGraphics: GameObjects.Graphics | null = null;
+  private reticleHint: GameObjects.Text | null = null;
+  private readonly snowballArcs = new Map<
+    string,
+    { ball: GameObjects.Arc; tween: Tweens.Tween; to: ScreenPoint }
+  >();
+  private readonly snowballSplats = new Map<string, GameObjects.Graphics>();
+
+  /**
+   * The #53 `SnowballView` the snowball controller draws through: the local
+   * Penguin is this scene's own, remote Penguins are `penguins`'. Every call
+   * is a no-op while the scene is not running (mid-restart or shut down).
+   */
+  readonly snowball: SnowballView = {
+    localPoint: () => this.localFeetPoint(),
+    remotePoint: (playerId) => (this.live ? this.penguins.pointOf(playerId) : null),
+    shownRemoteIds: () => (this.live ? this.penguins.shownRemoteIds() : []),
+    tileToPoint: (tile) => (this.room ? tileToScreen(tile, this.room.grid.origin) : { x: 0, y: 0 }),
+    drawArc: (throwId, from, to, durationMs) => this.drawSnowballArc(throwId, from, to, durationMs),
+    showSplat: (throwId, point) => this.showSnowballSplat(throwId, point),
+    setRemoteSnowHat: (playerId, on) => {
+      if (this.live) this.penguins.setSnowHat(playerId, on);
+    },
+    setLocalSnowHat: (on) => {
+      if (this.live) this.penguin?.setSnowHat(on);
+    },
+  };
+
   /** A stable reference so `cleanup` can `off` exactly what `create` `on`'d. */
   private readonly handlePointerDown = (
     pointer: Input.Pointer,
     currentlyOver: GameObjects.GameObject[],
   ): void => {
     this.onPointerDown(pointer, currentlyOver);
+  };
+
+  /** Moves the Snowball reticle with the pointer while aiming (#53). */
+  private readonly handlePointerMove = (pointer: Input.Pointer): void => {
+    if (!this.aiming) return;
+    this.aimAt(pointer);
+  };
+
+  /** Right-click cancels the aim rather than opening the browser menu, only while aiming (#53 D6). */
+  private readonly handleContextMenu = (event: Event): void => {
+    if (this.aiming) event.preventDefault();
   };
 
   /**
@@ -266,6 +343,9 @@ export class RoomScene extends Scene {
   /** A stable reference so a scene restart's fresh `create()` re-registers cleanly. */
   private readonly cleanup = (): void => {
     this.input.off('pointerdown', this.handlePointerDown);
+    this.input.off('pointermove', this.handlePointerMove);
+    this.game.canvas?.removeEventListener('contextmenu', this.handleContextMenu);
+    this.resetSnowballState();
     this.registry.events.off(Data.Events.SET_DATA, this.handleRegistrySetData);
     this.registry.events.off(
       Data.Events.CHANGE_DATA_KEY + PLAYER_REGISTRY_KEY,
@@ -309,6 +389,7 @@ export class RoomScene extends Scene {
     this.localPenguinMoveLog = [];
     this.localPenguinArrivedLog = [];
     this.debugPenguins = [];
+    this.resetSnowballState();
   }
 
   /** Resolves once the first `create()` has run. */
@@ -423,6 +504,21 @@ export class RoomScene extends Scene {
     this.spawnLocalPenguin(room);
 
     this.input.on('pointerdown', this.handlePointerDown);
+    this.input.on('pointermove', this.handlePointerMove);
+    this.game.canvas?.addEventListener('contextmenu', this.handleContextMenu);
+    this.reticleGraphics = this.add.graphics().setDepth(SNOWBALL_DEPTH).setVisible(false);
+    this.reticleHint = this.add
+      .text(0, 0, SNOWBALL_HINT_TEXT, {
+        fontFamily: "'Anton', sans-serif",
+        fontSize: '12px',
+        color: '#00BDFF',
+        backgroundColor: 'rgba(22,23,25,0.92)',
+        padding: { x: 14, y: 8 },
+      })
+      .setLetterSpacing(2)
+      .setOrigin(0.5, 0)
+      .setDepth(SNOWBALL_DEPTH)
+      .setVisible(false);
     this.registry.events.on(Data.Events.SET_DATA, this.handleRegistrySetData);
     this.registry.events.on(
       Data.Events.CHANGE_DATA_KEY + PLAYER_REGISTRY_KEY,
@@ -436,11 +532,15 @@ export class RoomScene extends Scene {
     this.penguins.attach(placePenguinsIn(this), room.grid.origin, room.walkable);
     this.events.once(Scenes.Events.SHUTDOWN, () => this.penguins.detach());
 
+    this.live = true;
     if (HOOKS_ENABLED) this.publishRoomDebug();
     this.resolveReady();
   }
 
   update(): void {
+    // The local Penguin may still be finishing a walk when aiming starts:
+    // keep the preview arc anchored to where it is drawn.
+    if (this.aiming && this.reticleTile) this.drawReticle();
     if (HOOKS_ENABLED) this.publishRoomDebug();
   }
 
@@ -511,6 +611,160 @@ export class RoomScene extends Scene {
     return true;
   }
 
+  // --- Snowball mode (#53) ---------------------------------------------------
+
+  /**
+   * Turns aiming on or off (#53 D6). While on, clicks throw instead of
+   * moving; the reticle appears on the next pointer move. Off hides the
+   * reticle, preview arc and cursor hint. `init()` resets it to off, so a
+   * Room change always starts outside the mode.
+   */
+  setAiming(on: boolean): void {
+    this.aiming = on;
+    if (!on) this.cancelAim();
+  }
+
+  /** The aimed Tile, or `null` (not aiming, not yet moved, or cancelled): `window.__snowballDebug.reticle`. */
+  snowballReticle(): Tile | null {
+    return this.reticleTile;
+  }
+
+  /** Whether the local Penguin is drawing its snow hat right now (`__snowballDebug.snowHats[own].rendered`). */
+  localHasSnowHat(): boolean {
+    return this.live && (this.penguin?.hasSnowHat() ?? false);
+  }
+
+  private localFeetPoint(): ScreenPoint {
+    const container = this.penguin?.container;
+    return container ? { x: container.x, y: container.y } : { x: 0, y: 0 };
+  }
+
+  /** Snaps the reticle to the pointer's Tile, clamped to the Room grid (walkability not required, #53 D8). */
+  private aimAt(pointer: Input.Pointer): Tile | null {
+    const room = this.room;
+    if (!room) return null;
+    const hovered = screenToTile({ x: pointer.x, y: pointer.y }, room.grid.origin);
+    this.reticleTile = clampTileToGrid(hovered, room.grid);
+    this.drawReticle();
+    return this.reticleTile;
+  }
+
+  private cancelAim(): void {
+    this.reticleTile = null;
+    this.reticleGraphics?.clear().setVisible(false);
+    this.reticleHint?.setVisible(false);
+  }
+
+  private drawReticle(): void {
+    const room = this.room;
+    const graphics = this.reticleGraphics;
+    const tile = this.reticleTile;
+    if (!room || !graphics || !tile) return;
+    const at = tileToScreen(tile, room.grid.origin);
+    const feet = this.localFeetPoint();
+    const from = { x: feet.x, y: feet.y - SNOWBALL_CHEST_OFFSET_Y };
+
+    graphics.clear().setVisible(true);
+    // Dashed preview arc: every other segment of the same Bezier a throw flies.
+    graphics.lineStyle(3, SNOWBALL_WHITE, 0.9);
+    for (let i = 0; i < SNOWBALL_PREVIEW_SEGMENTS; i += 2) {
+      const a = arcPoint(from, at, i / SNOWBALL_PREVIEW_SEGMENTS);
+      const b = arcPoint(from, at, (i + 1) / SNOWBALL_PREVIEW_SEGMENTS);
+      graphics.lineBetween(a.x, a.y, b.x, b.y);
+    }
+    graphics.fillStyle(SNOWBALL_WHITE, 1);
+    graphics.fillCircle(from.x, from.y, 6);
+    // Reticle: outer ring, soft inner fill, four ticks.
+    graphics.lineStyle(3, SNOWBALL_CYAN, 1);
+    graphics.strokeEllipse(at.x, at.y, 92, 46);
+    graphics.fillStyle(SNOWBALL_CYAN, 0.35);
+    graphics.fillEllipse(at.x, at.y, 44, 22);
+    graphics.lineBetween(at.x, at.y - 34, at.x, at.y - 48);
+    graphics.lineBetween(at.x, at.y + 34, at.x, at.y + 48);
+    graphics.lineBetween(at.x - 54, at.y, at.x - 68, at.y);
+    graphics.lineBetween(at.x + 54, at.y, at.x + 68, at.y);
+
+    const hint = this.reticleHint;
+    if (hint) {
+      hint.setPosition(at.x, at.y + SNOWBALL_HINT_OFFSET_Y).setVisible(true);
+      graphics.lineStyle(2, SNOWBALL_CYAN, 1);
+      graphics.strokeRect(hint.x - hint.width / 2, hint.y, hint.width, hint.height);
+    }
+  }
+
+  /** A thrown snowball flying `from` (a feet point; drawn from chest height) to `to` over `durationMs` (#53 D2). */
+  private drawSnowballArc(
+    throwId: string,
+    from: ScreenPoint,
+    to: ScreenPoint,
+    durationMs: number,
+  ): void {
+    if (!this.live) return;
+    this.stopSnowballArc(throwId);
+    const start = { x: from.x, y: from.y - SNOWBALL_CHEST_OFFSET_Y };
+    const ball = this.add
+      .circle(start.x, start.y, 9, SNOWBALL_WHITE)
+      .setStrokeStyle(2, SNOWBALL_OUTLINE)
+      .setDepth(SNOWBALL_DEPTH);
+    const tween = this.tweens.addCounter({
+      from: 0,
+      to: 1,
+      duration: durationMs,
+      onUpdate: (counter: Tweens.Tween) => {
+        const point = arcPoint(start, to, counter.getValue() ?? 0);
+        ball.setPosition(point.x, point.y);
+      },
+      onComplete: () => {
+        // Landing always shows a splat, on every screen watching the throw.
+        this.showSnowballSplat(throwId, to);
+      },
+    });
+    this.snowballArcs.set(throwId, { ball, tween, to });
+  }
+
+  private stopSnowballArc(throwId: string): void {
+    const arc = this.snowballArcs.get(throwId);
+    if (!arc) return;
+    this.snowballArcs.delete(throwId);
+    arc.tween.stop();
+    arc.ball.destroy();
+  }
+
+  /** Cuts `throwId`'s arc (if still flying) to one splat at `point`, replacing any splat it already showed. */
+  private showSnowballSplat(throwId: string, point: ScreenPoint): void {
+    if (!this.live) return;
+    this.stopSnowballArc(throwId);
+    this.snowballSplats.get(throwId)?.destroy();
+    const splat = this.add.graphics().setDepth(SNOWBALL_DEPTH);
+    splat.fillStyle(SNOWBALL_WHITE, 1);
+    splat.fillEllipse(point.x, point.y, 60, 24);
+    splat.fillCircle(point.x - 20, point.y - 8, 6);
+    splat.fillCircle(point.x + 18, point.y - 9, 7);
+    splat.fillCircle(point.x, point.y - 14, 5);
+    this.snowballSplats.set(throwId, splat);
+    this.tweens.add({
+      targets: splat,
+      alpha: 0,
+      duration: SNOWBALL_SPLAT_MS,
+      onComplete: () => {
+        splat.destroy();
+        if (this.snowballSplats.get(throwId) === splat) this.snowballSplats.delete(throwId);
+      },
+    });
+  }
+
+  /** Drops every snowball effect and aim (#53 v4 change 10). Phaser destroys the objects themselves on shutdown. */
+  private resetSnowballState(): void {
+    this.live = false;
+    this.aiming = false;
+    this.reticleTile = null;
+    this.reticleGraphics = null;
+    this.reticleHint = null;
+    for (const arc of this.snowballArcs.values()) arc.tween.stop();
+    this.snowballArcs.clear();
+    this.snowballSplats.clear();
+  }
+
   private spawnLocalPenguin(room: RoomDefinition): void {
     const registered = this.registry.get(PLAYER_REGISTRY_KEY) as RegisteredPlayer | undefined;
     const look = resolveRegisteredLook(registered);
@@ -546,6 +800,25 @@ export class RoomScene extends Scene {
   private onPointerDown(pointer: Input.Pointer, currentlyOver: GameObjects.GameObject[]): void {
     const room = this.room;
     if (!room) return;
+
+    // #53 D8: a right-click while aiming cancels the aim (the reticle and
+    // preview hide until the next pointer move) but keeps the mode on;
+    // nothing is thrown or moved. Outside the mode it keeps today's behaviour.
+    if (pointer.button === 2 && this.aiming) {
+      this.cancelAim();
+      return;
+    }
+
+    // #53 v4 change 2: while aiming, every click throws at the reticle Tile;
+    // NPC, door, hotspot and tile clicks are all suppressed.
+    if (this.aiming) {
+      const target = this.aimAt(pointer);
+      if (target) {
+        const event: SnowballThrowRequestEvent = { target };
+        this.events.emit(SNOWBALL_THROW_EVENT, event);
+      }
+      return;
+    }
 
     const npcHit = this.npcHitAreas.find((hit) => currentlyOver.includes(hit.object));
     if (npcHit) {
@@ -1006,6 +1279,9 @@ function placePenguinsIn(scene: Scene): PlacePenguin {
         });
       },
       say: (text) => penguin.say(text),
+      setSnowHat: (on) => penguin.setSnowHat(on),
+      hasSnowHat: () => penguin.hasSnowHat(),
+      point: () => ({ x: penguin.container.x, y: penguin.container.y }),
       destroy: () => {
         stopActiveStep();
         penguin.destroy();
