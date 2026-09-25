@@ -215,6 +215,12 @@ test('click-to-move', async ({ page }) => {
   await clickStagePoint(page, tileToScreen(westOfCurrent, origin));
   await expect.poll(async () => (await debugInfo(page))?.localPenguin?.facing).toBe('left');
   expect((await debugInfo(page))?.localPenguin?.flipX).toBe(true);
+  // #147 review fix: the actually-displayed texture key (not just the
+  // requested `facing`/`flipX`) ends up on the left-facing (counter-mirrored
+  // lettering) texture set too, once it's decoded.
+  await expect
+    .poll(async () => (await debugInfo(page))?.localPenguin?.textureKey)
+    .toMatch(/:left$/);
   await expect
     .poll(async () => (await debugInfo(page))?.localPenguin?.moving, { timeout: LONG_WALK_TIMEOUT })
     .toBe(false);
