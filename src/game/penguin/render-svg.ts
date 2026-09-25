@@ -12,7 +12,7 @@ import {
   SNORKEL_MASK,
   STROKE,
 } from './palette';
-import { type PenguinPose, resolvePenguinFramePose } from './poses';
+import { type PenguinFramePose, type PenguinPose, resolvePenguinFramePose } from './poses';
 import { PENGUIN_TEXT_PATHS } from './text-paths';
 
 /**
@@ -325,6 +325,46 @@ function renderPattern(
   }
 }
 
+/**
+ * The held prop for one of #47's four Emote-only poses (`resolvePenguinFramePose`'s
+ * `prop` field), or `''` for every other pose. Pure `<path>`/`<circle>`/`<line>`/
+ * `<polygon>` shapes only, positioned near the figure rather than inside its
+ * rotated arm groups (simpler than tracking each arm's rotated tip, and
+ * still reads as "held"); never `<text>` (render-svg.test.ts's "never draws
+ * a <text> element" check, #62 D3, covers every `PENGUIN_ANIMS` frame,
+ * including these).
+ *
+ * - THUMBS_UP reuses the picker icon's own thumb outline
+ *   (`design/Club JenGuin HUD Menus.dc.html`'s HUD-EMOTE THUMBS UP tile),
+ *   scaled down near the raised right shoulder.
+ * - BRB has no picker icon beyond its own lettered tile; a small clock face
+ *   reads "be right back" without needing a baked text outline.
+ * - JG_FLASH reuses the JG LOGO belly pattern's own hex + `PENGUIN_TEXT_PATHS.jgLogo`
+ *   path (`renderPattern`'s 'JG LOGO' case), flashed in front of the chest
+ *   with radiating burst lines that blink out on the pose's second frame.
+ * - SHIP_IT reuses the picker icon's own hull-and-sail outline, near the
+ *   Penguin's lowered right flipper, as if just launched.
+ */
+function renderProp(prop: PenguinFramePose['prop'], flashBurst: boolean): string {
+  switch (prop) {
+    case 'THUMBS_UP':
+      return `<g transform="translate(78 10) scale(0.9)"><path d="M9 17 h5 v11 h-5 z M14 18 l5 -11 c3 0 4 2 3 5 l-1 4 h7 c2 0 3 2 2 4 l-2 7 c0 1 -1 2 -3 2 h-11" fill="${STROKE}"></path></g>`;
+    case 'BRB':
+      return `<g transform="translate(18 26)"><circle r="9" fill="${SEAT_FILL}" stroke="${STROKE}" stroke-width="2"></circle><path d="M0 -5 V0 L4 3" fill="none" stroke="${STROKE}" stroke-width="2" stroke-linecap="round"></path></g>`;
+    case 'JG_FLASH': {
+      const burst = flashBurst
+        ? `<g stroke="${ACCENT}" stroke-width="2" stroke-linecap="round"><line x1="60" y1="55" x2="60" y2="47"></line><line x1="38" y1="68" x2="30" y2="62"></line><line x1="82" y1="68" x2="90" y2="62"></line><line x1="38" y1="92" x2="30" y2="98"></line><line x1="82" y1="92" x2="90" y2="98"></line></g>`
+        : '';
+      return `<g>${burst}<polygon points="60,64 74,72 74,88 60,96 46,88 46,72" fill="${STROKE}"></polygon><path d="${PENGUIN_TEXT_PATHS.jgLogo.d}" fill="${PENGUIN_TEXT_PATHS.jgLogo.fill}"></path></g>`;
+    }
+    case 'SHIP_IT':
+      return `<g transform="translate(70 90)"><path d="M8 22 h24 l-4 6 h-16 z M14 22 v-9 h8 v9 M22 13 l8 4" fill="none" stroke="${STROKE}" stroke-width="3" stroke-linejoin="round"></path></g>`;
+    case null:
+    default:
+      return '';
+  }
+}
+
 function renderEyes(
   eyes: Eyes,
   forceSleepy: boolean,
@@ -448,6 +488,10 @@ export function renderPenguinSvgWithColors(
     ? `<path d="${PENGUIN_TEXT_PATHS.haha.d}" fill="${PENGUIN_TEXT_PATHS.haha.fill}"></path>`
     : '';
 
+  // A #47 Emote pose's held prop, painted after (outside) the figure's
+  // rotate/translate group, same reasoning as `seat` above.
+  const prop = renderProp(framePose.prop, framePose.flashBurst);
+
   const figure = [
     `<g transform="${bodyTransform}">`,
     `<defs><clipPath id="${clipId}"><path d="M60 40 C46 40 38 62 38 84 C38 102 48 112 60 112 C72 112 82 102 82 84 C82 62 74 40 60 40 Z"></path></clipPath></defs>`,
@@ -464,6 +508,7 @@ export function renderPenguinSvgWithColors(
     haha,
     `</g>`,
     seat,
+    prop,
   ].join('');
 
   const minX = -PENGUIN_FRAME_PADDING_X;

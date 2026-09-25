@@ -33,7 +33,20 @@ export interface MinigameStatsMap {
      *  producer: #39. Additive to the original #26 shape. */
     bestStreak: number;
   };
-  'coffee-rush': Record<string, number>;
+  /** #50's done-screen fields: `small`/`medium`/`large` are cups served
+   *  correctly for that order size (their sum is the round's score and
+   *  `MINIGAME_RULES['coffee-rush'].rawBest`); `perfect` is how many of
+   *  those were within the tight fill-line tolerance; `spilled` is cups
+   *  lost to an overfill (release or force-spill); `lost` is orders that
+   *  walked out from a drained patience bar. Producer: #50. */
+  'coffee-rush': {
+    small: number;
+    medium: number;
+    large: number;
+    perfect: number;
+    spilled: number;
+    lost: number;
+  };
   /** #49's done-screen fields: `cone5`/`cone10`/`cone15`/`cone25` are
    *  normal-time cones served by size (1-4 scoops); `rushCone5` through
    *  `rushCone25` are the same, served during rush hour (paid double).

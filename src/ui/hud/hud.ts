@@ -1,4 +1,11 @@
-import { CHAT_TEXT_MAX, gameEvents, SPAWN_ROOM_ID, type RoomId } from '../../contracts';
+import {
+  CHAT_TEXT_MAX,
+  gameEvents,
+  SPAWN_ROOM_ID,
+  type EmoteId,
+  type RoomId,
+} from '../../contracts';
+import { createEmotePicker, EMOTE_OVERLAY_ID } from './emote-picker';
 import { createOverlayManager, type OverlayManager } from './overlay-manager';
 
 /** A Room's HUD header text: the big title and the small subtitle beneath it. */
@@ -25,6 +32,8 @@ export interface HudDeps {
    * `false` (e.g. rate-limited).
    */
   onChatSend: (text: string) => Promise<boolean>;
+  /** Plays `emoteId` on the local Penguin and best-effort broadcasts it to the Room (#47). */
+  onEmotePick: (emoteId: EmoteId) => void;
   /**
    * Asks to enter (`true`) or leave (`false`) Snowball mode (#53). The HUD
    * never flips its own mode: the caller decides, then reports the outcome
@@ -194,7 +203,15 @@ export function createHud(layer: HTMLElement, deps: HudDeps): Hud {
   emoteButton.type = 'button';
   emoteButton.className = 'hud__button hud__button--bottom hud__button--emote';
   emoteButton.textContent = 'EMOTE';
-  emoteButton.hidden = true;
+  emoteButton.addEventListener('click', () => {
+    // Closing MENU first keeps one overlay open at a time (#32 D6); the
+    // picker itself also registers with `overlays`, so opening it closes
+    // MENU too, but MENU's own panel needs its direct `closeMenu()` call
+    // (matching PENGUIN/MAP's existing style above).
+    overlays.close(MENU_OVERLAY_ID);
+    closeMenu();
+    emotePicker.toggle();
+  });
 
   const snowballButton = document.createElement('button');
   snowballButton.type = 'button';
@@ -315,6 +332,11 @@ export function createHud(layer: HTMLElement, deps: HudDeps): Hud {
   root.append(titleBlock, topRight, questSlot, menuPanel, snowballPanel, bottomBar, toastEl);
   layer.append(root);
 
+  const emotePicker = createEmotePicker(root, {
+    overlays,
+    onPick: (emoteId) => deps.onEmotePick(emoteId),
+  });
+
   function setBalance(balance: number): void {
     tokensValue.textContent = balance.toLocaleString('en-US');
   }
@@ -352,6 +374,7 @@ export function createHud(layer: HTMLElement, deps: HudDeps): Hud {
       root.hidden = true;
       overlays.close(MENU_OVERLAY_ID);
       closeMenu();
+      overlays.close(EMOTE_OVERLAY_ID);
     },
     destroy() {
       unsubscribeRoomEnter();
@@ -359,6 +382,7 @@ export function createHud(layer: HTMLElement, deps: HudDeps): Hud {
       unsubscribeToast();
       if (toastTimer !== null) clearTimeout(toastTimer);
       overlays.destroy();
+      emotePicker.destroy();
       root.remove();
     },
   };

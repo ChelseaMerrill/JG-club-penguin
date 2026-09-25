@@ -17,6 +17,7 @@ import {
   EYES,
   HATS,
   IDLE_EMOTES,
+  isEmoteId,
   isHexColor,
   PATTERNS,
   PENGUIN_NAME_MAX,
@@ -285,6 +286,13 @@ const BROADCAST_PARSERS: {
     if (text.length < 1 || text.length > CHAT_TEXT_MAX) return null;
     if (!isValidSentAt(p.sentAt)) return null;
     return { playerId: p.playerId, text, sentAt: p.sentAt };
+  },
+  emote(u) {
+    if (typeof u !== 'object' || u === null) return null;
+    const p = u as Record<string, unknown>;
+    if (!isValidPlayerId(p.playerId)) return null;
+    if (!isEmoteId(p.emoteId)) return null;
+    return { playerId: p.playerId, emoteId: p.emoteId };
   },
   'presence:hello': parsePresencePayload,
   'presence:bye'(u) {

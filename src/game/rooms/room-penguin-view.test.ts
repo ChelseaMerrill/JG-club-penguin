@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_LOOK, type Facing, type PenguinLook, type PresencePayload } from '../../contracts';
 import { MASKED_NAME } from '../../ui/mask-names';
+import type { PenguinAnim } from '../penguin';
 import type { WalkableGrid } from '../movement/pathfinding';
 import { TILE_STEP_MS } from '../movement/speed';
 import type { ScreenPoint } from './iso';
@@ -21,6 +22,8 @@ interface ShownPenguin {
   /** How many times `walk` has been called: a re-routed walk must call it once, not restart it per step (#43 D3). */
   walkCalls: number;
   bubble: string | null;
+  /** The last anim `play()` was called with (#47), or `null` until the first call. */
+  played: PenguinAnim | null;
   /** Whether the #53 snow hat is currently drawn on it. */
   snowHat: boolean;
 }
@@ -68,6 +71,7 @@ function createFakeStage() {
       walkCalls: 0,
       bubble: null,
       snowHat: false,
+      played: null,
     };
     placed.push(shown);
 
@@ -129,6 +133,9 @@ function createFakeStage() {
       },
       say: (text) => {
         shown.bubble = text;
+      },
+      play: (anim) => {
+        shown.played = anim;
       },
       setSnowHat: (on) => {
         shown.snowHat = on;
@@ -263,6 +270,7 @@ describe('RoomPenguinView', () => {
         facing: 'left',
         destroyed: false,
         bubble: null,
+        played: null,
       },
     ]);
   });
@@ -284,6 +292,7 @@ describe('RoomPenguinView', () => {
         facing: 'left',
         destroyed: false,
         bubble: null,
+        played: null,
       },
     ]);
   });
@@ -794,6 +803,32 @@ describe('RoomPenguinView', () => {
     const { view } = attachedView();
 
     expect(view.sayLocal('hi')).toBe(false);
+  });
+
+  it("plays (and clears back to the look's idle emote) an Emote pose above a shown remote Penguin, ignoring a Player not shown (#47)", () => {
+    const { stage, view } = attachedView();
+    view.upsert(payload({ playerId: 'player-b', look: { ...PEBBLE, emote: 'DANCE' } }));
+
+    expect(view.playEmote('player-b', 'WAVE')).toBe(true);
+    expect(view.playEmote('never-shown', 'WAVE')).toBe(false);
+
+    expect(stage.live()[0]!.played).toBe('WAVE');
+
+    expect(view.playEmote('player-b', null)).toBe(true);
+
+    // Clears through `idle()`, which returns to the look's own idle emote (#43).
+    expect(stage.live()[0]!.anim).toBe('idle');
+  });
+
+  it('clears an Emote back to the walk animation while the remote Penguin is still walking (#43, #47)', () => {
+    const { stage, view } = attachedView();
+    view.upsert(payload({ tile: { col: 5, row: 5 } }));
+    view.walkTo('player-b', { col: 5, row: 8 });
+
+    view.playEmote('player-b', 'WAVE');
+    expect(view.playEmote('player-b', null)).toBe(true);
+
+    expect(stage.live()[0]!.anim).toBe('walk');
   });
 
   it('notifies onBubbleChange(playerId, null) when a remote Penguin is removed (#44 review fix F1)', () => {

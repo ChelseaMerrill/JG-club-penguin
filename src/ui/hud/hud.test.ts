@@ -15,17 +15,19 @@ function setup(overrides: Partial<HudDeps> = {}) {
     subtitle: `subtitle-${roomId}`,
   }));
   const onChatSend = vi.fn(() => Promise.resolve(true));
+  const onEmotePick = vi.fn();
   const deps: HudDeps = {
     resolveRoomTitle,
     onIgloo,
     onSignOut,
     initialBalance: 0,
     onChatSend,
+    onEmotePick,
     ...overrides,
   };
   const hud = createHud(root, deps);
   currentHud = hud;
-  return { root, hud, onIgloo, onSignOut, resolveRoomTitle, onChatSend };
+  return { root, hud, onIgloo, onSignOut, resolveRoomTitle, onChatSend, onEmotePick };
 }
 
 beforeEach(() => {
@@ -173,12 +175,68 @@ describe('createHud', () => {
     expect((root.querySelector('.hud__menu-panel') as HTMLElement).hidden).toBe(true);
   });
 
-  it('EMOTE and QUESTS render hidden; the SNOWBALL button is shown (#53)', () => {
+  it('EMOTE (#47) and SNOWBALL (#53) are shown; QUESTS renders hidden', () => {
     const { root } = setup();
 
-    expect((root.querySelector('.hud__button--emote') as HTMLElement).hidden).toBe(true);
+    expect((root.querySelector('.hud__button--emote') as HTMLElement).hidden).toBe(false);
     expect((root.querySelector('.hud__button--snowball') as HTMLElement).hidden).toBe(false);
     expect((root.querySelector('.hud__button--quests') as HTMLElement).hidden).toBe(true);
+  });
+
+  it('EMOTE opens the picker, closing an open MENU first (#47)', () => {
+    const { root, hud } = setup();
+    const menuPanel = () => root.querySelector('.hud__menu-panel') as HTMLElement;
+    const picker = () => root.querySelector('.emote-picker') as HTMLElement;
+
+    (root.querySelector('.hud__button--menu') as HTMLButtonElement).click();
+    expect(menuPanel().hidden).toBe(false);
+
+    (root.querySelector('.hud__button--emote') as HTMLButtonElement).click();
+
+    expect(menuPanel().hidden).toBe(true);
+    expect(picker().hidden).toBe(false);
+    expect(hud.overlays.current()).toBe('emote');
+  });
+
+  it('EMOTE again closes the picker', () => {
+    const { root } = setup();
+    const picker = () => root.querySelector('.emote-picker') as HTMLElement;
+
+    (root.querySelector('.hud__button--emote') as HTMLButtonElement).click();
+    (root.querySelector('.hud__button--emote') as HTMLButtonElement).click();
+
+    expect(picker().hidden).toBe(true);
+  });
+
+  it('clicking a picker tile calls onEmotePick and closes the picker (#47)', () => {
+    const { root, onEmotePick } = setup();
+    const picker = () => root.querySelector('.emote-picker') as HTMLElement;
+
+    (root.querySelector('.hud__button--emote') as HTMLButtonElement).click();
+    (root.querySelector('[data-emote="wave"]') as HTMLButtonElement).click();
+
+    expect(onEmotePick).toHaveBeenCalledWith('wave');
+    expect(picker().hidden).toBe(true);
+  });
+
+  it('ESC closes the open picker (#47)', () => {
+    const { root } = setup();
+    const picker = () => root.querySelector('.emote-picker') as HTMLElement;
+
+    (root.querySelector('.hud__button--emote') as HTMLButtonElement).click();
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+
+    expect(picker().hidden).toBe(true);
+  });
+
+  it('hide() closes an open picker', () => {
+    const { root, hud } = setup();
+    const picker = () => root.querySelector('.emote-picker') as HTMLElement;
+
+    (root.querySelector('.hud__button--emote') as HTMLButtonElement).click();
+    hud.hide();
+
+    expect(picker().hidden).toBe(true);
   });
 
   describe('Snowball mode (#53)', () => {

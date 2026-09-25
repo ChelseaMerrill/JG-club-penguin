@@ -3,3 +3,4 @@ export * from './penguin';
 export * from './realtime';
 export * from './emitter';
 export * from './game-events';
+export * from './emotes';
