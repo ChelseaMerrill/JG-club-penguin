@@ -63,6 +63,10 @@ export interface RoomDebugInfo {
   comingSoonHint?: string | null;
   changeRoom?: (roomId: RoomId) => void;
   roomEventLog?: RoomDebugEventLogEntry[];
+  /** `npcId` per `npc:talked` emission, oldest first (#36). */
+  npcTalkedLog?: string[];
+  /** `stallId` per `actions.openStall` call, oldest first (#36). */
+  openStallLog?: string[];
 }
 
 declare global {

@@ -16,6 +16,8 @@ import {
   isIglooSlot,
   isProgressErrorCode,
   validateLook,
+  type CompleteQuestResult,
+  type QuestProgress,
   type IglooSlot,
   type LeaderboardEntry,
   type ProgressErrorCode,
@@ -177,7 +179,13 @@ export type ProgressTableName =
 export interface ProgressClient {
   from(table: ProgressTableName): ProgressTable;
   rpc(
-    fn: 'record_round' | 'purchase_item' | 'leaderboard',
+    fn:
+      | 'record_round'
+      | 'purchase_item'
+      | 'leaderboard'
+      | 'quest_progress'
+      | 'mark_dev_pit_visited'
+      | 'complete_quest',
     args: Record<string, unknown>,
   ): PromiseLike<RpcResult>;
 }
@@ -255,6 +263,8 @@ const TOAST_MESSAGES: Record<ProgressErrorCode, string> = {
   invalid_look: "That Penguin look can't be saved",
   not_owned: "You don't own that item",
   invalid_slot: "That slot doesn't exist",
+  unknown_quest: "That quest doesn't exist",
+  quest_incomplete: "That quest isn't finished yet",
 };
 
 /** Anything that isn't a typed `ProgressStoreError`: network failures, unrecognized errors. */
@@ -517,7 +527,52 @@ export function createSupabaseProgressStore(
     }));
   }
 
-  return { loadAll, saveLook, recordRound, purchase, setSlot, leaderboard };
+  // #46: a read, so no `guarded()` toast, exactly like `leaderboard()`.
+  async function questProgress(): Promise<QuestProgress> {
+    const { data, error } = await client.rpc('quest_progress', {});
+    if (error) {
+      throw toProgressError(error);
+    }
+    const result = (data ?? {}) as Partial<QuestProgress>;
+    return {
+      devPitVisited: result.devPitVisited === true,
+      roundsFinished: Array.isArray(result.roundsFinished) ? result.roundsFinished : [],
+      completedQuests: Array.isArray(result.completedQuests) ? result.completedQuests : [],
+    };
+  }
+
+  function markDevPitVisited(): Promise<void> {
+    return guarded(async () => {
+      const { error } = await client.rpc('mark_dev_pit_visited', {});
+      if (error) {
+        throw toProgressError(error);
+      }
+    });
+  }
+
+  function completeQuest(questId: string): Promise<CompleteQuestResult> {
+    return guarded(async () => {
+      const { data, error } = await client.rpc('complete_quest', { quest_id: questId });
+      if (error) {
+        throw toProgressError(error);
+      }
+      const result = data as CompleteQuestResult;
+      emitter?.emit('tokens:changed', { balance: result.balance });
+      return result;
+    });
+  }
+
+  return {
+    loadAll,
+    saveLook,
+    recordRound,
+    purchase,
+    setSlot,
+    leaderboard,
+    questProgress,
+    markDevPitVisited,
+    completeQuest,
+  };
 }
 
 /**

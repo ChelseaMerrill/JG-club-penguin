@@ -80,3 +80,27 @@ never their Token balance, Badges or other Minigame bests:
 ```sql
 delete from public.minigame_bests where player_id = '<id>' and minigame_id = '<game>';
 ```
+
+## #46 Quests (gate H2)
+
+`46_quests_proof.sql` proves `20260925000000_quests.sql` against the same #9
+H1 fixture Player, in `70_leaderboard_proof.sql`'s style: as the fixture
+signed in, `complete_quest('main')` refuses with `quest_incomplete` while a
+step is unmet (paying nothing) and `unknown_quest` for any other id, pays 150
+Tokens once all five steps are met out of order, and a second call returns
+`alreadyCompleted` with nothing paid; `mark_dev_pit_visited()` keeps the first
+visit's time; `quest_progress()` reports the saved state; the two new tables
+are own-rows SELECT-only; and as anon every function is denied (`42501`).
+It also checks `security definer`/`search_path = ''`/one overload each and the
+`authenticated`-only grants.
+
+1. Local: covered automatically by `sql-quests.test.ts`'s PGlite run in
+   `npm test` (not by `run-local.sh`).
+2. Real Supabase (gate H2): apply `supabase/migrations/20260925000000_quests.sql`
+   in the SQL editor first, then open `46_quests_proof.sql`, replace every
+   occurrence of `00000000-0000-0000-0000-00000000f1f0` with the real #9 H1
+   fixture Player's id, and run it. Expect every row's `pass` column to read
+   `true`, including the final `ALL` row. It changes nothing (everything is
+   rolled back) and prints only booleans, counts and Token amounts.
+3. Save the result table to `test-results/46-quests-proof-supabase/output.txt`,
+   and paste the same table on #46.

@@ -504,3 +504,54 @@ describe('createHud', () => {
     expect(hudRoot().hidden).toBe(true);
   });
 });
+
+describe('createHud Quests (#46)', () => {
+  it('shows the QUESTS button once onQuests is wired, and clicking it calls onQuests', () => {
+    const onQuests = vi.fn();
+    const { root } = setup({ onQuests });
+    const button = root.querySelector('.hud__button--quests') as HTMLButtonElement;
+
+    expect(button.hidden).toBe(false);
+    button.click();
+
+    expect(onQuests).toHaveBeenCalledTimes(1);
+  });
+
+  it('marks the QUESTS button active while the Quests panel is open', () => {
+    const { root, hud } = setup({ onQuests: vi.fn() });
+    const button = root.querySelector('.hud__button--quests') as HTMLButtonElement;
+
+    hud.setQuestsActive(true);
+    expect(button.classList.contains('hud__button--active')).toBe(true);
+    hud.setQuestsActive(false);
+    expect(button.classList.contains('hud__button--active')).toBe(false);
+  });
+
+  it('exposes a quest slot inside the HUD for the quest widget', () => {
+    const { root, hud } = setup();
+
+    expect(root.querySelector('.hud')?.contains(hud.questSlot)).toBe(true);
+  });
+
+  it('hides a toast after its own durationMs, and after 4 s by default', () => {
+    vi.useFakeTimers();
+    try {
+      const { root } = setup();
+      const toast = () => root.querySelector('.hud__toast') as HTMLElement;
+
+      gameEvents.emit('ui:toast', { message: 'Quest: Visit the Dev Pit', durationMs: 3000 });
+      vi.advanceTimersByTime(2999);
+      expect(toast().hidden).toBe(false);
+      vi.advanceTimersByTime(1);
+      expect(toast().hidden).toBe(true);
+
+      gameEvents.emit('ui:toast', { message: 'Saved' });
+      vi.advanceTimersByTime(3999);
+      expect(toast().hidden).toBe(false);
+      vi.advanceTimersByTime(1);
+      expect(toast().hidden).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});

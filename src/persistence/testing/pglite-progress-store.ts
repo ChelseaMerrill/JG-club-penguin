@@ -20,6 +20,8 @@ import {
   ProgressStoreError,
   emptySlots,
   isProgressErrorCode,
+  type CompleteQuestResult,
+  type QuestProgress,
   type IglooSlot,
   type LeaderboardEntry,
   type ProgressSnapshot,
@@ -48,6 +50,7 @@ async function getSharedDb(): Promise<PGliteInterface> {
   await db.exec(readSqlFile('supabase', 'migrations', '20260924000000_players.sql'));
   await db.exec(readSqlFile('supabase', 'migrations', '20260924010000_saved_progress.sql'));
   await db.exec(readSqlFile('supabase', 'migrations', '20260924020000_leaderboard.sql'));
+  await db.exec(readSqlFile('supabase', 'migrations', '20260925000000_quests.sql'));
   sharedDb = db;
   return db;
 }
@@ -302,7 +305,42 @@ function createSqlProgressStore(db: PGliteInterface, playerId: string): Progress
     });
   }
 
-  return { loadAll, saveLook, recordRound, purchase, setSlot, leaderboard };
+  // #46: straight calls to the quests migration's functions, as the
+  // Supabase store makes them through PostgREST's `rpc()`.
+  async function questProgress(): Promise<QuestProgress> {
+    return runAsPlayer(async (tx) => {
+      const res = await tx.query<{ result: QuestProgress }>(
+        'select public.quest_progress() as result',
+      );
+      return res.rows[0].result;
+    });
+  }
+
+  async function markDevPitVisited(): Promise<void> {
+    await runAsPlayer((tx) => tx.query('select public.mark_dev_pit_visited()'));
+  }
+
+  async function completeQuest(questId: string): Promise<CompleteQuestResult> {
+    return runAsPlayer(async (tx) => {
+      const res = await tx.query<{ result: CompleteQuestResult }>(
+        'select public.complete_quest($1) as result',
+        [questId],
+      );
+      return res.rows[0].result;
+    });
+  }
+
+  return {
+    loadAll,
+    saveLook,
+    recordRound,
+    purchase,
+    setSlot,
+    leaderboard,
+    questProgress,
+    markDevPitVisited,
+    completeQuest,
+  };
 }
 
 /** Builds a fresh Player (a new `auth.users` row) against the shared PGlite database. */

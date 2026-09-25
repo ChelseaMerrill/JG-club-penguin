@@ -10,6 +10,7 @@ import { MINIGAME_RULES } from './minigame-rules';
 import {
   IGLOO_SLOTS,
   ProgressStoreError,
+  type CompleteQuestResult,
   type IglooSlot,
   type LeaderboardEntry,
   type ProgressSnapshot,
@@ -203,8 +204,29 @@ function wrapStore(
     return store.leaderboard(minigameId, maxRows);
   }
 
+  // #46: `questProgress`/`markDevPitVisited` change nothing the snapshot
+  // holds, so they pass straight through; `completeQuest` keeps the
+  // snapshot's balance equal to the server's.
+  async function completeQuest(questId: string): Promise<CompleteQuestResult> {
+    const result = await store.completeQuest(questId);
+    if (!isCurrent()) return result;
+    const previous = currentSnapshot();
+    if (previous) setSnapshot({ ...previous, tokens: result.balance });
+    return result;
+  }
+
   return {
-    wrapper: { loadAll, saveLook, recordRound, purchase, setSlot, leaderboard },
+    wrapper: {
+      loadAll,
+      saveLook,
+      recordRound,
+      purchase,
+      setSlot,
+      leaderboard,
+      questProgress: () => store.questProgress(),
+      markDevPitVisited: () => store.markDevPitVisited(),
+      completeQuest,
+    },
     loadInitial: loadAll,
   };
 }
@@ -275,5 +297,8 @@ export function createActiveProgressStore(
     purchase: async (itemId) => current().purchase(itemId),
     setSlot: async (slot, itemId) => current().setSlot(slot, itemId),
     leaderboard: async (minigameId, maxRows) => current().leaderboard(minigameId, maxRows),
+    questProgress: async () => current().questProgress(),
+    markDevPitVisited: async () => current().markDevPitVisited(),
+    completeQuest: async (questId) => current().completeQuest(questId),
   };
 }
