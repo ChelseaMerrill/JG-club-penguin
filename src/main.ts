@@ -79,6 +79,8 @@ import { MINIGAME_OVERLAY_ID } from './minigames/minigame-shell';
 import { createPenguinCreator } from './ui/penguin-creator';
 import { createPenguinEditor } from './penguin/penguin-editor';
 import { initDevCreatorHook } from './penguin/dev-creator-hook';
+import { createNpcDialog } from './ui/npc-dialog/npc-dialog';
+import { recordNpcTalked, recordOpenStall } from './game/rooms/dev-room-hook';
 import { createTrophyCase, TROPHY_CASE_OVERLAY_ID } from './ui/trophy-case';
 import { createMapScreen } from './ui/map-screen';
 import { createMarket, MARKET_OVERLAY_ID } from './ui/market';
@@ -688,6 +690,29 @@ gameEvents.on('hotspot:click', ({ hotspotId }) => {
   if (hotspotId !== 'igloo-gear-stall') return;
   hud.overlays.open(MARKET_OVERLAY_ID, () => market.close());
   void market.open();
+});
+
+// NPC dialog (#36). #37 is on `main`, so GRAB THE HAMMER/GRAB THE SPATULA
+// open the real Minigame shell via `minigameLauncher.launch`. #40 is also on
+// `main` now, so Casey's own stall button opens the same real Market panel
+// the Roof Deck's `igloo-gear-stall` hotspot does, above. `npc:talked` and
+// every `openStall` call are still recorded to `window.__roomDebug` for
+// `e2e/npcs.spec.ts` (`dev-room-hook.ts`).
+createNpcDialog(getUiLayer(), {
+  overlays: hud.overlays,
+  actions: {
+    launchMinigame: (minigameId) => {
+      minigameLauncher.launch(minigameId);
+    },
+    openStall: (stallId) => {
+      recordOpenStall(stallId);
+      hud.overlays.open(MARKET_OVERLAY_ID, () => market.close());
+      void market.open();
+    },
+  },
+});
+gameEvents.on('npc:talked', ({ npcId }) => {
+  recordNpcTalked(npcId);
 });
 
 // #77 review round 1 nit 5: RoomScene builds a Phaser-side hit-area for
