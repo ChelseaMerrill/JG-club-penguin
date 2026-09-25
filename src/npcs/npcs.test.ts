@@ -89,6 +89,11 @@ describe('NPCS', () => {
     }
   });
 
+  it("nudges Tristin's bubble up to clear Millie's nameplate (confirmed overlapping via an e2e screenshot)", () => {
+    expect(NPCS.tristin.bubbleOffsetY).toBe(-60);
+    expect(NPCS.millie.bubbleOffsetY).toBeUndefined();
+  });
+
   it("matches design/Room 02 Dev Pit.dc.html's own say-cycle timing for Ian, Steven and Ryan", () => {
     // Traced directly from the (post-#91-resync) design's `<g style=
     // "animation:say 22s ease-in-out -1s infinite;...">`/`-10s` (Ian), `14s`/

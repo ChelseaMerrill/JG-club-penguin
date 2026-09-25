@@ -133,6 +133,17 @@ interface NpcDefinitionBase {
    * exactly 0 for every other Roof Deck NPC).
    */
   bubbleOffsetX?: number;
+  /**
+   * A per-NPC vertical nudge (more negative floats the bubble higher),
+   * layered on top of the shared head-top offset every NPC otherwise uses.
+   * Only set where deriving a screen position from `npcs.ts`'s own tile
+   * grid (rather than the design's exact, hand-placed pixel layout) pushed
+   * two NPCs' Room elements close enough to visually collide: e.g. Tristin's
+   * bubble and Millie's nameplate, confirmed via an e2e screenshot to
+   * overlap (#36 round-1 review item 3's overlap check) even though the
+   * source design's own pixel coordinates for the two don't.
+   */
+  bubbleOffsetY?: number;
 }
 
 /** A Human NPC (`design/build/humans.js`'s figures), rendered by `render-npc-svg.ts`. */
@@ -588,6 +599,12 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: "It's 12° out here.", periodS: 24, delayS: -1 },
       { text: 'Worth it for snacks.', periodS: 24, delayS: -13 },
     ],
+    // Confirmed via an e2e screenshot: at his own tile's derived screen
+    // position, Tristin's bubble overlapped Millie's nameplate (they sit far
+    // apart on the design's own hand-placed canvas, but close together once
+    // both are projected from `roofDeck.npcSlots`' tile grid). Nudged up to
+    // clear it.
+    bubbleOffsetY: -60,
     dialog: LINE_DIALOG,
     look: TRISTIN_LOOK,
   },

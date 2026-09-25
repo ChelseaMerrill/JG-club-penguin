@@ -164,15 +164,23 @@ export function createNpcSprite(
   container.setDepth(depth);
 
   // --- Speech bubble: a separate top-layer pair, not a container child. ---
-  const bubbleGraphics = new GameObjects.Graphics(scene);
-  const bubbleText = new GameObjects.Text(scene, 0, 0, '', {
-    fontFamily: SPEECH_BUBBLE_FONT_FAMILY,
-    fontStyle: SPEECH_BUBBLE_FONT_WEIGHT,
-    fontSize: SPEECH_BUBBLE_FONT_SIZE,
-    color: SPEECH_BUBBLE_TEXT_COLOR,
-    align: 'center',
-    wordWrap: { width: SPEECH_BUBBLE_MAX_TEXT_WIDTH },
-  });
+  // `scene.add.existing` is required here (unlike `sprite`/`namePill`/
+  // `nameText` above, which `scene.add.container` already adds as its own
+  // children): a `new GameObjects.X(scene, ...)` built directly, without
+  // either `scene.add.existing` or an `add.*` factory call, is never part of
+  // the Scene's display list and so never renders, however its depth/alpha/
+  // position are set.
+  const bubbleGraphics = scene.add.existing(new GameObjects.Graphics(scene));
+  const bubbleText = scene.add.existing(
+    new GameObjects.Text(scene, 0, 0, '', {
+      fontFamily: SPEECH_BUBBLE_FONT_FAMILY,
+      fontStyle: SPEECH_BUBBLE_FONT_WEIGHT,
+      fontSize: SPEECH_BUBBLE_FONT_SIZE,
+      color: SPEECH_BUBBLE_TEXT_COLOR,
+      align: 'center',
+      wordWrap: { width: SPEECH_BUBBLE_MAX_TEXT_WIDTH },
+    }),
+  );
   bubbleText.setOrigin(0.5, 0);
   bubbleGraphics.setDepth(1_000_000 + depth);
   bubbleText.setDepth(1_000_000 + depth);
@@ -180,7 +188,7 @@ export function createNpcSprite(
   bubbleText.setAlpha(0);
 
   const bubbleX = x + (npc.bubbleOffsetX ?? 0);
-  const bubbleBottomY = y + HEAD_TOP_OFFSET_Y - SPEECH_BUBBLE_GAP;
+  const bubbleBottomY = y + HEAD_TOP_OFFSET_Y + (npc.bubbleOffsetY ?? 0) - SPEECH_BUBBLE_GAP;
 
   function layoutBubble(text: string): void {
     bubbleText.setText(text);
