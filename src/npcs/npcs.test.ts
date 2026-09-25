@@ -94,6 +94,15 @@ describe('NPCS', () => {
     expect(NPCS.millie.bubbleOffsetY).toBeUndefined();
   });
 
+  it('spreads Ian/Dom and Ryan/Steven/Sam apart after #92 moved them close together (confirmed overlapping via an e2e screenshot)', () => {
+    expect(NPCS.ian.bubbleOffsetX).toBe(-70);
+    expect(NPCS.dom.bubbleOffsetX).toBe(70);
+    expect(NPCS.ryan.bubbleOffsetX).toBe(-110);
+    expect(NPCS.steven.bubbleOffsetX).toBeUndefined();
+    expect(NPCS.sam.bubbleOffsetX).toBe(110);
+    expect(NPCS.ashley.bubbleOffsetX).toBeUndefined();
+  });
+
   it("matches design/Room 02 Dev Pit.dc.html's own say-cycle timing for Ian, Steven and Ryan", () => {
     // Traced directly from the (post-#91-resync) design's `<g style=
     // "animation:say 22s ease-in-out -1s infinite;...">`/`-10s` (Ian), `14s`/

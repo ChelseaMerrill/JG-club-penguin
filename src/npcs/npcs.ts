@@ -126,11 +126,16 @@ interface NpcDefinitionBase {
   dialogLine: string;
   dialog: NpcDialog;
   /**
-   * Roof Deck's vendor stalls (Kevin, Ann Marie, Josh, Casey) float their
-   * speech bubble left of their own nameplate/figure centre by this many
-   * pixels (#36 round-1 review item 3c; traced directly from the Room
-   * design's own bubble-vs-nameplate x offset, exactly -90 for all four,
-   * exactly 0 for every other Roof Deck NPC).
+   * A per-NPC horizontal nudge, layered on top of the tile-derived bubble
+   * position. Two distinct reasons set this: Roof Deck's vendor stalls
+   * (Kevin, Ann Marie, Josh, Casey) float their speech bubble left of their
+   * own nameplate/figure centre by exactly -90px (#36 round-1 review item
+   * 3c; traced directly from the Room design's own bubble-vs-nameplate x
+   * offset). Dev Pit's row-1/row-5 NPCs sat close enough after #92's D3
+   * round 2 resync (Ian/Dom one tile apart; Ryan/Steven/Sam two tiles apart
+   * each) that their bubbles visibly overlapped -- confirmed via an e2e
+   * screenshot -- so those are spread apart by a nudge instead (`ian`/`dom`
+   * and `ryan`/`sam`'s own doc comments).
    */
   bubbleOffsetX?: number;
   /**
@@ -338,6 +343,10 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: 'Who broke CI? Be honest.', periodS: 22, delayS: -1 },
       { text: 'Grab the hammer. CI is red.', periodS: 22, delayS: -10 },
     ],
+    // #92 D3 round 2 moved Ian to (1,5) and Dom to (2,5), one tile apart
+    // (confirmed via an e2e screenshot to overlap at their derived screen
+    // position): nudged apart horizontally, opposite Dom's own +70 below.
+    bubbleOffsetX: -70,
     dialog: BUG_SQUASH_DIALOG,
     figure: {
       style: 'bald',
@@ -389,6 +398,8 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: 'Dashboards are lava.', periodS: 18, delayS: -7 },
       { text: 'Do not tell facilities.', periodS: 18, delayS: -13 },
     ],
+    // See Ian's own bubbleOffsetX note above -- the two are one tile apart.
+    bubbleOffsetX: 70,
     dialog: LINE_DIALOG,
     figure: {
       style: 'short',
@@ -413,6 +424,10 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: 'This diagram is load-bearing.', periodS: 20, delayS: -8 },
       { text: 'Whiteboard is the real repo.', periodS: 20, delayS: -14 },
     ],
+    // #92 D3 round 2's row-1 trio (Ryan, Steven, Sam) sit only 2 tiles apart
+    // each (confirmed via an e2e screenshot to overlap): Ryan and Sam nudged
+    // apart from Steven in the middle, opposite Sam's own +110 below.
+    bubbleOffsetX: -110,
     dialog: LINE_DIALOG,
     figure: {
       style: 'short',
@@ -438,6 +453,8 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: 'Drawing the architecture. Again.', periodS: 20, delayS: -11 },
       { text: 'Ship it Friday. What could go wrong.', periodS: 20, delayS: -17 },
     ],
+    // See Ryan's own bubbleOffsetX note above -- the row-1 trio sit close together.
+    bubbleOffsetX: 110,
     dialog: LINE_DIALOG,
     figure: {
       style: 'spiky',
