@@ -25,6 +25,9 @@ export interface MinigameStatsMap {
     raw: number;
     burnt: number;
     stacked: number;
+    /** Longest run of consecutive Golden/Flip Now flips in the round;
+     *  producer: #39. Additive to the original #26 shape. */
+    bestStreak: number;
   };
   'coffee-rush': Record<string, number>;
   'snow-cone-stand': Record<string, number>;
