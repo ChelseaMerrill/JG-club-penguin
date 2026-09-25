@@ -24,6 +24,19 @@ const NEUTRAL_PANCAKE_STATS: MinigameStatsMap['pancake-flip'] = {
   bestStreak: 0,
 };
 
+const NEUTRAL_SNOW_CONE_STATS: MinigameStatsMap['snow-cone-stand'] = {
+  cone5: 0,
+  cone10: 0,
+  cone15: 0,
+  cone25: 0,
+  rushCone5: 0,
+  rushCone10: 0,
+  rushCone15: 0,
+  rushCone25: 0,
+  served: 0,
+  lost: 0,
+};
+
 /**
  * The one behavioral suite every `ProgressStore` implementation must pass:
  * the in-memory fake (`createInMemoryProgressStore`) and the real store
@@ -301,6 +314,7 @@ export function describeProgressStoreContract(
       const { store } = await makeHarness();
 
       const result = await store.recordRound('snow-cone-stand', 210, {
+        ...NEUTRAL_SNOW_CONE_STATS,
         cone5: 2,
         rushCone25: 4,
       });
@@ -578,7 +592,10 @@ export function describeProgressStoreContract(
       async (key, tokensPerUnit) => {
         const { store } = await makeHarness();
 
-        const result = await store.recordRound('snow-cone-stand', 0, { [key]: 1 });
+        const result = await store.recordRound('snow-cone-stand', 0, {
+          ...NEUTRAL_SNOW_CONE_STATS,
+          [key]: 1,
+        } as MinigameStatsMap['snow-cone-stand']);
 
         expect(result.tokensAwarded).toBe(tokensPerUnit);
       },

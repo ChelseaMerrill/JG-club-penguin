@@ -34,7 +34,24 @@ export interface MinigameStatsMap {
     bestStreak: number;
   };
   'coffee-rush': Record<string, number>;
-  'snow-cone-stand': Record<string, number>;
+  /** #49's done-screen fields: `cone5`/`cone10`/`cone15`/`cone25` are
+   *  normal-time cones served by size (1-4 scoops); `rushCone5` through
+   *  `rushCone25` are the same, served during rush hour (paid double).
+   *  `served`/`lost` round out the done screen without affecting payout.
+   *  Producer: #49. Consumer: #27's `record_round` (same 8 payout keys,
+   *  `saved_progress.sql`'s `'snow-cone-stand'` branch). */
+  'snow-cone-stand': {
+    cone5: number;
+    cone10: number;
+    cone15: number;
+    cone25: number;
+    rushCone5: number;
+    rushCone10: number;
+    rushCone15: number;
+    rushCone25: number;
+    served: number;
+    lost: number;
+  };
 }
 
 /**
