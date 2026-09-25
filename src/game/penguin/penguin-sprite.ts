@@ -1,9 +1,12 @@
 import { GameObjects, Textures, type Scene, type Time } from 'phaser';
 import { DEFAULT_FACING, type Facing, type PenguinLook } from '../../contracts';
 import { penguinLookHash } from './look-hash';
+import { PLAYER_PENGUIN_SCALE } from './player-penguin-scale';
 import { PENGUIN_FRAME_MS, PENGUIN_FRAMES, type PenguinAnim } from './poses';
 import { PENGUIN_FRAME_PADDING_Y, PENGUIN_ORIGIN, penguinFeetOrigin } from './render-svg';
 import { ensurePenguinTextures, penguinTextureKey } from './texture';
+
+export { PLAYER_PENGUIN_SCALE } from './player-penguin-scale';
 
 const NAME_TAG_BG = 0x00bdff;
 const NAME_TAG_TEXT_COLOR = '#161719';
@@ -36,20 +39,43 @@ const BUBBLE_FONT_SIZE = '13px';
 const BUBBLE_PADDING_X = 14;
 const BUBBLE_PADDING_Y = 8;
 const BUBBLE_MAX_WIDTH = 260;
-// Gap above the sprite's own top edge (the sprite's top edge sits at
-// `-(PENGUIN_ORIGIN.y + PENGUIN_FRAME_PADDING_Y)` in container space,
-// regardless of frame size, since that's exactly what the feet-anchor
-// origin fraction cancels out to).
+// Gap above the sprite's own top edge, a fixed screen-pixel gap that must
+// not shrink with the sprite (#131 review fix): only the top-edge term
+// (measured off the sprite's own unscaled frame size) scales.
 const BUBBLE_GAP = 10;
-const BUBBLE_ANCHOR_Y = -(PENGUIN_ORIGIN.y + PENGUIN_FRAME_PADDING_Y) - BUBBLE_GAP;
+// The sprite's top edge sits at `-(PENGUIN_ORIGIN.y + PENGUIN_FRAME_PADDING_Y)`
+// in container space, regardless of frame size, since that's exactly what the
+// feet-anchor origin fraction cancels out to. Scaled by PLAYER_PENGUIN_SCALE
+// (#131) so it shrinks with the smaller figure; BUBBLE_GAP is added
+// afterwards, unscaled, so the visual gap above the head stays constant.
+// Exported (unlike the other module-private tuning constants above) so
+// `penguin-sprite.test.ts` can assert the scale is applied to the right term
+// without booting a Phaser scene (#131 review fix).
+export const BUBBLE_ANCHOR_Y =
+  -(PENGUIN_ORIGIN.y + PENGUIN_FRAME_PADDING_Y) * PLAYER_PENGUIN_SCALE - BUBBLE_GAP;
 
 // Snow hat (#53 D4): a transient 10 s effect on a hit Penguin, never a `Hat`
 // of the Penguin look. Drawn as the design's HUD-SNOWBALL splat mound (a
 // wide ellipse topped by three lumps, `#F4F4F4`), sat on the head: the
 // frame's unpadded top edge, `PENGUIN_ORIGIN.y` above the feet anchor.
+// These geometry constants are all in the sprite's own unscaled frame
+// units; the `snowHat` Graphics object below is scaled (and its position
+// scaled) by `PLAYER_PENGUIN_SCALE` as a whole (#131 review fix) so the
+// outline stroke scales with it too, rather than each constant being
+// hand-scaled (which left the 2px stroke full-size on a shrunk mound).
 const SNOW_HAT_COLOR = 0xf4f4f4;
 const SNOW_HAT_OUTLINE = 0x0c4b5f;
 const SNOW_HAT_Y = -PENGUIN_ORIGIN.y + 14;
+const SNOW_HAT_WIDTH = 60;
+const SNOW_HAT_HEIGHT = 24;
+const SNOW_HAT_LUMP_LEFT_X = -20;
+const SNOW_HAT_LUMP_LEFT_Y = 8;
+const SNOW_HAT_LUMP_LEFT_R = 6;
+const SNOW_HAT_LUMP_RIGHT_X = 18;
+const SNOW_HAT_LUMP_RIGHT_Y = 9;
+const SNOW_HAT_LUMP_RIGHT_R = 7;
+const SNOW_HAT_LUMP_CENTER_Y = 14;
+const SNOW_HAT_LUMP_CENTER_R = 5;
 
 /** Phaser's always-present built-in placeholder texture. */
 const PLACEHOLDER_TEXTURE_KEY = '__DEFAULT';
@@ -135,6 +161,10 @@ export function createPenguin(
 
   const sprite = new GameObjects.Sprite(scene, 0, 0, PLACEHOLDER_TEXTURE_KEY);
   sprite.setOrigin(origin.x, origin.y);
+  // #131: shrinks the sprite to the design's own scale, around its
+  // feet-anchor origin above -- Phaser scales a GameObject's display size
+  // around its fractional origin, so the feet stay pinned at (x, y).
+  sprite.setScale(PLAYER_PENGUIN_SCALE);
   sprite.setFlipX(facing === 'left');
 
   const pill = new GameObjects.Graphics(scene);
@@ -166,13 +196,20 @@ export function createPenguin(
   bubbleText.setVisible(false);
 
   const snowHat = new GameObjects.Graphics(scene);
+  // Scale the whole Graphics object (#131 review fix), not each hand-scaled
+  // constant above, so the 2px outline stroke shrinks with the mound too.
+  snowHat.setScale(PLAYER_PENGUIN_SCALE);
   snowHat.lineStyle(2, SNOW_HAT_OUTLINE, 1);
   snowHat.fillStyle(SNOW_HAT_COLOR, 1);
-  snowHat.fillEllipse(0, SNOW_HAT_Y, 60, 24);
-  snowHat.strokeEllipse(0, SNOW_HAT_Y, 60, 24);
-  snowHat.fillCircle(-20, SNOW_HAT_Y - 8, 6);
-  snowHat.fillCircle(18, SNOW_HAT_Y - 9, 7);
-  snowHat.fillCircle(0, SNOW_HAT_Y - 14, 5);
+  snowHat.fillEllipse(0, SNOW_HAT_Y, SNOW_HAT_WIDTH, SNOW_HAT_HEIGHT);
+  snowHat.strokeEllipse(0, SNOW_HAT_Y, SNOW_HAT_WIDTH, SNOW_HAT_HEIGHT);
+  snowHat.fillCircle(SNOW_HAT_LUMP_LEFT_X, SNOW_HAT_Y - SNOW_HAT_LUMP_LEFT_Y, SNOW_HAT_LUMP_LEFT_R);
+  snowHat.fillCircle(
+    SNOW_HAT_LUMP_RIGHT_X,
+    SNOW_HAT_Y - SNOW_HAT_LUMP_RIGHT_Y,
+    SNOW_HAT_LUMP_RIGHT_R,
+  );
+  snowHat.fillCircle(0, SNOW_HAT_Y - SNOW_HAT_LUMP_CENTER_Y, SNOW_HAT_LUMP_CENTER_R);
   snowHat.setVisible(false);
 
   const container = scene.add.container(x, y, [
