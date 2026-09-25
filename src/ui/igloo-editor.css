@@ -1,16 +1,18 @@
 /* The Igloo's Furniture editor (#41): the owner-only "EDIT IGLOO" button and
-   no-Furniture hint (a small standalone widget below the HUD's top-right
-   cluster, not part of `hud.ts`'s own bottom bar) plus the per-slot picker
-   modal, following `market.css`'s pattern -- every size here is Stage
-   pixels, filling the 1600x900 `#ui` layer. */
+   no-Furniture hint (a small standalone widget, not part of `hud.ts`'s own
+   bottom bar) plus the per-slot picker modal, following `market.css`'s
+   pattern -- every size here is Stage pixels, filling the 1600x900 `#ui`
+   layer. The widget sits under the HUD's top-left Room title, whose subtitle
+   already counts the "6 FURNITURE SLOTS"; the top-right corner under the
+   Token row belongs to the #46 quest widget. */
 
 .igloo-editor {
   position: absolute;
-  top: calc(var(--hud-inset-y) + 52px);
-  right: var(--hud-inset-x);
+  top: calc(var(--hud-inset-y) + 88px);
+  left: var(--hud-inset-x);
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: flex-start;
   gap: 8px;
   pointer-events: auto;
 }
@@ -50,7 +52,7 @@
   background: rgba(var(--jg-dark-rgb), 0.94);
   border: 2px solid var(--jg-primary);
   font: 700 12px var(--font-body);
-  text-align: right;
+  text-align: left;
   color: var(--fg-primary);
 }
 
