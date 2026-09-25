@@ -88,6 +88,10 @@ export interface RoomDebugInfo {
   textureListenerCount?: number;
   /** `npcId` per `npc:arrived` emission, oldest first. */
   npcArrivedLog?: string[];
+  /** `npcId` per `npc:talked` emission, oldest first (#36). */
+  npcTalkedLog?: string[];
+  /** `stallId` per `actions.openStall` call, oldest first (#36; a logged no-op until #40). */
+  openStallLog?: string[];
   /** Door label per `door:reached` emission, oldest first. */
   doorReachedLog?: string[];
   /** Target tile per `local-penguin:move` emission (walk start or re-route), oldest first. */
@@ -149,6 +153,28 @@ declare global {
   }
 }
 
+// `npc:talked`/`actions.openStall` calls (#36) come from `main.ts`'s NPC
+// dialog wiring, entirely outside `RoomScene`, so they can't be fields on the
+// `RoomDebugInfo` `RoomScene.publishRoomDebug` builds every frame the way
+// `npcArrivedLog` is: that snapshot would simply have no such data to put
+// there. Tracked here instead, as module state merged into every
+// `exposeRoomDebug` publish below, so a Room restart (a fresh `RoomScene`
+// snapshot) never clears a log that in fact spans the whole page session.
+const npcTalkedLog: string[] = [];
+const openStallLog: string[] = [];
+
+/** Records an `npc:talked` npcId for `window.__roomDebug.npcTalkedLog` (#36); a no-op unless `HOOKS_ENABLED`. */
+export function recordNpcTalked(npcId: string): void {
+  if (!HOOKS_ENABLED) return;
+  npcTalkedLog.push(npcId);
+}
+
+/** Records an `actions.openStall` stallId for `window.__roomDebug.openStallLog` (#36); a no-op unless `HOOKS_ENABLED`. */
+export function recordOpenStall(stallId: string): void {
+  if (!HOOKS_ENABLED) return;
+  openStallLog.push(stallId);
+}
+
 /** #15's navigator-owned fields, set once by `registerRoomDebugNavigatorHooks` and merged onto every `exposeRoomDebug` snapshot below. */
 let navigatorHooks: Pick<RoomDebugInfo, 'changeRoom' | 'roomEventLog'> = {};
 
@@ -170,11 +196,12 @@ export function registerRoomDebugNavigatorHooks(
  * only when `HOOKS_ENABLED`, so `e2e/room-framework.spec.ts` and
  * `e2e/click-to-move.spec.ts` can assert Room/movement state without
  * reaching into Phaser internals. Each call replaces the whole object,
- * merging in `navigatorHooks` last so those fields always survive.
+ * except `npcTalkedLog`/`openStallLog` (#36) and `navigatorHooks` (#15),
+ * which always carry forward regardless of what `info` itself sets.
  */
 export function exposeRoomDebug(info: RoomDebugInfo): void {
   if (!HOOKS_ENABLED) {
     return;
   }
-  window.__roomDebug = { ...info, ...navigatorHooks };
+  window.__roomDebug = { ...info, npcTalkedLog, openStallLog, ...navigatorHooks };
 }
