@@ -1,4 +1,5 @@
 import { gameEvents, type RoomId } from '../contracts';
+import { getRoomDefinition } from '../game/rooms/registry';
 import type { OverlayManager } from './hud/overlay-manager';
 import { isMapTileClickable, MAP_ROOMS, type MapRoomTile } from './map-rooms';
 import './map-screen.css';
@@ -35,6 +36,15 @@ function button(className: string, text?: string): HTMLButtonElement {
   const b = el('button', className, text);
   b.type = 'button';
   return b;
+}
+
+/** `getRoomDefinition(roomId).background`'s own image URL, or `null` for a
+ *  `'procedural'` background (none of today's five prototype Rooms are, but
+ *  the type allows it) -- rather than a hardcoded `rooms/<id>.png` guess
+ *  (#33 review round 1 nit 10). */
+function roomThumbnailUrl(roomId: RoomId): string | null {
+  const { background } = getRoomDefinition(roomId);
+  return background.kind === 'image' ? background.url : null;
 }
 
 interface TileEntry {
@@ -76,15 +86,20 @@ export function createMapScreen(root: HTMLElement, options: MapScreenOptions): M
     const clickable = isMapTileClickable(tile);
 
     const tileButton = button('map-screen__tile');
-    tileButton.dataset.mapRoom = tile.roomId ?? '';
     tileButton.dataset.mapNumber = tile.number;
-    tileButton.setAttribute('aria-disabled', String(!clickable));
+    // `data-map-room` and `aria-disabled` are only meaningful for their
+    // "true" state, so a coming-soon tile gets no `data-map-room` at all, and
+    // a clickable one gets no `aria-disabled` at all (#33 review round 1 nit
+    // 11), rather than the redundant `data-map-room=""`/`aria-disabled="false"`.
+    if (clickable) tileButton.dataset.mapRoom = tile.roomId as RoomId;
+    else tileButton.setAttribute('aria-disabled', 'true');
 
     const thumb = el('div', 'map-screen__thumb');
-    if (clickable) {
+    const thumbnailUrl = clickable ? roomThumbnailUrl(tile.roomId as RoomId) : null;
+    if (thumbnailUrl) {
       const image = document.createElement('img');
       image.className = 'map-screen__thumb-image';
-      image.src = `rooms/${tile.roomId}.png`;
+      image.src = thumbnailUrl;
       image.alt = '';
       thumb.append(image);
     } else {
