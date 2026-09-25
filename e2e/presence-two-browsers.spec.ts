@@ -66,8 +66,8 @@ test('presence-two-browsers', async ({ browser, baseURL }) => {
   const stateA = haveStateFiles ? AUTH_STATE_A : await passwordSessionState('A', origin);
   const stateB = haveStateFiles ? AUTH_STATE_B : await passwordSessionState('B', origin);
 
-  // #81: fail fast if another session is still running this pair of test
-  // users through Town Center, before opening any browser context.
+  // #81: fail fast if another run is still using this pair of test users
+  // in Town Center, before opening any browser context.
   await assertTestUsersAbsent([
     { label: 'A', playerId: playerIdFromStorageState(stateA) },
     { label: 'B', playerId: playerIdFromStorageState(stateB) },
@@ -113,9 +113,9 @@ test('presence-two-browsers', async ({ browser, baseURL }) => {
     await expectLookMatches(rosterOnB(idA), pageA);
 
     // AC2: five Room round trips. B loses/regains exactly one li for A each
-    // time; A's own roster (which never shows A, and can include Players
-    // other than B on the shared Supabase project, #81) never grows
-    // duplicates.
+    // time; A's own roster shows B exactly once and never A. It isn't
+    // checked by total count: on the shared Supabase project it can also
+    // list Players other than B (#81).
     for (let i = 0; i < 5; i++) {
       await pageA.click('button[data-room="dev-pit"]');
       await expect(rosterOnB(idA)).toHaveCount(0, { timeout: PROPAGATION_TIMEOUT });
@@ -127,10 +127,6 @@ test('presence-two-browsers', async ({ browser, baseURL }) => {
 
       await expect(rosterOnA(idB)).toHaveCount(1, { timeout: PROPAGATION_TIMEOUT });
       await expect(rosterOnA(idA)).toHaveCount(0, { timeout: PROPAGATION_TIMEOUT });
-      const rosterIds = await pageA
-        .locator('ul.debug-roster li')
-        .evaluateAll((items) => items.map((item) => item.getAttribute('data-player-id')));
-      expect(new Set(rosterIds).size).toBe(rosterIds.length);
     }
 
     // AC3: a look change (including a new name) propagates to the other

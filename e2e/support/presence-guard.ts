@@ -9,9 +9,8 @@
  */
 import { readFileSync } from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
-import { loadEnv } from 'vite';
 import { roomChannelKey, type RoomId } from '../../src/contracts';
-import type { StorageState } from './password-session';
+import { readTestEnv, type StorageState, type TestUser } from './password-session';
 import { decodeJwtSub } from './two-browser-session';
 
 /**
@@ -22,7 +21,7 @@ import { decodeJwtSub } from './two-browser-session';
 export type AuthStateInput = StorageState | string | undefined;
 
 export interface TestUserId {
-  label: 'A' | 'B';
+  label: TestUser;
   playerId: string;
 }
 
@@ -32,16 +31,15 @@ const POLL_INTERVAL_MS = 250;
 /** Distinct from any real Player id: this presence key is never tracked, only used to join. */
 const GUARD_PRESENCE_KEY = 'e2e-presence-guard';
 
-/** Reads `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` the way `password-session.ts` does. */
-function readSupabaseEnv(): { supabaseUrl: string; anonKey: string } {
-  const env = loadEnv('test', process.cwd(), '');
-  return { supabaseUrl: env.VITE_SUPABASE_URL ?? '', anonKey: env.VITE_SUPABASE_ANON_KEY ?? '' };
-}
-
 function loadStorageState(state: AuthStateInput): StorageState {
   if (state === undefined) throw new Error('no storage state to read a Player id from');
   if (typeof state !== 'string') return state;
-  return JSON.parse(readFileSync(state, 'utf8')) as StorageState;
+  // Never let a parse error echo the file: it holds a live refresh token.
+  try {
+    return JSON.parse(readFileSync(state, 'utf8')) as StorageState;
+  } catch {
+    throw new Error('storage state file is not valid JSON');
+  }
 }
 
 /** Reads the signed-in Player's id out of a storage state's `sb-*-auth-token` (inline, or a file path). */
@@ -50,7 +48,12 @@ export function playerIdFromStorageState(state: AuthStateInput): string {
   for (const origin of parsed.origins) {
     const entry = origin.localStorage.find((item) => /^sb-.*-auth-token$/.test(item.name));
     if (!entry) continue;
-    const { access_token: accessToken } = JSON.parse(entry.value) as { access_token: string };
+    let accessToken: string;
+    try {
+      accessToken = (JSON.parse(entry.value) as { access_token: string }).access_token;
+    } catch {
+      throw new Error('sb-*-auth-token value is not valid JSON');
+    }
     return decodeJwtSub(accessToken);
   }
   throw new Error('no sb-*-auth-token in storage state');
@@ -77,7 +80,7 @@ export async function assertTestUsersAbsent(
   users: TestUserId[],
   roomId: RoomId = 'town-center',
 ): Promise<void> {
-  const { supabaseUrl, anonKey } = readSupabaseEnv();
+  const { supabaseUrl, anonKey } = readTestEnv();
   if (!supabaseUrl || !anonKey) {
     throw new Error('VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY missing');
   }
@@ -94,15 +97,26 @@ export async function assertTestUsersAbsent(
     let subscribed = false;
     let synced = false;
     await new Promise<void>((resolve, reject) => {
+      const timer = setTimeout(
+        () => reject(new Error(`presence guard got no Presence sync from ${roomId}`)),
+        GUARD_TIMEOUT_MS,
+      );
       channel.on('presence', { event: 'sync' }, () => {
         synced = true;
-        if (subscribed) resolve();
+        if (subscribed) {
+          clearTimeout(timer);
+          resolve();
+        }
       });
       channel.subscribe((status) => {
         if (status === 'SUBSCRIBED') {
           subscribed = true;
-          if (synced) resolve();
-        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          if (synced) {
+            clearTimeout(timer);
+            resolve();
+          }
+        } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED') {
+          clearTimeout(timer);
           reject(new Error(`presence guard failed to subscribe to ${roomId}: ${status}`));
         }
       });
@@ -117,13 +131,14 @@ export async function assertTestUsersAbsent(
         const names = stillThere.map((u) => `test user ${u.label}`).join(' and ');
         const verb = stillThere.length === 1 ? 'is' : 'are';
         throw new Error(
-          `${names} ${verb} already in ${roomId}; another session is probably running the two-browser specs`,
+          `${names} ${verb} already in ${roomId}; another run is probably using the shared test users`,
         );
       }
       await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
     }
   } finally {
-    await client.removeChannel(channel);
-    client.realtime.disconnect();
+    // Teardown must never mask the guard's own error.
+    await client.removeChannel(channel).catch(() => {});
+    await client.realtime.disconnect();
   }
 }

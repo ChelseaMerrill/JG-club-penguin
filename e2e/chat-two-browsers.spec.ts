@@ -117,8 +117,8 @@ test('chat-two-browsers', async ({ browser, baseURL }) => {
   const stateA = haveStateFiles ? AUTH_STATE_A : await passwordSessionState('A', origin);
   const stateB = haveStateFiles ? AUTH_STATE_B : await passwordSessionState('B', origin);
 
-  // #81: fail fast if another session is still running this pair of test
-  // users through Town Center, before opening any browser context.
+  // #81: fail fast if another run is still using this pair of test users
+  // in Town Center, before opening any browser context.
   await assertTestUsersAbsent([
     { label: 'A', playerId: playerIdFromStorageState(stateA) },
     { label: 'B', playerId: playerIdFromStorageState(stateB) },
