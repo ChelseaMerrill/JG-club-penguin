@@ -476,6 +476,25 @@ function freezeAnimations(): void {
   document.addEventListener('DOMContentLoaded', attach);
 }
 
+// Runs in the browser context (page.evaluate), after the design's React
+// runtime has actually rendered the Room's `<svg>` (unlike `freezeAnimations`
+// above, which runs via `addInitScript` before any of it exists): pauses
+// every `<svg>`'s own SMIL (`<animate>`) timeline and resets it to time 0.
+// The Kitchen's oven glow (#92 round 2 nit 5) uses `<animate>`, which
+// `animation-play-state` never reaches (that CSS property only ever applies
+// to CSS animations), so without this a re-export could land on whatever
+// glow phase happened to be current when the screenshot fired.
+function freezeSmilAnimations(): void {
+  document.querySelectorAll('svg').forEach((svg) => {
+    const smilSvg = svg as SVGSVGElement & {
+      pauseAnimations?: () => void;
+      setCurrentTime?: (time: number) => void;
+    };
+    smilSvg.pauseAnimations?.();
+    smilSvg.setCurrentTime?.(0);
+  });
+}
+
 // Runs in the browser context (page.evaluate) against one Room's rules.
 function hideLiveElements(rules: HideRule[]): void {
   const CHROME_TAGS = new Set(['rect', 'polygon', 'svg', 'path', 'circle', 'ellipse', 'line']);
@@ -507,7 +526,17 @@ function hideLiveElements(rules: HideRule[]): void {
       const toHide: Element[] = [textEl];
       let sibling = textEl.previousElementSibling;
       let hops = 0;
-      while (sibling && hops < 2 && CHROME_TAGS.has(sibling.tagName.toLowerCase())) {
+      // 3, not 2 (#92 round 2 nit 5): the shared `peng()` sprite this design
+      // draws every static NPC/Penguin with is exactly four flat siblings --
+      // ellipse (ground shadow), svg (body), rect (nameplate background),
+      // text (name) -- so a 2-hop walk back from the name stopped one short,
+      // at the nameplate background, always leaving the shadow ellipse
+      // behind. Caught as Ian's shadow bleeding onto Dev Pit's desk B in the
+      // exported art; the same shape for every other static character in
+      // every Room, so the limit is raised generally rather than patched
+      // per-character. Still bounded (not unlimited) so an unrelated
+      // preceding shape of one of these tag kinds can never be swept in.
+      while (sibling && hops < 3 && CHROME_TAGS.has(sibling.tagName.toLowerCase())) {
         toHide.push(sibling);
         sibling = sibling.previousElementSibling;
         hops++;
@@ -574,6 +603,9 @@ async function exportRoom(
   // this, two runs can race a fallback-vs-real-font repaint and produce
   // slightly different pixels.
   await page.evaluate(() => document.fonts.ready);
+  // Only reachable now that the design's `<svg>` actually exists (see
+  // `freezeSmilAnimations`'s own comment).
+  await page.evaluate(freezeSmilAnimations);
 
   if (pageErrors.length > 0) {
     await page.close();
