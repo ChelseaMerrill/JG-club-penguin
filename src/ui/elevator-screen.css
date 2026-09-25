@@ -32,23 +32,27 @@
 
 .elevator-screen__strip {
   display: flex;
-  gap: 8px;
+  gap: 6px;
 }
 
+/* 46x52 with a 6px strip gap, matching the design's own floor chips
+   (`design/Elevator.dc.html`) rather than the earlier placeholder size. */
 .elevator-screen__floor {
-  width: 52px;
-  height: 58px;
+  width: 46px;
+  height: 52px;
   display: grid;
   place-items: center;
   font: 400 22px var(--font-display);
   color: var(--jg-light);
   background: transparent;
   border: 2px solid var(--jg-secondary);
+  opacity: 1;
   transition:
     background-color 0.2s ease-out,
     box-shadow 0.2s ease-out,
     color 0.2s ease-out,
-    border-color 0.2s ease-out;
+    border-color 0.2s ease-out,
+    opacity 0.2s ease-out;
 }
 
 /* The destination floor: lit, matching the design's own current-floor chip. */
@@ -66,12 +70,11 @@
 
 .elevator-screen__heading {
   font-family: var(--font-game-display);
-  font-size: 32px;
+  font-size: 30px;
   line-height: 1;
   color: var(--jg-primary);
   -webkit-text-stroke: 4px var(--jg-secondary);
   paint-order: stroke fill;
-  text-shadow: 0 4px 0 var(--jg-secondary);
   text-align: center;
   white-space: nowrap;
 }
@@ -90,20 +93,31 @@
   inset: 0 auto 0 0;
   width: 0;
   background: repeating-linear-gradient(-45deg, var(--jg-primary) 0 12px, #33cbff 12px 24px);
-  transition-property: width;
-  transition-timing-function: linear;
 }
 
-/* Width and `transition-duration` (set inline, per `minDurationMs`) both
-   drive the fill; `elevator-screen.ts`'s `restartProgress` resets this class
-   off and back on to restart the transition from empty. */
-.elevator-screen__progress-bar--filled {
-  width: 100%;
+@keyframes elevator-fill {
+  from {
+    width: 0;
+  }
+  to {
+    width: 100%;
+  }
+}
+
+/* Drives the fill via a `@keyframes` animation rather than a `width`
+   transition (#52 review MAJOR): a transition never runs while the overlay
+   is still `hidden` (`display: none`), so the bar used to show full the
+   instant it appeared. `--elevator-fill-duration` is set inline per
+   `minDurationMs`; `elevator-screen.ts`'s `restartProgress` removes and
+   re-adds this class, with a forced reflow in between and only *after* the
+   overlay is unhidden, so the animation actually restarts and plays. */
+.elevator-screen__progress-bar--filling {
+  animation: elevator-fill var(--elevator-fill-duration, 1200ms) linear forwards;
 }
 
 .elevator-screen__tip {
   font: 400 13px var(--font-display);
-  letter-spacing: 0.12em;
+  letter-spacing: 0.16em;
   color: var(--jg-inactive);
   text-align: center;
 }
@@ -112,8 +126,12 @@
    (destination lit, bar full) shows at once. The 1.2s JS minimum in
    `elevator-screen.ts` still applies regardless of this media query. */
 @media (prefers-reduced-motion: reduce) {
-  .elevator-screen__floor,
-  .elevator-screen__progress-bar {
+  .elevator-screen__floor {
     transition: none;
+  }
+
+  .elevator-screen__progress-bar--filling {
+    animation: none;
+    width: 100%;
   }
 }

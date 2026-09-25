@@ -191,12 +191,19 @@ export function createRoomNavigator(deps: RoomNavigatorDeps): RoomNavigator {
     // leave from; the very first `changeRoom` of a Session always goes
     // through `enterSpawnRoom` instead, so `leaving` is never null on a real
     // floor-crossing call in practice, but the `leaving !== null` check below
-    // stays anyway as the direct source of truth.
-    const showTransition =
+    // stays anyway as the direct source of truth. The condition lives
+    // directly in the `if` (rather than a separately-computed boolean
+    // dereferenced with `!`) so TypeScript narrows `transitionScreen` and
+    // `leaving` on its own (#52 review standards nit).
+    let showTransition = false;
+    if (
       transitionScreen !== undefined &&
       leaving !== null &&
-      floorsDiffer(ROOM_FLOORS[leaving], ROOM_FLOORS[roomId]);
-    if (showTransition) transitionScreen!.begin(leaving!, roomId);
+      floorsDiffer(ROOM_FLOORS[leaving], ROOM_FLOORS[roomId])
+    ) {
+      showTransition = true;
+      transitionScreen.begin(leaving, roomId);
+    }
     await enterRoom(roomId, entryTile, false, showTransition);
   }
 
@@ -217,6 +224,11 @@ export function createRoomNavigator(deps: RoomNavigatorDeps): RoomNavigator {
     changeRoom,
     async enterSpawnRoom(): Promise<void> {
       active = true;
+      // #52 review MINOR: cancel any transitionScreen state first, so a
+      // transition superseded by this spawn entry (e.g. a sign-out and a
+      // fresh sign-in racing a still-in-flight floor crossing) can never
+      // leave the Elevator overlay stuck up over the freshly spawned Room.
+      transitionScreen?.cancel();
       // Defensive: the normal path always calls `leaveForSignOut` first, so
       // `current` is already `null` here. If it somehow isn't, leave that
       // Room before forcing the fresh spawn entry.

@@ -4,6 +4,7 @@ import { igloo } from '../src/game/rooms/definitions/igloo';
 import { roofDeck } from '../src/game/rooms/definitions/roof-deck';
 import { townCenter } from '../src/game/rooms/definitions/town-center';
 import { GAME_HEIGHT, GAME_WIDTH } from '../src/game/stage-size';
+import { waitForElevatorHidden } from './support/elevator';
 import type { RoomDebugInfo } from './support/room-debug-types';
 
 const BOOT_TIMEOUT = 15_000;
@@ -48,15 +49,6 @@ function doorCenter(door: { hotspot: { x: number; y: number; width: number; heig
     x: door.hotspot.x + door.hotspot.width / 2,
     y: door.hotspot.y + door.hotspot.height / 2,
   };
-}
-
-/**
- * Town Center <-> Roof Deck crosses a floor, so #52's Elevator overlay
- * swallows clicks for at least its own 1.2s minimum; this spec's next click
- * after such a crossing must wait for it to hide first.
- */
-async function waitForElevatorHidden(page: Page): Promise<void> {
-  await expect(page.locator('.elevator-screen')).toBeHidden({ timeout: WALK_TIMEOUT });
 }
 
 test('room transitions: doors, changeRoom, HUD, reload (#15)', async ({ page }) => {

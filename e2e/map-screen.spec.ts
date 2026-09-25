@@ -5,6 +5,7 @@ import { roofDeck } from '../src/game/rooms/definitions/roof-deck';
 import { theMelt } from '../src/game/rooms/definitions/the-melt';
 import { townCenter } from '../src/game/rooms/definitions/town-center';
 import { GAME_HEIGHT, GAME_WIDTH } from '../src/game/stage-size';
+import { waitForElevatorHidden } from './support/elevator';
 import type { RoomDebugInfo } from './support/room-debug-types';
 
 test.use({ viewport: { width: GAME_WIDTH, height: GAME_HEIGHT } });
@@ -56,17 +57,6 @@ async function mapGridOverflows(page: Page): Promise<boolean> {
   return page.locator('.map-screen__grid').evaluate((el) => {
     return el.scrollHeight > el.clientHeight + 1 || el.scrollWidth > el.clientWidth + 1;
   });
-}
-
-/**
- * A Room change that crosses a floor (Town Center <-> Roof Deck/The Melt) is
- * covered by #52's Elevator overlay, which swallows clicks for at least its
- * own 1.2s minimum; this spec's next click after such a crossing must wait
- * for it to hide first. A harmless no-op wait for a same-floor crossing,
- * since the overlay is already hidden in that case.
- */
-async function waitForElevatorHidden(page: Page): Promise<void> {
-  await expect(page.locator('.elevator-screen')).toBeHidden({ timeout: WALK_TIMEOUT });
 }
 
 test('Map opens from the HUD in every prototype Room, with exactly one current tile (AC1)', async ({

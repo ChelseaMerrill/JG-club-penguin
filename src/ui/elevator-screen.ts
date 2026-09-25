@@ -5,6 +5,16 @@ import './elevator-screen.css';
 /** Default `minDurationMs`: 1.2s, the Elevator's own minimum ride time (#52 D4). */
 const DEFAULT_MIN_DURATION_MS = 1200;
 
+/**
+ * Safety cap (#52 review MINOR): if `ready()` never arrives -- a bug
+ * elsewhere, or a Room whose `create()` never resolves -- the overlay force-
+ * hides itself rather than staying stuck over the Stage forever.
+ */
+const SAFETY_HIDE_MS = 10_000;
+
+/** The chat input's own class (`hud.ts`); `begin()` never blurs it (#52 review MINOR). */
+const CHAT_INPUT_SELECTOR = '.hud__chat-input';
+
 /** The Elevator's own tip text, from `design/Elevator.dc.html`'s bottom bar. */
 const TIP_TEXT = 'TIP: JG HQ IS ON 5 · THE ROOF DECK IS ONE MORE UP';
 
@@ -86,6 +96,7 @@ export function createElevatorScreen(
   root.append(overlay);
 
   let hideTimer: ReturnType<typeof setTimeout> | null = null;
+  let safetyTimer: ReturnType<typeof setTimeout> | null = null;
   /** Set once `minDurationMs` has elapsed since the current `begin()`. */
   let minElapsed = false;
   /** Set once `ready()` has been called for the current `begin()`. */
@@ -98,8 +109,16 @@ export function createElevatorScreen(
     }
   }
 
+  function clearSafetyTimer(): void {
+    if (safetyTimer !== null) {
+      clearTimeout(safetyTimer);
+      safetyTimer = null;
+    }
+  }
+
   function hide(): void {
     clearHideTimer();
+    clearSafetyTimer();
     minElapsed = false;
     readyReceived = false;
     overlay.hidden = true;
@@ -110,25 +129,53 @@ export function createElevatorScreen(
     if (minElapsed && readyReceived) hide();
   }
 
+  /** Distance-from-destination opacity step, matching the design's own .9/.6/.35 floor-strip dimming. */
+  function farFloorOpacity(floor: FloorId, destIndex: number): string {
+    const distance = Math.abs(FLOOR_ORDER.indexOf(floor) - destIndex);
+    if (distance <= 1) return '0.9';
+    if (distance === 2) return '0.6';
+    return '0.35';
+  }
+
   function applyFloors(source: FloorId | null, destination: FloorId | null): void {
+    const destIndex = destination === null ? null : FLOOR_ORDER.indexOf(destination);
     for (const [floor, floorEl] of floorEls) {
-      floorEl.classList.toggle('elevator-screen__floor--dest', floor === destination);
-      floorEl.classList.toggle(
-        'elevator-screen__floor--source',
-        floor === source && floor !== destination,
-      );
+      const isDest = floor === destination;
+      const isSource = floor === source && !isDest;
+      floorEl.classList.toggle('elevator-screen__floor--dest', isDest);
+      floorEl.classList.toggle('elevator-screen__floor--source', isSource);
+      floorEl.style.opacity =
+        isDest || isSource || destIndex === null ? '' : farFloorOpacity(floor, destIndex);
     }
   }
 
-  /** Resets the progress bar to empty, then restarts its fill transition (skipped visually under reduced motion, via CSS). */
+  /**
+   * Resets the progress bar to empty, then restarts its `elevator-fill`
+   * keyframes animation from scratch (#52 review MAJOR). Must run *after*
+   * `overlay.hidden = false`: a class swap made while the overlay is still
+   * `display: none` never triggers a restart, so the bar would show full the
+   * instant it appears instead of filling over `minDurationMs`.
+   */
   function restartProgress(): void {
-    progressBar.style.transitionDuration = `${minDurationMs}ms`;
-    progressBar.classList.remove('elevator-screen__progress-bar--filled');
-    // Forces a reflow so the width-reset above lands before the class is
+    progressBar.style.setProperty('--elevator-fill-duration', `${minDurationMs}ms`);
+    progressBar.classList.remove('elevator-screen__progress-bar--filling');
+    // Forces a reflow so the removal above lands before the class is
     // re-added below, rather than the browser coalescing both into one
-    // no-op frame and skipping the fill transition entirely.
+    // frame and never restarting the animation at all.
     void progressBar.offsetWidth;
-    progressBar.classList.add('elevator-screen__progress-bar--filled');
+    progressBar.classList.add('elevator-screen__progress-bar--filling');
+  }
+
+  /**
+   * Blurs whatever has focus, unless it's the HUD's chat input (#52 review
+   * MINOR): otherwise a lingering focus ring on a door or the Map button
+   * lets Enter/Space "click" it again while the overlay is covering it.
+   */
+  function blurStrayFocus(): void {
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && !active.closest(CHAT_INPUT_SELECTOR)) {
+      active.blur();
+    }
   }
 
   return {
@@ -136,23 +183,36 @@ export function createElevatorScreen(
       const sourceFloor = options.resolveFloor(from);
       const destFloor = options.resolveFloor(to);
       applyFloors(sourceFloor, destFloor);
+      // Resolved outside `overlay.hidden = false` below so a defensively
+      // unresolved floor (shouldn't happen given `floorsDiffer`) clears any
+      // stale heading from a previous `begin()` instead of leaving it up.
+      let headingText = '';
       if (sourceFloor !== null && destFloor !== null) {
         const dir = direction(sourceFloor, destFloor) === 'up' ? 'UP' : 'DOWN';
-        heading.textContent = `WADDLING ${dir} TO ${floorLabel(destFloor)}`;
+        headingText = `WADDLING ${dir} TO ${floorLabel(destFloor)}`;
       }
-      restartProgress();
-      // #52 D5: re-`begin()` while already visible retargets the labels
-      // above and restarts the minimum duration below, rather than stacking
-      // onto whatever was already pending.
+      // #52 D5: re-`begin()` while already visible retargets everything
+      // below and restarts the minimum duration, rather than stacking onto
+      // whatever was already pending.
       clearHideTimer();
+      clearSafetyTimer();
       minElapsed = false;
       readyReceived = false;
       overlay.hidden = false;
+      // The heading is only set once the overlay is actually visible, so its
+      // `aria-live="polite"` announcement fires (#52 review NIT).
+      heading.textContent = headingText;
+      restartProgress();
+      blurStrayFocus();
       hideTimer = setTimeout(() => {
         minElapsed = true;
         hideTimer = null;
         maybeHide();
       }, minDurationMs);
+      safetyTimer = setTimeout(() => {
+        safetyTimer = null;
+        hide();
+      }, SAFETY_HIDE_MS);
     },
     ready() {
       readyReceived = true;

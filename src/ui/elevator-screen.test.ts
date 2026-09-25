@@ -72,6 +72,43 @@ describe('createElevatorScreen', () => {
     expect(overlay.getAttribute('aria-modal')).toBeNull();
   });
 
+  it('clears the heading (rather than leaving a stale one) if either floor cannot be resolved, defensively', () => {
+    const { q, screen } = setup();
+    screen.begin('town-center', 'roof-deck');
+    expect(q('.elevator-screen__heading')!.textContent).toBe('WADDLING UP TO THE ROOF');
+
+    screen.begin('roof-deck', 'igloo');
+
+    expect(q('.elevator-screen__heading')!.textContent).toBe('');
+  });
+
+  describe('focus (#52 review MINOR)', () => {
+    it('blurs focus outside the chat input on begin(), so Enter/Space cannot reopen something underneath', () => {
+      const { screen } = setup();
+      const mapButton = document.createElement('button');
+      document.body.append(mapButton);
+      mapButton.focus();
+      expect(document.activeElement).toBe(mapButton);
+
+      screen.begin('town-center', 'roof-deck');
+
+      expect(document.activeElement).not.toBe(mapButton);
+    });
+
+    it('leaves focus on the chat input alone on begin()', () => {
+      const { screen } = setup();
+      const chatInput = document.createElement('input');
+      chatInput.className = 'hud__chat-input';
+      document.body.append(chatInput);
+      chatInput.focus();
+      expect(document.activeElement).toBe(chatInput);
+
+      screen.begin('town-center', 'roof-deck');
+
+      expect(document.activeElement).toBe(chatInput);
+    });
+  });
+
   describe('timing (#52 D4/D5)', () => {
     beforeEach(() => {
       vi.useFakeTimers();
@@ -143,6 +180,33 @@ describe('createElevatorScreen', () => {
       expect(q('.elevator-screen')!.hidden).toBe(false); // no ready() yet for this begin
 
       screen.ready();
+      expect(q('.elevator-screen')!.hidden).toBe(true);
+    });
+
+    it('force-hides ~10s after begin() if ready() never arrives (safety cap, #52 review MINOR)', () => {
+      const { q, screen } = setup(1200);
+      screen.begin('town-center', 'roof-deck');
+
+      vi.advanceTimersByTime(9_999);
+      expect(q('.elevator-screen')!.hidden).toBe(false);
+
+      vi.advanceTimersByTime(1);
+      expect(q('.elevator-screen')!.hidden).toBe(true);
+    });
+
+    it('cancel() before the safety cap fires prevents a later stray hide', () => {
+      const { q, screen } = setup(1200);
+      screen.begin('town-center', 'roof-deck');
+      screen.cancel();
+
+      screen.begin('roof-deck', 'town-center');
+      vi.advanceTimersByTime(1200);
+      screen.ready();
+      expect(q('.elevator-screen')!.hidden).toBe(true);
+
+      // The first begin()'s safety timer must have been cleared by cancel();
+      // otherwise it would stray-fire here mid this second, already-hidden ride.
+      vi.advanceTimersByTime(10_000);
       expect(q('.elevator-screen')!.hidden).toBe(true);
     });
   });

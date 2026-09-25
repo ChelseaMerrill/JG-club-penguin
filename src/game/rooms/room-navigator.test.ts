@@ -479,6 +479,54 @@ describe('createRoomNavigator', () => {
       ]);
     });
 
+    it('enterSpawnRoom calls cancel() first, so a stale transition can never leave the overlay stuck (#52 review MINOR)', async () => {
+      const transitionScreen = createFakeTransitionScreen();
+      const events = createEmitter<RoomEventMap>();
+      const scene = createFakeScene();
+      const navigator = createRoomNavigator({
+        scene,
+        events,
+        hasPlayer: () => true,
+        transitionScreen,
+      });
+
+      await boot(scene, navigator);
+
+      expect(transitionScreen.calls[0]).toEqual({ type: 'cancel' });
+    });
+
+    it('when showRoom returns false, ready() fires immediately, before room:enter, without waiting for whenNextReady (#52 review)', async () => {
+      const order: string[] = [];
+      const events = createEmitter<RoomEventMap>();
+      events.on('room:leave', () => order.push('room:leave'));
+      events.on('room:enter', () => order.push('room:enter'));
+      const transitionScreen: RoomTransitionScreen = {
+        begin: (from, to) => order.push(`begin:${from}->${to}`),
+        ready: () => order.push('ready'),
+        cancel: () => order.push('cancel'),
+      };
+      const scene: RoomNavigatorScene = {
+        showRoom: () => false,
+        // Never resolves: proves `enterRoom` never awaits it when `showRoom`
+        // reports `switched: false`.
+        whenNextReady: () => new Promise<void>(() => {}),
+        onDoorReached: () => {},
+        showComingSoonHint: () => {},
+      };
+      const navigator = createRoomNavigator({
+        scene,
+        events,
+        hasPlayer: () => true,
+        transitionScreen,
+      });
+      await navigator.enterSpawnRoom(); // showRoom() false here too, so this also resolves at once
+      order.length = 0;
+
+      await navigator.changeRoom('roof-deck');
+
+      expect(order).toEqual(['room:leave', 'begin:town-center->roof-deck', 'ready', 'room:enter']);
+    });
+
     it('leaveForSignOut calls cancel()', async () => {
       const transitionScreen = createFakeTransitionScreen();
       const events = createEmitter<RoomEventMap>();

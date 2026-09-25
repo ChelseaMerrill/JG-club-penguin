@@ -100,6 +100,19 @@ async function elevatorLog(page: Page): Promise<ElevatorLogEntry[]> {
   return page.evaluate(() => window.__elevatorLog ?? []);
 }
 
+/** The progress bar's own computed width against its track's, in CSS pixels. */
+async function progressBarMetrics(page: Page): Promise<{ barWidth: number; trackWidth: number }> {
+  return page.evaluate(() => {
+    const track = document.querySelector<HTMLElement>('.elevator-screen__progress');
+    const bar = document.querySelector<HTMLElement>('.elevator-screen__progress-bar');
+    if (!track || !bar) throw new Error('.elevator-screen__progress(-bar) not found in the DOM');
+    return {
+      barWidth: bar.getBoundingClientRect().width,
+      trackWidth: track.getBoundingClientRect().width,
+    };
+  });
+}
+
 test('Elevator shows crossing Town Center -> Roof Deck via the door, hides once Roof Deck is ready (#52)', async ({
   page,
 }) => {
@@ -114,16 +127,43 @@ test('Elevator shows crossing Town Center -> Roof Deck via the door, hides once 
   const elevatorDoor = townCenter.doors.find((door) => door.label === 'ELEVATOR · ROOF DECK');
   if (!elevatorDoor) throw new Error('expected town-center to have an ELEVATOR · ROOF DECK door');
 
-  await clickStagePoint(page, doorCenter(elevatorDoor));
-  await expect(page.locator('.elevator-screen')).toBeVisible();
-  await page.screenshot({ path: 'test-results/elevator-transition/elevator.png' });
+  const clickPoint = doorCenter(elevatorDoor);
+  await clickStagePoint(page, clickPoint);
+  await expect(page.locator('.elevator-screen')).toBeVisible({ timeout: WALK_TIMEOUT });
 
   // A door click while the overlay is up (it swallows clicks, D6) must not
-  // start a second transition: verified below by the log/roomEventLog shape.
-  await clickStagePoint(page, doorCenter(elevatorDoor));
+  // start a second transition. Checked and clicked in a single `evaluate`
+  // round-trip (rather than a separate assertion followed by a separate
+  // `page.mouse.click`), so there's no gap in which the overlay's own
+  // `minDurationMs` could elapse between confirming the click point resolves
+  // to the overlay and actually clicking it -- both happen in the same
+  // browser-side tick, at the point the door itself sits at.
+  const canvasBox = await page.locator('#game canvas').boundingBox();
+  if (!canvasBox) throw new Error('canvas not visible');
+  const pagePoint = {
+    x: canvasBox.x + clickPoint.x * (canvasBox.width / GAME_WIDTH),
+    y: canvasBox.y + clickPoint.y * (canvasBox.height / GAME_HEIGHT),
+  };
+  const hitOverlay = await page.evaluate(({ x, y }) => {
+    const target = document.elementFromPoint(x, y);
+    const overlayHit = target?.closest('.elevator-screen') != null;
+    const opts: PointerEventInit = { bubbles: true, cancelable: true, clientX: x, clientY: y };
+    target?.dispatchEvent(new PointerEvent('pointerdown', opts));
+    target?.dispatchEvent(new PointerEvent('pointerup', opts));
+    target?.dispatchEvent(new MouseEvent('click', opts));
+    return overlayHit;
+  }, pagePoint);
+  expect(hitOverlay).toBe(true);
+
+  await page.screenshot({ path: 'test-results/elevator-transition/elevator.png' });
 
   await expect(page.locator('.elevator-screen')).toBeHidden({ timeout: WALK_TIMEOUT });
   await expect.poll(async () => (await debugInfo(page))?.roomId).toBe('roof-deck');
+
+  // The swallowed click must not have started a second transition/walk: the
+  // local Penguin's tile is still exactly the door's own entry tile into the
+  // Roof Deck, never having moved from it.
+  expect((await debugInfo(page))?.localPenguin?.tile).toEqual(elevatorDoor.entryTile);
 
   const log = await elevatorLog(page);
   expect(log.map((entry) => entry.type)).toEqual(['show', 'hide']);
@@ -137,6 +177,38 @@ test('Elevator shows crossing Town Center -> Roof Deck via the door, hides once 
     { type: 'room:leave', roomId: 'town-center' },
     { type: 'room:enter', roomId: 'roof-deck' },
   ]);
+
+  expect(errors).toEqual([]);
+});
+
+test('the progress bar fills gradually over the ride rather than showing full instantly (#52 review MAJOR)', async ({
+  page,
+}) => {
+  test.setTimeout(30_000);
+  const errors = collectErrors(page);
+
+  await page.goto('/?asPlayer');
+  await waitForBoot(page);
+  await expect.poll(async () => (await debugInfo(page))?.roomId).toBe('town-center');
+
+  await page.evaluate(() => window.__roomDebug?.changeRoom?.('roof-deck'));
+  await expect(page.locator('.elevator-screen')).toBeVisible({ timeout: WALK_TIMEOUT });
+
+  // ~300ms into the 1.2s minimum ride: the bar must still be filling, not
+  // already full (the MAJOR bug: a `width` transition never runs while the
+  // overlay is `display: none`, so it used to jump straight to 100%).
+  await page.waitForTimeout(300);
+  const midRide = await progressBarMetrics(page);
+  expect(midRide.barWidth).toBeLessThan(midRide.trackWidth * 0.75);
+  await page.screenshot({ path: 'test-results/elevator-transition/mid-ride.png' });
+
+  // ~1150ms in, near the end of the 1.2s minimum: the bar is (near) full.
+  await page.waitForTimeout(850);
+  const nearEnd = await progressBarMetrics(page);
+  expect(nearEnd.barWidth).toBeGreaterThanOrEqual(nearEnd.trackWidth * 0.95);
+
+  await expect(page.locator('.elevator-screen')).toBeHidden({ timeout: WALK_TIMEOUT });
+  await expect.poll(async () => (await debugInfo(page))?.roomId).toBe('roof-deck');
 
   expect(errors).toEqual([]);
 });
