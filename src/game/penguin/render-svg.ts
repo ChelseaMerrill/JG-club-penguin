@@ -1,4 +1,4 @@
-import type { Eyes, Hat, Pattern, PenguinLook } from '../../contracts';
+import type { Eyes, Facing, Hat, Pattern, PenguinLook } from '../../contracts';
 import { pickContrasting, pickContrastingOverlay, reachesMinContrast } from './contrast';
 import { DESIGN_TO_VIEWBOX_SCALE } from './design-scale';
 import { penguinLookHash } from './look-hash';
@@ -311,10 +311,49 @@ const SEAT_RADIUS = DESIGN_SEAT_RADIUS / DESIGN_TO_VIEWBOX_SCALE; // ~2.12
 const SEAT_X = PENGUIN_VIEWBOX_WIDTH / 2 - SEAT_WIDTH / 2; // ~24.7
 const SEAT_Y = (DESIGN_SEAT_TOP_FROM_CANVAS_TOP - DESIGN_FIGURE_TOP_GAP) / DESIGN_TO_VIEWBOX_SCALE; // ~119.7
 
+/**
+ * The horizontal bounding-box centre of an SVG path's `d` string, computed
+ * from every coordinate in it rather than a hand-picked constant:
+ * `text-paths.ts` (`scripts/penguin-text-to-paths.ts`) only ever emits
+ * absolute `M`/`L`/`Q` commands, each consuming its parameters in `x y`
+ * pairs (`Q`'s two: a control point then an endpoint), so every even-indexed
+ * number in `d` is an x-coordinate. Used by `renderLettering` (#147) to
+ * counter-mirror a lettering path about its *own* centre rather than the
+ * frame's shared one -- most lettering is baked `text-anchor="middle"` at
+ * design x=60 anyway, but "HA HA" (`text-anchor="start"` at x=100) is not, so
+ * a shared constant would displace it instead of merely un-mirroring it.
+ */
+function pathCenterX(d: string): number {
+  const coordinates = d.match(/-?\d+(?:\.\d+)?/g)?.map(Number) ?? [];
+  const xs = coordinates.filter((_, index) => index % 2 === 0);
+  return (Math.min(...xs) + Math.max(...xs)) / 2;
+}
+
+/**
+ * Renders one baked lettering path (a `PENGUIN_TEXT_PATHS` entry's `d`,
+ * painted in `fill`, which is sometimes a resolved contrast colour rather
+ * than the entry's own fixed one -- e.g. the JG CAP label/WAR WEEK BAND
+ * fill), counter-mirrored about its own horizontal centre for a left-facing
+ * frame (#147) so it still reads correctly once the whole sprite is flipped
+ * (`penguin-sprite.ts`'s `setFlipX`): reflecting a shape about its own
+ * centre and then about the frame's shared centre (the flip) composes to a
+ * pure horizontal translation, so the lettering lands exactly where a naive
+ * flip would have put its bounding box, just no longer mirrored. A
+ * right-facing (or default) frame draws the bare path, byte-identical to
+ * before this fix.
+ */
+function renderLettering(d: string, fill: string, facing: Facing): string {
+  const path = `<path d="${d}" fill="${fill}"></path>`;
+  if (facing !== 'left') return path;
+  const cx = pathCenterX(d);
+  return `<g transform="translate(${cx} 0) scale(-1 1) translate(${-cx} 0)">${path}</g>`;
+}
+
 function renderPattern(
   pattern: Pattern,
   ink: string,
   rims: Pick<ResolvedPenguinColors, 'pixelHeartRim' | 'snowflakeRim'>,
+  facing: Facing,
 ): string {
   switch (pattern) {
     case 'HEX':
@@ -322,7 +361,7 @@ function renderPattern(
     case 'STRIPES':
       return `<g fill="${ink}" opacity=".55"><rect x="30" y="56" width="60" height="5"></rect><rect x="30" y="68" width="60" height="5"></rect><rect x="30" y="80" width="60" height="5"></rect><rect x="30" y="92" width="60" height="5"></rect><rect x="30" y="104" width="60" height="5"></rect></g>`;
     case 'JG LOGO':
-      return `<g><polygon points="60,64 74,72 74,88 60,96 46,88 46,72" fill="${STROKE}"></polygon><path d="${PENGUIN_TEXT_PATHS.jgLogo.d}" fill="${PENGUIN_TEXT_PATHS.jgLogo.fill}"></path></g>`;
+      return `<g><polygon points="60,64 74,72 74,88 60,96 46,88 46,72" fill="${STROKE}"></polygon>${renderLettering(PENGUIN_TEXT_PATHS.jgLogo.d, PENGUIN_TEXT_PATHS.jgLogo.fill, facing)}</g>`;
     case 'PIXEL HEART':
       // Keeps the design's cyan (#79 D2); a rim on the group is inherited by
       // every unstroked rect child, so it only needs setting once.
@@ -361,7 +400,7 @@ function renderPattern(
  * - SHIP_IT reuses the picker icon's own hull-and-sail outline, near the
  *   Penguin's lowered right flipper, as if just launched.
  */
-function renderProp(prop: PenguinFramePose['prop'], flashBurst: boolean): string {
+function renderProp(prop: PenguinFramePose['prop'], flashBurst: boolean, facing: Facing): string {
   switch (prop) {
     case 'THUMBS_UP':
       return `<g transform="translate(78 10) scale(0.9)"><path d="M9 17 h5 v11 h-5 z M14 18 l5 -11 c3 0 4 2 3 5 l-1 4 h7 c2 0 3 2 2 4 l-2 7 c0 1 -1 2 -3 2 h-11" fill="${STROKE}"></path></g>`;
@@ -371,7 +410,7 @@ function renderProp(prop: PenguinFramePose['prop'], flashBurst: boolean): string
       const burst = flashBurst
         ? `<g stroke="${ACCENT}" stroke-width="2" stroke-linecap="round"><line x1="60" y1="55" x2="60" y2="47"></line><line x1="38" y1="68" x2="30" y2="62"></line><line x1="82" y1="68" x2="90" y2="62"></line><line x1="38" y1="92" x2="30" y2="98"></line><line x1="82" y1="92" x2="90" y2="98"></line></g>`
         : '';
-      return `<g>${burst}<polygon points="60,64 74,72 74,88 60,96 46,88 46,72" fill="${STROKE}"></polygon><path d="${PENGUIN_TEXT_PATHS.jgLogo.d}" fill="${PENGUIN_TEXT_PATHS.jgLogo.fill}"></path></g>`;
+      return `<g>${burst}<polygon points="60,64 74,72 74,88 60,96 46,88 46,72" fill="${STROKE}"></polygon>${renderLettering(PENGUIN_TEXT_PATHS.jgLogo.d, PENGUIN_TEXT_PATHS.jgLogo.fill, facing)}</g>`;
     }
     case 'SHIP_IT':
       return `<g transform="translate(70 90)"><path d="M8 22 h24 l-4 6 h-16 z M14 22 v-9 h8 v9 M22 13 l8 4" fill="none" stroke="${STROKE}" stroke-width="3" stroke-linejoin="round"></path></g>`;
@@ -415,6 +454,7 @@ function renderHat(
     ResolvedPenguinColors,
     'capOutline' | 'capLabel' | 'headphoneBand' | 'snorkelRim' | 'warWeekFill'
   >,
+  facing: Facing,
 ): string {
   switch (hat) {
     case 'JG CAP':
@@ -428,7 +468,7 @@ function renderHat(
       // colour (#92 round 2 nit 4) -- the label sits on the badge polygon,
       // itself filled with `capOutline`, and #79 varies that per cap colour,
       // so the label needs its own resolved contrast against it.
-      return `<g><path d="M34 24 C36 6 84 6 86 24 Z" fill="${capColor}" stroke="${resolved.capOutline}" stroke-width="2.5" stroke-linejoin="round"></path><path d="M34 24 L86 24 C86 27 82 29 74 30 L46 30 C38 29 34 27 34 24 Z" fill="${capColor}" stroke="${resolved.capOutline}" stroke-width="2.5" stroke-linejoin="round"></path><path d="M58 24 L102 26 C104 28 102 32 98 33 L60 29 Z" fill="${capColor}" stroke="${resolved.capOutline}" stroke-width="2.5" stroke-linejoin="round"></path><path d="M60 8 L60 24" stroke="${resolved.capOutline}" stroke-width="1.5" opacity=".5"></path><polygon points="60,11 65,14 65,20 60,23 55,20 55,14" fill="${resolved.capOutline}"></polygon><path d="${PENGUIN_TEXT_PATHS.jgCap.d}" fill="${resolved.capLabel}"></path></g>`;
+      return `<g><path d="M34 24 C36 6 84 6 86 24 Z" fill="${capColor}" stroke="${resolved.capOutline}" stroke-width="2.5" stroke-linejoin="round"></path><path d="M34 24 L86 24 C86 27 82 29 74 30 L46 30 C38 29 34 27 34 24 Z" fill="${capColor}" stroke="${resolved.capOutline}" stroke-width="2.5" stroke-linejoin="round"></path><path d="M58 24 L102 26 C104 28 102 32 98 33 L60 29 Z" fill="${capColor}" stroke="${resolved.capOutline}" stroke-width="2.5" stroke-linejoin="round"></path><path d="M60 8 L60 24" stroke="${resolved.capOutline}" stroke-width="1.5" opacity=".5"></path><polygon points="60,11 65,14 65,20 60,23 55,20 55,14" fill="${resolved.capOutline}"></polygon>${renderLettering(PENGUIN_TEXT_PATHS.jgCap.d, resolved.capLabel, facing)}</g>`;
     case 'SNORKEL': {
       // The frame/strap are stroke-only, so their rim is a wider halo drawn
       // first (same shapes), rather than a `stroke` attribute (#79 D2). Each
@@ -442,7 +482,7 @@ function renderHat(
     case 'HEADPHONES':
       return `<g><path d="M30 34 C30 10 90 10 90 34" fill="none" stroke="${resolved.headphoneBand}" stroke-width="5"></path><rect x="24" y="28" width="10" height="16" rx="4" fill="${capColor}" stroke="${resolved.capOutline}" stroke-width="2"></rect><rect x="86" y="28" width="10" height="16" rx="4" fill="${capColor}" stroke="${resolved.capOutline}" stroke-width="2"></rect></g>`;
     case 'WAR WEEK BAND':
-      return `<g><path d="M28 26 L92 26 L92 34 L28 34 Z" fill="${capColor}" stroke="${resolved.capOutline}" stroke-width="2"></path><path d="M88 26 L100 30 L98 60 L90 58 Z" fill="${capColor}" stroke="${resolved.capOutline}" stroke-width="2"></path><path d="${PENGUIN_TEXT_PATHS.warWeek.d}" fill="${resolved.warWeekFill}"></path></g>`;
+      return `<g><path d="M28 26 L92 26 L92 34 L28 34 Z" fill="${capColor}" stroke="${resolved.capOutline}" stroke-width="2"></path><path d="M88 26 L100 30 L98 60 L90 58 Z" fill="${capColor}" stroke="${resolved.capOutline}" stroke-width="2"></path>${renderLettering(PENGUIN_TEXT_PATHS.warWeek.d, resolved.warWeekFill, facing)}</g>`;
     case 'NONE':
     default:
       return '';
@@ -471,12 +511,20 @@ function renderHat(
  * `clipPath` id (#31 review fix 7), so a caller rendering many instances
  * inline on one DOM page (e.g. the e2e grid) can guarantee unique ids itself
  * without relying on every cell happening to differ by look or pose.
+ *
+ * `facing` (#147) defaults to `'right'`, which stays byte-identical to every
+ * call site predating this fix: only a `'left'` frame counter-mirrors its
+ * baked lettering paths (`renderLettering`) so they still read correctly once
+ * `penguin-sprite.ts` flips the whole sprite for a left-facing Penguin. Every
+ * other shape (body, arms, cap, props) is unaffected by `facing` here -- the
+ * sprite flip alone mirrors them.
  */
 export function renderPenguinSvgWithColors(
   look: PenguinLook,
   pose: PenguinPose = { anim: look.emote, frame: 0 },
   options: { idPrefix?: string } = {},
   colors: ResolvedPenguinColors = resolvePenguinColors(look),
+  facing: Facing = 'right',
 ): string {
   const framePose = resolvePenguinFramePose(pose);
   const resolved = colors;
@@ -501,26 +549,26 @@ export function renderPenguinSvgWithColors(
     : '';
 
   const haha = framePose.showHaha
-    ? `<path d="${PENGUIN_TEXT_PATHS.haha.d}" fill="${PENGUIN_TEXT_PATHS.haha.fill}"></path>`
+    ? renderLettering(PENGUIN_TEXT_PATHS.haha.d, PENGUIN_TEXT_PATHS.haha.fill, facing)
     : '';
 
   // A #47 Emote pose's held prop, painted after (outside) the figure's
   // rotate/translate group, same reasoning as `seat` above.
-  const prop = renderProp(framePose.prop, framePose.flashBurst);
+  const prop = renderProp(framePose.prop, framePose.flashBurst, facing);
 
   const figure = [
     `<g transform="${bodyTransform}">`,
     `<defs><clipPath id="${clipId}"><path d="M60 40 C46 40 38 62 38 84 C38 102 48 112 60 112 C72 112 82 102 82 84 C82 62 74 40 60 40 Z"></path></clipPath></defs>`,
     `<path d="M60 14 C30 14 22 50 22 82 C22 106 40 118 60 118 C80 118 98 106 98 82 C98 50 90 14 60 14 Z" fill="${look.body}" stroke="${resolved.bodyOutline}" stroke-width="6"></path>`,
     `<path d="M60 40 C46 40 38 62 38 84 C38 102 48 112 60 112 C72 112 82 102 82 84 C82 62 74 40 60 40 Z" fill="${look.belly}"${rimAttr(resolved.bellyRim)}></path>`,
-    `<g clip-path="url(#${clipId})">${renderPattern(look.pattern, resolved.patternInk, resolved)}</g>`,
+    `<g clip-path="url(#${clipId})">${renderPattern(look.pattern, resolved.patternInk, resolved, facing)}</g>`,
     renderEyes(look.eyes, framePose.forceSleepyEyes, resolved),
     `<path d="M50 44 L70 44 L60 54 Z" fill="${look.beak}"${rimAttr(resolved.beakRim)}></path>`,
     `<path d="M40 116 L26 124 L52 122 Z" fill="${look.feet}"${rimAttr(resolved.feetRim)}${leftFootAttr}></path>`,
     `<path d="M80 116 L94 124 L68 122 Z" fill="${look.feet}"${rimAttr(resolved.feetRim)}${rightFootAttr}></path>`,
     `<g transform="rotate(${framePose.leftArmRotateDeg} 26 62)"><path d="M24 60 C10 78 12 96 26 100 Z" fill="${look.body}" stroke="${resolved.bodyOutline}" stroke-width="4"></path></g>`,
     `<g transform="rotate(${framePose.rightArmRotateDeg} 94 62)"><path d="M96 60 C110 78 108 96 94 100 Z" fill="${look.body}" stroke="${resolved.bodyOutline}" stroke-width="4"></path></g>`,
-    renderHat(look.hat, look.cap, resolved),
+    renderHat(look.hat, look.cap, resolved, facing),
     haha,
     `</g>`,
     seat,
@@ -536,12 +584,14 @@ export function renderPenguinSvgWithColors(
  * Renders `look` at `pose` as a standalone SVG string, resolving its
  * colours with `resolvePenguinColors` (#79 D2). See
  * `renderPenguinSvgWithColors` for the markup itself and every other detail
- * (`idPrefix`, `look.name` never appearing, pure/no-DOM).
+ * (`idPrefix`, `look.name` never appearing, pure/no-DOM, `facing` and its
+ * `'right'` default, #147).
  */
 export function renderPenguinSvg(
   look: PenguinLook,
   pose: PenguinPose = { anim: look.emote, frame: 0 },
   options: { idPrefix?: string } = {},
+  facing: Facing = 'right',
 ): string {
-  return renderPenguinSvgWithColors(look, pose, options, resolvePenguinColors(look));
+  return renderPenguinSvgWithColors(look, pose, options, resolvePenguinColors(look), facing);
 }

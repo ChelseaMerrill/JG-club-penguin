@@ -148,4 +148,35 @@ describe('ensurePenguinTextures', () => {
 
     expect(manager.addedKeys).toEqual([secondKey]);
   });
+
+  // #147: a left-facing frame bakes counter-mirrored lettering
+  // (`render-svg.ts`'s `renderLettering`), so it needs its own texture set,
+  // distinct from the same look's right-facing ('right', the default) one.
+  it("registers a separate set of keys for a look's left-facing textures, leaving its right-facing (default) keys unchanged", () => {
+    const manager = createFakeTextureManager();
+    const scene: PenguinTextureScene = { textures: manager };
+
+    ensurePenguinTextures(scene, DEFAULT_LOOK);
+    const rightKeys = [...manager.addedKeys];
+    manager.addedKeys.length = 0;
+
+    ensurePenguinTextures(scene, DEFAULT_LOOK, 'left');
+
+    expect(manager.addedKeys).toHaveLength(TOTAL_FRAMES_PER_LOOK);
+    expect(new Set(manager.addedKeys).size).toBe(TOTAL_FRAMES_PER_LOOK);
+    for (const key of manager.addedKeys) expect(rightKeys).not.toContain(key);
+  });
+});
+
+describe('penguinTextureKey (#147)', () => {
+  it("omits any facing suffix for 'right' (the default), so it stays byte-identical to before facing existed", () => {
+    const hash = penguinLookHash(DEFAULT_LOOK);
+    expect(penguinTextureKey(hash, 'WADDLE', 0)).toBe(`penguin:${hash}:WADDLE:0`);
+    expect(penguinTextureKey(hash, 'WADDLE', 0, 'right')).toBe(`penguin:${hash}:WADDLE:0`);
+  });
+
+  it("adds a distinguishing suffix for 'left'", () => {
+    const hash = penguinLookHash(DEFAULT_LOOK);
+    expect(penguinTextureKey(hash, 'WADDLE', 0, 'left')).toBe(`penguin:${hash}:WADDLE:0:left`);
+  });
 });

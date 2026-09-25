@@ -13,7 +13,7 @@ import {
 } from '../../contracts';
 import { blend, contrastRatio, MIN_CONTRAST, reachesMinContrast } from './contrast';
 import { ACCENT, BACKDROP, EYE_PUPIL, EYE_WHITE, STROKE } from './palette';
-import { PENGUIN_ANIMS, PENGUIN_FRAMES } from './poses';
+import { PENGUIN_ANIMS, PENGUIN_FRAMES, type PenguinPose } from './poses';
 import {
   PATTERN_OPACITY,
   PENGUIN_FRAME_HEIGHT,
@@ -237,6 +237,87 @@ describe('renderPenguinSvg', () => {
     expect(idA).not.toBe(idB);
     expect(idA).toContain('cell-a');
     expect(idB).toContain('cell-b');
+  });
+});
+
+// #147: a left-facing Penguin is drawn by mirroring the whole sprite
+// (`penguin-sprite.ts`'s `sprite.setFlipX`), which would also mirror any
+// baked lettering (HA HA, the JG LOGO/JG CAP "JG", WAR WEEK) and make it
+// read backwards. `renderPenguinSvg`/`renderPenguinSvgWithColors` take a
+// `facing` argument (default `'right'`) that counter-mirrors only the
+// lettering paths for a `'left'` frame, about each path's own horizontal
+// centre, wrapped in `translate(cx 0) scale(-1 1) translate(-cx 0)`.
+describe('renderPenguinSvg facing (#147)', () => {
+  /** Strips every lettering counter-mirror wrapper this fix adds, leaving the bare `<path>` underneath. */
+  function stripLetteringMirror(svg: string): string {
+    return svg.replace(
+      /<g transform="translate\(-?[\d.]+ 0\) scale\(-1 1\) translate\(-?-?[\d.]+ 0\)">(<path[^>]*><\/path>)<\/g>/g,
+      '$1',
+    );
+  }
+
+  // One look/pose combination per baked lettering path: LAUGH draws "HA HA",
+  // JG LOGO and JG CAP each draw a "JG", WAR WEEK BAND draws "WAR WEEK", and
+  // the JG_FLASH emote pose draws the JG LOGO's "JG" a second way (as a held
+  // prop, outside the body's rotate/translate group).
+  const LETTERING_CASES: Array<{ label: string; look: PenguinLook; pose?: PenguinPose }> = [
+    {
+      label: 'HA HA (LAUGH)',
+      look: { ...DEFAULT_LOOK, emote: 'LAUGH' },
+      pose: { anim: 'LAUGH', frame: 0 },
+    },
+    { label: 'JG LOGO belly pattern', look: { ...DEFAULT_LOOK, pattern: 'JG LOGO' } },
+    { label: 'WAR WEEK BAND hat', look: { ...DEFAULT_LOOK, hat: 'WAR WEEK BAND' } },
+    { label: 'JG CAP hat crown', look: { ...DEFAULT_LOOK, hat: 'JG CAP' } },
+    {
+      label: 'JG_FLASH held prop',
+      look: DEFAULT_LOOK,
+      pose: { anim: 'JG_FLASH', frame: 0 },
+    },
+  ];
+
+  it.each(LETTERING_CASES)(
+    'counter-mirrors $label for a left-facing frame, and is otherwise byte-identical to the right-facing render',
+    ({ look, pose }) => {
+      const right = renderPenguinSvg(look, pose);
+      const left = renderPenguinSvg(look, pose, {}, 'left');
+
+      expect(left).not.toBe(right);
+      // Unwrapping every lettering counter-mirror this fix adds must recover
+      // the exact right-facing (unmirrored-lettering) markup: proof that
+      // *only* the lettering paths differ between the two facings, never the
+      // body/arm/cap/prop geometry (that mirroring is the sprite flip's job,
+      // not `render-svg.ts`'s).
+      expect(stripLetteringMirror(left)).toBe(right);
+    },
+  );
+
+  it("wraps a lettering path in a mirror group about its own bounding-box centre (not the frame's shared centre)", () => {
+    const left = renderPenguinSvg(
+      { ...DEFAULT_LOOK, emote: 'LAUGH' },
+      { anim: 'LAUGH', frame: 0 },
+      {},
+      'left',
+    );
+    const escapedD = PENGUIN_TEXT_PATHS.haha.d.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const match = left.match(
+      new RegExp(
+        `<g transform="translate\\((-?[\\d.]+) 0\\) scale\\(-1 1\\) translate\\((-?[\\d.]+) 0\\)"><path d="${escapedD}"`,
+      ),
+    );
+    expect(match).not.toBeNull();
+    const [, cx, negatedCx] = match!;
+    // Its own centre, not `PENGUIN_ORIGIN.x` (60, the frame's shared centre):
+    // "HA HA" is baked `text-anchor="start"` at design x=100
+    // (`scripts/penguin-text-to-paths.ts`), well clear of 60.
+    expect(Number(cx)).not.toBe(60);
+    expect(Number(negatedCx)).toBeCloseTo(-Number(cx), 5);
+  });
+
+  it("defaults to 'right', so every existing call site (no facing argument) renders byte-identical output", () => {
+    const withoutFacing = renderPenguinSvg(DEFAULT_LOOK, { anim: 'LAUGH', frame: 0 });
+    const explicitRight = renderPenguinSvg(DEFAULT_LOOK, { anim: 'LAUGH', frame: 0 }, {}, 'right');
+    expect(explicitRight).toBe(withoutFacing);
   });
 });
 

@@ -157,7 +157,7 @@ export function createPenguin(
   let pendingKey: string | null = null;
   let pendingListener: (() => void) | null = null;
 
-  ensurePenguinTextures(scene, look);
+  ensurePenguinTextures(scene, look, facing);
 
   const sprite = new GameObjects.Sprite(scene, 0, 0, PLACEHOLDER_TEXTURE_KEY);
   sprite.setOrigin(origin.x, origin.y);
@@ -281,7 +281,7 @@ export function createPenguin(
   }
 
   function applyFrame(): void {
-    const key = penguinTextureKey(currentHash, currentAnim, currentFrame);
+    const key = penguinTextureKey(currentHash, currentAnim, currentFrame, facing);
     clearPendingListener();
     if (scene.textures.exists(key)) {
       sprite.setTexture(key);
@@ -332,14 +332,21 @@ export function createPenguin(
       play(anim);
     },
     setFacing(next: Facing) {
+      // #147: a left-facing frame's texture bakes counter-mirrored lettering
+      // (`render-svg.ts`'s `renderLettering`), so switching facing must swap
+      // the sprite's *texture* (via `applyFrame`), not just flip it -- the
+      // flip alone would mirror the already-corrected lettering right back
+      // into reading backwards.
       facing = next;
+      ensurePenguinTextures(scene, currentLook, facing);
       sprite.setFlipX(facing === 'left');
+      applyFrame();
     },
     setLook(next: PenguinLook) {
       const wasWalking = currentAnim === 'WALK';
       currentLook = next;
       currentHash = penguinLookHash(next);
-      ensurePenguinTextures(scene, next);
+      ensurePenguinTextures(scene, next, facing);
       redrawNameTag();
       play(wasWalking ? 'WALK' : next.emote);
     },
