@@ -128,18 +128,28 @@
   opacity: 0.35;
 }
 
-/* The A-3 renderer's padded 180x190 frame at the design's figure scale
-   (340px per 120 design units). Its padding lets the SIT seat and raised arms
-   spill past the podium, as in the design. */
+/* The renderer's padded frame at the design's figure scale (340px per 120
+   design units). Sized by height, which is the 130-unit figure plus 30 units
+   of padding top and bottom (190 x 340/120), so the wider side padding for
+   HA HA and the SIT seat never changes the Penguin's size. That padding lets
+   them spill past the podium, as in the design. */
 .penguin-creator__figure {
   position: relative;
   z-index: 1;
+  /* The frame is wider than the podium; flex centring overflows it evenly on
+     both sides, where the podium's grid would pin it to the left edge. */
+  display: flex;
+  justify-content: center;
+  width: 100%;
+  /* A grid item otherwise grows to its content (min-width: auto). */
+  min-width: 0;
 }
 
 .penguin-creator__figure svg {
   display: block;
-  width: 510px;
-  height: auto;
+  flex: none;
+  width: auto;
+  height: 538px;
   overflow: visible;
 }
 
