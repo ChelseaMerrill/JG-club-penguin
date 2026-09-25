@@ -5,6 +5,7 @@ import { roofDeck } from '../src/game/rooms/definitions/roof-deck';
 import { theMelt } from '../src/game/rooms/definitions/the-melt';
 import { townCenter } from '../src/game/rooms/definitions/town-center';
 import { GAME_HEIGHT, GAME_WIDTH } from '../src/game/stage-size';
+import { waitForElevatorHidden } from './support/elevator';
 import type { RoomDebugInfo } from './support/room-debug-types';
 
 test.use({ viewport: { width: GAME_WIDTH, height: GAME_HEIGHT } });
@@ -74,6 +75,7 @@ test('Map opens from the HUD in every prototype Room, with exactly one current t
       await expect
         .poll(async () => (await debugInfo(page))?.roomId, { timeout: WALK_TIMEOUT })
         .toBe(room.id);
+      await waitForElevatorHidden(page); // #52: a no-op unless this crossed a floor
     }
 
     await page.locator('.hud__button--map').click();
@@ -222,12 +224,14 @@ test('every defined Room is reachable from the Map, including the Roof Deck / Th
   await expect
     .poll(async () => (await debugInfo(page))?.roomId, { timeout: WALK_TIMEOUT })
     .toBe('roof-deck');
+  await waitForElevatorHidden(page); // #52: crossed a floor (5 -> R)
 
   await page.locator('.hud__button--map').click();
   await page.locator('[data-map-room="the-melt"]').click();
   await expect
     .poll(async () => (await debugInfo(page))?.roomId, { timeout: WALK_TIMEOUT })
     .toBe('the-melt');
+  await waitForElevatorHidden(page); // #52: crossed a floor (R -> 5)
 
   await page.locator('.hud__button--map').click();
   await page.locator('[data-map-room="town-center"]').click();
