@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { createEmitter, type RoomEventMap, type TypedEmitter } from '../contracts';
+import { createEmitter, type RoomEventMap, type RoomId, type TypedEmitter } from '../contracts';
+import { getRoomDefinition } from './rooms/registry';
 import { createStubRoomDriver, entryTileFor } from './stub-rooms';
 
 type Seen =
@@ -35,14 +36,17 @@ describe('entryTileFor', () => {
 });
 
 describe('createStubRoomDriver', () => {
-  it("emits only room:enter, at the Player's entry tile, on the first enter", () => {
+  it("emits only room:enter, at the entered Room's spawnTile, on the first enter (#43 D2)", () => {
     const { events, seen } = setup();
     const driver = createStubRoomDriver(events);
 
     driver.enter('town-center', ALICE);
 
     expect(seen).toEqual([
-      { type: 'enter', event: { roomId: 'town-center', entryTile: entryTileFor(ALICE) } },
+      {
+        type: 'enter',
+        event: { roomId: 'town-center', entryTile: getRoomDefinition('town-center').spawnTile },
+      },
     ]);
     expect(driver.currentRoom()).toBe('town-center');
   });
@@ -57,9 +61,27 @@ describe('createStubRoomDriver', () => {
 
     expect(seen).toEqual([
       { type: 'leave', event: { roomId: 'town-center' } },
-      { type: 'enter', event: { roomId: 'dev-pit', entryTile: entryTileFor(ALICE) } },
+      {
+        type: 'enter',
+        event: { roomId: 'dev-pit', entryTile: getRoomDefinition('dev-pit').spawnTile },
+      },
     ]);
     expect(driver.currentRoom()).toBe('dev-pit');
+  });
+
+  it("falls back to the Player's hashed entry tile for a Room with no RoomDefinition (#43 D2)", () => {
+    const { events, seen } = setup();
+    const driver = createStubRoomDriver(events);
+
+    // Cast past the `RoomId` union: every real `RoomId` has a registered
+    // `RoomDefinition` in this build (#16), so the fallback needs an id
+    // outside it to exercise at all.
+    const unregisteredRoomId = 'not-yet-built' as unknown as RoomId;
+    driver.enter(unregisteredRoomId, ALICE);
+
+    expect(seen).toEqual([
+      { type: 'enter', event: { roomId: unregisteredRoomId, entryTile: entryTileFor(ALICE) } },
+    ]);
   });
 
   it('is a no-op when entering the current Room again', () => {

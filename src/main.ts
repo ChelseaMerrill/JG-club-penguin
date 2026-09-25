@@ -1,7 +1,13 @@
 import './style.css';
 import { loadEnv } from './env';
 import { startGame, whenSceneReady } from './game/main';
-import type { RoomScene } from './game/rooms/RoomScene';
+import {
+  LOCAL_PENGUIN_ARRIVED_EVENT,
+  LOCAL_PENGUIN_MOVE_EVENT,
+  type LocalPenguinArrivedEvent,
+  type LocalPenguinMoveEvent,
+  type RoomScene,
+} from './game/rooms/RoomScene';
 import type { RoomPenguinView } from './game/rooms/room-penguin-view';
 import { createStubRoomDriver } from './game/stub-rooms';
 import { getSupabaseClient } from './auth/supabase-client';
@@ -69,6 +75,18 @@ let penguins: RoomPenguinView | null = null;
 const sceneReady = whenSceneReady(game).then((scene) => {
   roomScene = scene;
   penguins = scene.penguins;
+  // #43: attached once (the same Scene instance and its `events` emitter are
+  // reused across every `showRoom` restart). A local walk's start/re-route
+  // broadcasts `move`; its arrival (never a queued re-route, never an
+  // own-tile no-op) tracks the Presence tile once, not per step or frame.
+  scene.events.on(LOCAL_PENGUIN_MOVE_EVENT, (event: LocalPenguinMoveEvent) => {
+    roomChannel?.send('move', { target: event.target }).catch((err: unknown) => {
+      console.error('[main] move broadcast failed', err);
+    });
+  });
+  scene.events.on(LOCAL_PENGUIN_ARRIVED_EVENT, (event: LocalPenguinArrivedEvent) => {
+    roomChannel?.setTile(event.tile, event.facing);
+  });
   return scene.penguins;
 });
 
@@ -241,6 +259,11 @@ async function startSession(player: Player, previous: RoomChannel | null): Promi
   });
   channel.onRoomChange((roomId) => debugOverlay?.setCurrentRoom(roomId));
   channel.onSubscribedChange((subscribed) => debugOverlay?.setSubscribed(subscribed));
+  // #43: a remote Player's click-to-move walks their Penguin the same way
+  // ours does, rather than snapping it forward.
+  channel.on('move', ({ playerId, target }) => {
+    view.walkTo(playerId, target);
+  });
 
   rooms.enter(SPAWN_ROOM_ID, player.id);
 }
