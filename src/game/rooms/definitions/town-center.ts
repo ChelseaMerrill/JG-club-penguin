@@ -184,9 +184,11 @@ const CORE_VALUES_POSTER_HOTSPOT: RoomHotspot = {
  * "ELEVATOR · ROOF DECK" (real; its hotspot is the two animated door panels'
  * bounding box, since it isn't drawn with the same `door()` frame as the
  * others). The design also shows a "KITCHEN ↘" HUD exit pill with no in-scene
- * door graphic to place a hotspot on, so this Room has no door to The Melt
- * (The Melt's own "← TOWN CENTER" door is one-way in this static prototype;
- * see the #16 execution plan's reported deviations).
+ * door graphic to place a hotspot on, so this Room has no door to the Kitchen
+ * (the Kitchen's own "← TOWN CENTER" door is one-way in this static
+ * prototype; see the #16 execution plan's reported deviations). #92 D3
+ * resync: this Room's only design change was a cosmetic tweak to Anthony's
+ * (Roof Deck) cameo figure, so this trace is otherwise unchanged.
  */
 export const townCenter: RoomDefinition = {
   id: 'town-center',

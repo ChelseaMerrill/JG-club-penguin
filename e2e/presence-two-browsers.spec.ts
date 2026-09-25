@@ -1,7 +1,14 @@
+/**
+ * Runs against the real shared Supabase project (#81): other Players can be
+ * in Town Center at the same time, so this only asserts on the specific
+ * test-user Player ids (`idA`/`idB`), never on the roster's total count. See
+ * "Running the two-browser e2e specs" in the README.
+ */
 import { mkdirSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { hasTestUsers, passwordSessionState } from './support/password-session';
+import { assertTestUsersAbsent, playerIdFromStorageState } from './support/presence-guard';
 import {
   completeCreatorIfShown,
   readOwnPlayerId,
@@ -59,6 +66,13 @@ test('presence-two-browsers', async ({ browser, baseURL }) => {
   const stateA = haveStateFiles ? AUTH_STATE_A : await passwordSessionState('A', origin);
   const stateB = haveStateFiles ? AUTH_STATE_B : await passwordSessionState('B', origin);
 
+  // #81: fail fast if another run is still using this pair of test users
+  // in Town Center, before opening any browser context.
+  await assertTestUsersAbsent([
+    { label: 'A', playerId: playerIdFromStorageState(stateA) },
+    { label: 'B', playerId: playerIdFromStorageState(stateB) },
+  ]);
+
   rmSync(OUTPUT_DIR, { recursive: true, force: true });
   mkdirSync(OUTPUT_DIR, { recursive: true });
   rmSync(VIDEO_DIR, { recursive: true, force: true });
@@ -99,7 +113,9 @@ test('presence-two-browsers', async ({ browser, baseURL }) => {
     await expectLookMatches(rosterOnB(idA), pageA);
 
     // AC2: five Room round trips. B loses/regains exactly one li for A each
-    // time; A's own roster (which never shows A) never grows duplicates.
+    // time; A's own roster shows B exactly once and never A. It isn't
+    // checked by total count: on the shared Supabase project it can also
+    // list Players other than B (#81).
     for (let i = 0; i < 5; i++) {
       await pageA.click('button[data-room="dev-pit"]');
       await expect(rosterOnB(idA)).toHaveCount(0, { timeout: PROPAGATION_TIMEOUT });
@@ -109,7 +125,8 @@ test('presence-two-browsers', async ({ browser, baseURL }) => {
       await expect(rosterOnB(idA)).toHaveCount(1, { timeout: PROPAGATION_TIMEOUT });
       await expect.poll(() => shownRoom(pageA)).toBe('town-center');
 
-      expect(await pageA.locator('ul.debug-roster li').count()).toBeLessThanOrEqual(1);
+      await expect(rosterOnA(idB)).toHaveCount(1, { timeout: PROPAGATION_TIMEOUT });
+      await expect(rosterOnA(idA)).toHaveCount(0, { timeout: PROPAGATION_TIMEOUT });
     }
 
     // AC3: a look change (including a new name) propagates to the other

@@ -464,7 +464,7 @@ describe('ROOM_DEFINITIONS registry', () => {
       subtitle: 'TEAM RMS 1–4 · FLOOR 5',
     });
     expect(getRoomDefinition('the-melt')).toMatchObject({
-      title: 'THE MELT',
+      title: 'THE KITCHEN',
       subtitle: 'KITCHEN · FLOOR 5',
     });
     expect(getRoomDefinition('roof-deck')).toMatchObject({

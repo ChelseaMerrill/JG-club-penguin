@@ -16,14 +16,14 @@ export interface StorageState {
 
 export type TestUser = 'A' | 'B';
 
-interface TestEnv {
+export interface TestEnv {
   supabaseUrl: string;
   anonKey: string;
   users: Partial<Record<TestUser, { email: string; password: string }>>;
 }
 
 /** Reads `.env`, `.env.test` and `.env.test.local` (Vite's `test` mode). */
-function readTestEnv(): TestEnv {
+export function readTestEnv(): TestEnv {
   const env = loadEnv('test', process.cwd(), '');
   const users: TestEnv['users'] = {};
   for (const user of ['A', 'B'] as const) {
