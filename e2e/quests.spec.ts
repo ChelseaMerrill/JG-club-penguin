@@ -107,9 +107,10 @@ test('the widget tracks the main Quest and opens the Quests panel; TRACK and BAD
   const panel = page.locator('.quests');
   await expect(panel).toBeVisible();
   await expect(widget).toBeHidden();
-  await expect(panel.locator('[data-quests-tab="active"]')).toHaveText('ACTIVE · 4');
+  // Main + one per registered Minigame (Bug Squash, Pancake Flip, Snow Cone Stand, Coffee Rush).
+  await expect(panel.locator('[data-quests-tab="active"]')).toHaveText('ACTIVE · 5');
   await expect(panel.locator('[data-quests-tab="done"]')).toHaveText('DONE · 0');
-  await expect(panel.locator('.quests__row')).toHaveCount(4);
+  await expect(panel.locator('.quests__row')).toHaveCount(5);
   const main = panel.locator('[data-quest-id="main"]');
   await expect(main.locator('.quests__row-progress')).toHaveText('1 / 5');
   await expect(main.locator('.quests__row-location')).toHaveText('MAIN · ANY ROOM');
@@ -231,6 +232,14 @@ test('every Quest done: the widget shows ALL QUESTS DONE with a line and opens t
       bestStreak: 0,
     });
     await t.recordRound('snow-cone-stand', 0, { cone25: 8 });
+    await t.recordRound('coffee-rush', 15, {
+      small: 15,
+      medium: 0,
+      large: 0,
+      perfect: 0,
+      spilled: 0,
+      lost: 0,
+    });
     await t.purchase('beanbag');
   });
 
@@ -244,9 +253,9 @@ test('every Quest done: the widget shows ALL QUESTS DONE with a line and opens t
   await widget.click();
   const panel = page.locator('.quests');
   await expect(panel).toBeVisible();
-  await expect(panel.locator('[data-quests-tab="done"]')).toHaveText('DONE · 4');
+  await expect(panel.locator('[data-quests-tab="done"]')).toHaveText('DONE · 5');
   await expect(panel.locator('[data-quests-tab="done"]')).toHaveAttribute('aria-pressed', 'true');
-  await expect(panel.locator('.quests__row')).toHaveCount(4);
+  await expect(panel.locator('.quests__row')).toHaveCount(5);
 
   expect(errors).toEqual([]);
 });
