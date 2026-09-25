@@ -18,6 +18,8 @@ import {
   type RegisteredPlayer,
 } from '../movement/registered-player';
 import { doorApproachTile, npcInteractionTile } from '../movement/targets';
+import { getNpcDefinition } from '../../npcs/npcs';
+import { createNpcSprite, type NpcSprite } from '../npcs/npc-sprite';
 import { createPenguin, type Penguin, type PenguinAnim } from '../penguin';
 import { GAME_HEIGHT, GAME_WIDTH } from '../stage-size';
 import { planBackgroundDraw } from './background';
@@ -87,11 +89,16 @@ const DOOR_LABEL_DEPTH = 1;
 const LABEL_FONT_FAMILY = 'sans-serif';
 const LABEL_TEXT_COLOR = '#F4F4F4';
 const DOOR_LABEL_FONT_SIZE = '14px';
-const NPC_LABEL_FONT_SIZE = '12px';
-const NPC_LABEL_OFFSET_Y = -30;
-
-const NPC_RADIUS = 18;
-const NPC_COLOR = 0x00bdff;
+/**
+ * The invisible click zone over each NPC sprite (#36 D3/A4): sized to
+ * roughly the figure's own 120-wide box, centred a bit above the sprite's
+ * feet-anchor point since the figure extends mostly upward from it -- not an
+ * alpha-0 shape, which Phaser drops from input hit-testing the same way
+ * `drawDoors`'s own image-background `Zone` avoids that trap.
+ */
+const NPC_HIT_ZONE_WIDTH = 110;
+const NPC_HIT_ZONE_HEIGHT = 160;
+const NPC_HIT_ZONE_OFFSET_Y = -70;
 
 const FURNITURE_WIDTH = 40;
 const FURNITURE_HEIGHT = 28;
@@ -185,6 +192,7 @@ export class RoomScene extends Scene {
   private queuedMove: QueuedMove | null = null;
   private npcHitAreas: HitArea<RoomNpcSlot>[] = [];
   private doorHitAreas: HitArea<RoomDoor>[] = [];
+  private npcSprites: NpcSprite[] = [];
   private npcArrivedLog: string[] = [];
   private doorReachedLog: string[] = [];
   private localPenguinMoveLog: Tile[] = [];
@@ -236,6 +244,8 @@ export class RoomScene extends Scene {
     this.queuedMove = null;
     this.debugPenguins.forEach((debugPenguin) => debugPenguin.destroy());
     this.debugPenguins = [];
+    this.npcSprites.forEach((npcSprite) => npcSprite.destroy());
+    this.npcSprites = [];
   };
 
   constructor() {
@@ -260,6 +270,7 @@ export class RoomScene extends Scene {
     this.doorReachedLog = [];
     this.localPenguinMoveLog = [];
     this.debugPenguins = [];
+    this.npcSprites = [];
   }
 
   /** Resolves once the first `create()` has run. */
@@ -716,21 +727,36 @@ export class RoomScene extends Scene {
     }
   }
 
+  /**
+   * Draws each Room's NPCs (#36 D3/A4, replacing #13's placeholder circle and
+   * id label): the NPC's own sprite (figure, name tag, speech bubble) from
+   * `src/npcs/npcs.ts`'s data, at the slot's tile, depth-sorted the same way
+   * as the local/remote Penguins. A slot naming an id with no `NpcDefinition`
+   * is skipped (should never happen once `npcs.ts` covers every slot; #36
+   * reports any gap instead of inventing one).
+   *
+   * The click target stays a separate invisible `Zone` (#14's own
+   * `npcHitAreas`/`handleNpcClick` path is unchanged): an alpha-0 shape is
+   * excluded from Phaser's input hit-testing, the same trap #16 already
+   * worked around for a door drawn over image art.
+   */
   private drawNpcs(room: RoomDefinition): void {
     for (const slot of room.npcSlots) {
+      const npc = getNpcDefinition(slot.npcId);
+      if (!npc) continue;
+
       const point = tileToScreen(slot.tile, room.grid.origin);
       const depth = depthForTile(slot.tile);
-      const circle = this.add.circle(point.x, point.y, NPC_RADIUS, NPC_COLOR).setDepth(depth);
-      circle.setInteractive({ useHandCursor: true });
-      this.npcHitAreas.push({ object: circle, data: slot });
-      this.add
-        .text(point.x, point.y + NPC_LABEL_OFFSET_Y, slot.npcId, {
-          fontFamily: LABEL_FONT_FAMILY,
-          fontSize: NPC_LABEL_FONT_SIZE,
-          color: LABEL_TEXT_COLOR,
-        })
-        .setOrigin(0.5)
-        .setDepth(depth + 1);
+
+      const npcSprite = createNpcSprite(this, point.x, point.y, npc);
+      npcSprite.container.setDepth(depth);
+      this.npcSprites.push(npcSprite);
+
+      const zone = this.add
+        .zone(point.x, point.y + NPC_HIT_ZONE_OFFSET_Y, NPC_HIT_ZONE_WIDTH, NPC_HIT_ZONE_HEIGHT)
+        .setDepth(depth)
+        .setInteractive({ useHandCursor: true });
+      this.npcHitAreas.push({ object: zone, data: slot });
     }
   }
 }

@@ -31,6 +31,8 @@ import { MINIGAME_OVERLAY_ID } from './minigames/minigame-shell';
 import { createPenguinCreator } from './ui/penguin-creator';
 import { createPenguinEditor } from './penguin/penguin-editor';
 import { initDevCreatorHook } from './penguin/dev-creator-hook';
+import { createNpcDialog } from './ui/npc-dialog/npc-dialog';
+import { recordNpcTalked, recordOpenStall } from './game/rooms/dev-room-hook';
 
 // Fail fast on a missing or malformed .env before anything boots.
 loadEnv();
@@ -222,6 +224,27 @@ const minigameLauncher = createMinigameLauncher({
   overlays: hud.overlays,
   resolveRoomTitle,
   registry: createDefaultMinigameRegistry(),
+});
+
+// NPC dialog (#36). #37 is on `main`, so GRAB THE HAMMER/GRAB THE SPATULA
+// open the real Minigame shell via `minigameLauncher.launch`, not a logged
+// stub. #40 (the Igloo Gear stall) isn't built yet, so `openStall` stays a
+// logged no-op; `npc:talked` and every `openStall` call are also recorded to
+// `window.__roomDebug` for `e2e/npcs.spec.ts` (`dev-room-hook.ts`).
+createNpcDialog(getUiLayer(), {
+  overlays: hud.overlays,
+  actions: {
+    launchMinigame: (minigameId) => {
+      minigameLauncher.launch(minigameId);
+    },
+    openStall: (stallId) => {
+      console.info(`[npc-dialog] openStall("${stallId}") -- #40 isn't built yet`);
+      recordOpenStall(stallId);
+    },
+  },
+});
+gameEvents.on('npc:talked', ({ npcId }) => {
+  recordNpcTalked(npcId);
 });
 
 // Must run before `startAuth`: Supabase's `onAuthStateChange` always fires
