@@ -59,6 +59,22 @@ export const PENGUIN_FRAME_HEIGHT = PENGUIN_VIEWBOX_HEIGHT + PENGUIN_FRAME_PADDI
 export const PENGUIN_ORIGIN = { x: 60, y: 120 };
 
 /**
+ * The feet-anchor fractional origin (`Sprite.setOrigin`) for any sprite drawn
+ * in this same padded 120x130 frame, in `[0, 1]` fractions of the frame's own
+ * width/height -- `PENGUIN_ORIGIN` converted from design-space pixels to a
+ * fraction of `PENGUIN_FRAME_WIDTH`/`HEIGHT`. Shared by #31's own Penguin
+ * sprite (`penguin-sprite.ts`) and #36's NPC sprite (`npc-sprite.ts`, whose
+ * Human figures and fixed-look Penguins both render into this exact frame),
+ * so the math lives in one place (#36 round-1 review item 8).
+ */
+export function penguinFeetOrigin(): { x: number; y: number } {
+  return {
+    x: (PENGUIN_ORIGIN.x + PENGUIN_FRAME_PADDING_X) / PENGUIN_FRAME_WIDTH,
+    y: (PENGUIN_ORIGIN.y + PENGUIN_FRAME_PADDING_Y) / PENGUIN_FRAME_HEIGHT,
+  };
+}
+
+/**
  * The design's own body-rotation pivot: `design/Penguin Creator.dc.html`
  * line 37's `transform-origin: 50% 100%` on the figure's animated wrapper
  * div. 50% of its width is this viewBox's horizontal centre (`60`); 100% of

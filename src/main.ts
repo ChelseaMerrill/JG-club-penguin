@@ -325,27 +325,6 @@ const minigameLauncher = createMinigameLauncher({
   registry: createDefaultMinigameRegistry(),
 });
 
-// NPC dialog (#36). #37 is on `main`, so GRAB THE HAMMER/GRAB THE SPATULA
-// open the real Minigame shell via `minigameLauncher.launch`, not a logged
-// stub. #40 (the Igloo Gear stall) isn't built yet, so `openStall` stays a
-// logged no-op; `npc:talked` and every `openStall` call are also recorded to
-// `window.__roomDebug` for `e2e/npcs.spec.ts` (`dev-room-hook.ts`).
-createNpcDialog(getUiLayer(), {
-  overlays: hud.overlays,
-  actions: {
-    launchMinigame: (minigameId) => {
-      minigameLauncher.launch(minigameId);
-    },
-    openStall: (stallId) => {
-      console.info(`[npc-dialog] openStall("${stallId}") -- #40 isn't built yet`);
-      recordOpenStall(stallId);
-    },
-  },
-});
-gameEvents.on('npc:talked', ({ npcId }) => {
-  recordNpcTalked(npcId);
-});
-
 // The Igloo's Trophy Case (#42): reloads `store.loadAll()` on every open
 // (no live update, no persistence -- #34), registered with `hud.overlays` so
 // Escape closes it and it closes any other open overlay first.
@@ -374,6 +353,29 @@ gameEvents.on('hotspot:click', ({ hotspotId }) => {
   if (hotspotId !== 'igloo-gear-stall') return;
   hud.overlays.open(MARKET_OVERLAY_ID, () => market.close());
   void market.open();
+});
+
+// NPC dialog (#36). #37 is on `main`, so GRAB THE HAMMER/GRAB THE SPATULA
+// open the real Minigame shell via `minigameLauncher.launch`. #40 is also on
+// `main` now, so Casey's own stall button opens the same real Market panel
+// the Roof Deck's `igloo-gear-stall` hotspot does, above. `npc:talked` and
+// every `openStall` call are still recorded to `window.__roomDebug` for
+// `e2e/npcs.spec.ts` (`dev-room-hook.ts`).
+createNpcDialog(getUiLayer(), {
+  overlays: hud.overlays,
+  actions: {
+    launchMinigame: (minigameId) => {
+      minigameLauncher.launch(minigameId);
+    },
+    openStall: (stallId) => {
+      recordOpenStall(stallId);
+      hud.overlays.open(MARKET_OVERLAY_ID, () => market.close());
+      void market.open();
+    },
+  },
+});
+gameEvents.on('npc:talked', ({ npcId }) => {
+  recordNpcTalked(npcId);
 });
 
 // A toast "wherever the Player is" for every earned Badge (#42), not just

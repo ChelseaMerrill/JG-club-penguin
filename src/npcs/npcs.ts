@@ -34,39 +34,103 @@ export type NpcId =
   | 'tonya'
   | 'jesse';
 
-/** Ian's Bug Squash / Chelsea's Pancake Flip trigger dialog (#36 D4). */
+/**
+ * Ian's Bug Squash / Chelsea's Pancake Flip trigger dialog (#36 D4; round-1
+ * review item 4 adds `triggerLine`/`subtitle`, the minigame design's own
+ * trigger-phase quote and "ROOM · ROLE"/"ROOM · GAME" badge next to the
+ * NPC's name, verbatim from `design/Minigame Bug Squash.dc.html` /
+ * `design/Minigame Pancake Flip.dc.html`).
+ */
 export interface NpcMinigameDialog {
   kind: 'minigame';
   minigameId: MinigameId;
   /** `design/Minigame Bug Squash.dc.html` / `design/Minigame Pancake Flip.dc.html`'s own button copy. */
   actionLabel: string;
   declineLabel: string;
+  /** The minigame design's own trigger-phase paragraph. */
+  triggerLine: string;
+  /** The minigame design's own name-badge text (e.g. "DEV PIT · VP OF ENGINEERING"). */
+  subtitle: string;
 }
 
-/** Casey's Igloo Gear stall trigger (#36 D4/D5; #40 isn't built, so this stays a logged no-op until then). */
+/** Casey's Igloo Gear stall trigger (#36 D4/D5, wired to #40's real Market panel). */
 export interface NpcStallDialog {
   kind: 'stall';
   stallId: string;
 }
 
-/** Every other NPC: its idle line and a close button, nothing else. */
+/** Every other NPC: its dialog line and a close button, nothing else. */
 export interface NpcLineDialog {
   kind: 'line';
 }
 
 export type NpcDialog = NpcMinigameDialog | NpcStallDialog | NpcLineDialog;
 
+/**
+ * One line of an NPC's idle speech-bubble cycle, ported from a Room design's
+ * own `say`-style CSS animation (`design/Room 01 Town Center.dc.html` and
+ * siblings) (#36 round-1 review item 2/3b): `periodS` is the animation's own
+ * duration, and `delayS` is its CSS `animation-delay` (typically negative,
+ * "already elapsed at load"), both normalized onto the shared 7%-26%-of-
+ * period visible window Dev Pit's and Roof Deck's generic `@keyframes say`
+ * use (Town Center's own per-NPC keyframes -- `sayDarrin`, `saySyd`, `sayJon`
+ * -- are converted to an equivalent delay under that same window, so every
+ * NPC's cycle uses one shared render-side timing model).
+ *
+ * `periodS: 0` means the design shows this line statically, with no cycling
+ * at all (Front Desk, and every The Melt NPC -- `design/Room 04
+ * Kitchen.dc.html` has zero `animation:say` occurrences).
+ */
+export interface NpcBubbleLine {
+  text: string;
+  periodS: number;
+  delayS: number;
+}
+
 interface NpcDefinitionBase {
   id: NpcId;
+  /** The character sheet's full name (#36 round-1 review item 1); shown in the dialog panel. */
   name: string;
-  /** `null` where the design shows "TITLE TBD" (or `design/build/humans.js`'s
-   *  equivalent unresolved `title` placeholder, "ROLE TBD · SEND ME THIS ONE"). */
+  /**
+   * `null` where `design/Characters.dc.html`'s footnote (line ~217) lists the
+   * NPC as still "TITLE TBD" (Chelsea, Tom, Dom, Ashley, Emily, Millie,
+   * Casey, Ryan, Sam), or where a Penguin-kind background NPC has no title at
+   * all. `design/build/humans.js`'s own `title` field is used only for
+   * figure-adjacent flavor and is NOT authoritative here -- it resolves
+   * several of these to a guessed title ("Developer", "Team Lead") the sheet
+   * itself still marks unresolved; the sheet wins per D1/A3 (#36 round-1
+   * review item 1).
+   */
   title: string | null;
   /** The Room whose `npcSlots` place this NPC (#36 D1: derived from #16's
    *  Room definitions, not duplicated as a tile here). */
   roomId: RoomId;
-  idleLine: string;
+  /**
+   * The in-Room nameplate text (#36 round-1 review item 5): Dev Pit and Roof
+   * Deck use first names ("Ian", "Kevin"); Town Center and The Melt use full
+   * names ("Darrin Jahnel", "Chelsea Merrill"), per each Room design's own
+   * nameplate markup.
+   */
+  tagName: string;
+  /** The idle speech-bubble cycle, from the Room design's own `say` bubbles. */
+  idleLines: NpcBubbleLine[];
+  /**
+   * The line `npc-dialog.ts` shows for a `kind: 'line'` or `kind: 'stall'`
+   * NPC's dialog panel: the character sheet's own short quote (distinct from
+   * `idleLines` above, which is the Room design's separate in-World bubble
+   * cycle). A `kind: 'minigame'` NPC's dialog uses `dialog.triggerLine`
+   * instead.
+   */
+  dialogLine: string;
   dialog: NpcDialog;
+  /**
+   * Roof Deck's vendor stalls (Kevin, Ann Marie, Josh, Casey) float their
+   * speech bubble left of their own nameplate/figure centre by this many
+   * pixels (#36 round-1 review item 3c; traced directly from the Room
+   * design's own bubble-vs-nameplate x offset, exactly -90 for all four,
+   * exactly 0 for every other Roof Deck NPC).
+   */
+  bubbleOffsetX?: number;
 }
 
 /** A Human NPC (`design/build/humans.js`'s figures), rendered by `render-npc-svg.ts`. */
@@ -88,6 +152,9 @@ const BUG_SQUASH_DIALOG: NpcMinigameDialog = {
   minigameId: 'bug-squash',
   actionLabel: 'GRAB THE HAMMER',
   declineLabel: 'NOT MY TICKET',
+  triggerLine:
+    "CI is red. Something's crawling through the test suite and I've got a 2 o'clock. Grab the hammer, squash what you find. 500 points and I'll put you on the Exterminator wall.",
+  subtitle: 'DEV PIT · VP OF ENGINEERING',
 };
 
 const PANCAKE_FLIP_DIALOG: NpcMinigameDialog = {
@@ -95,11 +162,19 @@ const PANCAKE_FLIP_DIALOG: NpcMinigameDialog = {
   minigameId: 'pancake-flip',
   actionLabel: 'GRAB THE SPATULA',
   declineLabel: 'I BURN TOAST',
+  triggerLine:
+    'Batter is mixed, griddle is hot, and Tom keeps eating the burnt ones. Watch the color and flip on GOLDEN. Twenty on the stack and you are in the Breakfast Club.',
+  subtitle: 'THE MELT · PANCAKE FLIP',
 };
 
 const IGLOO_GEAR_STALL_DIALOG: NpcStallDialog = { kind: 'stall', stallId: 'igloo-gear' };
 
 const LINE_DIALOG: NpcLineDialog = { kind: 'line' };
+
+/** A single static line, for the NPCs whose Room design shows no `say` cycling animation at all. */
+function staticLine(text: string): NpcBubbleLine[] {
+  return [{ text, periodS: 0, delayS: 0 }];
+}
 
 /**
  * The fixed look most background/market Penguin-kind NPCs share (Front Desk,
@@ -115,23 +190,21 @@ const MARKET_PENGUIN_LOOK: PenguinLook = { ...DEFAULT_LOOK, name: '' };
 const TRISTIN_LOOK: PenguinLook = { ...DEFAULT_LOOK, name: '', body: '#3a4046', cap: '#0C4B5F' };
 
 /**
- * `NPCS`: every prototype Room's NPC, keyed by `NpcId` (#36 D1). Names,
- * titles and idle lines come from `design/build/humans.js`'s `PEOPLE` array
- * (the structured data the character sheet and Room figures are themselves
- * built from) for the 16 Human NPCs, and from each Room's own `.dc.html`
- * inline speech-bubble/nameplate markup for the 6 Penguin-kind background
- * NPCs it draws (none of which appear in `design/Characters.dc.html`'s "24
- * humans" sheet).
+ * `NPCS`: every prototype Room's NPC, keyed by `NpcId` (#36 D1). Names come
+ * from `design/Characters.dc.html`'s character sheet (D1/A3); titles come
+ * from the same sheet, with `null` for every "TITLE TBD" card its footnote
+ * lists (Chelsea, Dom, Ashley, Millie, Casey, Ryan, Sam) plus Ann Marie's own
+ * resolved "SUBSCRIPTION AI" (#36 round-1 review item 1).
+ * `design/build/humans.js`'s figure `spec`s are used for the Human NPCs'
+ * rendered figures only, never for name/title. `idleLines` come from each
+ * Room design's own `say`-cycling (or static) speech bubbles (round-1 item
+ * 2), and `dialogLine` is the sheet's own short quote, shown in the dialog
+ * panel instead.
  *
- * `design/build/humans.js` is preferred over `design/Characters.dc.html`
- * where the two disagree (#36 deviation, reported): `ryan` and `sam` are
- * "DJ · MUSIC TRACKS"/"MC · FREESTYLE" at "The Mullet (Mezzanine)" on the
- * character sheet, a Room outside this prototype's five, but
- * `design/build/humans.js` -- the file that actually renders every figure --
- * resolves both of them to ordinary Dev Pit developers ("WANDERING NPC · CODE
- * REVIEW"/"PAIR PROGRAMMER"), matching where #16's `devPit.npcSlots` actually
- * places them. The character sheet looks like a stale snapshot for these two;
- * `humans.js`'s data is used throughout.
+ * The 6 Penguin-kind background NPCs (Front Desk, Kevin, Tristin, Chef
+ * Chelsea, Tonya, Jesse) are named, drawn characters in their own Room's
+ * `.dc.html` inline SVG but never appear in the character sheet's "24
+ * humans" -- their name/line/tag all come from that inline markup instead.
  */
 export const NPCS: Record<NpcId, NpcDefinition> = {
   darrin: {
@@ -140,7 +213,12 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     title: 'Founder & CEO',
     roomId: 'town-center',
     kind: 'human',
-    idleLine: 'Show me energy.',
+    tagName: 'Darrin Jahnel',
+    dialogLine: 'Show me energy.',
+    idleLines: [
+      { text: "LET'S GO! Who's shipping today?!", periodS: 11, delayS: -0.22 },
+      { text: 'YOU. ARE. CRUSHING IT.', periodS: 11, delayS: -5.28 },
+    ],
     dialog: LINE_DIALOG,
     figure: {
       style: 'short',
@@ -159,7 +237,9 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     title: 'President',
     roomId: 'town-center',
     kind: 'human',
-    idleLine: 'Welcome to JG. Sunglasses stay on.',
+    tagName: 'Jon Keller',
+    dialogLine: 'Welcome to JG. Sunglasses stay on.',
+    idleLines: [{ text: 'Wanna see a magic trick?', periodS: 14, delayS: -1.68 }],
     dialog: LINE_DIALOG,
     figure: {
       style: 'spiky',
@@ -179,7 +259,12 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     title: 'Technical Recruiter',
     roomId: 'town-center',
     kind: 'human',
-    idleLine: 'Welcome to JG HQ!',
+    tagName: 'Sydney Murauskas',
+    dialogLine: 'Welcome to JG HQ!',
+    idleLines: [
+      { text: 'Look what we won!', periodS: 24, delayS: -3.36 },
+      { text: 'Serve. Grind. Grow. Inspire.', periodS: 24, delayS: -12.72 },
+    ],
     dialog: LINE_DIALOG,
     figure: {
       style: 'straightLong',
@@ -198,17 +283,24 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     title: null,
     roomId: 'town-center',
     kind: 'penguin',
-    idleLine: 'Welcome to JG HQ!',
+    tagName: 'Front Desk',
+    dialogLine: 'Welcome to JG HQ!',
+    idleLines: staticLine('Welcome to JG HQ!'),
     dialog: LINE_DIALOG,
     look: MARKET_PENGUIN_LOOK,
   },
   ashley: {
     id: 'ashley',
     name: 'Ashley Schuliger',
-    title: 'Developer',
+    title: null,
     roomId: 'dev-pit',
     kind: 'human',
-    idleLine: 'The chicken stays. Non-negotiable.',
+    tagName: 'Ashley',
+    dialogLine: 'The chicken stays. Non-negotiable.',
+    idleLines: [
+      { text: 'Most spirited. Deal with it.', periodS: 14, delayS: -5 },
+      { text: 'Catch!', periodS: 14, delayS: -9.5 },
+    ],
     dialog: LINE_DIALOG,
     figure: {
       style: 'wavyLong',
@@ -226,7 +318,12 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     title: 'VP of Engineering',
     roomId: 'dev-pit',
     kind: 'human',
-    idleLine: 'Who broke CI? Be honest.',
+    tagName: 'Ian',
+    dialogLine: 'Who broke CI? Be honest.',
+    idleLines: [
+      { text: 'Who broke CI? Be honest.', periodS: 12, delayS: -1 },
+      { text: 'Green means go home.', periodS: 12, delayS: -7 },
+    ],
     dialog: BUG_SQUASH_DIALOG,
     figure: {
       style: 'bald',
@@ -245,7 +342,12 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     title: 'CTO',
     roomId: 'dev-pit',
     kind: 'human',
-    idleLine: 'Architecture question. Ready?',
+    tagName: 'Steven',
+    dialogLine: 'Architecture question. Ready?',
+    idleLines: [
+      { text: 'Architecture question. Ready?', periodS: 13, delayS: -3 },
+      { text: 'It scales. Probably.', periodS: 13, delayS: -9 },
+    ],
     dialog: LINE_DIALOG,
     figure: {
       style: 'shortDark',
@@ -263,10 +365,16 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
   dom: {
     id: 'dom',
     name: 'Dom Favata',
-    title: 'Developer',
+    title: null,
     roomId: 'dev-pit',
     kind: 'human',
-    idleLine: 'p95 is spicy today.',
+    tagName: 'Dom',
+    dialogLine: 'p95 is spicy today.',
+    idleLines: [
+      { text: 'Parkour!', periodS: 18, delayS: -1 },
+      { text: 'Dashboards are lava.', periodS: 18, delayS: -7 },
+      { text: 'Do not tell facilities.', periodS: 18, delayS: -13 },
+    ],
     dialog: LINE_DIALOG,
     figure: {
       style: 'short',
@@ -280,11 +388,17 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
   },
   ryan: {
     id: 'ryan',
-    name: 'Ryan',
-    title: 'Developer',
+    name: 'Ryan Shendler',
+    title: null,
     roomId: 'dev-pit',
     kind: 'human',
-    idleLine: 'LGTM. One nit.',
+    tagName: 'Ryan',
+    dialogLine: 'LGTM. One nit.',
+    idleLines: [
+      { text: 'LGTM. One nit.', periodS: 20, delayS: -2 },
+      { text: 'This diagram is load-bearing.', periodS: 20, delayS: -8 },
+      { text: 'Whiteboard is the real repo.', periodS: 20, delayS: -14 },
+    ],
     dialog: LINE_DIALOG,
     figure: {
       style: 'short',
@@ -299,11 +413,17 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
   },
   sam: {
     id: 'sam',
-    name: 'Sam',
-    title: 'Developer',
+    name: 'Sam Schantz',
+    title: null,
     roomId: 'dev-pit',
     kind: 'human',
-    idleLine: 'Have you tried turning it off?',
+    tagName: 'Sam',
+    dialogLine: 'Have you tried turning it off?',
+    idleLines: [
+      { text: 'Have you tried turning it off?', periodS: 20, delayS: -4 },
+      { text: 'Drawing the architecture. Again.', periodS: 20, delayS: -11 },
+      { text: 'Ship it Friday. What could go wrong.', periodS: 20, delayS: -17 },
+    ],
     dialog: LINE_DIALOG,
     figure: {
       style: 'spiky',
@@ -322,17 +442,26 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     title: null,
     roomId: 'roof-deck',
     kind: 'penguin',
-    idleLine: 'Hexles bounce. 800 tokens.',
+    tagName: 'Kevin',
+    dialogLine: 'Hexles bounce. 800 tokens.',
+    idleLines: [
+      { text: 'Hexles bounce. 800 tokens.', periodS: 13, delayS: -2 },
+      { text: 'They bite. Gently.', periodS: 13, delayS: -9 },
+    ],
+    bubbleOffsetX: -90,
     dialog: LINE_DIALOG,
     look: MARKET_PENGUIN_LOOK,
   },
   'ann-marie': {
     id: 'ann-marie',
     name: 'Ann Marie Berdar',
-    title: null,
+    title: 'SUBSCRIPTION AI',
     roomId: 'roof-deck',
     kind: 'human',
-    idleLine: 'That cap? Totally your color.',
+    tagName: 'Ann Marie',
+    dialogLine: 'That cap? Totally your color.',
+    idleLines: [{ text: 'Try it on!', periodS: 12, delayS: -6 }],
+    bubbleOffsetX: -90,
     dialog: LINE_DIALOG,
     figure: {
       style: 'wavyLong',
@@ -348,10 +477,12 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
   millie: {
     id: 'millie',
     name: 'Millie Elliott',
-    title: 'Team Lead',
+    title: null,
     roomId: 'roof-deck',
     kind: 'human',
-    idleLine: 'Quick question before you go in.',
+    tagName: 'Millie',
+    dialogLine: 'Quick question before you go in.',
+    idleLines: [{ text: 'Team lead perk: free cone.', periodS: 20, delayS: -7 }],
     dialog: LINE_DIALOG,
     figure: {
       style: 'highBun',
@@ -370,7 +501,13 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     title: 'Senior Project Manager',
     roomId: 'roof-deck',
     kind: 'human',
-    idleLine: 'Pumpkin spice is a lifestyle.',
+    tagName: 'Josh',
+    dialogLine: 'Pumpkin spice is a lifestyle.',
+    idleLines: [
+      { text: 'Snowcones are 15!', periodS: 11, delayS: -3 },
+      { text: 'Pumpkin spice, obviously.', periodS: 11, delayS: -8.5 },
+    ],
+    bubbleOffsetX: -90,
     dialog: LINE_DIALOG,
     figure: {
       style: 'bald',
@@ -390,7 +527,13 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     title: 'Senior Vice President',
     roomId: 'roof-deck',
     kind: 'human',
-    idleLine: "Giddy up. Arcade's this way.",
+    tagName: 'Brandon',
+    dialogLine: "Giddy up. Arcade's this way.",
+    idleLines: [
+      { text: 'Giddy up!', periodS: 26, delayS: -2 },
+      { text: 'Does it come in horse?', periodS: 26, delayS: -10 },
+      { text: 'Yeehaw. Hexle time.', periodS: 26, delayS: -18 },
+    ],
     dialog: LINE_DIALOG,
     figure: {
       style: 'sideSwept',
@@ -411,7 +554,13 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     title: 'Director of IT',
     roomId: 'roof-deck',
     kind: 'human',
-    idleLine: 'Would you click this link? Wrong.',
+    tagName: 'Anthony',
+    dialogLine: 'Would you click this link? Wrong.',
+    idleLines: [
+      { text: 'Catch of the day: your password.', periodS: 28, delayS: -2 },
+      { text: 'Never click the bait!', periodS: 28, delayS: -11 },
+      { text: 'Reel talk: check the sender.', periodS: 28, delayS: -20 },
+    ],
     dialog: LINE_DIALOG,
     figure: {
       style: 'shortDark',
@@ -430,17 +579,28 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     title: null,
     roomId: 'roof-deck',
     kind: 'penguin',
-    idleLine: "It's 12° out here.",
+    tagName: 'Tristin',
+    dialogLine: "It's 12° out here.",
+    idleLines: [
+      { text: "It's 12° out here.", periodS: 24, delayS: -1 },
+      { text: 'Worth it for snacks.', periodS: 24, delayS: -13 },
+    ],
     dialog: LINE_DIALOG,
     look: TRISTIN_LOOK,
   },
   casey: {
     id: 'casey',
     name: 'Casey Snow',
-    title: 'Developer',
+    title: null,
     roomId: 'roof-deck',
     kind: 'human',
-    idleLine: 'Snow by name. Snowcones by trade.',
+    tagName: 'Casey',
+    dialogLine: 'Snow by name. Snowcones by trade.',
+    idleLines: [
+      { text: 'Roof igloo: BYO fish.', periodS: 12, delayS: -4 },
+      { text: 'New gear drops Friday.', periodS: 12, delayS: -10 },
+    ],
+    bubbleOffsetX: -90,
     dialog: IGLOO_GEAR_STALL_DIALOG,
     figure: {
       style: 'straightLong',
@@ -461,7 +621,9 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     title: null,
     roomId: 'the-melt',
     kind: 'penguin',
-    idleLine: 'Fresh pot!',
+    tagName: 'Chef Chelsea',
+    dialogLine: 'Fresh pot!',
+    idleLines: staticLine('Fresh pot!'),
     dialog: LINE_DIALOG,
     look: MARKET_PENGUIN_LOOK,
   },
@@ -471,7 +633,9 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     title: null,
     roomId: 'the-melt',
     kind: 'human',
-    idleLine: 'Flip it NOW.',
+    tagName: 'Chelsea Merrill',
+    dialogLine: 'Flip it NOW.',
+    idleLines: staticLine('Flip it NOW.'),
     dialog: PANCAKE_FLIP_DIALOG,
     figure: {
       style: 'curlyLong',
@@ -493,7 +657,9 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     title: null,
     roomId: 'the-melt',
     kind: 'penguin',
-    idleLine: 'who took my yogurt',
+    tagName: 'Tonya',
+    dialogLine: 'who took my yogurt',
+    idleLines: staticLine('who took my yogurt'),
     dialog: LINE_DIALOG,
     look: MARKET_PENGUIN_LOOK,
   },
@@ -503,10 +669,12 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     title: null,
     roomId: 'the-melt',
     kind: 'penguin',
-    // No idle line is drawn in `design/Room 04 Kitchen.dc.html` for Jesse
-    // (every other background Penguin there has one); reported on #36 rather
-    // than left unset, since `NpcDefinition.idleLine` is required.
-    idleLine: 'Order up!',
+    tagName: 'Jesse',
+    // No line is drawn in `design/Room 04 Kitchen.dc.html` for Jesse (every
+    // other background Penguin there has one); invented, reported on #36
+    // rather than left unset, since this field is required.
+    dialogLine: 'Order up!',
+    idleLines: staticLine('Order up!'),
     dialog: LINE_DIALOG,
     look: MARKET_PENGUIN_LOOK,
   },

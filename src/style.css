@@ -1013,11 +1013,15 @@ body {
    child of `#ui` back into `pointer-events: auto`, the same trap `.hud`'s own
    comment documents. `#ui > .npc-dialog` below re-overrides that back to
    `none` -- it needs the extra `#ui >` specificity to win the cascade over
-   `#ui > *` -- so only `.npc-dialog__panel` itself opts back into `auto`. */
+   `#ui > *` -- so only `.npc-dialog__panel` itself opts back into `auto`.
+
+   `z-index: 2` (one above `.minigame`'s own `z-index: 1`) so a Badge toast
+   (`.hud__toast`, #42) earned while an NPC dialog happens to be open is never
+   hidden underneath the panel (#36 round-1 review item 10). */
 .npc-dialog {
   position: absolute;
   inset: 0;
-  z-index: 1;
+  z-index: 2;
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -1069,6 +1073,22 @@ body {
   color: var(--jg-primary);
 }
 
+/* The minigame trigger design's own "ROOM · ROLE"/"ROOM · GAME" name badge
+   (#36 round-1 review item 4), shown instead of `.npc-dialog__title` for a
+   `kind: 'minigame'` NPC. */
+.npc-dialog__subtitle {
+  display: inline-block;
+  padding: 4px 10px;
+  background: var(--jg-secondary);
+  font: 400 10px var(--font-display);
+  letter-spacing: 0.16em;
+  color: var(--fg-primary);
+}
+
+.npc-dialog__subtitle[hidden] {
+  display: none;
+}
+
 .npc-dialog__title {
   font: 400 11px var(--font-display);
   letter-spacing: 0.2em;
@@ -1093,30 +1113,47 @@ body {
   margin-top: 4px;
 }
 
+/* Chevron pill buttons, per the minigame trigger designs' own
+   `GRAB THE HAMMER`/`NOT MY TICKET` (`design/Minigame Bug Squash.dc.html`)
+   and `GRAB THE SPATULA`/`I BURN TOAST` (`design/Minigame Pancake Flip.dc.html`)
+   buttons: 48px tall, Anton 20px, the same six-point chevron `clip-path`
+   (#36 round-1 review item 10). */
 .npc-dialog__button {
-  height: 44px;
-  padding: 0 20px;
+  height: 48px;
+  padding: 0 24px;
   border: none;
+  clip-path: polygon(
+    14px 0,
+    calc(100% - 14px) 0,
+    100% 50%,
+    calc(100% - 14px) 100%,
+    14px 100%,
+    0 50%
+  );
   background: var(--jg-secondary);
-  font-family: var(--font-game-display);
-  font-size: 16px;
+  font-family: var(--font-display);
+  font-size: 20px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--fg-primary);
   cursor: pointer;
-  box-shadow: inset 0 -4px 0 #06303d;
+  /* #06303d is a manual-darkened shade with no equivalent named design
+     token (same exception `.landing__login`'s inset shadow makes). */
+  box-shadow: inset 0 -5px 0 #06303d;
 }
 
 .npc-dialog__button--primary {
   background: var(--jg-primary);
-  box-shadow: inset 0 -4px 0 var(--jg-secondary);
+  box-shadow: inset 0 -5px 0 var(--jg-secondary);
   color: var(--jg-dark);
 }
 
+/* `clip-path` would hide an outline (same reasoning as `.landing__play` and
+   `.minigame__button`'s own focus rings), so focus shows as an inset ring instead. */
 .npc-dialog__button:focus-visible {
   outline: none;
   filter: brightness(1.12);
   box-shadow:
-    inset 0 -4px 0 var(--jg-secondary),
+    inset 0 -5px 0 var(--jg-secondary),
     inset 0 0 0 3px var(--jg-light);
 }

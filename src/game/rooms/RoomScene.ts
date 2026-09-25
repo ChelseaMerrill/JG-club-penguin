@@ -119,20 +119,19 @@ const LABEL_FONT_FAMILY = 'sans-serif';
 const LABEL_TEXT_COLOR = '#F4F4F4';
 const DOOR_LABEL_FONT_SIZE = '14px';
 /**
- * The invisible click zone over each NPC sprite (#36 D3/A4): a modest area
- * around the sprite's feet-anchor point, shifted up slightly to sit over the
- * standing figure rather than only its feet -- not an alpha-0 shape, which
- * Phaser drops from input hit-testing the same way `drawDoors`'s own
- * image-background `Zone` avoids that trap. Deliberately smaller than the
- * full 120x130 figure box: `e2e/click-to-move.spec.ts` clicks tiles as close
- * as one column/two rows from Town Center's own NPC slots (#16), and a
- * bigger zone bleeds into those clicks' hit-testing, stealing them from the
- * tile underneath (review-caught while wiring #36 -- confirmed against
- * Town Center's actual NPC/click tile geometry, not a guess).
+ * The invisible click zone over each NPC sprite (#36 D3/A4, sized per #36
+ * round-1 review item 6): centred above the sprite's feet-anchor point,
+ * covering roughly feet-105 to feet+5 -- the figure's own body/head, not just
+ * its feet -- not an alpha-0 shape, which Phaser drops from input
+ * hit-testing the same way `drawDoors`'s own image-background `Zone` avoids
+ * that trap. Confirmed against Town Center's actual NPC/click tile geometry
+ * (`e2e/click-to-move.spec.ts` clicks tiles as close as one column/two rows
+ * from an NPC slot) to still exclude every one of that spec's own click
+ * points.
  */
-const NPC_HIT_ZONE_WIDTH = 80;
-const NPC_HIT_ZONE_HEIGHT = 90;
-const NPC_HIT_ZONE_OFFSET_Y = -20;
+const NPC_HIT_ZONE_WIDTH = 64;
+const NPC_HIT_ZONE_HEIGHT = 110;
+const NPC_HIT_ZONE_OFFSET_Y = -50;
 
 const FURNITURE_WIDTH = 40;
 const FURNITURE_HEIGHT = 28;
@@ -896,8 +895,7 @@ export class RoomScene extends Scene {
       const point = tileToScreen(slot.tile, room.grid.origin);
       const depth = depthForTile(slot.tile);
 
-      const npcSprite = createNpcSprite(this, point.x, point.y, npc);
-      npcSprite.container.setDepth(depth);
+      const npcSprite = createNpcSprite(this, point.x, point.y, npc, depth);
       npcSprite.container.setName(NPC_CONTAINER_NAME);
       this.npcSprites.push(npcSprite);
 

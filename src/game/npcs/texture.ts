@@ -1,17 +1,15 @@
 import type { NpcDefinition } from '../../npcs/npcs';
+import { ensureSvgTexture, type SvgTextureManager } from '../svg-texture';
 import { renderPenguinSvg } from '../penguin/render-svg';
 import { renderNpcSvg } from './render-npc-svg';
 
 /**
- * The slice of Phaser's `Textures.TextureManager` this module needs, written
- * against a minimal structural interface the same way #31's own
- * `texture.ts` is, so a unit test could pass a plain fake without booting
- * Phaser (mirrors `../penguin/texture.ts`'s `PenguinTextureManager`).
+ * The slice of Phaser's `Textures.TextureManager` this module needs. An
+ * alias of the shared `SvgTextureManager` (`../svg-texture.ts`, #36 round-1
+ * review item 8), kept under this name since existing callers import it as
+ * `NpcTextureManager`.
  */
-export interface NpcTextureManager {
-  exists(key: string): boolean;
-  addBase64(key: string, data: string): void;
-}
+export type NpcTextureManager = SvgTextureManager;
 
 export interface NpcTextureScene {
   textures: NpcTextureManager;
@@ -27,28 +25,21 @@ export function npcTextureKey(npc: NpcDefinition): string {
   return `npc:${npc.id}`;
 }
 
-// `btoa` is a global in both browsers and Node >=22 (this repo's minimum
-// engine), matching `../penguin/texture.ts`'s own helper.
-function svgToBase64(svg: string): string {
-  return `data:image/svg+xml;base64,${btoa(svg)}`;
-}
-
 /**
- * Registers `npc`'s one texture on `scene` if it isn't already there: a
- * Human NPC's figure via `renderNpcSvg`, or a Penguin-kind NPC's fixed look
- * via #31's own `renderPenguinSvg` (#36 D2). Returns the texture key either
- * way. `addBase64` decodes asynchronously, the same as #31's texture
- * registration; a caller that needs the decoded texture right away should
- * listen for `Textures.Events.ADD_KEY` the way `npc-sprite.ts` does.
+ * Registers `npc`'s one texture on `scene` if it isn't already there (or
+ * still pending decode from an earlier call, via the shared `ensureSvgTexture`,
+ * #36 round-1 review item 8): a Human NPC's figure via `renderNpcSvg`, or a
+ * Penguin-kind NPC's fixed look via #31's own `renderPenguinSvg` (#36 D2).
+ * Returns the texture key either way. `addBase64` decodes asynchronously; a
+ * caller that needs the decoded texture right away should listen for
+ * `Textures.Events.ADD_KEY` the way `npc-sprite.ts` does.
  */
 export function ensureNpcTexture(scene: NpcTextureScene, npc: NpcDefinition): string {
   const key = npcTextureKey(npc);
-  if (!scene.textures.exists(key)) {
-    const svg =
-      npc.kind === 'human'
-        ? renderNpcSvg(npc.figure, { idPrefix: npc.id })
-        : renderPenguinSvg(npc.look, { anim: npc.look.emote, frame: 0 }, { idPrefix: npc.id });
-    scene.textures.addBase64(key, svgToBase64(svg));
-  }
+  ensureSvgTexture(scene.textures, key, () =>
+    npc.kind === 'human'
+      ? renderNpcSvg(npc.figure, { idPrefix: npc.id })
+      : renderPenguinSvg(npc.look, { anim: npc.look.emote, frame: 0 }, { idPrefix: npc.id }),
+  );
   return key;
 }

@@ -2,13 +2,7 @@ import { GameObjects, Textures, type Scene, type Time } from 'phaser';
 import { DEFAULT_FACING, type Facing, type PenguinLook } from '../../contracts';
 import { penguinLookHash } from './look-hash';
 import { PENGUIN_FRAME_MS, PENGUIN_FRAMES, type PenguinAnim } from './poses';
-import {
-  PENGUIN_FRAME_HEIGHT,
-  PENGUIN_FRAME_PADDING_X,
-  PENGUIN_FRAME_PADDING_Y,
-  PENGUIN_FRAME_WIDTH,
-  PENGUIN_ORIGIN,
-} from './render-svg';
+import { PENGUIN_FRAME_PADDING_Y, PENGUIN_ORIGIN, penguinFeetOrigin } from './render-svg';
 import { ensurePenguinTextures, penguinTextureKey } from './texture';
 
 const NAME_TAG_BG = 0x00bdff;
@@ -101,8 +95,7 @@ export function createPenguin(
   look: PenguinLook,
   state?: PenguinInitialState,
 ): Penguin {
-  const originX = (PENGUIN_ORIGIN.x + PENGUIN_FRAME_PADDING_X) / PENGUIN_FRAME_WIDTH;
-  const originY = (PENGUIN_ORIGIN.y + PENGUIN_FRAME_PADDING_Y) / PENGUIN_FRAME_HEIGHT;
+  const origin = penguinFeetOrigin();
 
   let currentLook = look;
   let currentHash = penguinLookHash(look);
@@ -121,7 +114,7 @@ export function createPenguin(
   ensurePenguinTextures(scene, look);
 
   const sprite = new GameObjects.Sprite(scene, 0, 0, PLACEHOLDER_TEXTURE_KEY);
-  sprite.setOrigin(originX, originY);
+  sprite.setOrigin(origin.x, origin.y);
   sprite.setFlipX(facing === 'left');
 
   const pill = new GameObjects.Graphics(scene);
