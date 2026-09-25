@@ -1,6 +1,46 @@
 import { EMOTES, type EmoteId } from '../../contracts';
 import type { OverlayManager } from './overlay-manager';
 
+const ICON_INK = '#161719';
+const ICON_TEXT_FONT = 'Anton, Impact, sans-serif';
+
+/** Wraps an icon body in the design's 40x36 SVG frame. */
+function iconSvg(body: string): string {
+  return `<svg width="40" height="36" viewBox="0 0 40 36" aria-hidden="true">${body}</svg>`;
+}
+
+/**
+ * Each tile's icon, copied from the HUD-EMOTE screen's inline SVGs
+ * (`design/Club JenGuin HUD Menus.dc.html`), drawn in the design's dark ink
+ * over the tile's hexagon.
+ */
+const EMOTE_ICONS: Record<EmoteId, string> = {
+  wave: iconSvg(
+    `<path d="M12 22 V10 M17 22 V7 M22 22 V9 M27 22 V12 M12 22 c0 8 15 10 15 0 v-6" fill="none" stroke="${ICON_INK}" stroke-width="3" stroke-linecap="round"/>`,
+  ),
+  dance: iconSvg(
+    `<path d="M15 26 V8 l14 -4 v18" fill="none" stroke="${ICON_INK}" stroke-width="3" stroke-linecap="round"/><circle cx="11" cy="26" r="4" fill="${ICON_INK}"/><circle cx="25" cy="22" r="4" fill="${ICON_INK}"/>`,
+  ),
+  laugh: iconSvg(
+    `<circle cx="20" cy="18" r="12" fill="none" stroke="${ICON_INK}" stroke-width="3"/><path d="M13 19 a7 7 0 0 0 14 0 z" fill="${ICON_INK}"/><circle cx="15" cy="14" r="1.8" fill="${ICON_INK}"/><circle cx="25" cy="14" r="1.8" fill="${ICON_INK}"/>`,
+  ),
+  sit: iconSvg(
+    `<path d="M10 8 v20 M10 20 h18 v8 M14 20 v-6 h10 v6" fill="none" stroke="${ICON_INK}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`,
+  ),
+  'thumbs-up': iconSvg(
+    `<path d="M9 17 h5 v11 h-5 z M14 18 l5 -11 c3 0 4 2 3 5 l-1 4 h7 c2 0 3 2 2 4 l-2 7 c0 1 -1 2 -3 2 h-11" fill="none" stroke="${ICON_INK}" stroke-width="3" stroke-linejoin="round"/>`,
+  ),
+  brb: iconSvg(
+    `<text x="20" y="24" text-anchor="middle" font-family="${ICON_TEXT_FONT}" font-size="15" fill="${ICON_INK}">BRB</text>`,
+  ),
+  'jg-flash': iconSvg(
+    `<polygon points="20,6 31,12.5 31,25.5 20,32 9,25.5 9,12.5" fill="${ICON_INK}"/><text x="20" y="24" text-anchor="middle" font-family="${ICON_TEXT_FONT}" font-size="12" fill="#00BDFF">JG</text>`,
+  ),
+  'ship-it': iconSvg(
+    `<path d="M8 22 h24 l-4 6 h-16 z M14 22 v-9 h8 v9 M22 13 l8 4" fill="none" stroke="${ICON_INK}" stroke-width="3" stroke-linejoin="round"/>`,
+  ),
+};
+
 /** The id `createEmotePicker` registers with `hud.overlays`, so opening it closes MENU (and vice versa) and Escape closes it. */
 export const EMOTE_OVERLAY_ID = 'emote';
 
@@ -74,6 +114,8 @@ export function createEmotePicker(layer: HTMLElement, deps: EmotePickerDeps): Em
 
     const icon = document.createElement('span');
     icon.className = 'emote-picker__icon';
+    // A constant from `EMOTE_ICONS` below, never user input.
+    icon.innerHTML = EMOTE_ICONS[emoteId];
 
     const label = document.createElement('span');
     label.className = 'emote-picker__label';
