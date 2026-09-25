@@ -300,6 +300,79 @@ describe('validateRoomDefinitions', () => {
     expect(validateRoomDefinitions(rooms)).toEqual([]);
   });
 
+  it('flags a wallText anchor outside the 1600x900 Stage', () => {
+    const rooms = [
+      room({
+        id: 'town-center',
+        wallText: [
+          {
+            id: 'heading',
+            text: 'CORE VALUES',
+            x: 1700,
+            y: 217.5,
+            colour: '#B3B6C9',
+            maxWidth: 115,
+            skewY: 0.5,
+          },
+        ],
+      }),
+    ];
+
+    const errors = validateRoomDefinitions(rooms);
+
+    expect(errors).toContainEqual({
+      roomId: 'town-center',
+      message: 'wall text "heading" anchor { x: 1700, y: 217.5 } is outside the 1600x900 Stage',
+    });
+  });
+
+  it('flags a wallText block with a non-positive maxWidth', () => {
+    const rooms = [
+      room({
+        id: 'town-center',
+        wallText: [
+          {
+            id: 'serve',
+            text: 'SERVE',
+            x: 995,
+            y: 224,
+            colour: '#F4F4F4',
+            maxWidth: 0,
+            skewY: 0.5,
+          },
+        ],
+      }),
+    ];
+
+    const errors = validateRoomDefinitions(rooms);
+
+    expect(errors).toContainEqual({
+      roomId: 'town-center',
+      message: 'wall text "serve" maxWidth 0 must be greater than 0',
+    });
+  });
+
+  it('accepts a wallText block inside the Stage with a positive maxWidth', () => {
+    const rooms = [
+      room({
+        id: 'town-center',
+        wallText: [
+          {
+            id: 'serve',
+            text: 'SERVE',
+            x: 995,
+            y: 224,
+            colour: '#F4F4F4',
+            maxWidth: 15,
+            skewY: 0.5,
+          },
+        ],
+      }),
+    ];
+
+    expect(validateRoomDefinitions(rooms)).toEqual([]);
+  });
+
   it('accepts a disabled door (targetRoomId: null) with no defined destination', () => {
     const rooms = [
       room({
@@ -334,6 +407,14 @@ describe('ROOM_DEFINITIONS registry', () => {
       'slot-6',
     ]);
     expect((igloo.hotspots ?? []).map((hotspot) => hotspot.id)).toContain('trophy-case');
+  });
+
+  it('gives Town Center a core-values-poster hotspot (#77 D5)', () => {
+    const townCenter = getRoomDefinition('town-center');
+
+    expect((townCenter.hotspots ?? []).map((hotspot) => hotspot.id)).toContain(
+      'core-values-poster',
+    );
   });
 
   it('gives the Roof Deck an igloo-gear-stall hotspot and a casey NPC slot', () => {
@@ -383,7 +464,7 @@ describe('ROOM_DEFINITIONS registry', () => {
       subtitle: 'TEAM RMS 1–4 · FLOOR 5',
     });
     expect(getRoomDefinition('the-melt')).toMatchObject({
-      title: 'THE MELT',
+      title: 'THE KITCHEN',
       subtitle: 'KITCHEN · FLOOR 5',
     });
     expect(getRoomDefinition('roof-deck')).toMatchObject({

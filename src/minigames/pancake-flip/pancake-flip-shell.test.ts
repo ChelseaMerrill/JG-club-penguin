@@ -30,7 +30,7 @@ function setup() {
     layer,
     store,
     overlays,
-    resolveRoomTitle: () => ({ title: 'THE MELT', subtitle: 'x' }),
+    resolveRoomTitle: () => ({ title: 'THE KITCHEN', subtitle: 'x' }),
     registry: { 'pancake-flip': () => minigame },
   });
 

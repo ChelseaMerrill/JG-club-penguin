@@ -390,6 +390,165 @@ body {
   display: none;
 }
 
+/* Wall/signage text (#77): DOM-rendered replacements for a Room's baked SVG
+   labels (Town Center's Core Values poster is the first), stays sharp with
+   the page's own web fonts at every window size, unlike the flattened PNG
+   background underneath. Mounted before `.hud` in `src/main.ts` so it always
+   paints below the HUD (both are plain `#ui` siblings with no `z-index`, so
+   DOM order alone decides stacking); `pointer-events: none` throughout means
+   it never blocks a canvas click. Positions and per-label sizing come from
+   `src/ui/wall-text/wall-text.ts`'s inline styles (each Room's own
+   `RoomWallText` anchors, colours and skew, plus the module's shared
+   font-size/letter-spacing constants); this block only supplies the shared,
+   token-driven look. */
+.wall-text {
+  position: absolute;
+  inset: 0;
+}
+
+#ui > .wall-text {
+  pointer-events: none;
+}
+
+.wall-text__label {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+  font-family: var(--font-display);
+  font-weight: normal;
+  line-height: 1;
+  text-align: center;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+/* The poster's clickable hit target (#77 D5/D6, scope-change follow-up):
+   positioned/sized from the current Room's own `RoomHotspot.rect` (Stage
+   px) by `wall-text.ts`. Opts back into `pointer-events: auto` the same way
+   `.hud`'s own widgets do (see that rule's own comment below), so it's the
+   one clickable thing in an otherwise click-through `.wall-text` layer. */
+.wall-text__poster {
+  position: absolute;
+  border: none;
+  margin: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  pointer-events: auto;
+  /* #77 review round 1 nit 6: the poster's own backing plate is a
+     parallelogram (the wall's isometric shear), not the axis-aligned
+     rectangle `rect` gives its bounding box -- this clips the hit target
+     down to that exact parallelogram, traced from the same four backing-plate
+     corners `HEADING_MAX_WIDTH`'s derivation comment in
+     `definitions/town-center.ts` uses, expressed as fractions of this
+     button's own box. */
+  clip-path: polygon(0 50%, 100% 100%, 100% 50%, 0 0);
+}
+
+.wall-text__poster:focus-visible {
+  outline: 2px solid var(--jg-primary);
+  outline-offset: 2px;
+}
+
+/* Core Values card (#77 scope change): a readable stand-in for the wall
+   poster's own hexagon labels, which stay small enough to fit their
+   hexagons. Opened by `.wall-text__poster`, registered with the shared HUD
+   `OverlayManager` (`src/ui/wall-text/core-values-card.ts`). `z-index: 1`
+   guarantees it paints above `.hud` regardless of DOM append order, the same
+   reasoning `.minigame`'s own comment below gives. */
+.core-values-card {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+  background: var(--bg-overlay-strong);
+}
+
+.core-values-card[hidden] {
+  display: none;
+}
+
+.core-values-card__panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 36px;
+  padding: 48px 64px;
+  background: rgba(var(--jg-dark-rgb), 0.97);
+  border: 3px solid var(--jg-secondary);
+  box-shadow:
+    0 0 0 3px var(--jg-secondary),
+    0 12px 0 var(--jg-secondary);
+}
+
+/* #77 review round 1 nit 9: a 44x44 Stage-px minimum touch/click target
+   (WCAG 2.5.5-style sizing) with real padding, and "CLOSE" (Anton has no ×
+   glyph -- see `core-values-card.ts`'s own comment) rather than an icon. */
+.core-values-card__close {
+  position: absolute;
+  top: 12px;
+  right: 16px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px 16px;
+  border: none;
+  background: transparent;
+  font: 400 16px var(--font-display);
+  letter-spacing: 0.08em;
+  line-height: 1;
+  color: var(--fg-primary);
+  cursor: pointer;
+}
+
+.core-values-card__close:focus-visible {
+  outline: 2px solid var(--jg-primary);
+  outline-offset: 2px;
+}
+
+.core-values-card__heading {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: normal;
+  font-size: 48px;
+  line-height: 1;
+  letter-spacing: 0.08em;
+  color: var(--jg-primary);
+  -webkit-text-stroke: 5px var(--jg-secondary);
+  paint-order: stroke fill;
+  text-shadow: 0 4px 0 var(--jg-secondary);
+}
+
+.core-values-card__badges {
+  display: flex;
+  gap: 28px;
+}
+
+/* Same true-hexagon clip-path as `.landing__hex`/`.hud__tokens-icon`, sized
+   generously so a single 36px Anton word (INSPIRE is the widest) sits well
+   inside the flat-sided middle band with visible padding. */
+.core-values-card__badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 220px;
+  height: 150px;
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+}
+
+.core-values-card__badge-label {
+  font-family: var(--font-display);
+  font-weight: normal;
+  font-size: 36px;
+  letter-spacing: 0.04em;
+  color: var(--jg-dark);
+  text-align: center;
+}
+
 /* HUD (#32): Room title, Token balance, MENU/PENGUIN, and the bottom bar's
    chat slot / MAP / IGLOO. Reproduces design/Room 01 Town Center.dc.html and
    design/Club JenGuin HUD Menus.dc.html in Stage pixels (the `#ui` layer is

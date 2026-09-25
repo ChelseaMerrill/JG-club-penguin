@@ -10,36 +10,42 @@ import { townCenter } from './town-center';
 // `door()` isolib helper).
 const DOOR_HOTSPOT_SIZE = { width: 70, height: 165 };
 
-// Traced from `design/Room 04 Kitchen.dc.html`'s fixtures: the back-wall
-// counter/"FREE SNACKS" bar (rows 0-1), the central island counter and
-// fridge cluster (rows 3-6), and the front counter/table run (rows 7-9).
-// Row 4's cols 7-10 and row 9's cols 0-1 sample as the same floor colour as
-// the rest of the open floor in the exported art (not the counters'
-// white/teal), so they're walkable rather than blocked under the counter
-// cluster or the floor-arrow decal near the TOWN CENTER door (#16 fix 5).
-// Chelsea's and Jesse's own tiles are additionally blocked so a Penguin
-// can't walk through them (#16 fix 5); Chef Chelsea's and Tonya's tiles
-// already sat on unwalkable counters.
+// Traced from `design/Kitchen.dc.html`'s fixtures (#92 D3 round 2 --
+// re-checked against the art after round 1 blocked too much of row 1): the
+// back counter/oven itself is a thin strip -- design-fraction rows 0.2-1.2,
+// so only row 0 and a sliver of row 1 -- with row 1 otherwise open floor
+// (Chelsea stands on it), the central island counter and fridge cluster
+// (rows 3-6), and the front counter/table run (rows 7-9). Row 4's cols 7-10
+// and row 9's cols 0-1 sample as the same floor colour as the rest of the
+// open floor in the exported art (not the counters' white/teal), so they're
+// walkable rather than blocked under the counter cluster or the floor-arrow
+// decal near the TOWN CENTER door (#16 fix 5). Chelsea's and Jesse's own
+// tiles are blocked (#92 D3 round 2); Tom's is left walkable since he walks
+// in the design, so there's no single tile that's "his" the way there is for
+// every stationary NPC; Tonya's tile already sat on an unwalkable counter.
 const WALKABLE: readonly (readonly boolean[])[] = [
   [false, false, false, false, false, false, false, false, false, false, true, true],
-  [false, false, false, false, false, false, false, false, false, false, true, true],
-  [true, true, true, true, true, true, true, true, true, true, true, false],
+  [false, true, true, true, true, true, true, true, true, true, true, true],
+  [true, true, true, false, true, true, true, true, true, true, false, true],
   [true, true, true, false, false, false, false, true, true, true, true, true],
   [true, true, true, false, false, false, false, true, true, true, true, true],
   [true, true, false, false, false, false, false, false, false, false, false, false],
   [true, true, true, false, false, false, false, false, false, false, false, false],
   [false, true, true, true, true, true, true, true, false, false, false, false],
-  [false, false, true, true, false, true, true, true, true, false, false, true],
+  [false, false, true, true, true, true, true, true, true, false, false, true],
   [true, true, true, true, true, true, true, true, true, true, true, true],
 ];
 
 /**
- * Traced from `design/Room 04 Kitchen.dc.html` (The Melt is the Kitchen):
- * a real door back to Town Center and a real door on to the Roof Deck.
+ * Traced from `design/Kitchen.dc.html` (#92: file renamed from `Room 04
+ * Kitchen.dc.html`, Player-facing name renamed from THE MELT to THE
+ * KITCHEN): a real door back to Town Center and a real door on to the Roof
+ * Deck -- both doors are pixel-identical to the pre-resync design, so their
+ * hotspots/entry tiles are unchanged.
  */
 export const theMelt: RoomDefinition = {
   id: 'the-melt',
-  title: 'THE MELT',
+  title: 'THE KITCHEN',
   subtitle: 'KITCHEN · FLOOR 5',
   background: { kind: 'image', key: 'room-the-melt', url: 'rooms/the-melt.png' },
   grid: createStandardRoomGrid(),
@@ -50,8 +56,8 @@ export const theMelt: RoomDefinition = {
       label: 'TOWN CENTER',
       hotspot: { x: 420, y: 275, ...DOOR_HOTSPOT_SIZE },
       targetRoomId: 'town-center',
-      // Town Center has no door of its own back to The Melt (see below), so
-      // this lands on Town Center's own spawn tile (#16 fix 4) -- a
+      // Town Center has no door of its own back to the Kitchen (see below),
+      // so this lands on Town Center's own spawn tile (#16 fix 4) -- a
       // judgment call reported on the #16 execution plan, same as Roof
       // Deck's doors below.
       entryTile: townCenter.spawnTile,
@@ -67,12 +73,12 @@ export const theMelt: RoomDefinition = {
     },
   ],
   npcSlots: [
-    { npcId: 'chef-chelsea', tile: { col: 3, row: 1 } },
-    // "Chelsea Merrill": a full name like Darrin Jahnel's, kebab-cased to
-    // first name only — distinct from `chef-chelsea` above (the design
-    // names two different Chelseas in this Room).
-    { npcId: 'chelsea', tile: { col: 4, row: 8 } },
+    // #92 D3 resync: the design now names a single "Chelsea" (the pancake
+    // cook) instead of the pre-resync "Chef Chelsea"/"Chelsea Merrill" pair,
+    // and adds "Tom" (a walking, coffee-obsessed NPC); Tonya keeps her tile.
+    { npcId: 'chelsea', tile: { col: 3, row: 2 } },
+    { npcId: 'tom', tile: { col: 7, row: 2 } },
+    { npcId: 'jesse', tile: { col: 10, row: 2 } },
     { npcId: 'tonya', tile: { col: 8, row: 7 } },
-    { npcId: 'jesse', tile: { col: 11, row: 2 } },
   ],
 };

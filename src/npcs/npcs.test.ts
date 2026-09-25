@@ -1,27 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { ROOM_DEFINITIONS } from '../game/rooms/registry';
-import { getNpcDefinition, NPCS, type NpcId } from './npcs';
-
-/**
- * TODO(#92): #92 (not merged yet, `feat/92-design-resync`) already updates
- * `the-melt.ts`'s `npcSlots` to match the post-#91 Kitchen design (`tom` at
- * `(7,2)`, `jesse` moved to `(10,2)`, `chef-chelsea` removed); #36 must not
- * also edit that file (coordinator instruction, avoiding a conflicting
- * in-flight edit) and instead carries `npcs.ts`'s own data ahead of it. Until
- * #92 merges and this branch picks it up, `the-melt.ts` on `main` still has
- * the old `chef-chelsea` slot and no `tom` slot, so the two blanket
- * "every slot has a definition"/"every NPC has exactly one slot" checks below
- * carve out this one known, temporary mismatch. Remove this carve-out once
- * #92 lands.
- */
-const PENDING_92_STALE_SLOT_ID = 'chef-chelsea';
-const PENDING_92_UNPLACED_NPC_ID: NpcId = 'tom';
+import { getNpcDefinition, NPCS } from './npcs';
 
 describe('NPCS', () => {
   it("has a definition for every npcId in every prototype Room's npcSlots", () => {
     for (const room of ROOM_DEFINITIONS) {
       for (const slot of room.npcSlots) {
-        if (slot.npcId === PENDING_92_STALE_SLOT_ID) continue;
         expect(
           getNpcDefinition(slot.npcId),
           `${room.id}'s "${slot.npcId}" slot`,
@@ -36,7 +20,6 @@ describe('NPCS', () => {
     );
 
     for (const npc of Object.values(NPCS)) {
-      if (npc.id === PENDING_92_UNPLACED_NPC_ID) continue;
       const roomsContainingIt = ROOM_DEFINITIONS.filter((room) =>
         (slotIdsByRoom.get(room.id) ?? []).includes(npc.id),
       );
