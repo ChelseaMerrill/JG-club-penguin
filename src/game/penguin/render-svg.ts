@@ -347,7 +347,14 @@ function renderHat(
 ): string {
   switch (hat) {
     case 'JG CAP':
-      return `<g><path d="M32 22 C38 4 82 4 88 22 L60 18 Z" fill="${capColor}" stroke="${resolved.capOutline}" stroke-width="2"></path><path d="M30 22 L98 26 L96 30 L30 26 Z" fill="${capColor}" stroke="${resolved.capOutline}" stroke-width="2"></path><polygon points="60,10 65,13 65,18 60,21 55,18 55,13" fill="${resolved.capOutline}"></polygon></g>`;
+      // #92 D4 redraw: the crown dome, a split brim (a short back piece and
+      // a longer front bill), a centre seam and a raised button, all from
+      // `design/Penguin Creator.dc.html` L59 verbatim -- replacing #31's
+      // single-brim placeholder shape. `PENGUIN_TEXT_PATHS.jgCap` is the
+      // design's "JG" crown label (L59), baked to path outlines the same way
+      // as `jgLogo`/`warWeek` (#62), since an SVG-as-texture can't load a web
+      // font; its own fill is fixed (design colour), unlike `capOutline`.
+      return `<g><path d="M34 24 C36 6 84 6 86 24 Z" fill="${capColor}" stroke="${resolved.capOutline}" stroke-width="2.5" stroke-linejoin="round"></path><path d="M34 24 L86 24 C86 27 82 29 74 30 L46 30 C38 29 34 27 34 24 Z" fill="${capColor}" stroke="${resolved.capOutline}" stroke-width="2.5" stroke-linejoin="round"></path><path d="M58 24 L102 26 C104 28 102 32 98 33 L60 29 Z" fill="${capColor}" stroke="${resolved.capOutline}" stroke-width="2.5" stroke-linejoin="round"></path><path d="M60 8 L60 24" stroke="${resolved.capOutline}" stroke-width="1.5" opacity=".5"></path><polygon points="60,11 65,14 65,20 60,23 55,20 55,14" fill="${resolved.capOutline}"></polygon><path d="${PENGUIN_TEXT_PATHS.jgCap.d}" fill="${PENGUIN_TEXT_PATHS.jgCap.fill}"></path></g>`;
     case 'SNORKEL': {
       // The frame/strap are stroke-only, so their rim is a wider halo drawn
       // first (same shapes), rather than a `stroke` attribute (#79 D2). Each

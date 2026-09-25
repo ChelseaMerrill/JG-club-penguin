@@ -28,6 +28,11 @@ function pathExtent(d: string): { minX: number; maxX: number; minY: number; maxY
 const HAHA_FILL = '#00BDFF';
 const JG_LOGO_FILL = '#00BDFF';
 const WAR_WEEK_FILL = '#161719';
+// The JG CAP crown's own fixed fill (`design/Penguin Creator.dc.html` L59's
+// "JG" `<text fill="#F4F4F4">`, #92 D4) -- `EYE_WHITE`, but independent of
+// `render-svg.ts`'s import of that constant, matching this file's existing
+// literal-fill convention for the other three strings.
+const JG_CAP_FILL = '#F4F4F4';
 
 /**
  * `render-svg.ts`'s own body-rotation pivot (its private `BODY_ROTATE_ORIGIN`):
@@ -74,6 +79,11 @@ describe('PENGUIN_TEXT_PATHS', () => {
   it('has a non-empty path and the design fill for "WAR WEEK"', () => {
     expect(PENGUIN_TEXT_PATHS.warWeek.d.length).toBeGreaterThan(0);
     expect(PENGUIN_TEXT_PATHS.warWeek.fill).toBe(WAR_WEEK_FILL);
+  });
+
+  it('has a non-empty path and the design fill for the JG CAP crown\'s "JG" (#92 D4)', () => {
+    expect(PENGUIN_TEXT_PATHS.jgCap.d.length).toBeGreaterThan(0);
+    expect(PENGUIN_TEXT_PATHS.jgCap.fill).toBe(JG_CAP_FILL);
   });
 
   it('every entry stays inside the frame bounds at every pose it can actually render in, including the worst-case body rotate/translate (#62 review fix 4)', () => {
