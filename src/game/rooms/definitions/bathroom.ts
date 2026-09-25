@@ -24,11 +24,12 @@ const DOOR_HOTSPOT_SIZE = { width: 70, height: 165 };
 //     exception to the rule above -- a physical hazard prop, blocked
 //     regardless of footprint size.
 // The "MELTED ICE · CAUTION" puddle label and the floor arrow are flat floor
-// art. Every NPC's own tile (see `npcSlots` below) is additionally blocked
-// (#16 fix 5): Jessie (3,1).
+// art. The design also draws Jessie waiting outside the stalls at (3,1), but
+// only Players appear as Penguins in the World (owner decision 2026-09-25;
+// PR #133), so she gets no npcSlot and that tile stays walkable.
 const WALKABLE: readonly (readonly boolean[])[] = [
   [false, false, false, false, false, false, true, true],
-  [false, false, true, false, true, true, true, true],
+  [false, false, true, true, true, true, true, true],
   [false, false, true, true, true, true, true, true],
   [false, false, true, true, true, true, true, true],
   [true, true, true, true, true, false, true, true],
@@ -67,8 +68,6 @@ export const bathroom: RoomDefinition = {
     },
   ],
   npcSlots: [
-    // The tile under Jessie's ground shadow, waiting outside the stalls.
-    { npcId: 'jessie', tile: { col: 3, row: 1 } },
     // "You" is the local Player's own Penguin, never a static NPC slot.
   ],
 };

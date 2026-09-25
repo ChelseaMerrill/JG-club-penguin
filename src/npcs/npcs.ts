@@ -49,12 +49,11 @@ export type NpcId =
   | 'jethro'
   | 'darrin-icebox'
   // #51: the Hallway's, Team Rooms 1-4's and the Bathroom's NPCs, by the same
-  // rule. Emily, Michael Prete, Michael S., Samantha, Daniel and Jessie have
-  // no slot anywhere else, so they get bare ids; everyone else is a repeat
-  // appearance with a `-<room>` suffix.
-  | 'michael-s'
-  | 'samantha'
-  | 'daniel'
+  // rule. Emily and Michael Prete have no slot anywhere else, so they get
+  // bare ids; everyone else is a repeat appearance with a `-<room>` suffix.
+  // The design also draws Michael S., Samantha and Daniel in the Hallway and
+  // Jessie in the Bathroom, but only Players appear as Penguins in the World
+  // (owner decision 2026-09-25; PR #133), so none of those four gets an id.
   | 'emily'
   | 'anthony-hallway'
   | 'jethro-team-room-1'
@@ -65,8 +64,7 @@ export type NpcId =
   | 'sydney-team-room-3'
   | 'michael'
   | 'sam-team-room-4'
-  | 'ryan-team-room-4'
-  | 'jessie';
+  | 'ryan-team-room-4';
 
 /**
  * A minigame-launching NPC's trigger dialog (#36 D4; round-1 review item 4
@@ -260,12 +258,6 @@ function staticLine(text: string): NpcBubbleLine[] {
  * the same kind the #16 execution plan already documents for market fixtures.
  */
 const MARKET_PENGUIN_LOOK: PenguinLook = { ...DEFAULT_LOOK, name: '' };
-
-/**
- * The Hallway's Michael S. and the Bathroom's Jessie (#51): the shared
- * `peng()` figure with a `#F4F4F4` cap, per their Room designs' own markup.
- */
-const WHITE_CAP_PENGUIN_LOOK: PenguinLook = { ...DEFAULT_LOOK, name: '', cap: '#F4F4F4' };
 
 /** Tristin's figure uses the design's `#3a4046`/`#0C4B5F` grey-blue Penguin body/cap instead. */
 const TRISTIN_LOOK: PenguinLook = { ...DEFAULT_LOOK, name: '', body: '#3a4046', cap: '#0C4B5F' };
@@ -1016,52 +1008,10 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
   // window (see each entry). Only Ian's Team Room 2 slot shows a Minigame
   // trigger ("TALK · BUG SQUASH"); Team Room 4's Beystadium is not a
   // Minigame in this build.
-  'michael-s': {
-    id: 'michael-s',
-    // A Penguin-kind background NPC: name, tag and line from the Hallway
-    // design's own nameplate and bubble.
-    name: 'Michael S.',
-    title: null,
-    roomId: 'office-hallway',
-    kind: 'penguin',
-    tagName: 'Michael S.',
-    dialogLine: 'standup in 5',
-    idleLines: staticLine('standup in 5'),
-    dialog: LINE_DIALOG,
-    look: WHITE_CAP_PENGUIN_LOOK,
-  },
-  // Samantha and Daniel (#51 human decision 2026-09-25, superseding an
-  // earlier "excluded, Players not NPCs" call): silent Penguin NPCs, one of
-  // the banner's "4 PENGUINS" along with "You" and Michael S. The design
-  // gives them no bubble of their own, so `idleLines` is empty and their
-  // dialog is `LINE_DIALOG` with an empty `dialogLine`, showing just their
-  // name and a close button.
-  samantha: {
-    id: 'samantha',
-    name: 'Samantha',
-    title: null,
-    roomId: 'office-hallway',
-    kind: 'penguin',
-    tagName: 'Samantha',
-    dialogLine: '',
-    idleLines: [],
-    dialog: LINE_DIALOG,
-    // The design's own `#0C4B5F` dark teal cap, in place of the default cyan.
-    look: { ...DEFAULT_LOOK, name: '', cap: '#0C4B5F' },
-  },
-  daniel: {
-    id: 'daniel',
-    name: 'Daniel',
-    title: null,
-    roomId: 'office-hallway',
-    kind: 'penguin',
-    tagName: 'Daniel',
-    dialogLine: '',
-    idleLines: [],
-    dialog: LINE_DIALOG,
-    // The design's own cap is the same default cyan as "You"'s own Penguin.
-    look: { ...DEFAULT_LOOK, name: '' },
-  },
+  // Michael S., Samantha and Daniel: the design draws all three as Penguins
+  // in the Hallway, but only Players appear as Penguins in the World (owner
+  // decision 2026-09-25, superseding an earlier addition; see PR #133) --
+  // dropped here and from the Hallway's own npcSlots.
   emily: {
     id: 'emily',
     name: 'Emily Smith',
@@ -1226,21 +1176,11 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     dialog: LINE_DIALOG,
     figure: RYAN_FIGURE,
   },
-  jessie: {
-    id: 'jessie',
-    // A Penguin-kind background NPC: name, tag and line from the Bathroom
-    // design's own nameplate and bubble. Spelled "Jessie" there, unlike The
-    // Melt's "Jesse", so kept a separate character.
-    name: 'Jessie',
-    title: null,
-    roomId: 'bathroom',
-    kind: 'penguin',
-    tagName: 'Jessie',
-    dialogLine: 'occupied since standup',
-    idleLines: staticLine('occupied since standup'),
-    dialog: LINE_DIALOG,
-    look: WHITE_CAP_PENGUIN_LOOK,
-  },
+  // Jessie: the design draws her as a Penguin in the Bathroom, but only
+  // Players appear as Penguins in the World (owner decision 2026-09-25; see
+  // PR #133) -- dropped here and from the Bathroom's own npcSlots. Spelled
+  // "Jessie" there, unlike The Melt's "Jesse" (see that entry's own
+  // comment), which remains.
 };
 
 const NPC_IDS = Object.keys(NPCS) as NpcId[];

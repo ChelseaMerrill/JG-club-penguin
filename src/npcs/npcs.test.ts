@@ -278,35 +278,6 @@ describe('NPCS', () => {
     // 1.24s -> -2.76s, (0.39 - 0.07) * 6 = 1.92s -> -4.08s, and
     // (0.80 - 0.07) * 10 = 7.3s -> -2.7s. Repeat appearances get a
     // `-<room>` suffixed id.
-    expect(NPCS['michael-s']).toMatchObject({
-      kind: 'penguin',
-      name: 'Michael S.',
-      title: null,
-      roomId: 'office-hallway',
-      tagName: 'Michael S.',
-      dialogLine: 'standup in 5',
-      idleLines: [{ text: 'standup in 5', periodS: 0, delayS: 0 }],
-    });
-    expect(NPCS.samantha).toMatchObject({
-      kind: 'penguin',
-      name: 'Samantha',
-      title: null,
-      roomId: 'office-hallway',
-      tagName: 'Samantha',
-      dialogLine: '',
-      idleLines: [],
-      dialog: { kind: 'line' },
-    });
-    expect(NPCS.daniel).toMatchObject({
-      kind: 'penguin',
-      name: 'Daniel',
-      title: null,
-      roomId: 'office-hallway',
-      tagName: 'Daniel',
-      dialogLine: '',
-      idleLines: [],
-      dialog: { kind: 'line' },
-    });
     expect(NPCS.emily).toMatchObject({
       kind: 'human',
       name: 'Emily Smith',
@@ -391,15 +362,6 @@ describe('NPCS', () => {
       roomId: 'team-room-4',
       tagName: 'Ryan',
       idleLines: [],
-    });
-    expect(NPCS.jessie).toMatchObject({
-      kind: 'penguin',
-      name: 'Jessie',
-      title: null,
-      roomId: 'bathroom',
-      tagName: 'Jessie',
-      dialogLine: 'occupied since standup',
-      idleLines: [{ text: 'occupied since standup', periodS: 0, delayS: 0 }],
     });
   });
 
