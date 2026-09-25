@@ -53,8 +53,14 @@ export const devPit: RoomDefinition = {
     {
       label: 'THE ICEBOX',
       hotspot: { x: 830, y: 135, ...DOOR_HOTSPOT_SIZE },
-      targetRoomId: null,
-      entryTile: { col: 0, row: 0 },
+      targetRoomId: 'the-icebox',
+      // The tile just inside the Icebox's own "DEV PIT" door: project that
+      // door's own hotspot bottom-centre (the door sill, not its centre)
+      // into the Icebox's own grid, then the nearest walkable tile (#16 fix
+      // 4, #51 D4, #51 review fix 2). The centre-based projection landed on
+      // (9,0), close enough to Jason's own tile (8,0) to visually overlap
+      // his sprite as the Penguin arrived.
+      entryTile: { col: 10, row: 0 },
     },
     {
       label: 'TOWN CENTER',

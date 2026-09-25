@@ -31,7 +31,12 @@ export const MAP_ROOMS: readonly MapRoomTile[] = [
     roomId: 'town-center',
   },
   { number: '02', label: '02 · DEV PIT', subtitle: 'OPEN DESKS', roomId: 'dev-pit' },
-  { number: '03', label: '03 · THE ICEBOX', subtitle: 'CONFERENCE · 604 SF', roomId: null },
+  {
+    number: '03',
+    label: '03 · THE ICEBOX',
+    subtitle: 'CONFERENCE · 604 SF',
+    roomId: 'the-icebox',
+  },
   {
     number: '04',
     label: '04 · THE KITCHEN',

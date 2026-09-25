@@ -204,8 +204,12 @@ export const townCenter: RoomDefinition = {
     {
       label: 'THE ICEBOX',
       hotspot: { x: 860, y: 150, ...DOOR_HOTSPOT_SIZE },
-      targetRoomId: null,
-      entryTile: { col: 0, row: 0 },
+      targetRoomId: 'the-icebox',
+      // The tile just inside the Icebox's own "TOWN CENTER" door: project
+      // that door's own hotspot bottom-centre (the door sill, not its
+      // centre) into the Icebox's own grid, then the nearest walkable tile
+      // (#16 fix 4, #51 D4, #51 review fix 2).
+      entryTile: { col: 0, row: 1 },
     },
     {
       label: 'DEV PIT',

@@ -129,7 +129,7 @@ test('Clicking Dev Pit on the Map loads it: leave before enter, its own spawnTil
   expect(errors).toEqual([]);
 });
 
-test('Clicking a disabled Room (THE ICEBOX) does nothing: the Map stays open, log unchanged (AC3)', async ({
+test('Clicking a disabled (COMING SOON) Room does nothing: the Map stays open, log unchanged (AC3)', async ({
   page,
 }) => {
   const errors = collectErrors(page);
@@ -141,16 +141,18 @@ test('Clicking a disabled Room (THE ICEBOX) does nothing: the Map stays open, lo
   await expect(page.locator('.map-screen')).toBeVisible();
   const logBefore = (await debugInfo(page))?.roomEventLog;
 
-  const iceboxTile = page.locator('[data-map-number="03"]');
-  await expect(iceboxTile).toHaveAttribute('aria-disabled', 'true');
-  await expect(iceboxTile.locator('.map-screen__pill')).toHaveText('COMING SOON');
+  // Whichever tile is still COMING SOON (03 THE ICEBOX was, until #51
+  // built its Room).
+  const comingSoonTile = page.locator('.map-screen [aria-disabled="true"]').first();
+  await expect(comingSoonTile).toHaveAttribute('aria-disabled', 'true');
+  await expect(comingSoonTile.locator('.map-screen__pill')).toHaveText('COMING SOON');
 
   // `aria-disabled="true"` makes Playwright's actionability check refuse a
   // plain `.click()` (it treats the tile as disabled), but the tile is not
   // natively `disabled` -- only inert (#33 D3) -- so `dispatchEvent` fires a
   // real click event without going through that actionability gate,
   // exercising the click handler's own no-op.
-  await iceboxTile.dispatchEvent('click');
+  await comingSoonTile.dispatchEvent('click');
 
   await expect(page.locator('.map-screen')).toBeVisible();
   expect((await debugInfo(page))?.roomEventLog).toEqual(logBefore);

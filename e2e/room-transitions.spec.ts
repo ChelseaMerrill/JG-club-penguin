@@ -67,11 +67,12 @@ test('room transitions: doors, changeRoom, HUD, reload (#15)', async ({ page }) 
     .poll(async () => (await debugInfo(page))?.roomEventLog)
     .toEqual([{ type: 'room:enter', roomId: 'town-center' }]);
 
-  // --- A disabled door (THE ICEBOX, `targetRoomId: null`) shows the
-  // "coming soon" hint and leaves the Room unchanged.
-  const icebox = townCenter.doors.find((door) => door.label === 'THE ICEBOX');
-  if (!icebox) throw new Error('expected town-center to have a THE ICEBOX door');
-  await clickStagePoint(page, doorCenter(icebox));
+  // --- A disabled door (`targetRoomId: null`) shows the "coming soon" hint
+  // and leaves the Room unchanged. Whichever Town Center door is still
+  // disabled (THE ICEBOX was, until #51 built its Room).
+  const disabledDoor = townCenter.doors.find((door) => door.targetRoomId === null);
+  if (!disabledDoor) throw new Error('expected town-center to have a disabled door');
+  await clickStagePoint(page, doorCenter(disabledDoor));
   // Fast, fixed-interval polls: the default backoff (up to 1 s between
   // checks) could notice the hint up to a second late, eating most of its
   // 2 s window before the "still shown" check below.
@@ -80,10 +81,10 @@ test('room transitions: doors, changeRoom, HUD, reload (#15)', async ({ page }) 
       timeout: WALK_TIMEOUT,
       intervals: [50],
     })
-    .toEqual(expect.arrayContaining(['THE ICEBOX']));
+    .toEqual(expect.arrayContaining([disabledDoor.label]));
   await expect
     .poll(async () => (await debugInfo(page))?.comingSoonHint, { intervals: [50] })
-    .toBe('THE ICEBOX');
+    .toBe(disabledDoor.label);
   const hintSeenAt = Date.now();
   expect((await debugInfo(page))?.roomId).toBe('town-center');
   await page.screenshot({ path: 'test-results/room-transitions/coming-soon-hint.png' });
@@ -95,7 +96,7 @@ test('room transitions: doors, changeRoom, HUD, reload (#15)', async ({ page }) 
   // rather than a fixed wait, so parallel e2e workers' CPU contention can't
   // flake it.
   await page.waitForTimeout(Math.max(0, 1500 - (Date.now() - hintSeenAt)));
-  expect((await debugInfo(page))?.comingSoonHint).toBe('THE ICEBOX');
+  expect((await debugInfo(page))?.comingSoonHint).toBe(disabledDoor.label);
   await expect
     .poll(async () => (await debugInfo(page))?.comingSoonHint, { timeout: 15_000 })
     .toBeNull();
