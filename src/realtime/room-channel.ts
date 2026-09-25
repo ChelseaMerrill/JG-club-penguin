@@ -12,6 +12,7 @@
  * `presence_ref` it had when it said bye.
  */
 import {
+  CHAT_TEXT_MAX,
   DEFAULT_FACING,
   EYES,
   HATS,
@@ -139,7 +140,6 @@ export interface RoomChannel {
 
 const MAX_TILE = 255;
 const MAX_PLAYER_ID_LEN = 64;
-const MAX_CHAT_LEN = 120;
 const MAX_REMOTE_PENGUINS = 50;
 const REJOIN_DELAYS_MS = [1000, 2000, 4000];
 const REJOIN_MAX_DELAY_MS = 10000;
@@ -279,7 +279,7 @@ const BROADCAST_PARSERS: {
     if (!isValidPlayerId(p.playerId)) return null;
     if (typeof p.text !== 'string') return null;
     const text = normalizeChatText(p.text);
-    if (text.length < 1 || text.length > MAX_CHAT_LEN) return null;
+    if (text.length < 1 || text.length > CHAT_TEXT_MAX) return null;
     if (!isValidSentAt(p.sentAt)) return null;
     return { playerId: p.playerId, text, sentAt: p.sentAt };
   },
