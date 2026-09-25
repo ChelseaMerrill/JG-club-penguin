@@ -26,6 +26,14 @@ import { createHud } from './ui/hud/hud';
 import { initDevHudHook } from './ui/hud/dev-hud-hook';
 import { getRoomDefinition } from './game/rooms/registry';
 import { createDebugOverlay, isDebugEnabled } from './ui/debug-overlay';
+import { createWallText, type WallText } from './ui/wall-text/wall-text';
+import {
+  createCoreValuesCard,
+  CORE_VALUES_OVERLAY_ID,
+  type CoreValuesCard,
+} from './ui/wall-text/core-values-card';
+import { resolveRoomIdFromLocation } from './game/rooms/dev-room-hook';
+import { CORE_VALUES_POSTER_HOTSPOT_ID } from './game/rooms/definitions/town-center';
 import {
   createRoomChannel,
   type RemotePenguinView,
@@ -54,6 +62,7 @@ import { createPenguinCreator } from './ui/penguin-creator';
 import { createPenguinEditor } from './penguin/penguin-editor';
 import { initDevCreatorHook } from './penguin/dev-creator-hook';
 import { createTrophyCase, TROPHY_CASE_OVERLAY_ID } from './ui/trophy-case';
+import { createMapScreen } from './ui/map-screen';
 import { createMarket, MARKET_OVERLAY_ID } from './ui/market';
 import { wireBadgeToast } from './ui/badge-toast';
 
@@ -65,6 +74,55 @@ mountStage(game);
 const client = getSupabaseClient();
 const realtime = toRealtimeClient(client);
 const uiLayer = getUiLayer();
+
+// Assigned once `hud`/`creator` exist below (`coreValuesCard` needs
+// `hud.overlays`; the guard needs `creator.isOpen()`); `tryOpenCoreValuesCard`
+// only reads them when the button is actually clicked, well after boot
+// finishes, the same forward-reference pattern `onSignOut`'s `auth`
+// reference below relies on.
+let coreValuesCard: CoreValuesCard | null = null;
+
+/**
+ * True only while a Room Session is running (set alongside `channelPlayerId`
+ * in `startSession`/`endSession`) (#77 review round 1 fix 2): the condition
+ * `tryOpenCoreValuesCard` and the poster button's own `tabIndex`/`inert`
+ * gate on, so there's nothing to open (and nothing focusable/announced)
+ * before a Session exists or after it ends.
+ */
+let sessionActive = false;
+
+function setSessionActive(active: boolean): void {
+  sessionActive = active;
+  wallText.setSessionActive(active);
+}
+
+/**
+ * Opens the Core Values card, unless there's no Session yet or the Penguin
+ * Creator is open (#77 review round 1 fix 2) -- shared by the wall poster's
+ * own DOM button (`onPosterClick` below) and `RoomScene`'s Phaser-side
+ * hotspot hit-area for the same spot (the `hotspot:click` listener further
+ * down, nit 5), so both paths gate the same way.
+ */
+function tryOpenCoreValuesCard(): void {
+  if (!sessionActive || creator.isOpen()) return;
+  coreValuesCard?.open();
+}
+
+// Mounted before the login overlay and HUD (#77 D3) so it always paints
+// below them in `#ui`'s DOM-order stacking. The initial render matches
+// whatever Room `RoomScene` itself boots into (#77 review round 1 fix 1):
+// `RoomScene` reads `?room=` via this same `resolveRoomIdFromLocation`, not
+// always `SPAWN_ROOM_ID`, so this overlay would otherwise show Town Center's
+// poster text/button over a different Room in dev/e2e.
+const wallText: WallText = createWallText(uiLayer, {
+  resolve: (roomId) => getRoomDefinition(roomId).wallText ?? [],
+  resolvePosterHotspot: (roomId) =>
+    getRoomDefinition(roomId).hotspots?.find(
+      (hotspot) => hotspot.id === CORE_VALUES_POSTER_HOTSPOT_ID,
+    ),
+  onPosterClick: () => tryOpenCoreValuesCard(),
+  initialRoomId: resolveRoomIdFromLocation(window.location),
+});
 
 /**
  * The Room scene and its Penguin view, once `RoomScene.create()` has first run.
@@ -260,6 +318,7 @@ function endSession(): RoomChannel | null {
   roomNavigator?.leaveForSignOut();
   roomChannel = null;
   channelPlayerId = null;
+  setSessionActive(false);
   chatController?.stop();
   chatController = null;
   penguins?.clear();
@@ -280,6 +339,7 @@ async function startSession(player: Player, previous: RoomChannel | null): Promi
   if (generation !== signInGeneration) return;
 
   channelPlayerId = player.id;
+  setSessionActive(true);
   debugOverlay?.setOwnLook(player.look);
 
   const channel = createRoomChannel({
@@ -356,9 +416,6 @@ const hud = createHud(getUiLayer(), {
   onIgloo: () => {
     void roomNavigator?.changeRoom('igloo');
   },
-  onReturnToTownCenter: () => {
-    void roomNavigator?.changeRoom('town-center');
-  },
   onSignOut: () => {
     void auth.signOut();
   },
@@ -367,6 +424,20 @@ const hud = createHud(getUiLayer(), {
   initialBalance: 0,
   onChatSend: (text) => chatController?.send(text) ?? Promise.resolve(false),
 });
+
+// The Map (#33): reproduces design/Club JenGuin Map.dc.html, self-wiring the
+// HUD's MAP button (`ui:open-map`) and `hud.overlays` internally.
+createMapScreen(uiLayer, {
+  overlays: hud.overlays,
+  changeRoom: (roomId) => {
+    void roomNavigator?.changeRoom(roomId);
+  },
+  currentRoomId: () => roomNavigator?.currentRoomId() ?? null,
+});
+
+// #77 D7: registers with the same shared `OverlayManager` MENU uses, so
+// opening one closes the other and Escape closes whichever is open.
+coreValuesCard = createCoreValuesCard(getUiLayer(), hud.overlays);
 
 const progress = createProgressSession({ registry: game.registry, emitter: gameEvents });
 
@@ -380,6 +451,25 @@ const e2eHooksEnabled = import.meta.env.DEV || import.meta.env.VITE_E2E_HOOKS ==
 const devFallbackStore: ProgressStore | null = e2eHooksEnabled
   ? createInMemoryProgressStore({ emitter: gameEvents })
   : null;
+
+declare global {
+  interface Window {
+    /** Test-only (#77 review round 1 fix 2); see the assignment below. */
+    __wallTextTest?: { setSessionActive: (active: boolean) => void };
+  }
+}
+
+// Test-only (#77 review round 1 fix 2): e2e can't complete a real Google
+// sign-in, so this flips `sessionActive` directly, letting a spec exercise
+// the poster button's real guarded click path (and produce its own
+// screenshots) without a Session. Deliberately its own tiny hook, not folded
+// into `?hud`/`?creator`/`?minigame` or #15's own upcoming `?asPlayer` hook,
+// so the two stay conflict-free. Gated and named exactly like the existing
+// hooks; Vite's static replacement strips this block from a production
+// build the same way it does `initDevHudHook`'s own body.
+if (e2eHooksEnabled) {
+  window.__wallTextTest = { setSessionActive };
+}
 
 // Built once at boot for the long-lived consumers below; every call forwards
 // to the signed-in Player's Supabase store (#34), or to the dev fallback.
@@ -420,6 +510,18 @@ gameEvents.on('hotspot:click', ({ hotspotId }) => {
   if (hotspotId !== 'igloo-gear-stall') return;
   hud.overlays.open(MARKET_OVERLAY_ID, () => market.close());
   void market.open();
+});
+
+// #77 review round 1 nit 5: RoomScene builds a Phaser-side hit-area for
+// every `RoomDefinition.hotspots` entry, including this one, the same way it
+// does for the Trophy Case and the Igloo Gear stall above -- without this
+// listener that zone was dead (never reachable in practice, since the DOM
+// `.wall-text__poster` button normally covers the same rect and wins every
+// hit-test, but dead code left lying around all the same). Goes through the
+// same `tryOpenCoreValuesCard` guard as the button itself.
+gameEvents.on('hotspot:click', ({ hotspotId }) => {
+  if (hotspotId !== CORE_VALUES_POSTER_HOTSPOT_ID) return;
+  tryOpenCoreValuesCard();
 });
 
 // A toast "wherever the Player is" for every earned Badge (#42), not just
@@ -543,6 +645,7 @@ const auth = startAuth({
     hud.overlays.close(MINIGAME_OVERLAY_ID);
     hud.overlays.close(TROPHY_CASE_OVERLAY_ID);
     hud.overlays.close(MARKET_OVERLAY_ID);
+    hud.overlays.close(CORE_VALUES_OVERLAY_ID);
     overlay.showSignedOut();
     hud.hide();
   },
