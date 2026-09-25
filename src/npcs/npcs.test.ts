@@ -287,6 +287,26 @@ describe('NPCS', () => {
       dialogLine: 'standup in 5',
       idleLines: [{ text: 'standup in 5', periodS: 0, delayS: 0 }],
     });
+    expect(NPCS.samantha).toMatchObject({
+      kind: 'penguin',
+      name: 'Samantha',
+      title: null,
+      roomId: 'office-hallway',
+      tagName: 'Samantha',
+      dialogLine: '',
+      idleLines: [],
+      dialog: { kind: 'line' },
+    });
+    expect(NPCS.daniel).toMatchObject({
+      kind: 'penguin',
+      name: 'Daniel',
+      title: null,
+      roomId: 'office-hallway',
+      tagName: 'Daniel',
+      dialogLine: '',
+      idleLines: [],
+      dialog: { kind: 'line' },
+    });
     expect(NPCS.emily).toMatchObject({
       kind: 'human',
       name: 'Emily Smith',

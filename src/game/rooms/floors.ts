@@ -29,6 +29,14 @@ export const ROOM_FLOORS: Record<RoomId, FloorId | null> = {
   igloo: null,
   // #51: THE ICEBOX is on the JG HQ floor with the other office Rooms.
   'the-icebox': '5',
+  // #51: the Hallway, Team Rooms 1-4 and the Bathroom are on the JG HQ floor
+  // with the other office Rooms.
+  'office-hallway': '5',
+  'team-room-1': '5',
+  'team-room-2': '5',
+  'team-room-3': '5',
+  'team-room-4': '5',
+  bathroom: '5',
 };
 
 /** Whether `a` and `b` are both real (non-null) floors and differ -- the Elevator's own show condition (#52 D3). */

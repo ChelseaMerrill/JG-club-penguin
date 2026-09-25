@@ -49,10 +49,12 @@ export type NpcId =
   | 'jethro'
   | 'darrin-icebox'
   // #51: the Hallway's, Team Rooms 1-4's and the Bathroom's NPCs, by the same
-  // rule. Emily, Michael Prete, Michael S. and Jessie have no slot anywhere
-  // else, so they get bare ids; everyone else is a repeat appearance with a
-  // `-<room>` suffix.
+  // rule. Emily, Michael Prete, Michael S., Samantha, Daniel and Jessie have
+  // no slot anywhere else, so they get bare ids; everyone else is a repeat
+  // appearance with a `-<room>` suffix.
   | 'michael-s'
+  | 'samantha'
+  | 'daniel'
   | 'emily'
   | 'anthony-hallway'
   | 'jethro-team-room-1'
@@ -876,6 +878,9 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     dialog: LINE_DIALOG,
     look: MARKET_PENGUIN_LOOK,
   },
+  // Spelled "Jesse" here, unlike the Bathroom's "Jessie" (see that entry's
+  // own comment) -- a deliberate human decision to keep them as two separate
+  // characters, not a typo to reconcile (#51).
   jesse: {
     id: 'jesse',
     name: 'Jesse',
@@ -1025,6 +1030,38 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     dialog: LINE_DIALOG,
     look: WHITE_CAP_PENGUIN_LOOK,
   },
+  // Samantha and Daniel (#51 human decision 2026-09-25, superseding an
+  // earlier "excluded, Players not NPCs" call): silent Penguin NPCs, one of
+  // the banner's "4 PENGUINS" along with "You" and Michael S. The design
+  // gives them no bubble of their own, so `idleLines` is empty and their
+  // dialog is `LINE_DIALOG` with an empty `dialogLine`, showing just their
+  // name and a close button.
+  samantha: {
+    id: 'samantha',
+    name: 'Samantha',
+    title: null,
+    roomId: 'office-hallway',
+    kind: 'penguin',
+    tagName: 'Samantha',
+    dialogLine: '',
+    idleLines: [],
+    dialog: LINE_DIALOG,
+    // The design's own `#0C4B5F` dark teal cap, in place of the default cyan.
+    look: { ...DEFAULT_LOOK, name: '', cap: '#0C4B5F' },
+  },
+  daniel: {
+    id: 'daniel',
+    name: 'Daniel',
+    title: null,
+    roomId: 'office-hallway',
+    kind: 'penguin',
+    tagName: 'Daniel',
+    dialogLine: '',
+    idleLines: [],
+    dialog: LINE_DIALOG,
+    // The design's own cap is the same default cyan as "You"'s own Penguin.
+    look: { ...DEFAULT_LOOK, name: '' },
+  },
   emily: {
     id: 'emily',
     name: 'Emily Smith',
@@ -1094,7 +1131,11 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     tagName: 'Ian',
     dialogLine: 'Who broke CI? Be honest.',
     idleLines: staticLine('have you installed the atlas plugin yet?'),
-    dialog: BUG_SQUASH_DIALOG,
+    // Team Room 2's own name badge, not Dev Pit's "DEV PIT · VP OF
+    // ENGINEERING" (#51 review fix 2): the trigger line and action/decline
+    // labels are still Ian's own Bug Squash copy, shared via
+    // `BUG_SQUASH_DIALOG`.
+    dialog: { ...BUG_SQUASH_DIALOG, subtitle: 'TEAM ROOM 2 · VP OF ENGINEERING' },
     figure: IAN_FIGURE,
   },
   'millie-team-room-3': {

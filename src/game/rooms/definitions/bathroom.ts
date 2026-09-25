@@ -19,7 +19,10 @@ const DOOR_HOTSPOT_SIZE = { width: 70, height: 165 };
 //     2.1-3.7 -> (0-1,0-3);
 //   - the sink vanity along the back-right wall, cols 2.6-5.8, rows 0.2-1.1
 //     -> (2,0), (3,0), (4,0), (5,0);
-//   - the wet-floor cone, its base at cols 5.5-6.1, row 4.6 -> (5,4).
+//   - the wet-floor cone, its base at cols 5.5-6.1, row 4.6 -> (5,4): its
+//     footprint covers far less than a quarter of the tile, an explicit
+//     exception to the rule above -- a physical hazard prop, blocked
+//     regardless of footprint size.
 // The "MELTED ICE · CAUTION" puddle label and the floor arrow are flat floor
 // art. Every NPC's own tile (see `npcSlots` below) is additionally blocked
 // (#16 fix 5): Jessie (3,1).

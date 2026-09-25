@@ -22,16 +22,22 @@ const FLOOR_MARKER_SIZE = { width: 97, height: 44 };
 // left/right face polygons' floor edges back to grid coordinates (#51 D2),
 // a tile blocked where the footprint covers a quarter or more of its area:
 // the planter under the window, cols 11.65-12.45, rows 0.3-1.1 -> (12,0)
-// (it covers 0.245 of (11,0), whose centre is clear). The floor arrow toward TOWN CENTER, the cyan runner and the TEAM
-// ROOM 7-9 markers are flat floor art and stay walkable. Every NPC's own tile
-// (see `npcSlots` below) is additionally blocked so a Penguin can't walk
-// through them (#16 fix 5): Michael S. (5,1), Emily Smith (3,3) and Anthony
-// Conway (6,3).
+// (it covers 0.245 of (11,0), whose centre is clear). The floor arrow
+// toward TOWN CENTER, the cyan runner and the TEAM ROOM 7-9 markers are
+// flat floor art and stay walkable. Every NPC's own tile (see `npcSlots`
+// below) is additionally blocked so a Penguin can't walk through them (#16
+// fix 5): Michael S. (5,1), Samantha (11,1), Daniel (13,2), Emily Smith
+// (4,3) and Anthony Conway (5,3). Emily's and Anthony's raw nearest-tile
+// picks, (3,3) and (6,3), each sat under (or, for Emily, overlapping) the
+// TEAM ROOM 7/8 floor markers' own hit rects; both are moved one tile
+// toward each other instead, confirmed against `iso.ts`'s tile math and
+// `RoomScene.ts`'s `NPC_HIT_ZONE_WIDTH`/`HEIGHT` that neither NPC's hit
+// zone intersects a marker's hotspot rect (#51 review fix 5).
 const WALKABLE: readonly (readonly boolean[])[] = [
   [true, true, true, true, true, true, true, true, true, true, true, true, false, true, true],
-  [true, true, true, true, true, false, true, true, true, true, true, true, true, true, true],
-  [true, true, true, true, true, true, true, true, true, true, true, true, true, true, true],
-  [true, true, true, false, true, true, false, true, true, true, true, true, true, true, true],
+  [true, true, true, true, true, false, true, true, true, true, true, false, true, true, true],
+  [true, true, true, true, true, true, true, true, true, true, true, true, true, false, true],
+  [true, true, true, true, false, false, true, true, true, true, true, true, true, true, true],
 ];
 
 /**
@@ -130,14 +136,19 @@ export const officeHallway: RoomDefinition = {
   npcSlots: [
     // Michael S.'s slot is the tile under his ground shadow.
     { npcId: 'michael-s', tile: { col: 5, row: 1 } },
+    // Samantha's and Daniel's slots are the tile under their ground shadow
+    // (their shadows project to (11.0, 1.5) and (13.2, 2.6); each slot is
+    // the in-grid tile whose centre is closest on screen to that shadow).
+    { npcId: 'samantha', tile: { col: 11, row: 1 } },
+    { npcId: 'daniel', tile: { col: 13, row: 2 } },
     // The design draws Emily and Anthony in front of the corridor, off its
-    // floor (their shadows project to (5.5, 6.9) and (8.7, 7.3)); each slot
-    // is the in-grid tile whose centre is closest on screen to that shadow.
-    { npcId: 'emily', tile: { col: 3, row: 3 } },
-    { npcId: 'anthony-hallway', tile: { col: 6, row: 3 } },
-    // "You", Samantha and Daniel are Penguins drawn with the design's
-    // Player nameplate and no line of their own (the banner counts them as
-    // its "4 PENGUINS"): Players, placed live by Presence, never static NPC
-    // slots (compare Dev Pit's Matt).
+    // floor (their shadows project to (5.5, 6.9) and (8.7, 7.3), both off
+    // the 4-row floor grid). Their raw nearest-tile picks would be (3,3) and
+    // (6,3), but those sit on/overlapping the TEAM ROOM 7/8 floor markers'
+    // own hit rects, so each is moved one tile toward the other's own door
+    // instead -- see the `WALKABLE` comment above (#51 review fix 5).
+    { npcId: 'emily', tile: { col: 4, row: 3 } },
+    { npcId: 'anthony-hallway', tile: { col: 5, row: 3 } },
+    // "You" is the local Player's own Penguin, never a static NPC slot.
   ],
 };
