@@ -65,6 +65,14 @@ export interface LocalPenguinDebugInfo {
   moving: boolean;
   /** The sprite's Phaser `flipX` (true exactly when `facing === 'left'`); review fix 8. */
   flipX: boolean;
+  /**
+   * The sprite's currently-displayed Phaser texture key (`penguinTextureKey`,
+   * e.g. `...:left`) -- distinct from `facing`/`flipX`, which are the
+   * *requested* facing's state and can briefly lead the texture that's
+   * actually decoded and on screen (#147 review fix: the bug this guards
+   * against). Absent until the local Penguin's sprite exists.
+   */
+  textureKey?: string;
   /** `PenguinLook.name` as of this snapshot; review fix 1 (a sign-in look change, without a Room restart). */
   lookName: string;
   /** `PenguinLook.body`, same reasoning as `lookName`. */

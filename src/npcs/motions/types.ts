@@ -31,6 +31,9 @@ export interface NpcPropLayer {
  * - `props`: extra moving parts drawn in front of the figure.
  * - `replaceFigureProp`: draw the figure without its `npcs.ts` `prop`, for
  *   when a `props` layer is the design's version of what that hand holds.
+ * - `replaceFigureRestPose`: draw the figure without the static resting pose
+ *   of a designed prop (`cards`, `marker`, from issue #137), for when a
+ *   `props` layer animates that same prop, so it isn't drawn twice.
  *
  * Any NPC with a `path` or `figure` drops #36's idle bob: the designed
  * motion replaces it. Under `prefers-reduced-motion` none of this runs and
@@ -41,4 +44,5 @@ export interface NpcMotionSpec {
   figure?: CssAnimationSource;
   props?: readonly NpcPropLayer[];
   replaceFigureProp?: boolean;
+  replaceFigureRestPose?: boolean;
 }

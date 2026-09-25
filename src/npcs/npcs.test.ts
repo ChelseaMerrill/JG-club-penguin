@@ -1,9 +1,32 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_BUBBLE_WIDTH } from '../game/npcs/bubble-geometry';
+import { estimateBubbleSize } from '../game/npcs/bubble-geometry';
+import { bubbleSchedule } from '../game/npcs/bubble-schedule';
+import { estimateNameplateWidth, npcLayout } from '../game/npcs/npc-layout';
 import { devPit } from '../game/rooms/definitions/dev-pit';
 import { tileToScreen } from '../game/rooms/iso';
 import { ROOM_DEFINITIONS } from '../game/rooms/registry';
-import { getNpcDefinition, NPCS, type NpcId } from './npcs';
+import { getNpcDefinition, NPCS, type NpcBubbleLine, type NpcId } from './npcs';
+
+/** Whether two idle lines are ever shown at once (a `periodS: 0` line always is). */
+function visibleAtTheSameTime(a: NpcBubbleLine, b: NpcBubbleLine): boolean {
+  if (a.periodS === 0 || b.periodS === 0) return true;
+  const windowsOf = (line: NpcBubbleLine, horizonMs: number): [number, number][] => {
+    const { firstShowMs, visibleMs, periodMs } = bubbleSchedule(line);
+    const windows: [number, number][] = [];
+    for (let start = firstShowMs - periodMs; start < horizonMs; start += periodMs) {
+      windows.push([start, start + visibleMs]);
+    }
+    return windows;
+  };
+  // Both cycles line up again after their least common multiple.
+  const gcd = (x: number, y: number): number => (y === 0 ? x : gcd(y, x % y));
+  const pa = Math.round(a.periodS * 1000);
+  const pb = Math.round(b.periodS * 1000);
+  const horizonMs = (pa / gcd(pa, pb)) * pb;
+  const wa = windowsOf(a, horizonMs);
+  const wb = windowsOf(b, horizonMs);
+  return wa.some(([s1, e1]) => wb.some(([s2, e2]) => s1 < e2 && s2 < e1));
+}
 
 describe('NPCS', () => {
   it("has a definition for every npcId in every prototype Room's npcSlots", () => {
@@ -120,51 +143,94 @@ describe('NPCS', () => {
     }
   });
 
-  it("nudges Tristin's bubble up to clear Millie's nameplate (confirmed overlapping via an e2e screenshot)", () => {
-    expect(NPCS.tristin.bubbleOffsetY).toBe(-60);
-    expect(NPCS.millie.bubbleOffsetY).toBeUndefined();
-  });
-
   it(
-    "keeps Ryan/Steven/Sam's bubble rects from intersecting at the shared max bubble width, " +
-      "each rect (including Ian's) still spanning its own NPC's tile x (#36 round-2 review " +
-      'item 4: replaces a constants-only assertion after #92 moved them close together, ' +
-      'confirmed overlapping via an e2e screenshot; Dom dropped, owner request 2026-09-25 ' +
-      'removed him from this Room, so his own pairing with Ian no longer applies)',
+    "never shows an NPC's bubble over another NPC's bubble or nameplate while every NPC " +
+      'stands at its rest slot: any two lines whose visible windows overlap in time have ' +
+      "pill rects that don't intersect, and no line's pill ever covers another NPC's " +
+      "nameplate (#113: rest slots only; a roaming NPC's passing overlaps come from the " +
+      "designs' own paths)",
     () => {
-      const halfWidth = MAX_BUBBLE_WIDTH / 2;
-
-      function npcX(id: NpcId): number {
-        const slot = devPit.npcSlots.find((s) => s.npcId === id);
-        if (!slot) throw new Error(`expected dev-pit to have a "${id}" npcSlot`);
-        return tileToScreen(slot.tile, devPit.grid.origin).x;
+      interface Rect {
+        left: number;
+        right: number;
+        top: number;
+        bottom: number;
       }
-
-      function bubbleRect(id: NpcId): { min: number; max: number; npcTileX: number } {
-        const tileX = npcX(id);
-        const center = tileX + (NPCS[id].bubbleOffsetX ?? 0);
-        return { min: center - halfWidth, max: center + halfWidth, npcTileX: tileX };
+      const intersects = (a: Rect, b: Rect): boolean =>
+        a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+      const collisions: string[] = [];
+      for (const room of ROOM_DEFINITIONS) {
+        // Penguin-kind NPCs are being removed from the Rooms (only Players
+        // appear as Penguins, PR #133), so they're left out.
+        const placed = room.npcSlots.flatMap((slot) => {
+          const npc = getNpcDefinition(slot.npcId)!;
+          if (npc.kind === 'penguin') return [];
+          return [{ npc, feet: tileToScreen(slot.tile, room.grid.origin) }];
+        });
+        const nameplates = placed.map(({ npc, feet }) => {
+          const layout = npcLayout(npc);
+          const width = estimateNameplateWidth(npc.tagName);
+          return {
+            npcId: npc.id,
+            tagName: npc.tagName,
+            rect: {
+              left: feet.x - width / 2,
+              right: feet.x + width / 2,
+              top: feet.y + layout.nameplateTopY,
+              bottom: feet.y + layout.nameplateBottomY,
+            },
+          };
+        });
+        const shown = placed.flatMap(({ npc, feet }) => {
+          const bottom = feet.y + npcLayout(npc).bubbleBottomY + (npc.bubbleOffsetY ?? 0);
+          const centerX = feet.x + (npc.bubbleOffsetX ?? 0);
+          return npc.idleLines.map((line) => {
+            const size = estimateBubbleSize(line.text);
+            return {
+              npcId: npc.id,
+              line,
+              rect: {
+                left: centerX - size.width / 2,
+                right: centerX + size.width / 2,
+                top: bottom - size.height,
+                bottom,
+              },
+            };
+          });
+        });
+        for (let i = 0; i < shown.length; i += 1) {
+          const a = shown[i]!;
+          for (let j = i + 1; j < shown.length; j += 1) {
+            const b = shown[j]!;
+            if (a.npcId === b.npcId) continue;
+            if (intersects(a.rect, b.rect) && visibleAtTheSameTime(a.line, b.line)) {
+              collisions.push(
+                `${room.id}: ${a.npcId} "${a.line.text}" x ${b.npcId} "${b.line.text}"`,
+              );
+            }
+          }
+          for (const plate of nameplates) {
+            if (plate.npcId === a.npcId) continue;
+            if (intersects(a.rect, plate.rect)) {
+              collisions.push(
+                `${room.id}: ${a.npcId} "${a.line.text}" x ${plate.npcId}'s nameplate "${plate.tagName}"`,
+              );
+            }
+          }
+        }
       }
-
-      const ids: NpcId[] = ['ian', 'ryan', 'steven', 'sam'];
-      const rects = new Map(ids.map((id) => [id, bubbleRect(id)]));
-
-      for (const id of ids) {
-        const rect = rects.get(id)!;
-        expect(rect.npcTileX, `${id}'s bubble rect`).toBeGreaterThanOrEqual(rect.min);
-        expect(rect.npcTileX, `${id}'s bubble rect`).toBeLessThanOrEqual(rect.max);
-      }
-
-      const adjacentPairs: [NpcId, NpcId][] = [
-        ['ryan', 'steven'],
-        ['steven', 'sam'],
+      // Overlaps the Room design itself draws at rest, kept as designed: Dev
+      // Pit's Steven's pills (`y="323.4"`, 30 tall, x 957.8-1202.2) cover the
+      // bottom 14 px of Ryan's nameplate (`<rect x="974" y="317.4"
+      // width="52" height="20">`); in-game only its bottom 4 px, below the
+      // text.
+      const drawnByTheDesign = [
+        `dev-pit: steven "Boxes and arrows. Mostly arrows." x ryan's nameplate "Ryan"`,
+        `dev-pit: steven "This diagram scales. Trust me." x ryan's nameplate "Ryan"`,
       ];
-      for (const [a, b] of adjacentPairs) {
-        const rectA = rects.get(a)!;
-        const rectB = rects.get(b)!;
-        const noOverlap = rectA.max <= rectB.min || rectB.max <= rectA.min;
-        expect(noOverlap, `${a}'s and ${b}'s bubble rects overlap`).toBe(true);
-      }
+      expect(collisions.filter((collision) => !drawnByTheDesign.includes(collision))).toEqual([]);
+      // Each allowed overlap still happens, so a stale entry can't linger.
+      for (const allowed of drawnByTheDesign) expect(collisions).toContain(allowed);
     },
   );
 
@@ -384,15 +450,11 @@ describe('NPCS', () => {
 
   it("draws each repeat appearance with the same figure and dialog line as the person's first Room (#51)", () => {
     const repeats: [NpcId, NpcId][] = [
-      ['anthony-hallway', 'anthony'],
-      ['jethro-team-room-1', 'jethro'],
       ['dom-team-room-1', 'dom'],
       ['ian-team-room-2', 'ian'],
       ['millie-team-room-3', 'millie'],
       ['casey-team-room-3', 'casey'],
       ['sydney-team-room-3', 'sydney'],
-      ['sam-team-room-4', 'sam'],
-      ['ryan-team-room-4', 'ryan'],
     ];
     for (const [repeat, first] of repeats) {
       const again = NPCS[repeat];
@@ -402,6 +464,27 @@ describe('NPCS', () => {
       }
       expect(again.figure, repeat).toBe(original.figure);
       expect(again.dialogLine, repeat).toBe(original.dialogLine);
+    }
+  });
+
+  it("differs from a person's other appearances only by what that Room's design adds (#113: the Room design wins)", () => {
+    // Roof Deck's Anthony fishes instead of holding his laptop; the Icebox's
+    // Jethro wears a chest camera rig; Dev Pit's Ryan and Sam raise a
+    // whiteboard marker. Their other Rooms' designs draw none of that.
+    const overrides: [NpcId, NpcId, Record<string, unknown>][] = [
+      ['anthony', 'anthony-hallway', { prop: 'fishingRod' }],
+      ['jethro', 'jethro-team-room-1', { cameraRig: true }],
+      ['ryan', 'ryan-team-room-4', { marker: expect.anything() }],
+      ['sam', 'sam-team-room-4', { marker: expect.anything() }],
+    ];
+    for (const [roomOwn, other, added] of overrides) {
+      const withOverride = NPCS[roomOwn];
+      const plain = NPCS[other];
+      if (withOverride.kind !== 'human' || plain.kind !== 'human') {
+        throw new Error(`expected ${roomOwn} and ${other} to be Human NPCs`);
+      }
+      expect(withOverride.figure, roomOwn).toEqual({ ...plain.figure, ...added });
+      expect(withOverride.dialogLine, roomOwn).toBe(plain.dialogLine);
     }
   });
 

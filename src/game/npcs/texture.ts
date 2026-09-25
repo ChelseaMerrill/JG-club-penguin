@@ -37,17 +37,27 @@ export function npcTextureKey(npc: NpcDefinition): string {
 export function ensureNpcTexture(
   scene: NpcTextureScene,
   npc: NpcDefinition,
-  options: { omitProp?: boolean } = {},
+  options: { omitProp?: boolean; omitRestPose?: boolean } = {},
 ): string {
-  // #113: a designed motion can draw its own version of what a Human NPC
-  // holds (Anthony's rod for his laptop), so that variant omits `prop`.
-  const omitProp = options.omitProp === true && npc.kind === 'human';
-  const key = omitProp ? `${npcTextureKey(npc)}:no-prop` : npcTextureKey(npc);
+  // #113: a designed motion can draw its own moving version of what a Human
+  // NPC holds (Anthony's rod), so that variant omits `prop`; or of a prop's
+  // static resting pose (Jon's cards, the Dev Pit markers), so that variant
+  // omits `cards`/`marker`. Either way the NPC shows exactly one of each.
+  const isHuman = npc.kind === 'human';
+  const omitProp = options.omitProp === true && isHuman;
+  const omitRestPose = options.omitRestPose === true && isHuman;
+  const key =
+    npcTextureKey(npc) + (omitProp ? ':no-prop' : '') + (omitRestPose ? ':no-rest-pose' : '');
   ensureSvgTexture(scene.textures, key, () =>
     npc.kind === 'human'
-      ? renderNpcSvg(omitProp ? { ...npc.figure, prop: undefined } : npc.figure, {
-          idPrefix: npc.id,
-        })
+      ? renderNpcSvg(
+          {
+            ...npc.figure,
+            ...(omitProp ? { prop: undefined } : {}),
+            ...(omitRestPose ? { cards: undefined, marker: undefined } : {}),
+          },
+          { idPrefix: npc.id },
+        )
       : renderPenguinSvg(npc.look, { anim: npc.look.emote, frame: 0 }, { idPrefix: npc.id }),
   );
   return key;

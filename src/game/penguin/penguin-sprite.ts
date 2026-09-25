@@ -157,7 +157,7 @@ export function createPenguin(
   let pendingKey: string | null = null;
   let pendingListener: (() => void) | null = null;
 
-  ensurePenguinTextures(scene, look);
+  ensurePenguinTextures(scene, look, facing);
 
   const sprite = new GameObjects.Sprite(scene, 0, 0, PLACEHOLDER_TEXTURE_KEY);
   sprite.setOrigin(origin.x, origin.y);
@@ -165,7 +165,6 @@ export function createPenguin(
   // feet-anchor origin above -- Phaser scales a GameObject's display size
   // around its fractional origin, so the feet stay pinned at (x, y).
   sprite.setScale(PLAYER_PENGUIN_SCALE);
-  sprite.setFlipX(facing === 'left');
 
   const pill = new GameObjects.Graphics(scene);
   const nameText = new GameObjects.Text(scene, 0, NAME_TAG_GAP + NAME_TAG_PADDING_Y, '', {
@@ -281,20 +280,34 @@ export function createPenguin(
   }
 
   function applyFrame(): void {
-    const key = penguinTextureKey(currentHash, currentAnim, currentFrame);
+    const key = penguinTextureKey(currentHash, currentAnim, currentFrame, facing);
+    // Captured now, alongside `key`, rather than read from the outer
+    // `facing` closure variable inside the (possibly-async) callback below
+    // (#147): a later `setFacing`/`applyFrame` call can advance `facing`
+    // again before this key's texture decodes, and the flip must always
+    // match the facing baked into whichever texture is actually on screen,
+    // not whatever `facing` happens to hold when the callback fires.
+    const flipped = facing === 'left';
     clearPendingListener();
     if (scene.textures.exists(key)) {
       sprite.setTexture(key);
+      sprite.setFlipX(flipped);
       return;
     }
     // The texture hasn't decoded yet (`addBase64` is async); pick it up once
-    // it has.
+    // it has. The flip is applied together with the texture swap so the
+    // previous facing's frame never shows flipped for the new facing (#147
+    // review fix): its own lettering was baked for the old facing, and
+    // flipping it early mirrors it backwards until the new texture lands.
     const listener = (): void => {
       if (pendingKey === key) {
         pendingKey = null;
         pendingListener = null;
       }
-      if (!destroyed) sprite.setTexture(key);
+      if (!destroyed) {
+        sprite.setTexture(key);
+        sprite.setFlipX(flipped);
+      }
     };
     pendingKey = key;
     pendingListener = listener;
@@ -332,14 +345,29 @@ export function createPenguin(
       play(anim);
     },
     setFacing(next: Facing) {
+      // #147: a left-facing frame's texture bakes counter-mirrored lettering
+      // (`render-svg.ts`'s `renderLettering`), so switching facing must swap
+      // the sprite's *texture* (via `applyFrame`), not just flip it -- the
+      // flip alone would mirror the already-corrected lettering right back
+      // into reading backwards. The flip itself is applied inside
+      // `applyFrame`, together with whichever texture actually lands.
+      //
+      // Early-return when the facing hasn't changed (#147 review fix):
+      // `RoomScene.advanceStep` calls `setFacing` on every walk step, even
+      // while walking straight in one direction across several tiles, so
+      // without this guard every step re-hashes `currentLook` and re-runs 16
+      // `exists` checks (`ensurePenguinTextures`) for a texture set already
+      // in use.
+      if (next === facing) return;
       facing = next;
-      sprite.setFlipX(facing === 'left');
+      ensurePenguinTextures(scene, currentLook, facing);
+      applyFrame();
     },
     setLook(next: PenguinLook) {
       const wasWalking = currentAnim === 'WALK';
       currentLook = next;
       currentHash = penguinLookHash(next);
-      ensurePenguinTextures(scene, next);
+      ensurePenguinTextures(scene, next, facing);
       redrawNameTag();
       play(wasWalking ? 'WALK' : next.emote);
     },

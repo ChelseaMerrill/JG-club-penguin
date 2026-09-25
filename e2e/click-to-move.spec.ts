@@ -1,10 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
 import { DEFAULT_LOOK, type PenguinLook, type Tile } from '../src/contracts';
 import { npcInteractionTile } from '../src/game/movement/targets';
+import { npcLayout } from '../src/game/npcs/npc-layout';
 import { townCenter } from '../src/game/rooms/definitions/town-center';
 import { screenToTile, tileToScreen } from '../src/game/rooms/iso';
 import { GAME_HEIGHT, GAME_WIDTH } from '../src/game/stage-size';
-import type { RoomDebugInfo } from './support/room-debug-types';
+import type { NpcMotionDebugInfo, RoomDebugInfo } from './support/room-debug-types';
 import { TILE_STEP_MS } from '../src/game/movement/speed';
 
 /** Generous: the very first poll also waits out Phaser/WebGL's cold-start init. */
@@ -214,6 +215,12 @@ test('click-to-move', async ({ page }) => {
   await clickStagePoint(page, tileToScreen(westOfCurrent, origin));
   await expect.poll(async () => (await debugInfo(page))?.localPenguin?.facing).toBe('left');
   expect((await debugInfo(page))?.localPenguin?.flipX).toBe(true);
+  // #147 review fix: the actually-displayed texture key (not just the
+  // requested `facing`/`flipX`) ends up on the left-facing (counter-mirrored
+  // lettering) texture set too, once it's decoded.
+  await expect
+    .poll(async () => (await debugInfo(page))?.localPenguin?.textureKey)
+    .toMatch(/:left$/);
   await expect
     .poll(async () => (await debugInfo(page))?.localPenguin?.moving, { timeout: LONG_WALK_TIMEOUT })
     .toBe(false);
@@ -221,23 +228,30 @@ test('click-to-move', async ({ page }) => {
   // --- Clicking the NPC walks to its interaction tile and logs npc:arrived.
   // Darrin (#113) roams a designed loop around Town Center, so -- unlike
   // this test's earlier tile clicks -- both his own click target and his
-  // interaction tile move with him: read his live point off
-  // `__roomDebug.npcs` right before each click, and compute the expected
-  // interaction tile the same way `RoomScene.handleNpcClick` does (via
-  // `npcInteractionTile`) instead of assuming his static `npcSlots` tile.
+  // interaction tile move with him. Click the centre of his click target
+  // (`npcLayout`'s `hitArea.centerY` from his live feet, so a few frames of walking
+  // between reading his point and the click landing can't carry the target
+  // off the pointer), then wait for the click to pause him and compute the
+  // expected interaction tile from where he actually stopped, the same way
+  // `RoomScene.handleNpcClick` does (via `npcInteractionTile`), instead of
+  // assuming his static `npcSlots` tile or his pre-click point.
   const npc = townCenter.npcSlots[0];
-  async function npcPoint(): Promise<{ x: number; y: number }> {
-    const point = (await debugInfo(page))?.npcs?.[npc.npcId];
-    if (!point) throw new Error(`no __roomDebug.npcs entry for ${npc.npcId}`);
-    return point;
+  expect(npc.npcId).toBe('darrin');
+  async function npcState(): Promise<NpcMotionDebugInfo> {
+    const state = (await debugInfo(page))?.npcs?.[npc.npcId];
+    if (!state) throw new Error(`no __roomDebug.npcs entry for ${npc.npcId}`);
+    return state;
   }
+  const NPC_HIT_ZONE_OFFSET_Y = npcLayout({ kind: 'human' }).hitArea.centerY;
 
-  const beforeClick = await npcPoint();
+  const beforeClick = await npcState();
+  await clickStagePoint(page, { x: beforeClick.x, y: beforeClick.y + NPC_HIT_ZONE_OFFSET_Y });
+  await expect.poll(async () => (await npcState()).paused).toBe(true);
+  const pausedAt = await npcState();
   const npcInteractionTileNow = npcInteractionTile(townCenter.walkable, {
     ...npc,
-    tile: screenToTile(beforeClick, origin),
+    tile: screenToTile(pausedAt, origin),
   });
-  await clickStagePoint(page, beforeClick);
   await expect
     .poll(async () => (await debugInfo(page))?.localPenguin, { timeout: LONG_WALK_TIMEOUT })
     .toMatchObject({ tile: npcInteractionTileNow, moving: false });
@@ -247,8 +261,9 @@ test('click-to-move', async ({ page }) => {
   // counts as arriving (no walk needed), so its dialog can reopen (#36).
   // The first click already paused Darrin where he stood (#113), so his
   // live point -- and therefore his interaction tile -- hasn't moved since.
+  expect(await npcState()).toMatchObject({ x: pausedAt.x, y: pausedAt.y, paused: true });
   const arrivalsBefore = (await debugInfo(page))?.npcArrivedLog?.length ?? 0;
-  await clickStagePoint(page, await npcPoint());
+  await clickStagePoint(page, pausedAt);
   await expect
     .poll(async () => (await debugInfo(page))?.npcArrivedLog?.length)
     .toBe(arrivalsBefore + 1);

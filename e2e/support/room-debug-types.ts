@@ -23,6 +23,7 @@ export interface LocalPenguinDebugInfo {
   facing: Facing;
   moving: boolean;
   flipX: boolean;
+  textureKey?: string;
   lookName: string;
   lookBody: HexColor;
   playerId: string;

@@ -1,5 +1,6 @@
 import { mkdirSync, rmSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
+import { npcLayout } from '../src/game/npcs/npc-layout';
 import { theMelt } from '../src/game/rooms/definitions/the-melt';
 import { tileToScreen } from '../src/game/rooms/iso';
 import { GAME_HEIGHT, GAME_WIDTH } from '../src/game/stage-size';
@@ -14,10 +15,19 @@ import type { NpcMotionDebugInfo, RoomDebugInfo } from './support/room-debug-typ
 const BOOT_TIMEOUT = 15_000;
 const LONG_WALK_TIMEOUT = 15_000;
 const PROOF_ROOT = 'test-results/npc-motion-the-melt';
-/** `RoomScene`'s NPC click zone sits this far above the feet (`NPC_HIT_ZONE_OFFSET_Y`). */
-const HIT_ZONE_OFFSET_Y = -50;
+/** The centre of `RoomScene`'s click zone for a Human NPC, relative to its feet. */
+const HIT_ZONE_OFFSET_Y = npcLayout({ kind: 'human' }).hitArea.centerY;
 const MOVING_NPCS = ['tom'];
-const STILL_NPCS = ['chelsea', 'jesse', 'tonya'];
+/** Tonya and Jesse are Penguins in the design, so they aren't placed (#133). */
+const STILL_NPCS = ['chelsea'];
+/**
+ * Phaser clamps each frame's delta to 16.7ms for its first 120 frames (its
+ * TimeStep `panicMax` cool-down), and NPC motions run on that game clock. On a
+ * slow frame rate (software WebGL on a loaded machine) the clock then runs
+ * far behind the wall clock, so a spec polls, up to this long, for an NPC to
+ * move rather than sampling it on a fixed wall-clock schedule.
+ */
+const MOTION_TIMEOUT = 45_000;
 
 test.use({ viewport: { width: 1600, height: 900 } });
 
@@ -71,9 +81,8 @@ async function bootTheMelt(page: Page): Promise<string[]> {
   return errors;
 }
 
-test('the Kitchen: Tom walks his designed path; Chelsea, Jesse and Tonya stay put', async ({
-  page,
-}) => {
+test('the Kitchen: Tom walks his designed path; Chelsea stays put', async ({ page }) => {
+  test.slow();
   const dir = proofDir('npcs-move');
   const errors = await bootTheMelt(page);
 
@@ -84,18 +93,18 @@ test('the Kitchen: Tom walks his designed path; Chelsea, Jesse and Tonya stay pu
   }
 
   const start = await npc(page, 'tom');
-  const seen = [start];
   for (let shot = 1; shot <= 4; shot += 1) {
     await page.waitForTimeout(1_500);
-    seen.push(await npc(page, 'tom'));
     await page.screenshot({ path: `${dir}/t${shot * 1.5}s.png` });
   }
-  // tomWalk holds at each end of its 16s loop (0%,15% and 35%,60% and
-  // 80%,100%) and only actually moves for part of it (the unit tests pin
-  // the exact translate(-240px,60px) stop), so these four evenly-spaced
-  // screenshots may repeat a held position; what the e2e proof needs is
-  // that Tom's point does move somewhere across the sampled window.
-  expect(new Set(seen.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`)).size).toBeGreaterThan(1);
+  // tomWalk holds at his slot point for the first 15% of its 16s loop, then
+  // heads left and down toward translate(-240px, 60px) (the unit tests pin
+  // the exact stop). Poll on the game clock (see MOTION_TIMEOUT) for him to
+  // leave his slot point in that direction.
+  await expect
+    .poll(async () => (await npc(page, 'tom')).x - start.x, { timeout: MOTION_TIMEOUT })
+    .toBeLessThan(-1);
+  expect((await npc(page, 'tom')).y).toBeGreaterThan(start.y);
 
   const tom = await npc(page, 'tom');
   await page.screenshot({
@@ -109,6 +118,7 @@ test('the Kitchen: Tom walks his designed path; Chelsea, Jesse and Tonya stay pu
 test('clicking a moving Tom pauses him, opens his dialog, and closing it resumes his walk', async ({
   page,
 }) => {
+  test.slow();
   const dir = proofDir('click-pauses');
   const errors = await bootTheMelt(page);
 
@@ -140,15 +150,16 @@ test('clicking a moving Tom pauses him, opens his dialog, and closing it resumes
   await expect(dialog).toBeHidden();
   await expect.poll(async () => (await npc(page, 'tom')).moving).toBe(true);
   // tomWalk holds position for long stretches of its 16s loop (see the
-  // npcs-move test above), so poll across a full loop rather than a fixed
-  // wait for his point to actually differ from where he paused.
+  // npcs-move test above), so poll on the game clock (see MOTION_TIMEOUT)
+  // rather than a fixed wait for his point to actually differ from where he
+  // paused.
   await expect
     .poll(
       async () => {
         const p = await npc(page, 'tom');
         return p.x !== pausedAt.x || p.y !== pausedAt.y;
       },
-      { timeout: 17_000 },
+      { timeout: MOTION_TIMEOUT },
     )
     .toBe(true);
   await page.screenshot({ path: `${dir}/resumed.png` });

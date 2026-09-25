@@ -92,7 +92,7 @@ export const devPit: RoomDefinition = {
     // Matt is a Penguin (a Player), like "You", not an NPC -- see the export
     // script's `LIVE_ELEMENT_RULES['dev-pit']` labels-rule comment. Players
     // are never part of a static `RoomDefinition`; presence (#28) places
-    // them live. Contrast Town Center's Jory Hutchins, who *is* a designed
-    // NPC but still gets no slot here, for a different reason (#16 fix 5).
+    // them live. Contrast Town Center's Jory Hutchins, a designed Human NPC
+    // who has her own slot there (#137).
   ],
 };

@@ -4,17 +4,26 @@ import {
   PENGUIN_FRAME_PADDING_Y,
   PENGUIN_FRAME_WIDTH,
 } from '../penguin/render-svg';
+import { NPC_TEXT_PATHS } from './text-paths';
 
 /**
  * A Human NPC's figure, ported from `design/build/humans.js`'s `spec`
  * argument to its `human(s, uid)` builder. Scoped to the options the NPC
  * roster (`src/npcs/npcs.ts`) actually uses, not every option `humans.js`
  * supports: #51 ported the `buzz` hairstyle, the `plaid` pattern and the
- * `camera` and `beyblade` props as its Rooms needed them. The
- * `curlyShort`/`slick` hairstyles, the `henley` collar, the
- * `yarn`/`basketball`/`survivor` props, the `survivor` hat/tee, and the horse
+ * `camera` and `beyblade` props as its Rooms needed them, and #113 the
+ * `survivor` hat/tee (Jory). The `curlyShort`/`slick` hairstyles, the
+ * `henley` collar, the `yarn`/`basketball`/`survivor` props and the horse
  * `mount` composite are still never used by any Human NPC here, so they're
  * left unported; adding one later is a direct copy from `humans.js`.
+ *
+ * #113 also adds options that aren't in `humans.js` at all: the variations
+ * a Room design draws for its own NPCs (Dev Pit's and Team Room 2's dotted
+ * stubble for Ian, the Kitchen's apron for Tom and textured hair and toque
+ * for Chelsea) and the static resting pose of each designed prop (Jon's
+ * cards, the whiteboard markers, Anthony's fishing rod, Jethro's camera rig,
+ * Nicole seated with a laptop). Each is copied verbatim from that Room
+ * design's own figure markup; animating them is later work.
  */
 export interface HumanFigureSpec {
   style?:
@@ -27,7 +36,9 @@ export interface HumanFigureSpec {
     | 'curlyLong'
     | 'straightLong'
     | 'highBun'
-    | 'bald';
+    | 'bald'
+    /** Chelsea's hair in the Kitchen design: wavy, textured and long. */
+    | 'texturedLong';
   hair?: 'auburn' | 'ash' | 'caramel' | 'dark' | 'brown' | 'blond' | 'lblond' | 'sandy';
   skin?: 'light' | 'fair' | 'med';
   /** The torso/shirt colour. */
@@ -43,11 +54,16 @@ export interface HumanFigureSpec {
   earrings?: string;
   mouth?: 'flat' | 'smirk' | 'sip';
   teeth?: boolean;
-  beard?: 'full' | 'stubble';
+  /** `dotStubble`: Dev Pit's and Team Room 2's light dotted stubble for Ian. */
+  beard?: 'full' | 'stubble' | 'dotStubble';
   beardColor?: string;
   greys?: boolean;
   glasses?: 'rect' | 'thin' | 'sun' | 'roundBrown';
-  hat?: 'chef' | 'headphones';
+  /** `toque`: Chelsea's tall pleated toque in the Kitchen design. */
+  hat?: 'chef' | 'headphones' | 'toque' | 'survivor';
+  tee?: 'survivor';
+  /** The Kitchen design's green apron over Tom's shirt. */
+  apron?: boolean;
   prop?:
     | 'tieHeadband'
     | 'scarf'
@@ -59,7 +75,17 @@ export interface HumanFigureSpec {
     | 'chicken'
     | 'hobbyhorse'
     | 'camera'
-    | 'beyblade';
+    | 'beyblade'
+    /** Roof Deck's rod, reel and line with a "FREE $$$" envelope as bait (Anthony). */
+    | 'fishingRod';
+  /** Town Center's three playing cards in Jon's right hand. */
+  cards?: boolean;
+  /** Dev Pit's raised arm holding a whiteboard marker (Ryan, Sam, Steven). */
+  marker?: { arm: string; hand: string; color: string };
+  /** The Icebox's large camera rig strapped to Jethro's chest. */
+  cameraRig?: boolean;
+  /** The Icebox's Nicole: seated, with a laptop on her lap. */
+  seated?: 'laptop';
 }
 
 const SKIN: Record<NonNullable<HumanFigureSpec['skin']>, string> = {
@@ -122,6 +148,12 @@ function renderHumanFigure(spec: HumanFigureSpec, idPrefix: string): string {
       o += `<circle cx="${cx}" cy="${cy}" r="6" fill="${hc}" stroke="${OUTLINE}" stroke-width="1.8"></circle>`;
     }
   }
+  if (spec.style === 'texturedLong') {
+    o +=
+      `<path d="M32 28 Q18 32 25 42 Q14 50 23 58 Q12 66 21 74 Q11 82 21 90 Q14 99 28 102 L92 102 Q106 99 99 90 Q109 82 99 74 Q108 66 97 58 Q106 50 95 42 Q102 32 88 28 Z" fill="${hc}" stroke="${OUTLINE}" stroke-width="2.5"></path>` +
+      `<path d="M28 46 q-5 3 -1 7 q4 2 5 -2 M26 62 q-5 3 -1 7 q4 2 5 -2 M25 78 q-5 3 -1 7 q4 2 5 -2 M27 93 q-4 3 0 6 M92 46 q5 3 1 7 q-4 2 -5 -2 M94 62 q5 3 1 7 q-4 2 -5 -2 M95 78 q5 3 1 7 q-4 2 -5 -2 M93 93 q4 3 0 6" fill="none" stroke="#B08A45" stroke-width="1.6" stroke-linecap="round"></path>` +
+      `<path d="M33 52 q3 3 1 6 M31 70 q3 3 1 6 M87 52 q-3 3 -1 6 M89 70 q-3 3 -1 6" fill="none" stroke="#F6E2B0" stroke-width="1.4" stroke-linecap="round"></path>`;
+  }
 
   // Legs + shoes.
   o +=
@@ -154,6 +186,17 @@ function renderHumanFigure(spec: HumanFigureSpec, idPrefix: string): string {
         o += `<circle cx="${x + (y % 14 ? 3 : 0)}" cy="${y}" r="1.2" fill="#F4F4F4" clip-path="url(#${id}t)" opacity=".9"></circle>`;
       }
     }
+  }
+
+  // The Kitchen design's apron, clipped to the torso like the shirt pattern.
+  if (spec.apron) {
+    o +=
+      `<g clip-path="url(#${id}t)">` +
+      `<path d="M47 67 L50 76 M73 67 L70 76" stroke="#2F6B3A" stroke-width="2.5" stroke-linecap="round"></path>` +
+      `<path d="M47 76 H73 V86 H78 L80 110 H40 L42 86 H47 Z" fill="#3E8E4E" stroke="${OUTLINE}" stroke-width="2"></path>` +
+      `<rect x="34" y="85" width="52" height="3" fill="#2F6B3A"></rect>` +
+      `<rect x="52" y="93" width="16" height="9" rx="2" fill="none" stroke="#2F6B3A" stroke-width="1.8"></rect>` +
+      `</g>`;
   }
 
   // Jacket/vest over the shirt.
@@ -222,6 +265,9 @@ function renderHumanFigure(spec: HumanFigureSpec, idPrefix: string): string {
   if (style === 'curlyLong') {
     o += `<path d="M34 40 C30 16 50 8 62 12 C76 12 90 18 86 40 C82 30 74 24 60 26 C48 26 40 30 34 40 Z" fill="${hc}" stroke="${OUTLINE}" stroke-width="2.5"></path><circle cx="40" cy="26" r="6" fill="${hc}"></circle><circle cx="80" cy="26" r="6" fill="${hc}"></circle>`;
   }
+  if (style === 'texturedLong') {
+    o += `<path d="M33 42 C30 18 48 9 60 11 C74 10 90 18 87 42 Q86 33 80 33 Q77 25 70 28 Q64 22 58 27 Q50 22 46 30 Q38 29 33 42 Z" fill="${hc}" stroke="${OUTLINE}" stroke-width="2.5"></path>`;
+  }
   if (style === 'straightLong') {
     o += `<path d="M34 42 C32 16 50 10 62 12 C76 12 88 18 86 42 C82 30 72 26 60 26 C48 26 40 30 34 42 Z" fill="${hc}" stroke="${OUTLINE}" stroke-width="2.5"></path>`;
   }
@@ -256,6 +302,35 @@ function renderHumanFigure(spec: HumanFigureSpec, idPrefix: string): string {
   }
   if (spec.greys) {
     o += `<path d="M40 24 q6 -6 12 -8 M48 18 q8 -5 16 -6 M74 20 q5 3 8 8 M38 32 q3 -4 6 -6" fill="none" stroke="#B3B6C9" stroke-width="2" stroke-linecap="round" opacity=".85"></path>`;
+  }
+
+  // Dotted stubble: the Room designs draw it before the eyes and mouth,
+  // unlike humans.js's beards, which go over the mouth.
+  if (spec.beard === 'dotStubble') {
+    o += `<path d="M38 47 Q42 64 60 64.5 Q78 64 82 47 Q77 57 68 57 Q60 55 52 57 Q43 57 38 47 Z" fill="#8A7A6E" opacity=".22"></path>`;
+    for (const [cx, cy] of [
+      [42, 52],
+      [45, 56],
+      [48, 59],
+      [52, 61],
+      [56, 62],
+      [60, 62.5],
+      [64, 62],
+      [68, 61],
+      [72, 59],
+      [75, 56],
+      [78, 52],
+      [44, 54],
+      [50, 60],
+      [70, 60],
+      [76, 54],
+      [54, 57.5],
+      [66, 57.5],
+      [58, 59],
+      [62, 59],
+    ]) {
+      o += `<circle cx="${cx}" cy="${cy}" r=".7" fill="#5A4A3E" opacity=".55"></circle>`;
+    }
   }
 
   // Eyebrows, eyes.
@@ -302,6 +377,22 @@ function renderHumanFigure(spec: HumanFigureSpec, idPrefix: string): string {
   if (spec.hat === 'chef') {
     o += `<path d="M36 26 L36 14 C34 2 50 0 56 8 C62 -2 80 0 84 10 C90 4 92 18 84 22 L84 26 Z" fill="#F4F4F4" stroke="${OUTLINE}" stroke-width="2.5"></path><rect x="34" y="22" width="52" height="8" rx="2" fill="#F4F4F4" stroke="${OUTLINE}" stroke-width="2.5"></rect>`;
   }
+  if (spec.hat === 'toque') {
+    o +=
+      `<path d="M40 22 C27 21 23 5 35 1 C34 -10 49 -13 54 -5 C58 -14 73 -13 75 -4 C86 -9 96 4 86 12 C92 16 88 23 80 22 Z" fill="#F4F4F4" stroke="${OUTLINE}" stroke-width="2.5"></path>` +
+      `<path d="M49 21 Q46 9 51 -2 M61 21 Q60 7 64 -5 M72 21 Q73 10 79 2" fill="none" stroke="#B3B6C9" stroke-width="1.6" stroke-linecap="round"></path>` +
+      `<rect x="36" y="19" width="48" height="12" rx="2" fill="#F4F4F4" stroke="${OUTLINE}" stroke-width="2.5"></rect>` +
+      `<path d="M44 20 V30 M52 20 V30 M60 20 V30 M68 20 V30 M76 20 V30" stroke="#B3B6C9" stroke-width="1.4"></path>`;
+  }
+  if (spec.hat === 'survivor') {
+    o += `<path d="M35 28 L85 28 L85 36 L35 36 Z" fill="#E07A2F" stroke="${OUTLINE}" stroke-width="1.5"></path><path d="M40 30 q10 3 20 0 q10 -3 20 0" fill="none" stroke="#F2C12E" stroke-width="1.5"></path><path d="M84 30 L92 26 L96 40 L90 44 Z" fill="#E07A2F" stroke="${OUTLINE}" stroke-width="1.5"></path>`;
+  }
+  // humans.js draws the tee's "SURVIVOR" as Anton `<text>`; here it's the
+  // pre-baked outline (`text-paths.ts`), since a texture can't use web fonts.
+  if (spec.tee === 'survivor') {
+    const tee = NPC_TEXT_PATHS.survivorTee;
+    o += `<path d="${tee.d}" fill="${tee.fill}" clip-path="url(#${id}t)"></path><path d="M48 96 q12 4 24 0" fill="none" stroke="#E07A2F" stroke-width="1.5" clip-path="url(#${id}t)"></path>`;
+  }
   if (spec.hat === 'headphones') {
     o += `<path d="M32 40 C30 14 90 14 88 40" fill="none" stroke="${OUTLINE}" stroke-width="5"></path><rect x="26" y="34" width="11" height="17" rx="4" fill="#00BDFF" stroke="${OUTLINE}" stroke-width="2"></rect><rect x="83" y="34" width="11" height="17" rx="4" fill="#00BDFF" stroke="${OUTLINE}" stroke-width="2"></rect>`;
   }
@@ -341,8 +432,61 @@ function renderHumanFigure(spec: HumanFigureSpec, idPrefix: string): string {
   if (spec.prop === 'hobbyhorse') {
     o += `<rect x="18" y="56" width="5" height="68" rx="2" fill="#C9A366" stroke="${OUTLINE}" stroke-width="1.5"></rect><path d="M8 58 C2 58 0 46 8 40 L26 42 C32 46 30 58 22 60 Z" fill="#8A5A2B" stroke="${OUTLINE}" stroke-width="2.5"></path><path d="M6 40 L10 30 L14 41 Z M14 40 L19 29 L23 41 Z" fill="#8A5A2B" stroke="${OUTLINE}" stroke-width="2"></path><path d="M12 40 Q24 36 28 50" fill="none" stroke="#3b2a1a" stroke-width="4" stroke-linecap="round"></path><circle cx="8" cy="48" r="2" fill="#161719"></circle><path d="M4 54 q4 2 8 0" stroke="#161719" stroke-width="1.5" fill="none"></path><path d="M14 50 Q20 54 26 50" fill="none" stroke="#D63C3C" stroke-width="2"></path><circle cx="20" cy="126" r="4" fill="#3b2a1a" stroke="${OUTLINE}" stroke-width="1.5"></circle>`;
   }
+  if (spec.prop === 'fishingRod') {
+    const bait = NPC_TEXT_PATHS.freeBait;
+    o +=
+      `<path d="M92 96 L118 10" stroke="#C9A366" stroke-width="3.5" stroke-linecap="round"></path>` +
+      `<circle cx="95" cy="92" r="4" fill="#161719" stroke="${OUTLINE}" stroke-width="1.5"></circle>` +
+      `<path d="M118 10 L118 70" stroke="#F4F4F4" stroke-width="1.2"></path>` +
+      `<path d="M118 70 q0 8 -6 6" stroke="#B3B6C9" stroke-width="1.5" fill="none"></path>` +
+      `<rect x="108" y="72" width="20" height="14" rx="2" fill="#F4F4F4" stroke="${OUTLINE}" stroke-width="1.5"></rect>` +
+      `<path d="M108 72 L118 80 L128 72" stroke="${OUTLINE}" stroke-width="1.5" fill="none"></path>` +
+      `<path d="${bait.d}" fill="${bait.fill}"></path>`;
+  }
   if (spec.prop === 'beyblade') {
     o += `<circle cx="18" cy="96" r="11" fill="#00BDFF" stroke="#F4F4F4" stroke-width="3"></circle><circle cx="18" cy="96" r="4" fill="#161719"></circle><path d="M18 85 L18 107 M7 96 L29 96 M10 88 L26 104 M26 88 L10 104" stroke="#161719" stroke-width="1.5"></path><circle cx="102" cy="96" r="11" fill="#F4F4F4" stroke="${OUTLINE}" stroke-width="3"></circle><circle cx="102" cy="96" r="4" fill="#161719"></circle><path d="M102 85 L102 107 M91 96 L113 96 M94 88 L110 104 M110 88 L94 104" stroke="${OUTLINE}" stroke-width="1.5"></path>`;
+  }
+
+  // Resting poses of the Room designs' animated props (#113).
+  if (spec.cameraRig) {
+    o +=
+      `<rect x="40" y="70" width="40" height="26" rx="4" fill="#161719" stroke="${OUTLINE}" stroke-width="2.5"></rect>` +
+      `<circle cx="60" cy="83" r="9" fill="#2f3338" stroke="${OUTLINE}" stroke-width="2"></circle>` +
+      `<circle cx="60" cy="83" r="4" fill="#0a3d4d"></circle>` +
+      `<rect x="66" y="66" width="10" height="6" rx="1" fill="#F4F4F4" stroke="${OUTLINE}" stroke-width="1.5"></rect>`;
+  }
+  if (spec.cards) {
+    o +=
+      `<g transform="translate(96 84) rotate(-12)">` +
+      `<rect x="0" y="0" width="16" height="22" rx="2" fill="#F4F4F4" stroke="${OUTLINE}" stroke-width="1.5"></rect>` +
+      `<rect x="3" y="-3" width="16" height="22" rx="2" fill="#F4F4F4" stroke="${OUTLINE}" stroke-width="1.5"></rect>` +
+      `<rect x="6" y="-6" width="16" height="22" rx="2" fill="#F4F4F4" stroke="${OUTLINE}" stroke-width="1.5"></rect>` +
+      `<path d="M14 -1 l2 3 l-2 3 l-2 -3 z" fill="#00BDFF"></path>` +
+      `</g>`;
+  }
+  if (spec.marker) {
+    const { arm, hand, color } = spec.marker;
+    o +=
+      `<path d="M92 78 L112 56" stroke="${arm}" stroke-width="6" stroke-linecap="round"></path>` +
+      `<circle cx="113" cy="54" r="5.5" fill="${hand}" stroke="${OUTLINE}" stroke-width="2"></circle>` +
+      `<rect x="110" y="44" width="6" height="14" rx="2" fill="${color}" stroke="${OUTLINE}" stroke-width="1.5"></rect>`;
+  }
+  // Keep this last: it wraps everything drawn so far (`o`) in the seated
+  // offset, so any part added after it wouldn't sit with the figure.
+  if (spec.seated === 'laptop') {
+    // The whole figure sits 14 px lower, a lap over its legs.
+    o =
+      `<g transform="translate(0 14)">` +
+      o +
+      `<path d="M30 104 Q60 92 90 104 L96 112 Q60 122 24 112 Z" fill="#1d1f22" stroke="${OUTLINE}" stroke-width="2"></path>` +
+      `<rect x="18" y="106" width="16" height="8" rx="4" fill="#0f1012" stroke="${OUTLINE}" stroke-width="2"></rect>` +
+      `<rect x="86" y="106" width="16" height="8" rx="4" fill="#0f1012" stroke="${OUTLINE}" stroke-width="2"></rect>` +
+      `<rect x="44" y="84" width="32" height="20" rx="2" fill="#2f3338" stroke="${OUTLINE}" stroke-width="2"></rect>` +
+      `<rect x="47" y="87" width="26" height="14" fill="#0a3d4d"></rect>` +
+      `<rect x="50" y="90" width="14" height="2" fill="#00BDFF"></rect>` +
+      `<rect x="50" y="94" width="10" height="2" fill="#00BDFF" opacity=".6"></rect>` +
+      `<rect x="42" y="103" width="36" height="3" fill="#161719" stroke="${OUTLINE}" stroke-width="1.5"></rect>` +
+      `</g>`;
   }
 
   return o;

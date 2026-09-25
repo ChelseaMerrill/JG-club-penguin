@@ -1,5 +1,6 @@
 import { mkdirSync, rmSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
+import { npcLayout } from '../src/game/npcs/npc-layout';
 import { roofDeck } from '../src/game/rooms/definitions/roof-deck';
 import { tileToScreen } from '../src/game/rooms/iso';
 import { GAME_HEIGHT, GAME_WIDTH } from '../src/game/stage-size';
@@ -14,9 +15,10 @@ import type { NpcMotionDebugInfo, RoomDebugInfo } from './support/room-debug-typ
 const BOOT_TIMEOUT = 15_000;
 const LONG_WALK_TIMEOUT = 15_000;
 const PROOF_ROOT = 'test-results/npc-motion-roof-deck';
-/** `RoomScene`'s NPC click zone sits this far above the feet (`NPC_HIT_ZONE_OFFSET_Y`). */
-const HIT_ZONE_OFFSET_Y = -50;
-const MOVING_NPCS = ['brandon', 'anthony', 'millie', 'tristin'];
+/** The centre of `RoomScene`'s click zone for a Human NPC, relative to its feet. */
+const HIT_ZONE_OFFSET_Y = npcLayout({ kind: 'human' }).hitArea.centerY;
+/** Kevin and Tristin are Penguins in the design, so they aren't placed (#133). */
+const MOVING_NPCS = ['brandon', 'anthony', 'millie'];
 
 test.use({ viewport: { width: 1600, height: 900 } });
 

@@ -1,5 +1,6 @@
 import { mkdirSync, rmSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
+import { npcLayout } from '../src/game/npcs/npc-layout';
 import { townCenter } from '../src/game/rooms/definitions/town-center';
 import { tileToScreen } from '../src/game/rooms/iso';
 import { GAME_HEIGHT, GAME_WIDTH } from '../src/game/stage-size';
@@ -14,8 +15,8 @@ import type { NpcMotionDebugInfo, RoomDebugInfo } from './support/room-debug-typ
 const BOOT_TIMEOUT = 15_000;
 const LONG_WALK_TIMEOUT = 15_000;
 const PROOF_ROOT = 'test-results/npc-motion-town-center';
-/** `RoomScene`'s NPC click zone sits this far above the feet (`NPC_HIT_ZONE_OFFSET_Y`). */
-const HIT_ZONE_OFFSET_Y = -50;
+/** The centre of `RoomScene`'s click zone for a Human NPC, relative to its feet. */
+const HIT_ZONE_OFFSET_Y = npcLayout({ kind: 'human' }).hitArea.centerY;
 const MOVING_NPCS = ['darrin', 'jon', 'sydney'];
 
 test.use({ viewport: { width: 1600, height: 900 } });
@@ -76,11 +77,14 @@ test('Town Center NPCs walk their designed paths; Darrin pumps his fists, Jon do
   const dir = proofDir('npcs-move');
   const errors = await bootTownCenter(page);
 
+  // Every NPC placed here roams except Jory Hutchins (#137), who stays on
+  // her slot with the idle bob (her designed `jump` isn't ported yet). The
+  // design's Front Desk receptionist is a Penguin, so she isn't placed (#133).
+  expect(Object.keys((await debugInfo(page))?.npcs ?? {}).sort()).toEqual(
+    [...MOVING_NPCS, 'jory'].sort(),
+  );
   for (const id of MOVING_NPCS) expect((await npc(page, id)).moving).toBe(true);
-  // The Front Desk penguin keeps #36's idle bob and never leaves her slot.
-  const frontDesk = await npc(page, 'front-desk');
-  const frontDeskRest = tileToScreen({ col: 6, row: 1 }, townCenter.grid.origin);
-  expect(frontDesk).toMatchObject({ x: frontDeskRest.x, y: frontDeskRest.y, moving: false });
+  expect((await npc(page, 'jory')).moving).toBe(false);
 
   const start = await npc(page, 'darrin');
   const seen = [start];
