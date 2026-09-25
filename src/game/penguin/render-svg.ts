@@ -46,6 +46,14 @@ export interface ResolvedPenguinColors {
   feetRim: string | null;
   /** JG CAP/HEADPHONES cup outline and the JG badge fill, against the cap. */
   capOutline: string;
+  /**
+   * The JG CAP crown's "JG" label fill, against the badge -- which is
+   * itself filled with `capOutline`, so this is resolved *from* that
+   * resolved value, not from `look.cap` directly (#92 round 2 nit 4: the
+   * label is drawn on the badge, not the cap fill, so the badge's own
+   * colour is the surface that matters).
+   */
+  capLabel: string;
   /** HEADPHONES band, against the body (and `BACKDROP`, as for the body outline). */
   headphoneBand: string;
   /** Halo under the SNORKEL frame/strap, against the body. */
@@ -68,6 +76,9 @@ export function resolvePenguinColors(look: PenguinLook): ResolvedPenguinColors {
   const bodySurfaces = reachesMinContrast(look.body, [BACKDROP])
     ? [look.body]
     : [look.body, BACKDROP];
+  // Resolved once, used both for the cap's own outline and (below) as the
+  // surface `capLabel` is checked against (#92 round 2 nit 4).
+  const capOutline = pickContrasting(STROKE, [look.cap]);
 
   return {
     bodyOutline: pickContrasting(STROKE, bodySurfaces),
@@ -95,7 +106,8 @@ export function resolvePenguinColors(look: PenguinLook): ResolvedPenguinColors {
       ? null
       : pickContrasting(STROKE, [look.body]),
     feetRim: reachesMinContrast(look.feet, [BACKDROP]) ? null : pickContrasting(STROKE, [BACKDROP]),
-    capOutline: pickContrasting(STROKE, [look.cap]),
+    capOutline,
+    capLabel: pickContrasting(EYE_WHITE, [capOutline]),
     headphoneBand: pickContrasting(STROKE, bodySurfaces),
     snorkelRim: reachesMinContrast(ACCENT, [look.body])
       ? null
@@ -109,10 +121,12 @@ export function resolvePenguinColors(look: PenguinLook): ResolvedPenguinColors {
  * outline, cap outline and headphone band are always `STROKE`; every
  * rim/halo is `null`; the pattern ink is always the raw body colour
  * (`renderPattern`'s old `bodyColor` parameter); the WAR WEEK BAND fill is
- * always `EYE_PUPIL`. Used only by the #79 golden regression test and the
- * e2e evidence grid's "before" column, both of which reproduce the old
- * renderer's output through the *current* markup templates
- * (`renderPenguinSvgWithColors`) instead of keeping a second copy of them.
+ * always `EYE_PUPIL`; the JG CAP label fill is always `EYE_WHITE` (#92 D4's
+ * own fixed design colour, predating #79's `capLabel` resolution). Used only
+ * by the #79 golden regression test and the e2e evidence grid's "before"
+ * column, both of which reproduce the old renderer's output through the
+ * *current* markup templates (`renderPenguinSvgWithColors`) instead of
+ * keeping a second copy of them.
  */
 export function preContrastFixColors(look: PenguinLook): ResolvedPenguinColors {
   return {
@@ -126,6 +140,7 @@ export function preContrastFixColors(look: PenguinLook): ResolvedPenguinColors {
     beakRim: null,
     feetRim: null,
     capOutline: STROKE,
+    capLabel: EYE_WHITE,
     headphoneBand: STROKE,
     snorkelRim: null,
     warWeekFill: EYE_PUPIL,
@@ -342,7 +357,7 @@ function renderHat(
   capColor: string,
   resolved: Pick<
     ResolvedPenguinColors,
-    'capOutline' | 'headphoneBand' | 'snorkelRim' | 'warWeekFill'
+    'capOutline' | 'capLabel' | 'headphoneBand' | 'snorkelRim' | 'warWeekFill'
   >,
 ): string {
   switch (hat) {
@@ -353,8 +368,11 @@ function renderHat(
       // single-brim placeholder shape. `PENGUIN_TEXT_PATHS.jgCap` is the
       // design's "JG" crown label (L59), baked to path outlines the same way
       // as `jgLogo`/`warWeek` (#62), since an SVG-as-texture can't load a web
-      // font; its own fill is fixed (design colour), unlike `capOutline`.
-      return `<g><path d="M34 24 C36 6 84 6 86 24 Z" fill="${capColor}" stroke="${resolved.capOutline}" stroke-width="2.5" stroke-linejoin="round"></path><path d="M34 24 L86 24 C86 27 82 29 74 30 L46 30 C38 29 34 27 34 24 Z" fill="${capColor}" stroke="${resolved.capOutline}" stroke-width="2.5" stroke-linejoin="round"></path><path d="M58 24 L102 26 C104 28 102 32 98 33 L60 29 Z" fill="${capColor}" stroke="${resolved.capOutline}" stroke-width="2.5" stroke-linejoin="round"></path><path d="M60 8 L60 24" stroke="${resolved.capOutline}" stroke-width="1.5" opacity=".5"></path><polygon points="60,11 65,14 65,20 60,23 55,20 55,14" fill="${resolved.capOutline}"></polygon><path d="${PENGUIN_TEXT_PATHS.jgCap.d}" fill="${PENGUIN_TEXT_PATHS.jgCap.fill}"></path></g>`;
+      // font; its fill is `resolved.capLabel`, not the design's raw fixed
+      // colour (#92 round 2 nit 4) -- the label sits on the badge polygon,
+      // itself filled with `capOutline`, and #79 varies that per cap colour,
+      // so the label needs its own resolved contrast against it.
+      return `<g><path d="M34 24 C36 6 84 6 86 24 Z" fill="${capColor}" stroke="${resolved.capOutline}" stroke-width="2.5" stroke-linejoin="round"></path><path d="M34 24 L86 24 C86 27 82 29 74 30 L46 30 C38 29 34 27 34 24 Z" fill="${capColor}" stroke="${resolved.capOutline}" stroke-width="2.5" stroke-linejoin="round"></path><path d="M58 24 L102 26 C104 28 102 32 98 33 L60 29 Z" fill="${capColor}" stroke="${resolved.capOutline}" stroke-width="2.5" stroke-linejoin="round"></path><path d="M60 8 L60 24" stroke="${resolved.capOutline}" stroke-width="1.5" opacity=".5"></path><polygon points="60,11 65,14 65,20 60,23 55,20 55,14" fill="${resolved.capOutline}"></polygon><path d="${PENGUIN_TEXT_PATHS.jgCap.d}" fill="${resolved.capLabel}"></path></g>`;
     case 'SNORKEL': {
       // The frame/strap are stroke-only, so their rim is a wider halo drawn
       // first (same shapes), rather than a `stroke` attribute (#79 D2). Each
