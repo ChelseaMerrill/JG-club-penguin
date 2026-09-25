@@ -16,7 +16,7 @@ export interface HudDeps {
   onIgloo: () => void;
   /** The existing `auth.signOut`. */
   onSignOut: () => void;
-  /** 0 until #34 loads the real Token balance. */
+  /** 0 until #34's progress session loads the saved balance via `tokens:changed`. */
   initialBalance: number;
 }
 
