@@ -797,6 +797,15 @@ body {
   color: var(--jg-dark);
 }
 
+/* SNOWBALL at 0 ammo with the mode off (#109): dimmed like
+   `.stub-minigame__squash-button:disabled`'s inactive state, but never the
+   native `disabled` attribute — the button must stay clickable so it can
+   still close MENU. */
+.hud__button--disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
 /* Snowball mode's bottom-centre panel (#53, design HUD-SNOWBALL). Read-only:
    `pointer-events: none` so it never swallows a throw click on the canvas
    underneath (v4 change 9); the reticle's cursor hint is drawn in Phaser. */

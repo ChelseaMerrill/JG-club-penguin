@@ -94,6 +94,20 @@ export interface SnowballController {
   ammo(): { count: number; capacity: number };
   /** Fires on every ammo change (a throw, a refund, or a refill tick). */
   onAmmoChange(listener: (ammo: { count: number; capacity: number }) => void): () => void;
+  /**
+   * Fires once a throw's send resolves `true` and that throw's reservation
+   * (captured immediately after `ammo.reserve()` succeeds, before the send
+   * is awaited) left the bucket at 0 ammo (#109): the signal `main.ts` uses
+   * to leave Snowball mode once ammo runs out. Refill race: if a refill tick
+   * adds ammo back while this throw's send is still in flight, this still
+   * fires — the throw took the last snowball at the moment it was reserved,
+   * even though the bucket may show ammo again by the time the send
+   * resolves. Never fires for a throw whose send is rejected or resolves
+   * `false` (refunded, not exhausted), never fires from a refill tick alone,
+   * and never fires when a Room change or `stop()` intervened before the
+   * send resolved (see `throwAt`).
+   */
+  onAmmoEmptied(listener: () => void): () => void;
   /** A snapshot of every active snow hat, keyed by playerId (the local Player included). */
   snowHats(): ReadonlyMap<string, SnowHatEntry>;
   /** Fires whenever a snow hat is applied or expires. */
@@ -120,6 +134,7 @@ export function createSnowballController(options: SnowballControllerOptions): Sn
   const hatTimers = new Map<string, ReturnType<typeof scheduleTimer>>();
   const flightTimers = new Set<ReturnType<typeof scheduleTimer>>();
   const ammoListeners = new Set<(ammo: { count: number; capacity: number }) => void>();
+  const ammoEmptiedListeners = new Set<() => void>();
   const snowHatsListeners = new Set<(hats: ReadonlyMap<string, SnowHatEntry>) => void>();
 
   let refillTimer: ReturnType<typeof scheduleTimer> | null = null;
@@ -137,6 +152,10 @@ export function createSnowballController(options: SnowballControllerOptions): Sn
   function notifyAmmoChange(): void {
     const snapshot = ammoSnapshot();
     for (const listener of Array.from(ammoListeners)) listener(snapshot);
+  }
+
+  function notifyAmmoEmptied(): void {
+    for (const listener of Array.from(ammoEmptiedListeners)) listener();
   }
 
   function notifySnowHatsChange(): void {
@@ -245,6 +264,11 @@ export function createSnowballController(options: SnowballControllerOptions): Sn
     async throwAt(target: Tile): Promise<boolean> {
       if (stopped) return false;
       if (!ammo.reserve(now())) return false;
+      // Captured immediately after the reservation succeeds, before the
+      // send is awaited (#109): whether *this* throw took the last
+      // snowball, independent of any refill tick or further reserve/refund
+      // activity while the send is in flight.
+      const emptiedByThis = ammo.count(now()) === 0;
       notifyAmmoChange();
       scheduleRefillNotification();
 
@@ -268,6 +292,10 @@ export function createSnowballController(options: SnowballControllerOptions): Sn
       // sent, but this Player has left the Room it would land in.
       if (stopped || generation !== startGeneration) return true;
 
+      // #109: the send resolved true and this reservation emptied the
+      // bucket -> exactly one fire from the throw that emptied it.
+      if (emptiedByThis) notifyAmmoEmptied();
+
       view.drawArc(throwId, from, to, SNOWBALL_FLIGHT_MS);
       const timer = scheduleTimer(() => {
         flightTimers.delete(timer);
@@ -285,6 +313,12 @@ export function createSnowballController(options: SnowballControllerOptions): Sn
       ammoListeners.add(listener);
       return () => {
         ammoListeners.delete(listener);
+      };
+    },
+    onAmmoEmptied(listener): () => void {
+      ammoEmptiedListeners.add(listener);
+      return () => {
+        ammoEmptiedListeners.delete(listener);
       };
     },
     snowHats(): ReadonlyMap<string, SnowHatEntry> {
@@ -314,6 +348,7 @@ export function createSnowballController(options: SnowballControllerOptions): Sn
         refillTimer = null;
       }
       ammoListeners.clear();
+      ammoEmptiedListeners.clear();
       snowHatsListeners.clear();
     },
   };
