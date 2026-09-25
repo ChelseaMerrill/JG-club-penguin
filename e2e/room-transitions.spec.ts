@@ -4,6 +4,7 @@ import { igloo } from '../src/game/rooms/definitions/igloo';
 import { roofDeck } from '../src/game/rooms/definitions/roof-deck';
 import { townCenter } from '../src/game/rooms/definitions/town-center';
 import { GAME_HEIGHT, GAME_WIDTH } from '../src/game/stage-size';
+import { waitForElevatorHidden } from './support/elevator';
 import type { RoomDebugInfo } from './support/room-debug-types';
 
 const BOOT_TIMEOUT = 15_000;
@@ -135,6 +136,7 @@ test('room transitions: doors, changeRoom, HUD, reload (#15)', async ({ page }) 
   await expect
     .poll(async () => (await debugInfo(page))?.localPenguin?.tile)
     .toEqual(roofDeck.spawnTile);
+  await waitForElevatorHidden(page); // #52: crossed a floor (5 -> R)
   await page.screenshot({ path: 'test-results/room-transitions/roof-deck.png' });
 
   // --- MAP -> the Town Center tile (#33): sends the Player back to Town
@@ -150,6 +152,7 @@ test('room transitions: doors, changeRoom, HUD, reload (#15)', async ({ page }) 
   await expect
     .poll(async () => (await debugInfo(page))?.localPenguin?.tile)
     .toEqual(townCenter.spawnTile);
+  await waitForElevatorHidden(page); // #52: crossed a floor (R -> 5)
 
   // --- The HUD's IGLOO button lands on the Igloo's own spawnTile.
   await page.locator('.hud__button--igloo').click();

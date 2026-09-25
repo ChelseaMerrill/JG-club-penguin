@@ -15,6 +15,7 @@ import {
   type Tile,
   type TypedEmitter,
 } from '../../contracts';
+import { floorsDiffer, ROOM_FLOORS } from './floors';
 import { getRoomDefinition } from './registry';
 import type { RoomDoor } from './room-definition';
 
@@ -47,6 +48,19 @@ export interface RoomNavigatorScene {
   showComingSoonHint(door: RoomDoor): void;
 }
 
+/**
+ * The Elevator overlay's own navigator-facing seam (#52 D3/D6):
+ * `src/ui/elevator-screen.ts`'s `createElevatorScreen` return value. `begin`
+ * shows it (or retargets/restarts it if already visible); `ready` lets it
+ * hide once the target Room's `create()` has actually finished, no sooner
+ * than its own minimum duration; `cancel` hides it immediately (sign-out).
+ */
+export interface RoomTransitionScreen {
+  begin(from: RoomId, to: RoomId): void;
+  ready(): void;
+  cancel(): void;
+}
+
 export interface RoomNavigatorDeps {
   scene: RoomNavigatorScene;
   /** The shared `gameEvents` bus in production; a fresh `TypedEmitter` in tests. */
@@ -58,6 +72,13 @@ export interface RoomNavigatorDeps {
    * `changeRoom` and doors.
    */
   hasPlayer: () => boolean;
+  /**
+   * Optional (#52 D3): when given, `changeRoom` shows it for any transition
+   * that crosses a floor (`floorsDiffer(ROOM_FLOORS[from], ROOM_FLOORS[to])`).
+   * `enterSpawnRoom` never shows it (the first Room of a Session has no
+   * "from" floor to leave), and `leaveForSignOut` always `cancel()`s it.
+   */
+  transitionScreen?: RoomTransitionScreen;
 }
 
 export interface RoomNavigator {
@@ -90,7 +111,7 @@ function resolveEntryTile(roomId: RoomId, entryTile: Tile | undefined): Tile {
 }
 
 export function createRoomNavigator(deps: RoomNavigatorDeps): RoomNavigator {
-  const { scene, events, hasPlayer } = deps;
+  const { scene, events, hasPlayer, transitionScreen } = deps;
   let current: RoomId | null = null;
   /**
    * Set by `enterSpawnRoom`, cleared by `leaveForSignOut` (#15 review round
@@ -120,14 +141,29 @@ export function createRoomNavigator(deps: RoomNavigatorDeps): RoomNavigator {
    * `current` updates optimistically, before the restart's ready signal, so
    * a sign-out mid-transition still reports the Room it was headed to as the
    * one it leaves. Never emits `room:leave` itself: callers emit it first.
+   *
+   * `showTransition` (#52 D3/D4) is `true` only for a `changeRoom` that
+   * crossed a floor and therefore called `transitionScreen.begin()` first:
+   * it's what makes this call also responsible for `transitionScreen.ready()`
+   * once the Room is actually ready (or straight away if `showRoom` returned
+   * `false`) -- but only while this is still the current transition, exactly
+   * the same stale-`token` guard `room:enter` itself uses below, so a
+   * superseded transition's `ready()` never fires after a newer transition or
+   * a sign-out has already moved on.
    */
-  async function enterRoom(roomId: RoomId, entryTile?: Tile, force = false): Promise<void> {
+  async function enterRoom(
+    roomId: RoomId,
+    entryTile?: Tile,
+    force = false,
+    showTransition = false,
+  ): Promise<void> {
     const token = ++transitionToken;
     transitionInFlight = true;
     current = roomId;
     const switched = scene.showRoom(roomId, entryTile, force);
     if (switched) await scene.whenNextReady();
     transitionInFlight = false;
+    if (showTransition && token === transitionToken) transitionScreen?.ready();
     if (token !== transitionToken) return;
     if (!active || !hasPlayer()) return;
     events.emit('room:enter', { roomId, entryTile: resolveEntryTile(roomId, entryTile) });
@@ -149,7 +185,26 @@ export function createRoomNavigator(deps: RoomNavigatorDeps): RoomNavigator {
     if (roomId === current) return;
     const leaving = current;
     if (leaving) events.emit('room:leave', { roomId: leaving });
-    await enterRoom(roomId, entryTile);
+    // #52 D3: only a real floor crossing shows the Elevator -- never a
+    // same-floor move, and never when either Room (e.g. the Igloo) has no
+    // floor at all. `leaving` is non-null here whenever there's a floor to
+    // leave from; the very first `changeRoom` of a Session always goes
+    // through `enterSpawnRoom` instead, so `leaving` is never null on a real
+    // floor-crossing call in practice, but the `leaving !== null` check below
+    // stays anyway as the direct source of truth. The condition lives
+    // directly in the `if` (rather than a separately-computed boolean
+    // dereferenced with `!`) so TypeScript narrows `transitionScreen` and
+    // `leaving` on its own (#52 review standards nit).
+    let showTransition = false;
+    if (
+      transitionScreen !== undefined &&
+      leaving !== null &&
+      floorsDiffer(ROOM_FLOORS[leaving], ROOM_FLOORS[roomId])
+    ) {
+      showTransition = true;
+      transitionScreen.begin(leaving, roomId);
+    }
+    await enterRoom(roomId, entryTile, false, showTransition);
   }
 
   scene.onDoorReached((door) => {
@@ -169,6 +224,11 @@ export function createRoomNavigator(deps: RoomNavigatorDeps): RoomNavigator {
     changeRoom,
     async enterSpawnRoom(): Promise<void> {
       active = true;
+      // #52 review MINOR: cancel any transitionScreen state first, so a
+      // transition superseded by this spawn entry (e.g. a sign-out and a
+      // fresh sign-in racing a still-in-flight floor crossing) can never
+      // leave the Elevator overlay stuck up over the freshly spawned Room.
+      transitionScreen?.cancel();
       // Defensive: the normal path always calls `leaveForSignOut` first, so
       // `current` is already `null` here. If it somehow isn't, leave that
       // Room before forcing the fresh spawn entry.
@@ -179,6 +239,7 @@ export function createRoomNavigator(deps: RoomNavigatorDeps): RoomNavigator {
       active = false;
       transitionToken += 1;
       transitionInFlight = false;
+      transitionScreen?.cancel();
       const leaving = current;
       current = null;
       if (leaving) events.emit('room:leave', { roomId: leaving });

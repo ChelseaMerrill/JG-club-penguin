@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 import { roofDeck } from '../src/game/rooms/definitions/roof-deck';
 import { GAME_HEIGHT, GAME_WIDTH } from '../src/game/stage-size';
+import { waitForElevatorHidden } from './support/elevator';
 import type { RoomDebugInfo } from './support/room-debug-types';
 
 const BOOT_TIMEOUT = 15_000;
@@ -62,6 +63,9 @@ test('roof-deck-kitchen-exit: clicking the KITCHEN arrow walks the Penguin to th
   await expect
     .poll(async () => (await debugInfo(page))?.roomId, { timeout: WALK_TIMEOUT })
     .toBe('roof-deck');
+  // Town Center (floor 5) to the Roof Deck (R) rides #52's Elevator, which
+  // swallows clicks until it hides.
+  await waitForElevatorHidden(page);
 
   // The blinking arrow, frozen in its visible state by `export:room-art`
   // (#100 D1), baked into `public/rooms/roof-deck.png`.
@@ -72,6 +76,8 @@ test('roof-deck-kitchen-exit: clicking the KITCHEN arrow walks the Penguin to th
   await expect
     .poll(async () => (await debugInfo(page))?.roomId, { timeout: WALK_TIMEOUT })
     .toBe('the-melt');
+  // The Roof Deck (R) down to THE KITCHEN (5) rides the Elevator too.
+  await waitForElevatorHidden(page);
   await expect
     .poll(async () => (await debugInfo(page))?.localPenguin?.tile)
     .toEqual(kitchenDoor.entryTile);
