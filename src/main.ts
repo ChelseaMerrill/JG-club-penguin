@@ -15,6 +15,8 @@ import { createHud } from './ui/hud/hud';
 import { initDevHudHook } from './ui/hud/dev-hud-hook';
 import { getRoomDefinition } from './game/rooms/registry';
 import { createDebugOverlay, isDebugEnabled } from './ui/debug-overlay';
+import { createWallText } from './ui/wall-text/wall-text';
+import { createCoreValuesCard, type CoreValuesCard } from './ui/wall-text/core-values-card';
 import {
   createRoomChannel,
   type RemotePenguinView,
@@ -38,6 +40,21 @@ const client = getSupabaseClient();
 const realtime = toRealtimeClient(client);
 const rooms = createStubRoomDriver(gameEvents);
 const uiLayer = getUiLayer();
+
+// Assigned once `hud` exists below (`coreValuesCard` needs `hud.overlays`);
+// `onPosterClick` only reads it when the button is actually clicked, well
+// after boot finishes, the same forward-reference pattern `onSignOut`'s
+// `auth` reference below relies on.
+let coreValuesCard: CoreValuesCard | null = null;
+
+// Mounted before the login overlay and HUD (#77 D3) so it always paints
+// below them in `#ui`'s DOM-order stacking.
+createWallText(uiLayer, {
+  resolve: (roomId) => getRoomDefinition(roomId).wallText ?? [],
+  resolvePosterHotspot: (roomId) =>
+    getRoomDefinition(roomId).hotspots?.find((hotspot) => hotspot.id === 'core-values-poster'),
+  onPosterClick: () => coreValuesCard?.open(),
+});
 
 /**
  * The Room scene and its Penguin view, once `RoomScene.create()` has first run.
@@ -185,6 +202,10 @@ const hud = createHud(getUiLayer(), {
   // real Token balance.
   initialBalance: STARTING_TOKENS,
 });
+
+// #77 D7: registers with the same shared `OverlayManager` MENU uses, so
+// opening one closes the other and Escape closes whichever is open.
+coreValuesCard = createCoreValuesCard(getUiLayer(), hud.overlays);
 
 // In-memory fake until #34's real ProgressStore lands; the HUD's Token
 // balance updates via `tokens:changed`, which this store emits on every
