@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ROOM_DEFINITIONS } from '../game/rooms/registry';
-import { getNpcDefinition, NPCS } from './npcs';
+import { getNpcDefinition, NPCS, type NpcId } from './npcs';
 
 describe('NPCS', () => {
   it("has a definition for every npcId in every prototype Room's npcSlots", () => {
