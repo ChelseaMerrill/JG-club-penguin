@@ -31,7 +31,7 @@ describe('NPCS', () => {
     }
   });
 
-  it('covers every npcSlot exactly once across the five prototype Rooms (no duplicate npcId)', () => {
+  it('covers every npcSlot exactly once across every Room (no duplicate npcId)', () => {
     const allSlotIds = ROOM_DEFINITIONS.flatMap((room) => room.npcSlots.map((slot) => slot.npcId));
     const uniqueSlotIds = new Set(allSlotIds);
     expect(allSlotIds).toHaveLength(uniqueSlotIds.size);
@@ -188,9 +188,11 @@ describe('NPCS', () => {
   it("gives the Icebox's five NPCs the sheet's names/titles, first-name tags and the design's own say-cycles (#51)", () => {
     // Names/titles from design/Characters.dc.html's cards (Millie is on its
     // TITLE TBD list); tags, lines and timing from design/Room 03 The
-    // Icebox.dc.html's own nameplates and `animation:say` bubbles. Millie,
-    // Jason and Darrin already have a slot in another Room, so their Icebox
-    // appearance is its own NpcId (an NPC lives in exactly one Room).
+    // Icebox.dc.html's own nameplates and `animation:say` bubbles. Millie and
+    // Darrin already have a slot in another Room, so their Icebox appearance
+    // is its own suffixed NpcId (an NPC lives in exactly one Room); Jason has
+    // no slot elsewhere, so the Icebox gets his bare id, `jason` (see
+    // `npcs.ts`'s own `NpcId` union comment).
     expect(NPCS['millie-icebox']).toMatchObject({
       name: 'Millie Elliott',
       title: null,
@@ -214,7 +216,7 @@ describe('NPCS', () => {
         { text: 'Nope, that is billable.', periodS: 15, delayS: -12 },
       ],
     });
-    expect(NPCS['jason-icebox']).toMatchObject({
+    expect(NPCS.jason).toMatchObject({
       name: 'Jason Jahnel',
       title: 'COO',
       roomId: 'the-icebox',
@@ -250,13 +252,7 @@ describe('NPCS', () => {
         { text: 'Who is demoing first?', periodS: 15, delayS: -11 },
       ],
     });
-    for (const id of [
-      'millie-icebox',
-      'nicole',
-      'jason-icebox',
-      'jethro',
-      'darrin-icebox',
-    ] as const) {
+    for (const id of ['millie-icebox', 'nicole', 'jason', 'jethro', 'darrin-icebox'] as const) {
       expect(NPCS[id].dialog, `${id}'s dialog`).toEqual({ kind: 'line' });
     }
   });

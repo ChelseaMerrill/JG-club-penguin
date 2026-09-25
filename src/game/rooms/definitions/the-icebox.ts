@@ -20,7 +20,9 @@ const DOOR_HOTSPOT_SIZE = { width: 70, height: 165 };
 //     to cols 3.3-8.7, rows 3.4-5.8 -> cols 3-8, rows 3-5;
 //   - its eight chairs, four a side, at rows 2.6-3.2 and 6.1-6.7, centred on
 //     cols 4.1, 5.4, 6.7 and 8.0 -> (4,2), (5,2), (6,2), (8,2) and (4,6),
-//     (5,6), (6,6), (8,6);
+//     (5,6), (6,6), (8,6); the fourth chair of each row (centred on 8.0) is
+//     wide enough to also cover (7,2)/(7,6), blocked below too (#51 review
+//     fix 4);
 //   - the corner planter: cols 11-11.8, rows 8.8-9.6 -> (11,9).
 // Every NPC's own tile (see `npcSlots` below) is additionally blocked so a
 // Penguin can't walk through them (#16 fix 5): Millie (1,0), Jason (8,0),
@@ -29,11 +31,11 @@ const DOOR_HOTSPOT_SIZE = { width: 70, height: 165 };
 const WALKABLE: readonly (readonly boolean[])[] = [
   [true, false, true, true, false, false, true, true, false, true, true, true],
   [true, true, true, true, true, true, true, true, true, true, true, true],
-  [true, true, true, true, false, false, false, true, false, true, true, true],
+  [true, true, true, true, false, false, false, false, false, true, true, true],
   [true, true, true, false, false, false, false, false, false, true, true, true],
   [true, true, true, false, false, false, false, false, false, true, true, true],
   [true, true, true, false, false, false, false, false, false, true, true, true],
-  [true, true, true, true, false, false, false, true, false, true, false, true],
+  [true, true, true, true, false, false, false, false, false, true, false, true],
   [true, false, true, true, true, true, true, true, true, true, true, true],
   [true, true, true, true, true, true, true, true, true, true, true, true],
   [true, true, true, true, false, true, true, true, true, true, true, false],
@@ -63,27 +65,30 @@ export const theIcebox: RoomDefinition = {
       label: 'TOWN CENTER',
       hotspot: { x: 705, y: 132.5, ...DOOR_HOTSPOT_SIZE },
       targetRoomId: 'town-center',
-      // The tile just inside Town Center's own "THE ICEBOX" door (#16 fix
-      // 4): the nearest walkable tile to that door's hotspot centre in Town
-      // Center's own grid, the same rule `reachability.test.ts` uses for a
-      // door's approach tile.
+      // The tile just inside Town Center's own "THE ICEBOX" door: project
+      // that door's own hotspot bottom-centre (the door sill, not its
+      // centre) into Town Center's own grid, then the nearest walkable tile
+      // (#16 fix 4, #51 review fix 2). Unchanged by that fix -- the sill and
+      // centre projections land on the same tile here.
       entryTile: { col: 2, row: 0 },
     },
     {
       label: 'DEV PIT',
       hotspot: { x: 1290, y: 365, ...DOOR_HOTSPOT_SIZE },
       targetRoomId: 'dev-pit',
-      // The tile just inside Dev Pit's own "THE ICEBOX" door, by the same
-      // rule.
-      entryTile: { col: 0, row: 0 },
+      // The tile just inside Dev Pit's own "THE ICEBOX" door: project that
+      // door's own hotspot bottom-centre (the door sill, not its centre)
+      // into Dev Pit's own grid, then the nearest walkable tile (#16 fix 4,
+      // #51 review fix 2).
+      entryTile: { col: 1, row: 0 },
     },
   ],
   npcSlots: [
-    // Each slot is the tile under the character's ground shadow at its
+    // Each slot is the tile under the NPC's ground shadow at its
     // roam animation's rest (0%) frame -- the frame the design shows at load.
     { npcId: 'millie-icebox', tile: { col: 1, row: 0 } },
     { npcId: 'nicole', tile: { col: 1, row: 7 } },
-    { npcId: 'jason-icebox', tile: { col: 8, row: 0 } },
+    { npcId: 'jason', tile: { col: 8, row: 0 } },
     { npcId: 'jethro', tile: { col: 4, row: 9 } },
     { npcId: 'darrin-icebox', tile: { col: 10, row: 6 } },
     // "You" is the local Player's own Penguin, never a static NPC slot

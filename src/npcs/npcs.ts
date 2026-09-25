@@ -35,12 +35,17 @@ export type NpcId =
   | 'chelsea'
   | 'tonya'
   | 'jesse'
-  // #51: the Icebox's NPCs. Millie, Jason and Darrin already have an npcSlot
-  // in another Room, and an NPC lives in exactly one Room (`roomId`), so
-  // each of their Icebox appearances is its own id.
+  // #51: the Icebox's NPCs. The id rule: a person's first Room gets the bare
+  // id; each repeat appearance gets a `-<roomId-ish>` suffix, since an NPC
+  // lives in exactly one Room (`roomId`) and two different people's slots
+  // can't share one id. Millie and Darrin already have an npcSlot in another
+  // Room (Roof Deck and Town Center respectively), so their Icebox
+  // appearances are `millie-icebox`/`darrin-icebox`; Jason has no npcSlot
+  // anywhere else, so the Icebox -- his first and only Room -- gets his bare
+  // id, `jason`.
   | 'millie-icebox'
   | 'nicole'
-  | 'jason-icebox'
+  | 'jason'
   | 'jethro'
   | 'darrin-icebox';
 
@@ -241,6 +246,38 @@ const MARKET_PENGUIN_LOOK: PenguinLook = { ...DEFAULT_LOOK, name: '' };
 const TRISTIN_LOOK: PenguinLook = { ...DEFAULT_LOOK, name: '', body: '#3a4046', cap: '#0C4B5F' };
 
 /**
+ * Darrin Jahnel's figure, shared by his Town Center (`darrin`) and Icebox
+ * (`darrin-icebox`) appearances (#51 review fix 3): the same person, the same
+ * `humans.js` spec, pulled into one constant so the two copies can't drift.
+ */
+const DARRIN_FIGURE: HumanFigureSpec = {
+  style: 'short',
+  hair: 'brown',
+  skin: 'fair',
+  top: '#BFD6EE',
+  jacket: '#2a2f3a',
+  collar: 'shirtLight',
+  mouth: 'flat',
+  prop: 'tieHeadband',
+};
+
+/**
+ * Millie Elliott's figure, shared by her Roof Deck (`millie`) and Icebox
+ * (`millie-icebox`) appearances (#51 review fix 3): the same person, the same
+ * `humans.js` spec, pulled into one constant so the two copies can't drift.
+ */
+const MILLIE_FIGURE: HumanFigureSpec = {
+  style: 'highBun',
+  hair: 'dark',
+  skin: 'med',
+  top: '#8C7A80',
+  jacket: '#1f2a4a',
+  collar: 'crew',
+  necklace: true,
+  teeth: true,
+};
+
+/**
  * `NPCS`: every prototype Room's NPC, keyed by `NpcId` (#36 D1). Names come
  * from `design/Characters.dc.html`'s character sheet (D1/A3); titles come
  * from the same sheet, with `null` for every "TITLE TBD" card its footnote
@@ -271,16 +308,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: 'YOU. ARE. CRUSHING IT.', periodS: 11, delayS: -5.28 },
     ],
     dialog: LINE_DIALOG,
-    figure: {
-      style: 'short',
-      hair: 'brown',
-      skin: 'fair',
-      top: '#BFD6EE',
-      jacket: '#2a2f3a',
-      collar: 'shirtLight',
-      mouth: 'flat',
-      prop: 'tieHeadband',
-    },
+    figure: DARRIN_FIGURE,
   },
   jon: {
     id: 'jon',
@@ -557,16 +585,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     dialogLine: 'Quick question before you go in.',
     idleLines: [{ text: 'Team lead perk: free cone.', periodS: 20, delayS: -7 }],
     dialog: LINE_DIALOG,
-    figure: {
-      style: 'highBun',
-      hair: 'dark',
-      skin: 'med',
-      top: '#8C7A80',
-      jacket: '#1f2a4a',
-      collar: 'crew',
-      necklace: true,
-      teeth: true,
-    },
+    figure: MILLIE_FIGURE,
   },
   josh: {
     id: 'josh',
@@ -802,17 +821,9 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: 'Trivia time. Door stays shut.', periodS: 26, delayS: -20 },
     ],
     dialog: LINE_DIALOG,
-    // The same figure as her Roof Deck appearance (`millie` above).
-    figure: {
-      style: 'highBun',
-      hair: 'dark',
-      skin: 'med',
-      top: '#8C7A80',
-      jacket: '#1f2a4a',
-      collar: 'crew',
-      necklace: true,
-      teeth: true,
-    },
+    // The same figure as her Roof Deck appearance (`millie` above); shared
+    // via the `MILLIE_FIGURE` constant so the two can't drift.
+    figure: MILLIE_FIGURE,
   },
   nicole: {
     id: 'nicole',
@@ -840,8 +851,8 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       teeth: true,
     },
   },
-  'jason-icebox': {
-    id: 'jason-icebox',
+  jason: {
+    id: 'jason',
     name: 'Jason Jahnel',
     title: 'COO',
     roomId: 'the-icebox',
@@ -907,17 +918,9 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: 'Who is demoing first?', periodS: 15, delayS: -11 },
     ],
     dialog: LINE_DIALOG,
-    // The same figure as his Town Center appearance (`darrin` above).
-    figure: {
-      style: 'short',
-      hair: 'brown',
-      skin: 'fair',
-      top: '#BFD6EE',
-      jacket: '#2a2f3a',
-      collar: 'shirtLight',
-      mouth: 'flat',
-      prop: 'tieHeadband',
-    },
+    // The same figure as his Town Center appearance (`darrin` above); shared
+    // via the `DARRIN_FIGURE` constant so the two can't drift.
+    figure: DARRIN_FIGURE,
   },
 };
 
