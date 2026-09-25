@@ -206,8 +206,10 @@ test('every defined Room is reachable from the Map, including the Roof Deck / Th
   await page.goto('/?asPlayer&hud');
   await waitForBoot(page);
 
-  // Roof Deck and The Kitchen (`the-melt`) have no door back to Town Center
-  // (#33 revision 2's "dead ends"): only the Map can leave them.
+  // Roof Deck has no exit door (`doors: []`), and The Kitchen (`the-melt`)
+  // has no entry door (no other Room's doors target it) -- #33 revision 2's
+  // "dead ends": only the Map can leave Roof Deck, and only the Map can
+  // enter The Kitchen.
   await page.evaluate(() => window.__roomDebug?.changeRoom?.('roof-deck'));
   await expect
     .poll(async () => (await debugInfo(page))?.roomId, { timeout: WALK_TIMEOUT })

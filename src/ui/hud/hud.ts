@@ -187,8 +187,10 @@ export function createHud(layer: HTMLElement, deps: HudDeps): Hud {
   mapButton.className = 'hud__button hud__button--bottom hud__button--map';
   mapButton.textContent = 'MAP';
   mapButton.addEventListener('click', () => {
-    // Closing MENU first keeps one overlay open at a time (#32 D6) even
-    // though the Map itself isn't wired up yet.
+    // Closes MENU directly (#32 D6) rather than relying on the Map (#33) to
+    // do it: the Map's own `ui:open-map` handler only calls
+    // `overlays.open` when a Session is active, so this is what actually
+    // closes MENU on the rare click before one has started.
     overlays.close(MENU_OVERLAY_ID);
     gameEvents.emit('ui:open-map');
   });
