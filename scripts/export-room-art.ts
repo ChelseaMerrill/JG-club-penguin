@@ -551,7 +551,8 @@ function hideLiveElements(rules: HideRule[]): void {
     // wrapper is an *ancestor* of the `<a>` it protects) or below it (the
     // arrow's inner `blink` group is a *descendant* of that same `<a>`), so
     // both directions are checked with `Node.contains`.
-    const protectedEls = except.length > 0 ? Array.from(document.querySelectorAll(except.join(','))) : [];
+    const protectedEls =
+      except.length > 0 ? Array.from(document.querySelectorAll(except.join(','))) : [];
     const isProtected = (el: Element): boolean =>
       protectedEls.some((p) => p === el || p.contains(el) || el.contains(p));
     document.querySelectorAll<HTMLElement | SVGElement>('[style]').forEach((el) => {
