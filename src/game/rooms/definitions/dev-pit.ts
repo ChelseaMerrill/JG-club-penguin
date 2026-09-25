@@ -9,30 +9,29 @@ import { createStandardRoomGrid } from '../grid';
 const DOOR_HOTSPOT_SIZE = { width: 70, height: 165 };
 
 // Traced from `design/Room 02 Dev Pit.dc.html`'s fixtures: the "SPRINT 42"
-// whiteboard/desk cluster (cols 1-4, rows 1-3) and a small pedestal by THE
-// ICEBOX elevator (col 11, row 3). #92 D3 resync added five more desks
-// (each a monitor tile plus the desktop/keyboard tile just in front of it,
-// the same two-tile footprint the original desk already blocked): (4,1)/
-// (5,2) (partially overlapping the original cluster's own (4,2)), (1,4)/
-// (1,5), (4,5) (its monitor tile (4,4) is left walkable -- blocking it seals
-// (2,4)/(3,4)/(2,5) into a pocket with no other opening, `reachability.test.ts`
-// catches this, so it's left walkable as a documented exception, the same
-// call Roof Deck's Kevin/Josh aisle makes), (7,1) (its desktop tiles
-// (7,2)/(8,2) were already blocked as Ryan's and Sam's own NPC tiles,
-// below), and (7,4)/(7,5). Every NPC's own tile (see `npcSlots` below) is
-// additionally blocked so a Penguin can't walk through them (#16 fix 5) --
-// this Room's floor was otherwise fully open.
+// whiteboard/desk cluster (cols 1-4, rows 1-3, unchanged since #16) and a
+// small pedestal by THE ICEBOX elevator (col 11, row 3). #92 D3 round 2:
+// #91's five new desks are traced from the design's desk-body/chair *floor*
+// polygons, not the monitor/keyboard sprites sitting atop them (those sit
+// ~47.5px up-screen of the floor, one tile off from the desk's actual
+// footprint -- round 1's mistake, caught in review): desk C (5,2)/(6,2)/
+// (5,3)/(6,3) with its chair (6,4); desk E (8,2)/(9,2)/(8,3)/(9,3) with its
+// chair (9,4); desk B (2,6)/(3,6) with its chair (3,7); desk D (5,6)/(6,6)
+// with its chair (6,7); desk F (8,6)/(9,6) with its chair (9,7). Every NPC's
+// own tile (see `npcSlots` below) is additionally blocked so a Penguin can't
+// walk through them (#16 fix 5) -- this Room's floor was otherwise fully
+// open.
 const WALKABLE: readonly (readonly boolean[])[] = [
   [true, true, true, true, true, true, true, true, true, true, true, true],
-  [true, false, false, false, false, true, true, false, true, true, true, true],
-  [true, false, false, false, false, false, true, false, false, true, true, true],
-  [true, true, false, false, false, true, true, true, true, true, true, false],
-  [true, false, true, true, true, true, true, false, true, true, true, true],
-  [true, false, true, false, false, true, true, false, true, true, true, true],
-  [true, true, false, true, true, true, true, true, true, true, true, true],
+  [true, false, false, false, true, false, true, false, true, false, true, true],
+  [true, false, false, false, false, false, false, true, false, false, true, true],
+  [true, true, false, false, false, false, false, true, false, false, true, false],
+  [true, true, true, true, true, true, false, true, true, false, true, true],
+  [true, false, false, true, true, true, true, true, true, true, true, true],
+  [true, true, false, false, true, false, false, true, false, false, true, true],
+  [true, true, true, false, true, true, false, true, true, false, true, true],
+  [true, false, true, true, true, true, true, true, true, true, true, true],
   [true, true, true, true, true, true, true, true, true, true, true, true],
-  [true, true, true, true, true, true, true, true, true, true, false, true],
-  [true, true, true, false, true, true, true, true, true, true, true, true],
 ];
 
 /**
@@ -69,17 +68,19 @@ export const devPit: RoomDefinition = {
     },
   ],
   npcSlots: [
-    { npcId: 'ashley', tile: { col: 3, row: 9 } },
-    { npcId: 'ian', tile: { col: 3, row: 5 } },
-    // Steven has no ground-shadow ellipse in the design markup (his figure
-    // is a custom illustration without one, unlike the shared `peng()`
-    // sprite); this tile is estimated from his nameplate position and the
-    // typical nameplate-to-shadow offset seen on other characters in this
-    // Room — a judgment call reported on the #16 execution plan.
-    { npcId: 'steven', tile: { col: 10, row: 8 } },
-    { npcId: 'dom', tile: { col: 2, row: 6 } },
-    { npcId: 'ryan', tile: { col: 7, row: 2 } },
-    { npcId: 'sam', tile: { col: 8, row: 2 } },
+    // #92 D3 round 2: #91 moved every NPC in this Room; slots resynced to
+    // each one's new shadow position (round 1 left these stale, caught in
+    // review).
+    { npcId: 'ashley', tile: { col: 1, row: 8 } },
+    { npcId: 'ian', tile: { col: 1, row: 5 } },
+    { npcId: 'steven', tile: { col: 7, row: 1 } },
+    // Dom's new shadow sits almost on desk B's own body tile (2,6); placed
+    // one tile south, on the open floor in front of the desk instead, so he
+    // doesn't render standing inside the furniture (still his nearest
+    // walkable neighbour by `reachability.test.ts`'s rule).
+    { npcId: 'dom', tile: { col: 2, row: 5 } },
+    { npcId: 'ryan', tile: { col: 5, row: 1 } },
+    { npcId: 'sam', tile: { col: 9, row: 1 } },
     // Matt is a Penguin (a Player), like "You", not an NPC -- see the export
     // script's `LIVE_ELEMENT_RULES['dev-pit']` labels-rule comment. Players
     // are never part of a static `RoomDefinition`; presence (#28) places
