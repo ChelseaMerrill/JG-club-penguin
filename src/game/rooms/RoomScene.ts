@@ -1,4 +1,4 @@
-import { Data, GameObjects, Scene, Scenes, type Input, type Tweens } from 'phaser';
+import { Data, GameObjects, Scene, Scenes, type Input, type Time, type Tweens } from 'phaser';
 import {
   gameEvents,
   SPAWN_ROOM_ID,
@@ -83,12 +83,23 @@ const WALL_DEPTH = -1;
 const FLOOR_DEPTH = -1;
 const DOOR_DEPTH = 0;
 const DOOR_LABEL_DEPTH = 1;
+const DOOR_HINT_DEPTH = 2;
 
 const LABEL_FONT_FAMILY = 'sans-serif';
 const LABEL_TEXT_COLOR = '#F4F4F4';
 const DOOR_LABEL_FONT_SIZE = '14px';
 const NPC_LABEL_FONT_SIZE = '12px';
 const NPC_LABEL_OFFSET_Y = -30;
+
+// #15 D3/A4: a disabled door's (`targetRoomId: null`) "COMING SOON" hint, in
+// the Stage's own display font (`--font-game-display`, `style.css`).
+const DOOR_HINT_FONT_FAMILY = "'Bumbastika', sans-serif";
+const DOOR_HINT_FONT_SIZE = '22px';
+const DOOR_HINT_STROKE_COLOR = '#0a0b0d';
+const DOOR_HINT_STROKE_THICKNESS = 4;
+const DOOR_HINT_TEXT = 'COMING SOON';
+/** How long the "coming soon" hint stays up (#15 D3). */
+export const DOOR_HINT_DURATION_MS = 2000;
 
 const NPC_RADIUS = 18;
 const NPC_COLOR = 0x00bdff;
@@ -191,6 +202,12 @@ export class RoomScene extends Scene {
   private debugPenguins: Penguin[] = [];
   /** Persists across restarts (never reset in `init()`); see `restartCount` on `RoomDebugInfo`. */
   private restartCount = 0;
+  /** The "coming soon" hint currently shown for a disabled door (#15 D3), or `null`. Not reset in `init()`: `cleanup()` (SHUTDOWN) always clears it first. */
+  private comingSoonHint: {
+    door: RoomDoor;
+    text: GameObjects.Text;
+    timer: Time.TimerEvent;
+  } | null = null;
 
   /** A stable reference so `cleanup` can `off` exactly what `create` `on`'d. */
   private readonly handlePointerDown = (
@@ -236,6 +253,7 @@ export class RoomScene extends Scene {
     this.queuedMove = null;
     this.debugPenguins.forEach((debugPenguin) => debugPenguin.destroy());
     this.debugPenguins = [];
+    this.clearComingSoonHint();
   };
 
   constructor() {
@@ -265,6 +283,62 @@ export class RoomScene extends Scene {
   /** Resolves once the first `create()` has run. */
   whenReady(): Promise<void> {
     return this.readyPromise;
+  }
+
+  /**
+   * Resolves once the *next* restart's `create()` finishes — unlike
+   * `whenReady()`, which only ever resolves for the very first one. #15's
+   * navigator calls this right after `showRoom()` (deferred by Phaser to its
+   * own scene-transition tick, so subscribing here is never too late) and
+   * awaits it before emitting `room:enter`.
+   */
+  whenNextReady(): Promise<void> {
+    return new Promise((resolve) => {
+      this.events.once(Scenes.Events.CREATE, () => resolve());
+    });
+  }
+
+  /**
+   * Registers `handler` for every door the local Penguin reaches, enabled or
+   * disabled alike (#15 D3). Call once: `this.events` (and any listener
+   * already attached to it) survives every `scene.restart()`, so calling
+   * this again on a later Room change would only stack a duplicate.
+   */
+  onDoorReached(handler: (door: RoomDoor) => void): void {
+    this.events.on(DOOR_REACHED_EVENT, ({ door }: DoorReachedEvent) => handler(door));
+  }
+
+  /**
+   * Shows the "COMING SOON" hint for a disabled door (#15 D3/A4) near its
+   * hotspot for `DOOR_HINT_DURATION_MS`, replacing any hint already shown
+   * rather than stacking two.
+   */
+  showComingSoonHint(door: RoomDoor): void {
+    this.clearComingSoonHint();
+    const centerX = door.hotspot.x + door.hotspot.width / 2;
+    const centerY = door.hotspot.y + door.hotspot.height / 2;
+    const text = this.add
+      .text(centerX, centerY, DOOR_HINT_TEXT, {
+        fontFamily: DOOR_HINT_FONT_FAMILY,
+        fontSize: DOOR_HINT_FONT_SIZE,
+        color: LABEL_TEXT_COLOR,
+        stroke: DOOR_HINT_STROKE_COLOR,
+        strokeThickness: DOOR_HINT_STROKE_THICKNESS,
+      })
+      .setOrigin(0.5)
+      .setDepth(DOOR_HINT_DEPTH);
+    const timer = this.time.delayedCall(DOOR_HINT_DURATION_MS, () => {
+      text.destroy();
+      this.comingSoonHint = null;
+    });
+    this.comingSoonHint = { door, text, timer };
+  }
+
+  private clearComingSoonHint(): void {
+    if (!this.comingSoonHint) return;
+    this.comingSoonHint.timer.remove();
+    this.comingSoonHint.text.destroy();
+    this.comingSoonHint = null;
   }
 
   /** The Room currently shown (or being restarted into). */
@@ -358,6 +432,7 @@ export class RoomScene extends Scene {
       npcArrivedLog: this.npcArrivedLog,
       doorReachedLog: this.doorReachedLog,
       localPenguinMoveLog: this.localPenguinMoveLog,
+      comingSoonHint: this.comingSoonHint?.door.label ?? null,
       restartRoom: () => this.scene.restart(),
       restartCount: this.restartCount,
       penguinCount: this.countPenguinContainers((name) => name !== REMOTE_PENGUIN_NAME),
