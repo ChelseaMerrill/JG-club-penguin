@@ -33,11 +33,28 @@ function setup(store: Pick<ProgressStore, 'loadAll' | 'saveLook'> = createInMemo
   return { creator, overlays, store, onLookChanged, onReady, onError, editor };
 }
 
-/** A store whose first save has already completed the Creator. */
+/** A store whose first save has already completed the Creator, with a valid name. */
 async function returningStore(): Promise<ProgressStore> {
   const store = createInMemoryProgressStore();
   await store.saveLook(saved);
   return store;
+}
+
+/**
+ * A store whose Creator "completed" with an empty name. The real `saveLook`
+ * rejects that (`players_penguin_name_check`), but a profile created before
+ * names were required, or corrupted some other way, must still be caught by
+ * the gate rather than trusted (#75).
+ */
+function createdButUnnamedStore(): Pick<ProgressStore, 'loadAll' | 'saveLook'> {
+  const inner = createInMemoryProgressStore();
+  return {
+    loadAll: async () => ({
+      ...(await inner.loadAll()),
+      profileCreatedAt: '2020-01-01T00:00:00.000Z',
+    }),
+    saveLook: inner.saveLook,
+  };
 }
 
 describe('createPenguinEditor', () => {
@@ -52,7 +69,17 @@ describe('createPenguinEditor', () => {
     expect(onLookChanged).not.toHaveBeenCalled();
   });
 
-  it('sends a returning Player straight in with their saved look', async () => {
+  it('opens the Creator, not dismissible, when the profile was created but the name is empty (#75)', async () => {
+    const { editor, creator, onReady, onLookChanged } = setup(createdButUnnamedStore());
+
+    await editor.playerSignedIn();
+
+    expect(creator.open).toHaveBeenCalledWith(DEFAULT_LOOK, { dismissible: false });
+    expect(onReady).not.toHaveBeenCalled();
+    expect(onLookChanged).not.toHaveBeenCalled();
+  });
+
+  it('sends a returning, named Player straight in with their saved look', async () => {
     const { editor, creator, onReady, onLookChanged } = setup(await returningStore());
 
     await editor.playerSignedIn();
@@ -131,11 +158,25 @@ describe('createPenguinEditor', () => {
     expect(onReady).toHaveBeenCalledTimes(1);
   });
 
-  it('shows the error and stays open when the save is rejected', async () => {
+  it('rejects an invalid name at the editor level without saving (#75)', async () => {
+    const { editor, store, creator, onLookChanged, onReady } = setup();
+    await editor.playerSignedIn();
+    const saveLookSpy = vi.spyOn(store, 'saveLook');
+
+    await editor.submit({ ...saved, name: '   ' });
+
+    expect(saveLookSpy).not.toHaveBeenCalled();
+    expect(creator.setSaving).not.toHaveBeenCalledWith(true);
+    expect(onLookChanged).not.toHaveBeenCalled();
+    expect(onReady).not.toHaveBeenCalled();
+    expect(creator.close).not.toHaveBeenCalled();
+  });
+
+  it('shows the error and stays open when the store rejects the save', async () => {
     const { editor, creator, onLookChanged, onReady } = setup();
     await editor.playerSignedIn();
 
-    await editor.submit({ ...saved, name: '' });
+    await editor.submit({ ...saved, hat: 'NOT-A-HAT' as PenguinLook['hat'] });
 
     expect(creator.showError).toHaveBeenCalledWith("Couldn't save your Penguin: invalid_look");
     expect(creator.setSaving).toHaveBeenLastCalledWith(false);
@@ -144,7 +185,7 @@ describe('createPenguinEditor', () => {
     expect(creator.close).not.toHaveBeenCalled();
   });
 
-  it('reports a load failure and still lets the Player in', async () => {
+  it('a load error opens the non-dismissible Creator and reports it, without letting the Player in', async () => {
     const store = {
       loadAll: vi.fn().mockRejectedValue(new ProgressStoreError('not_authenticated')),
       saveLook: vi.fn(),
@@ -154,8 +195,45 @@ describe('createPenguinEditor', () => {
     await editor.playerSignedIn();
 
     expect(onError).toHaveBeenCalledWith("Couldn't load your Penguin: not_authenticated");
+    expect(creator.open).toHaveBeenCalledWith(DEFAULT_LOOK, { dismissible: false });
+    expect(creator.showError).toHaveBeenCalledWith("Couldn't load your Penguin: not_authenticated");
+    expect(onReady).not.toHaveBeenCalled();
+  });
+
+  it('on submit after a load error, a reload that finds a named profile wins without saving', async () => {
+    const inner = await returningStore();
+    const store = {
+      loadAll: vi
+        .fn()
+        .mockRejectedValueOnce(new ProgressStoreError('not_authenticated'))
+        .mockImplementation(() => inner.loadAll()),
+      saveLook: vi.fn(inner.saveLook.bind(inner)),
+    };
+    const { editor, onReady, onLookChanged, creator } = setup(store);
+    await editor.playerSignedIn();
+
+    await editor.submit(saved);
+
+    expect(store.saveLook).not.toHaveBeenCalled();
+    expect(onLookChanged).toHaveBeenCalledWith(saved);
+    expect(creator.close).toHaveBeenCalled();
     expect(onReady).toHaveBeenCalledTimes(1);
-    expect(creator.open).not.toHaveBeenCalled();
+  });
+
+  it('on submit after a load error, a reload that is still unnamed or fails saves the submitted look instead', async () => {
+    const store = {
+      loadAll: vi.fn().mockRejectedValue(new ProgressStoreError('not_authenticated')),
+      saveLook: vi.fn().mockResolvedValue(undefined),
+    };
+    const { editor, onReady, onLookChanged, creator } = setup(store);
+    await editor.playerSignedIn();
+
+    await editor.submit(saved);
+
+    expect(store.saveLook).toHaveBeenCalledWith(saved);
+    expect(onLookChanged).toHaveBeenCalledWith(saved);
+    expect(creator.close).toHaveBeenCalled();
+    expect(onReady).toHaveBeenCalledTimes(1);
   });
 
   it('drops a load that finishes after the Player signed out', async () => {
@@ -209,5 +287,16 @@ describe('createPenguinEditor', () => {
 
     expect(creator.close).toHaveBeenCalled();
     expect(overlays.close).toHaveBeenCalledWith(PENGUIN_CREATOR_OVERLAY_ID);
+  });
+
+  it('signing in as a different Player closes any Creator already open first (#75 R2-3)', async () => {
+    const { editor, creator } = setup();
+    await editor.playerSignedIn();
+    expect(creator.open).toHaveBeenCalledTimes(1);
+    creator.close.mockClear();
+
+    await editor.playerSignedIn();
+
+    expect(creator.close).toHaveBeenCalled();
   });
 });

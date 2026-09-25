@@ -31,6 +31,7 @@ import { MINIGAME_OVERLAY_ID } from './minigames/minigame-shell';
 import { createPenguinCreator } from './ui/penguin-creator';
 import { createPenguinEditor } from './penguin/penguin-editor';
 import { initDevCreatorHook } from './penguin/dev-creator-hook';
+import { isNamedLook } from './penguin/look';
 
 // Fail fast on a missing or malformed .env before anything boots.
 loadEnv();
@@ -258,7 +259,7 @@ const penguinEditor = createPenguinEditor({
 });
 
 // After `penguinEditor` exists; see the note on `devHudActive` above.
-const devCreatorActive = initDevCreatorHook(penguinEditor);
+const devCreatorActive = initDevCreatorHook(penguinEditor, progressStore);
 const devHookActive = devHudActive || devMinigameActive || devCreatorActive;
 
 gameEvents.on('ui:open-creator', () => {
@@ -277,7 +278,9 @@ const auth = startAuth({
     // `room:enter` fires only after `registry.player` is set.
     bindPlayer(game.registry, player);
     if (devHookActive) {
-      void startSession(player, previous);
+      // #75: even on the dev-hook fast path, an unnamed Player never starts
+      // a Session (no Presence join) ahead of the name gate.
+      if (isNamedLook(player.look)) void startSession(player, previous);
       return;
     }
     overlay.showSignedIn();
