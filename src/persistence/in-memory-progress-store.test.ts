@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createEmitter } from '../contracts/emitter';
+import { DEFAULT_LOOK } from '../contracts/penguin';
 import type { BadgeId, GameEventMap } from '../contracts/game-events';
 import { createInMemoryProgressStore } from './in-memory-progress-store';
 import {
@@ -35,6 +36,29 @@ describe('createInMemoryProgressStore event emission', () => {
       bestCombo: 0,
       escaped: 0,
     });
+
+    expect(balances).toEqual([result.balance]);
+  });
+
+  it('emits tokens:changed with the new balance after a successful completeQuest', async () => {
+    const emitter = createEmitter<GameEventMap>();
+    const balances: number[] = [];
+    emitter.on('tokens:changed', ({ balance }) => balances.push(balance));
+    const store = createInMemoryProgressStore({ emitter, completedLook: DEFAULT_LOOK });
+    await store.markDevPitVisited();
+    await store.recordRound('bug-squash', 0, { score: 0, squashed: 0, bestCombo: 0, escaped: 0 });
+    await store.recordRound('pancake-flip', 0, {
+      golden: 0,
+      flipNow: 0,
+      raw: 0,
+      burnt: 0,
+      stacked: 0,
+      bestStreak: 0,
+    });
+    await store.purchase('beanbag');
+    balances.length = 0;
+
+    const result = await store.completeQuest('main');
 
     expect(balances).toEqual([result.balance]);
   });

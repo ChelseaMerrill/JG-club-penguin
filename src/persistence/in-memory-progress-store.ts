@@ -18,6 +18,10 @@ import {
 import {
   clampLeaderboardRows,
   IGLOO_SLOTS,
+  MAIN_QUEST_REWARD,
+  SERVER_QUEST_IDS,
+  type CompleteQuestResult,
+  type QuestProgress,
   ProgressStoreError,
   emptySlots,
   isIglooSlot,
@@ -56,6 +60,10 @@ interface PlayerState {
   /** Item id to the time (ms) it was acquired, for `loadAll`'s ordering. */
   ownedItems: Map<string, number>;
   slots: Record<IglooSlot, string | null>;
+  /** #46: the Dev Pit visit flag (`player_quest_state.dev_pit_visited_at`). */
+  devPitVisited: boolean;
+  /** #46: Quests `completeQuest` has paid (`player_quest_completions`). */
+  completedQuests: Set<string>;
 }
 
 /** One rival's Minigame best, for `InMemoryProgressStoreOptions.leaderboardRivals`. Test-only. */
@@ -105,6 +113,8 @@ export function createInMemoryProgressStore(
     lastRoundFinishedAtMs: {},
     ownedItems: new Map(),
     slots: emptySlots(),
+    devPitVisited: false,
+    completedQuests: new Set(),
   };
 
   async function loadAll(): Promise<ProgressSnapshot> {
@@ -322,5 +332,53 @@ export function createInMemoryProgressStore(
     state.slots[slot] = itemId;
   }
 
-  return { loadAll, saveLook, recordRound, purchase, setSlot, leaderboard };
+  // #46: mirrors `20260925000000_quests.sql`'s `quest_progress`,
+  // `mark_dev_pit_visited` and `complete_quest`. A finished round is any
+  // recorded round (`lastRoundFinishedAtMs` has an entry), best or not.
+  async function questProgress(): Promise<QuestProgress> {
+    return {
+      devPitVisited: state.devPitVisited,
+      roundsFinished: (Object.keys(state.lastRoundFinishedAtMs) as MinigameId[]).sort(),
+      completedQuests: [...state.completedQuests].sort(),
+    };
+  }
+
+  async function markDevPitVisited(): Promise<void> {
+    state.devPitVisited = true;
+  }
+
+  async function completeQuest(questId: string): Promise<CompleteQuestResult> {
+    if (!(SERVER_QUEST_IDS as readonly string[]).includes(questId)) {
+      throw new ProgressStoreError('unknown_quest');
+    }
+    if (state.completedQuests.has(questId)) {
+      emitter?.emit('tokens:changed', { balance: state.tokens });
+      return { tokensAwarded: 0, balance: state.tokens, alreadyCompleted: true };
+    }
+    const stepsMet =
+      state.profileCreatedAt !== null &&
+      state.devPitVisited &&
+      state.lastRoundFinishedAtMs['bug-squash'] !== undefined &&
+      state.lastRoundFinishedAtMs['pancake-flip'] !== undefined &&
+      state.ownedItems.size > 0;
+    if (!stepsMet) {
+      throw new ProgressStoreError('quest_incomplete');
+    }
+    state.tokens += MAIN_QUEST_REWARD;
+    state.completedQuests.add(questId);
+    emitter?.emit('tokens:changed', { balance: state.tokens });
+    return { tokensAwarded: MAIN_QUEST_REWARD, balance: state.tokens, alreadyCompleted: false };
+  }
+
+  return {
+    loadAll,
+    saveLook,
+    recordRound,
+    purchase,
+    setSlot,
+    leaderboard,
+    questProgress,
+    markDevPitVisited,
+    completeQuest,
+  };
 }
