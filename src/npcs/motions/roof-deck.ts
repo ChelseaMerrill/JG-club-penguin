@@ -13,7 +13,9 @@ const FREE_BAIT = NPC_TEXT_PATHS.freeBait;
  * bouncing on Kevin's counter, and the Hexle pet following the design's
  * sample "You" Penguin), `mkYou` (that sample Player Penguin), `idle` (the
  * vendors' bob, which #36's own idle bob already covers), `say` (#36's
- * bubbles) and `blink` (the HUD/door arrow).
+ * bubbles) and `blink` (the HUD/door arrow). Also left out: `mkTristin`,
+ * since Tristin is a Penguin in the design and so isn't placed (#133: only
+ * Players appear as Penguins).
  */
 export const ROOF_DECK_MOTIONS: Partial<Record<NpcId, NpcMotionSpec>> = {
   // Brandon gallops a loop around the deck on his hobby horse. The horse is
@@ -73,13 +75,6 @@ export const ROOF_DECK_MOTIONS: Partial<Record<NpcId, NpcMotionSpec>> = {
       keyframes:
         '@keyframes mkMillie { 0% { transform: translate(0,0);} 44.0%,56.0% { transform: translate(25.00000000000002px, 67.5px);} 100% { transform: translate(0,0);} }',
       animation: 'mkMillie 20s ease-in-out infinite',
-    },
-  },
-  tristin: {
-    path: {
-      keyframes:
-        '@keyframes mkTristin { 0% { transform: translate(0,0);} 28.3%,38.3% { transform: translate(470px, -19.99999999999997px);} 62.7%,70.7% { transform: translate(305px, -102.49999999999999px);} 100% { transform: translate(0,0);} }',
-      animation: 'mkTristin 24s ease-in-out infinite',
     },
   },
 };

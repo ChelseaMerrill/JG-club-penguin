@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { NPCS, type NpcId } from '../../npcs/npcs';
 import { getNpcMotion } from '../../npcs/npc-motions';
 import { depthForTile, tileToScreen } from '../rooms/iso';
+import { ROOM_DEFINITIONS } from '../rooms/registry';
 import { transformPoint } from './css-keyframes';
 import { createNpcMotion, NpcClickPause } from './npc-motion';
 
@@ -112,7 +113,7 @@ describe('NPC motion (#113)', () => {
     const moving = (Object.keys(NPCS) as NpcId[]).filter(
       (id) => NPCS[id].roomId === 'roof-deck' && getNpcMotion(id),
     );
-    expect(moving.sort()).toEqual(['anthony', 'brandon', 'millie', 'tristin']);
+    expect(moving.sort()).toEqual(['anthony', 'brandon', 'millie']);
   });
 
   it('compiles every motion in the registry, and only for known NPCs', () => {
@@ -125,10 +126,21 @@ describe('NPC motion (#113)', () => {
     }
     expect(getNpcMotion('not-an-npc')).toBeUndefined();
   });
+
+  it('only gives a motion to an NPC placed in its own Room (a motion for an unplaced NPC is dead data)', () => {
+    for (const id of Object.keys(NPCS) as NpcId[]) {
+      if (!getNpcMotion(id)) continue;
+      const room = ROOM_DEFINITIONS.find((candidate) => candidate.id === NPCS[id].roomId);
+      expect(
+        room?.npcSlots.map((slot) => slot.npcId),
+        `"${id}" has a motion but no slot in ${NPCS[id].roomId}`,
+      ).toContain(id);
+    }
+  });
 });
 
 describe('NpcClickPause: a clicked roaming NPC waits for its dialog (#113)', () => {
-  function setup(roaming: string[] = ['brandon', 'tristin']) {
+  function setup(roaming: string[] = ['brandon', 'anthony']) {
     const paused = new Set<string>();
     const pauser = new NpcClickPause({
       roams: (id) => roaming.includes(id),
@@ -164,8 +176,8 @@ describe('NpcClickPause: a clicked roaming NPC waits for its dialog (#113)', () 
   it('resumes the previously clicked NPC when another NPC is clicked first', () => {
     const { pauser, paused } = setup();
     pauser.clicked('brandon');
-    pauser.clicked('tristin');
-    expect([...paused]).toEqual(['tristin']);
+    pauser.clicked('anthony');
+    expect([...paused]).toEqual(['anthony']);
   });
 
   it('never pauses an NPC that does not roam', () => {

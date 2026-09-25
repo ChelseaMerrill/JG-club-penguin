@@ -76,11 +76,10 @@ test('Town Center NPCs walk their designed paths; Darrin pumps his fists, Jon do
   const dir = proofDir('npcs-move');
   const errors = await bootTownCenter(page);
 
+  // Every NPC placed here roams: the design's Front Desk receptionist is a
+  // Penguin, so she isn't placed (#133).
+  expect(Object.keys((await debugInfo(page))?.npcs ?? {}).sort()).toEqual([...MOVING_NPCS].sort());
   for (const id of MOVING_NPCS) expect((await npc(page, id)).moving).toBe(true);
-  // The Front Desk penguin keeps #36's idle bob and never leaves her slot.
-  const frontDesk = await npc(page, 'front-desk');
-  const frontDeskRest = tileToScreen({ col: 6, row: 1 }, townCenter.grid.origin);
-  expect(frontDesk).toMatchObject({ x: frontDeskRest.x, y: frontDeskRest.y, moving: false });
 
   const start = await npc(page, 'darrin');
   const seen = [start];
