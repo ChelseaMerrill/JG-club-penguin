@@ -1,7 +1,17 @@
 import type { Eyes, Hat, Pattern, PenguinLook } from '../../contracts';
 import { DESIGN_TO_VIEWBOX_SCALE } from './design-scale';
 import { penguinLookHash } from './look-hash';
+import {
+  ACCENT,
+  EYE_PUPIL,
+  EYE_WHITE,
+  SEAT_FILL,
+  SNORKEL_LENS,
+  SNORKEL_MASK,
+  STROKE,
+} from './palette';
 import { type PenguinPose, resolvePenguinFramePose } from './poses';
+import { PENGUIN_TEXT_PATHS } from './text-paths';
 
 /**
  * The design's own figure box (`design/Penguin Creator.dc.html`'s
@@ -12,22 +22,39 @@ export const PENGUIN_VIEWBOX_WIDTH = 120;
 export const PENGUIN_VIEWBOX_HEIGHT = 130;
 
 /**
- * Extra room on every side of the design box, so a raised arm, the "HA HA"
- * text (which starts at x=100) or the SIT seat (which extends past both
- * sides) never clips against the rendered frame's edge (#31 D4).
+ * Extra room on left/right of the design box, so a raised arm or the
+ * "HA HA" text never clips against the rendered frame's edge (#31 D4).
+ * "HA HA" starts at x=100 and, drawn as real Bumbastika outlines (#62),
+ * reaches about x=182, so the horizontal padding must clear 62 units plus
+ * the LAUGH tilt. Kept equal on both left and right (unlike
+ * `PENGUIN_FRAME_PADDING_Y`, which has no such constraint) so the feet
+ * anchor stays centred for `setFlipX` mirroring (#62 review fix 3).
  */
-export const PENGUIN_FRAME_PADDING = 30;
+export const PENGUIN_FRAME_PADDING_X = 70;
 
-export const PENGUIN_FRAME_WIDTH = PENGUIN_VIEWBOX_WIDTH + PENGUIN_FRAME_PADDING * 2;
-export const PENGUIN_FRAME_HEIGHT = PENGUIN_VIEWBOX_HEIGHT + PENGUIN_FRAME_PADDING * 2;
+/**
+ * Extra room above/below the design box. Nothing vertical needs anywhere
+ * near `PENGUIN_FRAME_PADDING_X`'s clearance: the SIT seat
+ * (`design/Penguin Creator.dc.html` line 67) and the small per-frame body
+ * lift/tilt in `poses.ts` are the only sources of vertical overhang, both
+ * far smaller than the "HA HA" text's horizontal reach (#62 review fix 3;
+ * `render-svg.test.ts`'s seat-in-frame check and `text-paths.test.ts`'s
+ * worst-case-pose check both prove nothing clips at this value).
+ */
+export const PENGUIN_FRAME_PADDING_Y = 30;
+
+export const PENGUIN_FRAME_WIDTH = PENGUIN_VIEWBOX_WIDTH + PENGUIN_FRAME_PADDING_X * 2;
+export const PENGUIN_FRAME_HEIGHT = PENGUIN_VIEWBOX_HEIGHT + PENGUIN_FRAME_PADDING_Y * 2;
 
 /**
  * The feet-centre anchor, in the design's own 120×130 coordinate space (the
  * same space `renderPenguinSvg`'s `viewBox` uses, padding aside). A consumer
  * placing a Phaser sprite by its feet computes the sprite's fractional
- * origin as `(PENGUIN_ORIGIN.x + PENGUIN_FRAME_PADDING) / PENGUIN_FRAME_WIDTH`
- * (and the equivalent for y), since the rendered image's pixel (0,0) is the
- * padded box's top-left corner.
+ * origin as
+ * `(PENGUIN_ORIGIN.x + PENGUIN_FRAME_PADDING_X) / PENGUIN_FRAME_WIDTH` and
+ * `(PENGUIN_ORIGIN.y + PENGUIN_FRAME_PADDING_Y) / PENGUIN_FRAME_HEIGHT`,
+ * since the rendered image's pixel (0,0) is the padded box's top-left
+ * corner.
  */
 export const PENGUIN_ORIGIN = { x: 60, y: 120 };
 
@@ -42,15 +69,6 @@ export const PENGUIN_ORIGIN = { x: 60, y: 120 };
  * the *sprite* at its feet for #14/#28, not the body's rotation.
  */
 const BODY_ROTATE_ORIGIN = { x: PENGUIN_VIEWBOX_WIDTH / 2, y: PENGUIN_VIEWBOX_HEIGHT };
-
-const STROKE = '#0C4B5F';
-const EYE_WHITE = '#F4F4F4';
-const EYE_PUPIL = '#161719';
-const ACCENT = '#00BDFF';
-const SEAT_FILL = '#3a4046';
-const SNORKEL_MASK = '#F2C12E';
-const SNORKEL_LENS = '#BFE3F0';
-const BAND_TEXT = '#161719';
 
 /**
  * The SIT seat, converted from the design's own CSS box (#31 review fix 1):
@@ -101,7 +119,7 @@ function renderPattern(pattern: Pattern, bodyColor: string): string {
     case 'STRIPES':
       return `<g fill="${bodyColor}" opacity=".55"><rect x="30" y="56" width="60" height="5"></rect><rect x="30" y="68" width="60" height="5"></rect><rect x="30" y="80" width="60" height="5"></rect><rect x="30" y="92" width="60" height="5"></rect><rect x="30" y="104" width="60" height="5"></rect></g>`;
     case 'JG LOGO':
-      return `<g><polygon points="60,64 74,72 74,88 60,96 46,88 46,72" fill="${STROKE}"></polygon><text x="60" y="85" text-anchor="middle" font-family="Anton, Impact, sans-serif" font-size="13" fill="${ACCENT}">JG</text></g>`;
+      return `<g><polygon points="60,64 74,72 74,88 60,96 46,88 46,72" fill="${STROKE}"></polygon><path d="${PENGUIN_TEXT_PATHS.jgLogo.d}" fill="${PENGUIN_TEXT_PATHS.jgLogo.fill}"></path></g>`;
     case 'PIXEL HEART':
       return `<g fill="${ACCENT}"><rect x="50" y="68" width="6" height="6"></rect><rect x="64" y="68" width="6" height="6"></rect><rect x="44" y="74" width="32" height="6"></rect><rect x="47" y="80" width="26" height="6"></rect><rect x="51" y="86" width="18" height="6"></rect><rect x="57" y="92" width="6" height="6"></rect></g>`;
     case 'SNOWFLAKE':
@@ -136,7 +154,7 @@ function renderHat(hat: Hat, capColor: string): string {
     case 'HEADPHONES':
       return `<g><path d="M30 34 C30 10 90 10 90 34" fill="none" stroke="${STROKE}" stroke-width="5"></path><rect x="24" y="28" width="10" height="16" rx="4" fill="${capColor}" stroke="${STROKE}" stroke-width="2"></rect><rect x="86" y="28" width="10" height="16" rx="4" fill="${capColor}" stroke="${STROKE}" stroke-width="2"></rect></g>`;
     case 'WAR WEEK BAND':
-      return `<g><path d="M28 26 L92 26 L92 34 L28 34 Z" fill="${capColor}" stroke="${STROKE}" stroke-width="2"></path><path d="M88 26 L100 30 L98 60 L90 58 Z" fill="${capColor}" stroke="${STROKE}" stroke-width="2"></path><text x="60" y="32.5" text-anchor="middle" font-family="Anton, Impact, sans-serif" font-size="7" fill="${BAND_TEXT}" letter-spacing="1">WAR WEEK</text></g>`;
+      return `<g><path d="M28 26 L92 26 L92 34 L28 34 Z" fill="${capColor}" stroke="${STROKE}" stroke-width="2"></path><path d="M88 26 L100 30 L98 60 L90 58 Z" fill="${capColor}" stroke="${STROKE}" stroke-width="2"></path><path d="${PENGUIN_TEXT_PATHS.warWeek.d}" fill="${PENGUIN_TEXT_PATHS.warWeek.fill}"></path></g>`;
     case 'NONE':
     default:
       return '';
@@ -185,7 +203,7 @@ export function renderPenguinSvg(
     : '';
 
   const haha = framePose.showHaha
-    ? `<text x="100" y="30" font-family="Bumbastika, Anton, sans-serif" font-size="14" fill="${ACCENT}">HA HA</text>`
+    ? `<path d="${PENGUIN_TEXT_PATHS.haha.d}" fill="${PENGUIN_TEXT_PATHS.haha.fill}"></path>`
     : '';
 
   const figure = [
@@ -206,7 +224,7 @@ export function renderPenguinSvg(
     seat,
   ].join('');
 
-  const minX = -PENGUIN_FRAME_PADDING;
-  const minY = -PENGUIN_FRAME_PADDING;
+  const minX = -PENGUIN_FRAME_PADDING_X;
+  const minY = -PENGUIN_FRAME_PADDING_Y;
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${minX} ${minY} ${PENGUIN_FRAME_WIDTH} ${PENGUIN_FRAME_HEIGHT}" width="${PENGUIN_FRAME_WIDTH}" height="${PENGUIN_FRAME_HEIGHT}">${figure}</svg>`;
 }

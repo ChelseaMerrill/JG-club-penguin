@@ -4,7 +4,8 @@ import { penguinLookHash } from './look-hash';
 import { PENGUIN_FRAME_MS, PENGUIN_FRAMES, type PenguinAnim } from './poses';
 import {
   PENGUIN_FRAME_HEIGHT,
-  PENGUIN_FRAME_PADDING,
+  PENGUIN_FRAME_PADDING_X,
+  PENGUIN_FRAME_PADDING_Y,
   PENGUIN_FRAME_WIDTH,
   PENGUIN_ORIGIN,
 } from './render-svg';
@@ -42,11 +43,11 @@ const BUBBLE_PADDING_X = 14;
 const BUBBLE_PADDING_Y = 8;
 const BUBBLE_MAX_WIDTH = 260;
 // Gap above the sprite's own top edge (the sprite's top edge sits at
-// `-(PENGUIN_ORIGIN.y + PENGUIN_FRAME_PADDING)` in container space,
+// `-(PENGUIN_ORIGIN.y + PENGUIN_FRAME_PADDING_Y)` in container space,
 // regardless of frame size, since that's exactly what the feet-anchor
 // origin fraction cancels out to).
 const BUBBLE_GAP = 10;
-const BUBBLE_ANCHOR_Y = -(PENGUIN_ORIGIN.y + PENGUIN_FRAME_PADDING) - BUBBLE_GAP;
+const BUBBLE_ANCHOR_Y = -(PENGUIN_ORIGIN.y + PENGUIN_FRAME_PADDING_Y) - BUBBLE_GAP;
 
 /** Phaser's always-present built-in placeholder texture. */
 const PLACEHOLDER_TEXTURE_KEY = '__DEFAULT';
@@ -88,8 +89,8 @@ export function createPenguin(
   look: PenguinLook,
   state?: PenguinInitialState,
 ): Penguin {
-  const originX = (PENGUIN_ORIGIN.x + PENGUIN_FRAME_PADDING) / PENGUIN_FRAME_WIDTH;
-  const originY = (PENGUIN_ORIGIN.y + PENGUIN_FRAME_PADDING) / PENGUIN_FRAME_HEIGHT;
+  const originX = (PENGUIN_ORIGIN.x + PENGUIN_FRAME_PADDING_X) / PENGUIN_FRAME_WIDTH;
+  const originY = (PENGUIN_ORIGIN.y + PENGUIN_FRAME_PADDING_Y) / PENGUIN_FRAME_HEIGHT;
 
   let currentLook = look;
   let currentHash = penguinLookHash(look);

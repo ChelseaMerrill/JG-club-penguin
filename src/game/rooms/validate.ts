@@ -1,4 +1,5 @@
 import type { Tile } from '../../contracts';
+import { GAME_HEIGHT, GAME_WIDTH } from '../stage-size';
 import type { RoomDefinition } from './room-definition';
 
 export interface RoomValidationError {
@@ -62,6 +63,29 @@ function checkSlotsInBounds(room: RoomDefinition, errors: RoomValidationError[])
   }
 }
 
+/** A hotspot's `rect` must lie entirely within the 1600x900 Stage (#16 D5). */
+function checkHotspotsInStage(room: RoomDefinition, errors: RoomValidationError[]): void {
+  const seenIds = new Set<string>();
+  for (const hotspot of room.hotspots ?? []) {
+    if (seenIds.has(hotspot.id)) {
+      errors.push({
+        roomId: room.id,
+        message: `duplicate hotspot id "${hotspot.id}"`,
+      });
+    }
+    seenIds.add(hotspot.id);
+
+    const { x, y, width, height } = hotspot.rect;
+    const withinStage = x >= 0 && y >= 0 && x + width <= GAME_WIDTH && y + height <= GAME_HEIGHT;
+    if (!withinStage) {
+      errors.push({
+        roomId: room.id,
+        message: `hotspot "${hotspot.id}" rect { x: ${x}, y: ${y}, width: ${width}, height: ${height} } is outside the ${GAME_WIDTH}x${GAME_HEIGHT} Stage`,
+      });
+    }
+  }
+}
+
 /**
  * Checks the invariants #13's acceptance criteria name: unique ids; a
  * walkable spawn tile; a `walkable` mask shaped exactly `grid.rows` x
@@ -83,6 +107,7 @@ export function validateRoomDefinitions(rooms: readonly RoomDefinition[]): RoomV
 
     checkWalkableMaskShape(room, errors);
     checkSlotsInBounds(room, errors);
+    checkHotspotsInStage(room, errors);
 
     if (!isWalkable(room, room.spawnTile)) {
       errors.push({

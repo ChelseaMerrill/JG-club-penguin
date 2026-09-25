@@ -85,7 +85,7 @@ describe('loadPlayer', () => {
 });
 
 describe('ensurePlayer', () => {
-  it('upserts with ignoreDuplicates and never sends a penguin_color, then loads the database default colour #00bdff into look.body', async () => {
+  it("upserts with ignoreDuplicates and never sends a penguin_color, then loads the row's own colour into look.body", async () => {
     const { client, upsert } = createFakeClient({
       row: { id: 'user-1', penguin_color: '#00bdff' },
     });

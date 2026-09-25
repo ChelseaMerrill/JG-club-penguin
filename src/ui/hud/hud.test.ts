@@ -1,8 +1,7 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { CHAT_TEXT_MAX, gameEvents, type RoomId } from '../../contracts';
-import { createHud, type Hud, type HudDeps } from './hud';
-import type { RoomTitle } from './room-titles';
+import { createHud, type Hud, type HudDeps, type RoomTitle } from './hud';
 
 let currentHud: Hud | undefined;
 

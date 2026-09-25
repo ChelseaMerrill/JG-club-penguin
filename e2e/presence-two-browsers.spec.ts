@@ -36,6 +36,21 @@ async function readOwnPlayerId(page: Page): Promise<string> {
   return decodeJwtSub(accessToken);
 }
 
+/**
+ * Finishes the Penguin Creator when the Player lands in it (every fresh
+ * Session does until #34's real ProgressStore remembers a saved look): the
+ * Session, and so the Room channel, starts only after the first save. A
+ * Player who has already completed it goes straight to Town Center.
+ */
+async function completeCreatorIfShown(page: Page, name: string): Promise<void> {
+  const creator = page.locator('.penguin-creator');
+  const joined = page.locator('.debug-overlay[data-current-room="town-center"]');
+  await expect(creator.or(joined).first()).toBeVisible({ timeout: READY_TIMEOUT });
+  if (!(await creator.isVisible())) return;
+  await page.locator('#penguin-creator-name').fill(name);
+  await page.locator('.penguin-creator__submit').click();
+  await expect(creator).toBeHidden();
+}
 /** Waits until the page is in Town Center with its Room channel joined. */
 async function waitUntilJoined(page: Page): Promise<void> {
   const overlay = page.locator('.debug-overlay');
@@ -101,6 +116,9 @@ test('presence-two-browsers', async ({ browser, baseURL }) => {
     await pageA.goto('/?debug&masknames');
     await pageB.goto('/?debug&masknames');
 
+    await completeCreatorIfShown(pageA, 'Penguin A');
+    await completeCreatorIfShown(pageB, 'Penguin B');
+
     await waitUntilJoined(pageA);
     await waitUntilJoined(pageB);
 
@@ -134,6 +152,23 @@ test('presence-two-browsers', async ({ browser, baseURL }) => {
     // AC3: a look change (including a new name) propagates to the other
     // browser without a reload.
     await pageA.click('button.debug-random-look');
+    await expectLookMatches(rosterOnB(idA), pageA, PROPAGATION_TIMEOUT);
+
+    // #35: saving in the Penguin Creator, reopened from the HUD mid-session,
+    // propagates the same way.
+    await pageA.locator('.hud__button--penguin').click();
+    await pageA.locator('.penguin-creator [aria-label="HAT"] [data-value="SNORKEL"]').click();
+    await pageA
+      .locator('.penguin-creator [aria-label="Idle animation"] [data-value="SIT"]')
+      .click();
+    await pageA.locator('.penguin-creator__submit').click();
+    await expect(pageA.locator('.penguin-creator')).toBeHidden();
+    await expect
+      .poll(async () => {
+        const look = await readJsonAttribute(pageA.locator('.debug-overlay'), 'data-own-look');
+        return look as { hat?: string; emote?: string } | null;
+      })
+      .toMatchObject({ hat: 'SNORKEL', emote: 'SIT' });
     await expectLookMatches(rosterOnB(idA), pageA, PROPAGATION_TIMEOUT);
   } finally {
     await pageA.screenshot({ path: path.join(OUTPUT_DIR, 'screenshot.png') }).catch(() => {});
