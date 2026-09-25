@@ -58,6 +58,17 @@ async function mapGridOverflows(page: Page): Promise<boolean> {
   });
 }
 
+/**
+ * A Room change that crosses a floor (Town Center <-> Roof Deck/The Melt) is
+ * covered by #52's Elevator overlay, which swallows clicks for at least its
+ * own 1.2s minimum; this spec's next click after such a crossing must wait
+ * for it to hide first. A harmless no-op wait for a same-floor crossing,
+ * since the overlay is already hidden in that case.
+ */
+async function waitForElevatorHidden(page: Page): Promise<void> {
+  await expect(page.locator('.elevator-screen')).toBeHidden({ timeout: WALK_TIMEOUT });
+}
+
 test('Map opens from the HUD in every prototype Room, with exactly one current tile (AC1)', async ({
   page,
 }) => {
@@ -74,6 +85,7 @@ test('Map opens from the HUD in every prototype Room, with exactly one current t
       await expect
         .poll(async () => (await debugInfo(page))?.roomId, { timeout: WALK_TIMEOUT })
         .toBe(room.id);
+      await waitForElevatorHidden(page); // #52: a no-op unless this crossed a floor
     }
 
     await page.locator('.hud__button--map').click();
@@ -218,12 +230,14 @@ test('every defined Room is reachable from the Map, including the Roof Deck / Th
   await expect
     .poll(async () => (await debugInfo(page))?.roomId, { timeout: WALK_TIMEOUT })
     .toBe('roof-deck');
+  await waitForElevatorHidden(page); // #52: crossed a floor (5 -> R)
 
   await page.locator('.hud__button--map').click();
   await page.locator('[data-map-room="the-melt"]').click();
   await expect
     .poll(async () => (await debugInfo(page))?.roomId, { timeout: WALK_TIMEOUT })
     .toBe('the-melt');
+  await waitForElevatorHidden(page); // #52: crossed a floor (R -> 5)
 
   await page.locator('.hud__button--map').click();
   await page.locator('[data-map-room="town-center"]').click();

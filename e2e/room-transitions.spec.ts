@@ -50,6 +50,15 @@ function doorCenter(door: { hotspot: { x: number; y: number; width: number; heig
   };
 }
 
+/**
+ * Town Center <-> Roof Deck crosses a floor, so #52's Elevator overlay
+ * swallows clicks for at least its own 1.2s minimum; this spec's next click
+ * after such a crossing must wait for it to hide first.
+ */
+async function waitForElevatorHidden(page: Page): Promise<void> {
+  await expect(page.locator('.elevator-screen')).toBeHidden({ timeout: WALK_TIMEOUT });
+}
+
 test('room transitions: doors, changeRoom, HUD, reload (#15)', async ({ page }) => {
   test.setTimeout(120_000);
   const errors = collectErrors(page);
@@ -121,6 +130,7 @@ test('room transitions: doors, changeRoom, HUD, reload (#15)', async ({ page }) 
   await expect
     .poll(async () => (await debugInfo(page))?.localPenguin?.tile)
     .toEqual(roofDeck.spawnTile);
+  await waitForElevatorHidden(page); // #52: crossed a floor (5 -> R)
   await page.screenshot({ path: 'test-results/room-transitions/roof-deck.png' });
 
   // --- MAP -> the Town Center tile (#33): sends the Player back to Town
@@ -136,6 +146,7 @@ test('room transitions: doors, changeRoom, HUD, reload (#15)', async ({ page }) 
   await expect
     .poll(async () => (await debugInfo(page))?.localPenguin?.tile)
     .toEqual(townCenter.spawnTile);
+  await waitForElevatorHidden(page); // #52: crossed a floor (R -> 5)
 
   // --- The HUD's IGLOO button lands on the Igloo's own spawnTile.
   await page.locator('.hud__button--igloo').click();
