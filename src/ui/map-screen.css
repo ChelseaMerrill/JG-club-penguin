@@ -6,8 +6,12 @@
   --ms-teal: var(--jg-secondary);
   --ms-light: var(--jg-light);
   --ms-dark: var(--jg-dark);
-  --ms-locked-border: #0c4b5f;
+  --ms-locked-border: var(--jg-secondary);
+  /* No design-system token matches these two near-blacks; trophy-case.css's
+     --tc-locked-bg/.trophy-case__badge-icon set the same literal precedent
+     (#33 review round 1 nit 9). */
   --ms-locked-bg: #0a0c0f;
+  --ms-thumb-bg: #2f3338;
 
   position: absolute;
   inset: 0;
@@ -92,6 +96,18 @@
   border: 2px solid var(--ms-locked-border);
   font-family: inherit;
   cursor: pointer;
+  transition: filter 0.1s ease-out;
+}
+
+/* A subtle hover/active affordance on clickable tiles only (coming-soon
+   tiles are the only ones still carrying `aria-disabled`, #33 review round 1
+   nit 11), matching the design's `a:hover` on its own cards (nit 12). */
+.map-screen__tile:not([aria-disabled]):hover {
+  filter: brightness(1.2);
+}
+
+.map-screen__tile:not([aria-disabled]):active {
+  filter: brightness(0.9);
 }
 
 .map-screen__tile[aria-disabled='true'] {
@@ -113,7 +129,7 @@
   flex: 1;
   min-height: 0;
   overflow: hidden;
-  background: #2f3338;
+  background: var(--ms-thumb-bg);
 }
 
 .map-screen__thumb-image {
@@ -129,16 +145,25 @@
 
 .map-screen__label {
   font-family: var(--font-game-display);
-  font-size: 14px;
+  font-size: 13px;
   color: var(--ms-cyan);
   -webkit-text-stroke: 2px var(--ms-teal);
   paint-order: stroke fill;
+  /* Keeps the longest label ("13 · THE THAW ROOM") on one line (#33 review
+     round 1 fix 4); the ellipsis is a defensive fallback that the tile
+     width budget (~255px) should never actually trigger. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .map-screen__subtitle {
-  font: 400 9px var(--font-display);
-  letter-spacing: 0.12em;
+  font: 400 11px var(--font-display);
+  letter-spacing: 0.08em;
   color: var(--jg-inactive);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .map-screen__pill {
@@ -147,8 +172,8 @@
   right: 6px;
   padding: 3px 8px;
   background: var(--ms-teal);
-  font: 400 9px var(--font-display);
-  letter-spacing: 0.1em;
+  font: 400 11px var(--font-display);
+  letter-spacing: 0.08em;
   color: var(--ms-light);
 }
 
