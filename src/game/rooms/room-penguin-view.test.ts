@@ -20,6 +20,12 @@ interface ShownPenguin {
   facing: Facing;
   anim: 'idle' | 'walk';
   destroyed: boolean;
+  /** How many times `moveTo` has been called (#43 fix F1's regression check). */
+  moveToCalls: number;
+  /** How many times `setFacing` has been called (#43 fix F1's regression check). */
+  setFacingCalls: number;
+  /** How many times `walk` has been called: a re-routed walk must call it once, not restart it per step (#43 fix F2). */
+  walkCalls: number;
 }
 
 /** One `step()` call the fake stage recorded, with a manual resolver. */
@@ -35,6 +41,12 @@ interface StepCall {
  * current state. `step()` never resolves on its own — tests drive it
  * tile by tile with `resolveNextStep()`, simulating the tween the real
  * `placePenguinsIn` runs completing.
+ *
+ * Honours `placePenguinsIn`'s real `PlacedPenguin` contract (#43 fix F3):
+ * `moveTo`, a new `step`, and `destroy` each cut an in-flight `step` short,
+ * resolving its promise early without landing it on its target tile —
+ * exactly the mechanism that let a stray `moveTo` mid-walk snap a walker
+ * back and skip a tile before fix F1.
  */
 function createFakeStage() {
   const placed: ShownPenguin[] = [];
@@ -47,42 +59,77 @@ function createFakeStage() {
     depth: number,
     facing: Facing,
   ): PlacedPenguin => {
-    const shown: ShownPenguin = { look, point, depth, facing, anim: 'idle', destroyed: false };
+    const shown: ShownPenguin = {
+      look,
+      point,
+      depth,
+      facing,
+      anim: 'idle',
+      destroyed: false,
+      moveToCalls: 0,
+      setFacingCalls: 0,
+      walkCalls: 0,
+    };
     placed.push(shown);
+
+    // Set only while a `step()` promise is unsettled; cuts it short (without
+    // landing it on its target) exactly as the real `stopActiveStep` does.
+    let interruptPendingStep: (() => void) | null = null;
+
     return {
       setLook: (next) => {
         shown.look = next;
       },
       setFacing: (next) => {
+        shown.setFacingCalls += 1;
         shown.facing = next;
       },
       moveTo: (nextPoint, nextDepth) => {
+        interruptPendingStep?.();
+        shown.moveToCalls += 1;
         shown.point = nextPoint;
         shown.depth = nextDepth;
       },
       walk: () => {
         shown.anim = 'walk';
+        shown.walkCalls += 1;
       },
       idle: () => {
         shown.anim = 'idle';
       },
       step: (nextPoint, durationMs, depthAt) => {
+        interruptPendingStep?.();
         return new Promise<void>((resolve) => {
+          let settled = false;
           const call: StepCall = {
             point: nextPoint,
             durationMs,
             depthAt,
             resolve: () => {
+              if (settled) return;
+              settled = true;
               shown.point = nextPoint;
               shown.depth = depthAt(1);
+              const index = pendingSteps.indexOf(call);
+              if (index !== -1) pendingSteps.splice(index, 1);
+              interruptPendingStep = null;
               resolve();
             },
+          };
+          interruptPendingStep = () => {
+            if (settled) return;
+            settled = true;
+            const index = pendingSteps.indexOf(call);
+            if (index !== -1) pendingSteps.splice(index, 1);
+            interruptPendingStep = null;
+            resolve();
           };
           pendingSteps.push(call);
           stepCalls.push(call);
         });
       },
       destroy: () => {
+        interruptPendingStep?.();
         shown.destroyed = true;
       },
     };
@@ -279,6 +326,7 @@ describe('RoomPenguinView', () => {
           tile: { col: 5, row: 5 },
           moving: true,
           placedTile: { col: 5, row: 5 },
+          walkStartedAt: expect.any(Number),
         },
       ]);
       expect(stage.live()[0].anim).toBe('walk');
@@ -314,43 +362,89 @@ describe('RoomPenguinView', () => {
         tile: { col: 5, row: 8 },
         moving: false,
         placedTile: { col: 5, row: 5 },
+        walkStartedAt: expect.any(Number),
       });
       expect(stage.live()[0].anim).toBe('idle');
       // Tile {5,8}: corner (800 - 150, 250 + 325) = (650, 575), centre (650, 600).
       expect(stage.live()[0].point).toEqual({ x: 650, y: 600 });
     });
 
-    it('queues a walkTo that arrives mid-step, applying it once the step lands (#43 D3)', async () => {
+    it('an upsert mid-step touches only the look: the step still lands on the very next tile (#43 fix F1)', async () => {
+      const { stage, view } = attachedView();
+      view.upsert(payload({ tile: { col: 5, row: 5 }, facing: 'right' }));
+
+      view.walkTo('player-b', { col: 5, row: 8 });
+      const penguin = stage.live()[0];
+      const moveToCallsBeforeUpsert = penguin.moveToCalls;
+      const setFacingCallsBeforeUpsert = penguin.setFacingCalls;
+      expect(stage.pendingStepCount()).toBe(1);
+
+      // A Presence sync arrives mid-step (today's bug: this used to call
+      // `moveTo`/`setFacing`, which cuts the in-flight step short and
+      // snaps the Penguin back, so the *next* step then skips a tile).
+      view.upsert(
+        payload({
+          tile: { col: 0, row: 0 },
+          facing: 'left',
+          look: { ...PEBBLE, name: 'Synced' },
+        }),
+      );
+
+      expect(penguin.moveToCalls).toBe(moveToCallsBeforeUpsert);
+      expect(penguin.setFacingCalls).toBe(setFacingCallsBeforeUpsert);
+      expect(penguin.look.name).toBe('Synced');
+      // Still exactly one step pending: the upsert never cut it short.
+      expect(stage.pendingStepCount()).toBe(1);
+
+      await stage.resolveNextStep();
+
+      // The step landed cleanly on tile {5,6} — not skipped, not snapped back.
+      expect(view.debugRemotePenguins()[0]).toMatchObject({
+        tile: { col: 5, row: 6 },
+        moving: true,
+      });
+      expect(penguin.point).toEqual({ x: 750, y: 550 });
+    });
+
+    it("re-paths a walkTo received mid-step from the landed tile, at that one step's boundary, not after the old path ends (#43 fix F2)", async () => {
       const { stage, view } = attachedView();
       view.upsert(payload({ tile: { col: 5, row: 5 } }));
 
-      view.walkTo('player-b', { col: 5, row: 8 }); // 3 steps down row 5's column
+      view.walkTo('player-b', { col: 5, row: 8 }); // straight path down column 5
       expect(stage.pendingStepCount()).toBe(1);
 
-      // A re-route arrives mid-step: queued, not applied immediately.
-      view.walkTo('player-b', { col: 2, row: 8 });
+      // A re-route arrives mid-step, toward a target whose own path
+      // diverges immediately from the original path once re-planned from
+      // the landed tile: queued, not applied immediately.
+      view.walkTo('player-b', { col: 8, row: 6 });
       expect(stage.pendingStepCount()).toBe(1);
 
-      await stage.resolveNextStep(); // -> {5,6}
-      await stage.resolveNextStep(); // -> {5,7}
-      await stage.resolveNextStep(); // -> {5,8}: original path exhausted, queued move starts
+      await stage.resolveNextStep(); // lands on {5,6}: re-paths right here
 
       expect(view.debugRemotePenguins()[0]).toMatchObject({
-        tile: { col: 5, row: 8 },
+        tile: { col: 5, row: 6 },
         moving: true,
       });
+      // The very next step already heads toward the re-route's own path
+      // ({5,6} -> {6,6}), not toward the old path's {5,7}.
       expect(stage.pendingStepCount()).toBe(1);
+      const reroutedStep = stage.stepCalls[stage.stepCalls.length - 1];
+      // Tile {6,6}: corner (800 + 0, 250 + 12*25) = (800, 550), centre (800, 575).
+      expect(reroutedStep.point).toEqual({ x: 800, y: 575 });
 
-      await stage.resolveNextStep(); // -> {4,8}
-      await stage.resolveNextStep(); // -> {3,8}
-      await stage.resolveNextStep(); // -> {2,8}: arrived
+      await stage.resolveNextStep(); // -> {6,6}
+      await stage.resolveNextStep(); // -> {7,6}
+      await stage.resolveNextStep(); // -> {8,6}: arrived
 
       expect(view.debugRemotePenguins()[0]).toEqual({
         playerId: 'player-b',
-        tile: { col: 2, row: 8 },
+        tile: { col: 8, row: 6 },
         moving: false,
         placedTile: { col: 5, row: 5 },
+        walkStartedAt: expect.any(Number),
       });
+      // The walk animation never restarted/flickered across the re-route.
+      expect(stage.live()[0].walkCalls).toBe(1);
     });
 
     it('places an unreachable target directly, with no walk animation', () => {
@@ -371,26 +465,36 @@ describe('RoomPenguinView', () => {
       });
     });
 
-    it('cancels the walk on remove, leaving the resolved step harmless', async () => {
+    it('cancels the walk on remove: destroy resolves the in-flight step early, harmlessly (#43 fix F3)', async () => {
       const { stage, view } = attachedView();
       view.upsert(payload({ tile: { col: 5, row: 5 } }));
       view.walkTo('player-b', { col: 5, row: 8 });
       expect(stage.pendingStepCount()).toBe(1);
 
       view.remove('player-b');
-      await stage.resolveNextStep();
+
+      // `destroy` (the real `PlacePenguin` contract) cuts the in-flight step
+      // short: nothing is left pending, and the cut-short resolution is
+      // harmless since the walk itself was already torn down.
+      expect(stage.pendingStepCount()).toBe(0);
+      await Promise.resolve();
+      await Promise.resolve();
 
       expect(stage.live()).toEqual([]);
       expect(view.debugRemotePenguins()).toEqual([]);
     });
 
-    it('cancels the walk on clear', async () => {
+    it('cancels the walk on clear: destroy resolves the in-flight step early, harmlessly (#43 fix F3)', async () => {
       const { stage, view } = attachedView();
       view.upsert(payload({ tile: { col: 5, row: 5 } }));
       view.walkTo('player-b', { col: 5, row: 8 });
+      expect(stage.pendingStepCount()).toBe(1);
 
       view.clear();
-      await stage.resolveNextStep();
+
+      expect(stage.pendingStepCount()).toBe(0);
+      await Promise.resolve();
+      await Promise.resolve();
 
       expect(stage.live()).toEqual([]);
       expect(view.debugRemotePenguins()).toEqual([]);
@@ -412,6 +516,7 @@ describe('RoomPenguinView', () => {
         tile: { col: 5, row: 8 },
         moving: false,
         placedTile: { col: 5, row: 8 },
+        walkStartedAt: expect.any(Number),
       });
       // Against origin (700, 200): tile {5,8} centre = (700 + (5-8)*50, 200 + 13*25 + 25)
       // = (550, 550).

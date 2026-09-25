@@ -104,11 +104,21 @@ export interface RoomDebugInfo {
   remotePenguinCount?: number;
   /**
    * One entry per remote Penguin `RoomPenguinView` currently shows (#43 D6):
-   * its shown tile, whether it's mid-walk, and `placedTile` (the tile it
-   * was first placed at since the last Room `attach()`, e.g. from Presence
-   * on a late join), distinct from `tile` so a test can tell them apart.
+   * its shown tile, whether it's mid-walk, `placedTile` (the tile it was
+   * first placed at since the last Room `attach()`, e.g. from Presence on a
+   * late join, distinct from `tile` so a test can tell them apart), and
+   * `walkStartedAt` (`Date.now()` when its current or last walk started,
+   * absent if it has never walked; #43 fix F4 — an e2e latency measurement
+   * reads this directly instead of paying a round trip and poll interval as
+   * measurement noise).
    */
-  remotePenguins?: Array<{ playerId: string; tile: Tile; moving: boolean; placedTile: Tile }>;
+  remotePenguins?: Array<{
+    playerId: string;
+    tile: Tile;
+    moving: boolean;
+    placedTile: Tile;
+    walkStartedAt?: number;
+  }>;
   /**
    * Test-only: sets `registry.player`, exercising the real sign-in
    * look/id-update path end to end (review fixes 1 and 4) rather than

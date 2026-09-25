@@ -37,6 +37,7 @@ interface RemotePenguinDebugInfo {
   tile: Tile;
   moving: boolean;
   placedTile: Tile;
+  walkStartedAt?: number;
 }
 
 interface RoomDebugInfo {
@@ -94,14 +95,25 @@ async function shownRoomId(page: Page): Promise<string | undefined> {
   return (await debugInfo(page))?.roomId;
 }
 
-/** Converts a Town Center tile to a page click point via the canvas's own bounding box (`e2e/click-to-move.spec.ts`'s technique). */
-async function clickTownCenterTile(page: Page, tile: Tile): Promise<void> {
+/**
+ * Converts a Town Center tile to a page click point via the canvas's own
+ * bounding box (`e2e/click-to-move.spec.ts`'s technique). Split out from the
+ * actual click (fix F4) so AC1's latency timing can start its clock right
+ * before `page.mouse.click`, excluding this bounding-box round trip.
+ */
+async function townCenterClickPoint(page: Page, tile: Tile): Promise<{ x: number; y: number }> {
   const canvasBox = await page.locator('#game canvas').boundingBox();
   if (!canvasBox) throw new Error('canvas not visible');
   const point = tileToScreen(tile, townCenter.grid.origin);
   const scaleX = canvasBox.width / GAME_WIDTH;
   const scaleY = canvasBox.height / GAME_HEIGHT;
-  await page.mouse.click(canvasBox.x + point.x * scaleX, canvasBox.y + point.y * scaleY);
+  return { x: canvasBox.x + point.x * scaleX, y: canvasBox.y + point.y * scaleY };
+}
+
+/** Clicks a Town Center tile in one call, for callers that don't time the click itself. */
+async function clickTownCenterTile(page: Page, tile: Tile): Promise<void> {
+  const { x, y } = await townCenterClickPoint(page, tile);
+  await page.mouse.click(x, y);
 }
 
 test('movement-sync', async ({ browser, baseURL }) => {
@@ -144,11 +156,20 @@ test('movement-sync', async ({ browser, baseURL }) => {
     // --- AC1: A clicks a Town Center tile far from its current tile
     // (spawnTile {6,8}; {2,2} is 10 tiles away by Manhattan distance, and
     // reachable — the same far tile `e2e/click-to-move.spec.ts` uses).
+    // The click point is computed *before* `clickedAt` starts the clock
+    // (fix F4): a standalone run showed the previous number folded in this
+    // bounding-box round trip, the whole-`__roomDebug` CDP poll below, and
+    // its 50ms sleeps — none of which are the sync latency AC1 measures.
+    // `walkStartedAt` (below) is `Date.now()` taken in B's own page the
+    // instant `RoomPenguinView` starts A's remote walk, so the latency this
+    // asserts is exactly "click to remote walk start", on this machine's
+    // shared clock.
     const ac1Target: Tile = { col: 2, row: 2 };
+    const clickPoint = await townCenterClickPoint(pageA, ac1Target);
     const clickedAt = Date.now();
-    await clickTownCenterTile(pageA, ac1Target);
+    await pageA.mouse.click(clickPoint.x, clickPoint.y);
 
-    let movingLatencyMs: number | null = null;
+    let walkStartedAt: number | null = null;
     const distinctTiles = new Set<string>();
     let settledLocalTile: Tile | undefined;
     let settledRemoteTile: Tile | undefined;
@@ -158,10 +179,10 @@ test('movement-sync', async ({ browser, baseURL }) => {
       const remote = await remoteInfo(pageB, idA);
       if (remote) {
         distinctTiles.add(`${remote.tile.col},${remote.tile.row}`);
-        if (movingLatencyMs === null && remote.moving) {
-          movingLatencyMs = Date.now() - clickedAt;
+        if (walkStartedAt === null && remote.moving && remote.walkStartedAt !== undefined) {
+          walkStartedAt = remote.walkStartedAt;
         }
-        if (movingLatencyMs !== null && !remote.moving) {
+        if (walkStartedAt !== null && !remote.moving) {
           const localPenguin = (await debugInfo(pageA))?.localPenguin;
           if (localPenguin && !localPenguin.moving) {
             settledRemoteTile = remote.tile;
@@ -173,9 +194,12 @@ test('movement-sync', async ({ browser, baseURL }) => {
       await sleep(POLL_INTERVAL_MS);
     }
 
-    expect(movingLatencyMs, 'B never observed A moving').not.toBeNull();
-    console.log(`[movement-sync] AC1: B observed A moving after ${movingLatencyMs}ms`);
-    expect(movingLatencyMs as number).toBeLessThanOrEqual(MOVE_SYNC_TIMEOUT_MS);
+    expect(walkStartedAt, 'B never observed A moving').not.toBeNull();
+    const movingLatencyMs = (walkStartedAt as number) - clickedAt;
+    console.log(
+      `[movement-sync] AC1: B observed A's remote walk start ${movingLatencyMs}ms after the click`,
+    );
+    expect(movingLatencyMs).toBeLessThanOrEqual(MOVE_SYNC_TIMEOUT_MS);
     expect(
       distinctTiles.size,
       `distinct tiles B observed for A: ${[...distinctTiles].join(' ')}`,
