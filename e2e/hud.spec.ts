@@ -1,6 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
-import { ROOM_IDS } from '../src/contracts';
+import { ROOM_IDS, type Tile } from '../src/contracts';
+import { townCenter } from '../src/game/rooms/definitions/town-center';
+import { tileToScreen } from '../src/game/rooms/iso';
+import { GAME_HEIGHT, GAME_WIDTH } from '../src/game/stage-size';
 import type { HudTestHandle } from '../src/ui/hud/hud-test-handle';
+import type { SnowballDebugInfo } from './support/snowball-debug-types';
 
 declare global {
   interface Window {
@@ -149,6 +153,79 @@ test('hud-chat-field-stays-in-hud', async ({ page }) => {
   await input.pressSequentially('hello there', { delay: 10 });
 
   expect(await page.evaluate(() => window.canvasPointerDowns)).toBe(0);
+
+  expect(errors).toEqual([]);
+});
+
+async function snowballDebug(page: Page): Promise<SnowballDebugInfo | undefined> {
+  return page.evaluate(() => window.__snowballDebug);
+}
+
+/** A Stage-pixel point as a page point, via the canvas's own bounding box (`e2e/snowball-hit.spec.ts`'s technique). */
+async function pagePoint(page: Page, stage: { x: number; y: number }) {
+  const canvasBox = await page.locator('#game canvas').boundingBox();
+  if (!canvasBox) throw new Error('canvas not visible');
+  return {
+    x: canvasBox.x + stage.x * (canvasBox.width / GAME_WIDTH),
+    y: canvasBox.y + stage.y * (canvasBox.height / GAME_HEIGHT),
+  };
+}
+
+async function tilePoint(page: Page, tile: Tile) {
+  return pagePoint(page, tileToScreen(tile, townCenter.grid.origin));
+}
+
+/** An empty Town Center Tile, clear of NPCs and HUD widgets, for aiming/throwing. */
+const EMPTY_TILE: Tile = { col: 11, row: 0 };
+
+// #109: single-browser coverage of Snowball mode's two exits, via the
+// `?asPlayer` hook's local-only stub controller (`src/main.ts`
+// `initDevAsPlayerHook`) rather than `snowball-hit.spec.ts`'s real two-user
+// setup (skipped locally without E2E_USER_A/B credentials).
+test('snowball-escape-exits-the-mode', async ({ page }) => {
+  const errors = collectErrors(page);
+
+  await page.setViewportSize({ width: 1618, height: 918 });
+  await page.goto('/?asPlayer&hud');
+  await expect(page.locator('.hud')).toBeVisible();
+  await expect.poll(async () => (await snowballDebug(page))?.ammo).toBe(3);
+
+  await page.locator('.hud__button--snowball').click();
+  await expect.poll(async () => (await snowballDebug(page))?.mode).toBe(true);
+  await expect(page.locator('.hud__snowball-panel')).toBeVisible();
+  await expect(page.locator('.hud__button--snowball')).toHaveClass(/hud__button--active/);
+
+  await page.keyboard.press('Escape');
+
+  await expect.poll(async () => (await snowballDebug(page))?.mode).toBe(false);
+  await expect(page.locator('.hud__snowball-panel')).toBeHidden();
+  await expect(page.locator('.hud__button--snowball')).not.toHaveClass(/hud__button--active/);
+  // Escape neither threw nor moved the Penguin.
+  expect((await snowballDebug(page))?.throwLog).toEqual([]);
+  expect((await snowballDebug(page))?.ammo).toBe(3);
+
+  expect(errors).toEqual([]);
+});
+
+test('snowball-third-throw-from-full-ammo-exits-the-mode', async ({ page }) => {
+  const errors = collectErrors(page);
+
+  await page.setViewportSize({ width: 1618, height: 918 });
+  await page.goto('/?asPlayer&hud');
+  await expect(page.locator('.hud')).toBeVisible();
+  await expect.poll(async () => (await snowballDebug(page))?.ammo).toBe(3);
+
+  await page.locator('.hud__button--snowball').click();
+  await expect.poll(async () => (await snowballDebug(page))?.mode).toBe(true);
+
+  const empty = await tilePoint(page, EMPTY_TILE);
+  for (let i = 0; i < 3; i += 1) await page.mouse.click(empty.x, empty.y);
+
+  await expect.poll(async () => (await snowballDebug(page))?.throwLog.length).toBe(3);
+  await expect.poll(async () => (await snowballDebug(page))?.ammo).toBe(0);
+  await expect.poll(async () => (await snowballDebug(page))?.mode).toBe(false);
+  await expect(page.locator('.hud__snowball-panel')).toBeHidden();
+  await expect(page.locator('.hud__button--snowball')).not.toHaveClass(/hud__button--active/);
 
   expect(errors).toEqual([]);
 });

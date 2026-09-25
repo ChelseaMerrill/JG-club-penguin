@@ -38,7 +38,10 @@ export interface HudDeps {
    * Asks to enter (`true`) or leave (`false`) Snowball mode (#53). The HUD
    * never flips its own mode: the caller decides, then reports the outcome
    * through `Hud.setSnowballMode`. Entering first closes MENU and is refused
-   * outright (no call) while any other HUD overlay is open.
+   * outright (no call) while any other HUD overlay is open, or while ammo
+   * (`setSnowballAmmo`) is 0 (#109). Escape also asks to leave (`false`)
+   * whenever the mode is on (#109); in practice that's always while no HUD
+   * overlay is open, since opening one already turns the mode off.
    */
   onSnowballToggle?: (on: boolean) => void;
 }
@@ -209,11 +212,19 @@ export function createHud(layer: HTMLElement, deps: HudDeps): Hud {
   snowballButton.className = 'hud__button hud__button--bottom hud__button--snowball';
   snowballButton.textContent = 'SNOWBALL';
   let snowballMode = false;
+  // #109: whether there's ammo to enter with. Starts `true` (permissive)
+  // since a real Session always reports the full bucket via
+  // `setSnowballAmmo` before the button is reachable; only an explicit 0
+  // count refuses entry.
+  let hasSnowballAmmo = true;
   snowballButton.addEventListener('click', () => {
     if (snowballMode) {
       deps.onSnowballToggle?.(false);
       return;
     }
+    // #109: refuse to enter with 0 ammo (the button stays off); the Player
+    // re-enters once ammo refills.
+    if (!hasSnowballAmmo) return;
     // As MAP does: MENU closes first (#32 D6). Any other overlay (Creator,
     // Minigame, Trophy Case, Market) refuses the mode outright (#53 v4 #12).
     overlays.close(MENU_OVERLAY_ID);
@@ -221,6 +232,19 @@ export function createHud(layer: HTMLElement, deps: HudDeps): Hud {
     if (overlays.current() !== null) return;
     deps.onSnowballToggle?.(true);
   });
+
+  // #109: Escape leaves Snowball mode. In practice this only ever fires
+  // while no HUD overlay is open: `main.ts` wires `hud.overlays.onOpen` to
+  // turn the mode off the moment any overlay opens, so by the time one is
+  // open here, `snowballMode` is already `false` and this is a no-op; a
+  // still-open overlay's own Escape handling (`overlays`' `keydown`
+  // listener, registered above) closes it exactly as before #109.
+  function handleSnowballEscape(event: KeyboardEvent): void {
+    if (event.key !== 'Escape') return;
+    if (!snowballMode) return;
+    deps.onSnowballToggle?.(false);
+  }
+  window.addEventListener('keydown', handleSnowballEscape);
 
   const mapButton = document.createElement('button');
   mapButton.type = 'button';
@@ -293,6 +317,7 @@ export function createHud(layer: HTMLElement, deps: HudDeps): Hud {
   snowballPanel.append(snowballTitle, snowballAmmo, snowballDivider, snowballHint);
 
   function setSnowballAmmo(count: number, capacity: number): void {
+    hasSnowballAmmo = count > 0;
     const pips: HTMLElement[] = [];
     for (let i = 0; i < capacity; i += 1) {
       const pip = document.createElement('span');
@@ -354,6 +379,7 @@ export function createHud(layer: HTMLElement, deps: HudDeps): Hud {
       unsubscribeRoomEnter();
       unsubscribeTokens();
       unsubscribeToast();
+      window.removeEventListener('keydown', handleSnowballEscape);
       if (toastTimer !== null) clearTimeout(toastTimer);
       overlays.destroy();
       emotePicker.destroy();

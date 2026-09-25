@@ -319,6 +319,49 @@ describe('createHud', () => {
       expect(onSnowballToggle).not.toHaveBeenCalled();
       expect(hud.overlays.current()).toBe('penguin-creator');
     });
+
+    it('Escape leaves the mode when no overlay is open (#109)', () => {
+      const onSnowballToggle = vi.fn();
+      const { hud } = setup({ onSnowballToggle });
+      hud.setSnowballMode(true);
+
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+
+      expect(onSnowballToggle).toHaveBeenCalledWith(false);
+    });
+
+    it('Escape does nothing while the mode is already off (as when a HUD overlay is open: main.ts already turned it off, #109)', () => {
+      const onSnowballToggle = vi.fn();
+      setup({ onSnowballToggle });
+
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+
+      expect(onSnowballToggle).not.toHaveBeenCalled();
+    });
+
+    it('refuses to enter the mode with 0 ammo; SNOWBALL stays off (#109)', () => {
+      const onSnowballToggle = vi.fn();
+      const { root, hud } = setup({ onSnowballToggle });
+      hud.setSnowballAmmo(0, 3);
+
+      snowballButton(root).click();
+
+      expect(onSnowballToggle).not.toHaveBeenCalled();
+      expect(snowballButton(root).classList.contains('hud__button--active')).toBe(false);
+    });
+
+    it('re-entering is allowed again once ammo refills above 0 (#109)', () => {
+      const onSnowballToggle = vi.fn();
+      const { root, hud } = setup({ onSnowballToggle });
+      hud.setSnowballAmmo(0, 3);
+      snowballButton(root).click();
+      expect(onSnowballToggle).not.toHaveBeenCalled();
+
+      hud.setSnowballAmmo(1, 3);
+      snowballButton(root).click();
+
+      expect(onSnowballToggle).toHaveBeenCalledWith(true);
+    });
   });
 
   it('renders the chat field with the shared 120 maxlength and its placeholder', () => {

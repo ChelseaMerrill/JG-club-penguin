@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { Tile } from '../contracts';
 import {
   createSnowballController,
@@ -336,6 +336,49 @@ describe('createSnowballController: throwAt', () => {
 
     expect(firstResult).toBe(false);
     expect(controller.ammo().count).toBe(1);
+  });
+});
+
+describe('createSnowballController: onAmmoEmptied (#109)', () => {
+  it('fires once the throw that empties a full bucket has been sent', async () => {
+    const fakeChannel = createFakeChannel();
+    const fakeView = createFakeView();
+    const timer = createManualTimer();
+    const controller = createController(fakeChannel, fakeView, {
+      setTimeout: timer.setTimeout,
+      clearTimeout: timer.clearTimeout,
+    });
+    const emptied = vi.fn();
+    controller.onAmmoEmptied(emptied);
+
+    await controller.throwAt({ col: 0, row: 0 }); // 3 -> 2
+    expect(emptied).not.toHaveBeenCalled();
+    await controller.throwAt({ col: 0, row: 0 }); // 2 -> 1
+    expect(emptied).not.toHaveBeenCalled();
+    await controller.throwAt({ col: 0, row: 0 }); // 1 -> 0: the signal
+
+    expect(emptied).toHaveBeenCalledTimes(1);
+    expect(controller.ammo().count).toBe(0);
+  });
+
+  it('does not fire for a throw whose send is rejected and whose ammo is refunded', async () => {
+    const fakeChannel = createFakeChannel();
+    const fakeView = createFakeView();
+    const timer = createManualTimer();
+    const controller = createController(fakeChannel, fakeView, {
+      setTimeout: timer.setTimeout,
+      clearTimeout: timer.clearTimeout,
+    });
+    const emptied = vi.fn();
+    controller.onAmmoEmptied(emptied);
+
+    await controller.throwAt({ col: 0, row: 0 }); // 3 -> 2, sent
+    fakeChannel.setThrowSendResult(false);
+    const result = await controller.throwAt({ col: 0, row: 0 }); // would be 2 -> 1, but rejected
+
+    expect(result).toBe(false);
+    expect(controller.ammo().count).toBe(2); // refunded, not left at 1
+    expect(emptied).not.toHaveBeenCalled();
   });
 });
 

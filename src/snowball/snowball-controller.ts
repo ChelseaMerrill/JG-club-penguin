@@ -94,6 +94,14 @@ export interface SnowballController {
   ammo(): { count: number; capacity: number };
   /** Fires on every ammo change (a throw, a refund, or a refill tick). */
   onAmmoChange(listener: (ammo: { count: number; capacity: number }) => void): () => void;
+  /**
+   * Fires once a throw's send resolves `true` and that reservation leaves
+   * the bucket at 0 ammo (#109): the signal `main.ts` uses to leave Snowball
+   * mode once ammo runs out. Never fires for a throw whose send is rejected
+   * or resolves `false` (refunded, not exhausted), and never fires from a
+   * refill tick alone.
+   */
+  onAmmoEmptied(listener: () => void): () => void;
   /** A snapshot of every active snow hat, keyed by playerId (the local Player included). */
   snowHats(): ReadonlyMap<string, SnowHatEntry>;
   /** Fires whenever a snow hat is applied or expires. */
@@ -120,6 +128,7 @@ export function createSnowballController(options: SnowballControllerOptions): Sn
   const hatTimers = new Map<string, ReturnType<typeof scheduleTimer>>();
   const flightTimers = new Set<ReturnType<typeof scheduleTimer>>();
   const ammoListeners = new Set<(ammo: { count: number; capacity: number }) => void>();
+  const ammoEmptiedListeners = new Set<() => void>();
   const snowHatsListeners = new Set<(hats: ReadonlyMap<string, SnowHatEntry>) => void>();
 
   let refillTimer: ReturnType<typeof scheduleTimer> | null = null;
@@ -137,6 +146,10 @@ export function createSnowballController(options: SnowballControllerOptions): Sn
   function notifyAmmoChange(): void {
     const snapshot = ammoSnapshot();
     for (const listener of Array.from(ammoListeners)) listener(snapshot);
+  }
+
+  function notifyAmmoEmptied(): void {
+    for (const listener of Array.from(ammoEmptiedListeners)) listener();
   }
 
   function notifySnowHatsChange(): void {
@@ -264,6 +277,10 @@ export function createSnowballController(options: SnowballControllerOptions): Sn
         return false;
       }
 
+      // #109: once a *sent* throw leaves the bucket empty, signal the exit
+      // (never for a refunded one, handled in the `!ok` branch above).
+      if (!stopped && ammo.count(now()) === 0) notifyAmmoEmptied();
+
       // A Room change or stop() while the send was in flight: the throw was
       // sent, but this Player has left the Room it would land in.
       if (stopped || generation !== startGeneration) return true;
@@ -285,6 +302,12 @@ export function createSnowballController(options: SnowballControllerOptions): Sn
       ammoListeners.add(listener);
       return () => {
         ammoListeners.delete(listener);
+      };
+    },
+    onAmmoEmptied(listener): () => void {
+      ammoEmptiedListeners.add(listener);
+      return () => {
+        ammoEmptiedListeners.delete(listener);
       };
     },
     snowHats(): ReadonlyMap<string, SnowHatEntry> {
@@ -314,6 +337,7 @@ export function createSnowballController(options: SnowballControllerOptions): Sn
         refillTimer = null;
       }
       ammoListeners.clear();
+      ammoEmptiedListeners.clear();
       snowHatsListeners.clear();
     },
   };
