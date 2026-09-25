@@ -179,6 +179,9 @@ test('steps complete in any order with 3-second toasts; the main Quest pays 150 
 
   // Step 5, last: buy the Beanbag at the Igloo Gear stall.
   await changeRoom(page, 'roof-deck');
+  // Floor 5 -> the Roof Deck plays the elevator screen (#52) over the Stage
+  // first; a click during it never reaches the stall.
+  await expect(page.locator('.elevator-screen')).toBeHidden();
   await clickStagePoint(page, {
     x: stallHotspot.rect.x + stallHotspot.rect.width / 2,
     y: stallHotspot.rect.y + stallHotspot.rect.height / 2,
