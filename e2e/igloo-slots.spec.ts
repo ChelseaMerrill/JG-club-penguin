@@ -61,6 +61,9 @@ const slot3Point = tileToScreen(slot3.tile, igloo.grid.origin);
 
 async function buyBeanbagAtRoofDeck(page: Page): Promise<void> {
   await changeRoom(page, 'roof-deck');
+  // Floor 5 -> the Roof Deck plays the elevator screen (#52) over the Stage
+  // first; a click during it never reaches the stall.
+  await expect(page.locator('.elevator-screen')).toBeHidden();
   await clickStagePoint(page, stallHotspotCenter);
   await expect(page.locator('.market')).toBeVisible();
   await page.locator('[data-item-id="beanbag"] .market__item-buy').click();

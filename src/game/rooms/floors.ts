@@ -25,6 +25,8 @@ export const ROOM_FLOORS: Record<RoomId, FloorId | null> = {
   'town-center': '5',
   'dev-pit': '5',
   'the-melt': '5',
+  // Reached by a door straight from Town Center, like the Dev Pit and The Melt (#51).
+  'the-icebox': '5',
   'roof-deck': 'R',
   igloo: null,
 };
