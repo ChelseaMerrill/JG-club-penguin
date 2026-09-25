@@ -7,13 +7,14 @@ import {
 
 /**
  * A Human NPC's figure, ported from `design/build/humans.js`'s `spec`
- * argument to its `human(s, uid)` builder. Scoped to the options the current
- * 22-NPC roster (`src/npcs/npcs.ts`) actually uses, not every option
- * `humans.js` supports (`buzz`/`curlyShort`/`slick` hairstyles, the `henley`
- * collar, the `plaid` pattern, the `camera`/`yarn`/`beyblade`/`basketball`/
- * `survivor` props, the `survivor` hat/tee, and the horse `mount` composite
- * are never used by any Human NPC here, so they're left unported; adding one
- * later is a direct copy from `humans.js`).
+ * argument to its `human(s, uid)` builder. Scoped to the options the NPC
+ * roster (`src/npcs/npcs.ts`) actually uses, not every option `humans.js`
+ * supports: #51 ported the `buzz` hairstyle, the `plaid` pattern and the
+ * `camera` and `beyblade` props as its Rooms needed them. The
+ * `curlyShort`/`slick` hairstyles, the `henley` collar, the
+ * `yarn`/`basketball`/`survivor` props, the `survivor` hat/tee, and the horse
+ * `mount` composite are still never used by any Human NPC here, so they're
+ * left unported; adding one later is a direct copy from `humans.js`.
  */
 export interface HumanFigureSpec {
   style?:
@@ -57,7 +58,8 @@ export interface HumanFigureSpec {
     | 'clipboard'
     | 'chicken'
     | 'hobbyhorse'
-    | 'camera';
+    | 'camera'
+    | 'beyblade';
 }
 
 const SKIN: Record<NonNullable<HumanFigureSpec['skin']>, string> = {
@@ -338,6 +340,9 @@ function renderHumanFigure(spec: HumanFigureSpec, idPrefix: string): string {
   }
   if (spec.prop === 'hobbyhorse') {
     o += `<rect x="18" y="56" width="5" height="68" rx="2" fill="#C9A366" stroke="${OUTLINE}" stroke-width="1.5"></rect><path d="M8 58 C2 58 0 46 8 40 L26 42 C32 46 30 58 22 60 Z" fill="#8A5A2B" stroke="${OUTLINE}" stroke-width="2.5"></path><path d="M6 40 L10 30 L14 41 Z M14 40 L19 29 L23 41 Z" fill="#8A5A2B" stroke="${OUTLINE}" stroke-width="2"></path><path d="M12 40 Q24 36 28 50" fill="none" stroke="#3b2a1a" stroke-width="4" stroke-linecap="round"></path><circle cx="8" cy="48" r="2" fill="#161719"></circle><path d="M4 54 q4 2 8 0" stroke="#161719" stroke-width="1.5" fill="none"></path><path d="M14 50 Q20 54 26 50" fill="none" stroke="#D63C3C" stroke-width="2"></path><circle cx="20" cy="126" r="4" fill="#3b2a1a" stroke="${OUTLINE}" stroke-width="1.5"></circle>`;
+  }
+  if (spec.prop === 'beyblade') {
+    o += `<circle cx="18" cy="96" r="11" fill="#00BDFF" stroke="#F4F4F4" stroke-width="3"></circle><circle cx="18" cy="96" r="4" fill="#161719"></circle><path d="M18 85 L18 107 M7 96 L29 96 M10 88 L26 104 M26 88 L10 104" stroke="#161719" stroke-width="1.5"></path><circle cx="102" cy="96" r="11" fill="#F4F4F4" stroke="${OUTLINE}" stroke-width="3"></circle><circle cx="102" cy="96" r="4" fill="#161719"></circle><path d="M102 85 L102 107 M91 96 L113 96 M94 88 L110 104 M110 88 L94 104" stroke="${OUTLINE}" stroke-width="1.5"></path>`;
   }
 
   return o;

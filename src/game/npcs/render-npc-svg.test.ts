@@ -111,6 +111,26 @@ describe('renderNpcSvg', () => {
     expect(svg).toContain('<rect x="104" y="85" width="3" height="3" fill="#D63C3C">');
   });
 
+  // #51: Team Room 4's Michael Prete holds a beyblade in each hand, a
+  // `humans.js` prop no earlier Room needed. Expected markup is copied from
+  // the figure `design/Team Room 4.dc.html` bakes for him.
+  it("draws humans.js's beyblade prop, one top in each hand", () => {
+    const svg = renderNpcSvg({ prop: 'beyblade' });
+    assertValidSvg(svg);
+    expect(svg).toContain(
+      '<circle cx="18" cy="96" r="11" fill="#00BDFF" stroke="#F4F4F4" stroke-width="3">',
+    );
+    expect(svg).toContain(
+      '<path d="M18 85 L18 107 M7 96 L29 96 M10 88 L26 104 M26 88 L10 104" stroke="#161719" stroke-width="1.5">',
+    );
+    expect(svg).toContain(
+      '<circle cx="102" cy="96" r="11" fill="#F4F4F4" stroke="#0C4B5F" stroke-width="3">',
+    );
+    expect(svg).toContain(
+      '<path d="M102 85 L102 107 M91 96 L113 96 M94 88 L110 104 M110 88 L94 104" stroke="#0C4B5F" stroke-width="1.5">',
+    );
+  });
+
   it("never draws a <text> element (an SVG loaded as a Phaser texture can't use page web fonts)", () => {
     for (const figure of humanFigures) {
       expect(renderNpcSvg(figure)).not.toContain('<text');
