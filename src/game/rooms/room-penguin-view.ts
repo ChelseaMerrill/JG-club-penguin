@@ -1,6 +1,7 @@
 import { type Facing, type PenguinLook, type PresencePayload, type Tile } from '../../contracts';
 import type { RemotePenguinView } from '../../realtime/room-channel';
 import { maskName } from '../../ui/mask-names';
+import type { PenguinAnim } from '../penguin';
 import { facingForStep } from '../movement/controller';
 import { findPath, tilesEqual, type WalkableGrid } from '../movement/pathfinding';
 import { TILE_STEP_MS } from '../movement/speed';
@@ -26,6 +27,8 @@ export interface PlacedPenguin {
   step(point: ScreenPoint, durationMs: number, depthAt: (t: number) => number): Promise<void>;
   /** Shows a chat speech bubble above the Penguin, or clears it (`null`) (#44). */
   say(text: string | null): void;
+  /** Plays `anim` immediately, e.g. a #47 Emote pose. */
+  play(anim: PenguinAnim): void;
   /** Draws or removes the transient #53 snow hat (never part of the Penguin look). */
   setSnowHat(on: boolean): void;
   /** Whether the snow hat is actually drawn right now (#53 debug hook's `rendered`). */
@@ -497,6 +500,17 @@ export class RoomPenguinView implements RemotePenguinView {
     return this.sayAt(LOCAL_KEY, text);
   }
 
+  /**
+   * Plays (or clears, given `null`) a #47 Emote pose on a remote Penguin.
+   * Clearing returns it to its own look's idle emote: remote Penguins have
+   * no local walk-anim state to prefer instead (unlike the local Penguin,
+   * `RoomScene` owns that). No-op (returns `false`) for a Player not
+   * currently shown.
+   */
+  playEmote(playerId: string, anim: PenguinAnim | null): boolean {
+    return this.playEmoteAt(playerId, anim);
+  }
+
   private sayAt(key: PenguinKey, text: string | null): boolean {
     const placed = this.placed.get(key);
     if (!placed) return false;
@@ -545,6 +559,19 @@ export class RoomPenguinView implements RemotePenguinView {
     for (const key of this.placed.keys()) {
       if (isPlayerKey(key)) this.placed.get(key)?.setSnowHat(false);
     }
+  }
+
+  private playEmoteAt(key: PenguinKey, anim: PenguinAnim | null): boolean {
+    const placed = this.placed.get(key);
+    if (!placed) return false;
+    if (anim !== null) {
+      placed.play(anim);
+      return true;
+    }
+    // A remote Penguin still mid-walk (#43) goes back to walking, not idle.
+    if (isPlayerKey(key) && this.walks.has(key)) placed.walk();
+    else placed.idle();
+    return true;
   }
 
   /** The raw, unmasked name decides whether to draw at all (#75); masking only affects the tag text. */

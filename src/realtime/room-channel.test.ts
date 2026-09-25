@@ -524,6 +524,61 @@ describe('createRoomChannel', () => {
     expect(moveCalls).toEqual([{ playerId: 'other', target: { col: 3, row: 4 } }]);
   });
 
+  it('send stamps playerId (not sentAt) and resolves true for a valid emote (#47)', async () => {
+    const { client, events, view } = setup();
+    const rc = createChannel(client, events, view, 'me');
+
+    events.emit('room:enter', { roomId: 'town-center', entryTile: { col: 0, row: 0 } });
+    await flush();
+    client.channels[0].emitStatus('SUBSCRIBED');
+    await flush();
+
+    const result = await rc.send('emote', { emoteId: 'wave' });
+
+    expect(result).toBe(true);
+    expect(busSends(client.channels[0])).toEqual([
+      { event: 'emote', payload: { playerId: 'me', emoteId: 'wave' } },
+    ]);
+  });
+
+  it('send returns false and does not push an emote with an unknown emoteId', async () => {
+    const { client, events, view } = setup();
+    const rc = createChannel(client, events, view, 'me');
+
+    events.emit('room:enter', { roomId: 'town-center', entryTile: { col: 0, row: 0 } });
+    await flush();
+    client.channels[0].emitStatus('SUBSCRIBED');
+    await flush();
+
+    const result = await rc.send('emote', {
+      emoteId: 'nope',
+    } as unknown as SendablePayload<'emote'>);
+
+    expect(result).toBe(false);
+    expect(busSends(client.channels[0])).toEqual([]);
+  });
+
+  it('dispatches a valid incoming emote from an id currently shown in Presence, dropping an unknown emoteId and an own-origin event (#47)', async () => {
+    const { client, events, view } = setup();
+    const rc = createChannel(client, events, view, 'me');
+
+    events.emit('room:enter', { roomId: 'town-center', entryTile: { col: 0, row: 0 } });
+    await flush();
+    const ch = client.channels[0];
+    showOther(ch, 'other');
+    await flush();
+
+    const emoteCalls: unknown[] = [];
+    rc.on('emote', (event) => emoteCalls.push(event));
+
+    ch.emitBroadcast('emote', { playerId: 'other', emoteId: 'dance' });
+    ch.emitBroadcast('emote', { playerId: 'me', emoteId: 'wave' });
+    ch.emitBroadcast('emote', { playerId: 'other', emoteId: 'not-a-real-emote' });
+    ch.emitBroadcast('emote', { playerId: 'not-shown', emoteId: 'brb' });
+
+    expect(emoteCalls).toEqual([{ playerId: 'other', emoteId: 'dance' }]);
+  });
+
   it('stops delivering to a bus handler after its unsubscribe runs', async () => {
     const { client, events, view } = setup();
     const rc = createChannel(client, events, view);

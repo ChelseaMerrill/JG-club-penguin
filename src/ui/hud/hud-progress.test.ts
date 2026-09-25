@@ -48,6 +48,7 @@ describe('HUD balance', () => {
       onIgloo: () => {},
       onSignOut: () => {},
       onChatSend: () => Promise.resolve(true),
+      onEmotePick: () => {},
       initialBalance: 0,
     });
     currentHud = hud;

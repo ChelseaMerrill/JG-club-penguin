@@ -38,8 +38,10 @@ import { resolveRoomIdFromLocation } from './game/rooms/dev-room-hook';
 import { CORE_VALUES_POSTER_HOTSPOT_ID } from './game/rooms/definitions/town-center';
 import {
   createRoomChannel,
+  type PublicBroadcastEvent,
   type RemotePenguinView,
   type RoomChannel,
+  type SendablePayload,
 } from './realtime/room-channel';
 import { toRealtimeClient } from './realtime/supabase-realtime';
 import {
@@ -48,13 +50,20 @@ import {
   type ChatController,
 } from './chat/chat-controller';
 import { exposeChatDebug } from './chat/dev-chat-hook';
+import {
+  createEmoteController,
+  type EmoteController,
+  type EmoteRoomChannel,
+  type EmotePenguinView,
+} from './emotes/emote-controller';
+import { EMOTE_TO_ANIM } from './emotes/emote-rules';
 import { createSnowballController, type SnowballController } from './snowball/snowball-controller';
 import {
   exposeSnowballDebug,
   type SnowballThrowLogEntry,
   type SnowHatDebugInfo,
 } from './snowball/dev-snowball-hook';
-import { DEFAULT_LOOK, type PenguinLook } from './contracts';
+import { DEFAULT_LOOK, type EmoteId, type PenguinLook, type RoomBroadcastMap } from './contracts';
 import { createInMemoryProgressStore } from './persistence/in-memory-progress-store';
 import type { ProgressStore } from './persistence/progress-store';
 import { createActiveProgressStore, createProgressSession } from './persistence/progress-session';
@@ -83,6 +92,36 @@ mountStage(game);
 const client = getSupabaseClient();
 const realtime = toRealtimeClient(client);
 const uiLayer = getUiLayer();
+
+/**
+ * A stable `EmoteRoomChannel` (#47), unlike `ChatRoomChannel`: an Emote must
+ * play on the local Penguin even with no session/Room channel joined yet
+ * (the local Penguin exists from boot, #14, independent of sign-in), so
+ * `emoteController` below is built once at boot rather than recreated per
+ * session like `ChatController`. `send` forwards to whichever `roomChannel`
+ * is currently live (`false` with none, e.g. before sign-in); `on` and
+ * `onRoomChange` are re-registered against each session's own fresh
+ * `RoomChannel` from `startSession` below, and simply fan out to whatever
+ * this shim's own callers subscribed with.
+ */
+const emoteBroadcastHandlers = new Set<(payload: RoomBroadcastMap['emote']) => void>();
+const emoteRoomChangeHandlers = new Set<(roomId: RoomId | null) => void>();
+
+const emoteChannel: EmoteRoomChannel = {
+  async send<K extends PublicBroadcastEvent>(type: K, payload: SendablePayload<K>) {
+    return roomChannel?.send(type, payload) ?? false;
+  },
+  on<K extends PublicBroadcastEvent>(type: K, handler: (payload: RoomBroadcastMap[K]) => void) {
+    if (type !== 'emote') return () => {};
+    const wrapped = handler as (payload: RoomBroadcastMap['emote']) => void;
+    emoteBroadcastHandlers.add(wrapped);
+    return () => emoteBroadcastHandlers.delete(wrapped);
+  },
+  onRoomChange(handler) {
+    emoteRoomChangeHandlers.add(handler);
+    return () => emoteRoomChangeHandlers.delete(handler);
+  },
+};
 
 // Assigned once `hud`/`creator` exist below (`coreValuesCard` needs
 // `hud.overlays`; the guard needs `creator.isOpen()`); `tryOpenCoreValuesCard`
@@ -152,9 +191,15 @@ let penguins: RoomPenguinView | null = null;
  * always set by the time any of them runs.
  */
 let roomNavigator: RoomNavigator | null = null;
+/** Built once `sceneReady` resolves (below), so it's ready before any sign-in (#47). */
+let emoteController: EmoteController | null = null;
 const sceneReady = whenSceneReady(game).then((scene) => {
   roomScene = scene;
   penguins = scene.penguins;
+  emoteController = createEmoteController({
+    channel: emoteChannel,
+    view: composeEmoteView(scene.penguins),
+  });
   roomNavigator = createRoomNavigator({
     scene: {
       showRoom: (roomId, entryTile, force) => scene.showRoom(roomId, entryTile, force),
@@ -305,6 +350,27 @@ function composeChatView(view: RoomPenguinView, getPlayerId: () => string | null
   };
 }
 
+/**
+ * Wraps `view` (the #28 `RoomPenguinView`) and `roomScene` (the local
+ * Penguin, #14) into one `EmotePenguinView` (#47): remote Emotes render
+ * through `view.playEmote`, the local Emote through `RoomScene`'s own
+ * `playEmoteLocal`/`clearEmoteLocal` (which decides whether clearing means
+ * idle or `WALK`, per its own doc comment). `roomScene` is read lazily
+ * (`() => roomScene`, not captured at composition time) since `main.ts`
+ * assigns it only once `whenSceneReady` resolves, before any session starts.
+ */
+function composeEmoteView(view: RoomPenguinView): EmotePenguinView {
+  return {
+    play(playerId, emoteId) {
+      return view.playEmote(playerId, emoteId === null ? null : EMOTE_TO_ANIM[emoteId]);
+    },
+    playLocal(emoteId) {
+      if (emoteId === null) return roomScene?.clearEmoteLocal() ?? false;
+      return roomScene?.playEmoteLocal(EMOTE_TO_ANIM[emoteId]) ?? false;
+    },
+  };
+}
+
 function composeView(view: RemotePenguinView): RemotePenguinView {
   if (!debugOverlay) return view;
   return {
@@ -383,6 +449,9 @@ function endSession(): RoomChannel | null {
   setSessionActive(false);
   chatController?.stop();
   chatController = null;
+  // `emoteController` (#47) is a boot-time singleton (see its declaration
+  // above), never stopped: its `onRoomChange` forwarding above already
+  // clears every active Emote once the real Room channel reports the leave.
   setSnowballMode(false);
   snowballController?.stop();
   snowballController = null;
@@ -419,6 +488,16 @@ async function startSession(player: Player, previous: RoomChannel | null): Promi
   chatController = createChatController({
     channel,
     view: composeChatView(view, () => channelPlayerId),
+  });
+  // Forwards this session's real Room channel into the boot-time
+  // `emoteController`'s stable `emoteChannel` shim (#47; see its own doc
+  // comment above for why the Emote controller itself isn't recreated here
+  // like `chatController`).
+  channel.on('emote', (payload) => {
+    for (const handler of emoteBroadcastHandlers) handler(payload);
+  });
+  channel.onRoomChange((roomId) => {
+    for (const handler of emoteRoomChangeHandlers) handler(roomId);
   });
   const scene = roomScene;
   if (scene) {
@@ -506,6 +585,9 @@ const hud = createHud(getUiLayer(), {
   // session's sign-in load finishes (#34).
   initialBalance: 0,
   onChatSend: (text) => chatController?.send(text) ?? Promise.resolve(false),
+  onEmotePick: (emoteId: EmoteId) => {
+    void emoteController?.send(emoteId);
+  },
   onSnowballToggle: (on) => setSnowballMode(on),
 });
 

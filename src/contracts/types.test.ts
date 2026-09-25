@@ -28,8 +28,7 @@ describe('contract type-level guarantees', () => {
     expect(completed.minigameId).toBe('bug-squash');
   });
 
-  it('rejects a reserved event name as a RoomBroadcastEvent', () => {
-    // @ts-expect-error 'emote' is reserved (#47) but not a key of RoomBroadcastMap yet.
+  it('accepts emote (#47) as a RoomBroadcastEvent, now that it is a real RoomBroadcastMap key', () => {
     const event: RoomBroadcastEvent = 'emote';
 
     expect(event).toBe('emote');
