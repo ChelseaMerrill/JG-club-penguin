@@ -558,6 +558,26 @@ body {
   color: var(--jg-inactive);
 }
 
+/* A toast (`ui:toast`, #42): centered above the bottom bar, wherever the
+   Player is, since the HUD is mounted across every Room. */
+.hud__toast {
+  position: absolute;
+  left: 50%;
+  bottom: calc(var(--hud-inset-y) + 68px);
+  transform: translateX(-50%);
+  padding: 12px 20px;
+  background: rgba(var(--jg-dark-rgb), 0.94);
+  border: 2px solid var(--jg-primary);
+  font: 400 14px var(--font-display);
+  letter-spacing: 0.08em;
+  color: var(--fg-primary);
+  pointer-events: none;
+}
+
+.hud__toast[hidden] {
+  display: none;
+}
+
 /* The bottom bar's hexagon buttons (EMOTE, SNOWBALL, MAP, IGLOO, QUESTS)
    share their hexagon clip-path with `.minigame__button`. */
 .hud__button--bottom,
