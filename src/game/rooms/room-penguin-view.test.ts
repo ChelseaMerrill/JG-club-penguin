@@ -7,6 +7,7 @@ import {
   type PresencePayload,
 } from '../../contracts';
 import { MASKED_NAME } from '../../ui/mask-names';
+import type { PenguinAnim } from '../penguin';
 import type { ScreenPoint } from './iso';
 import { RoomPenguinView, type PlacedPenguin } from './room-penguin-view';
 
@@ -18,6 +19,8 @@ interface ShownPenguin {
   facing: Facing;
   destroyed: boolean;
   bubble: string | null;
+  /** The last anim `play()` was called with (#47), or `null` until the first call. */
+  anim: PenguinAnim | null;
 }
 
 /** A fake rendering stage: records every Penguin placed on it and its current state. */
@@ -29,7 +32,15 @@ function createFakeStage() {
     depth: number,
     facing: Facing,
   ): PlacedPenguin => {
-    const shown: ShownPenguin = { look, point, depth, facing, destroyed: false, bubble: null };
+    const shown: ShownPenguin = {
+      look,
+      point,
+      depth,
+      facing,
+      destroyed: false,
+      bubble: null,
+      anim: null,
+    };
     placed.push(shown);
     return {
       setLook: (next) => {
@@ -44,6 +55,9 @@ function createFakeStage() {
       },
       say: (text) => {
         shown.bubble = text;
+      },
+      play: (anim) => {
+        shown.anim = anim;
       },
       destroy: () => {
         shown.destroyed = true;
@@ -93,6 +107,7 @@ describe('RoomPenguinView', () => {
         facing: 'left',
         destroyed: false,
         bubble: null,
+        anim: null,
       },
     ]);
   });
@@ -114,6 +129,7 @@ describe('RoomPenguinView', () => {
         facing: 'left',
         destroyed: false,
         bubble: null,
+        anim: null,
       },
     ]);
   });
@@ -210,6 +226,21 @@ describe('RoomPenguinView', () => {
     const { view } = attachedView();
 
     expect(view.sayLocal('hi')).toBe(false);
+  });
+
+  it("plays (and clears back to the look's idle emote) an Emote pose above a shown remote Penguin, ignoring a Player not shown (#47)", () => {
+    const { stage, view } = attachedView();
+    view.upsert(payload({ playerId: 'player-b', look: { ...PEBBLE, emote: 'DANCE' } }));
+
+    expect(view.playEmote('player-b', 'WAVE')).toBe(true);
+    expect(view.playEmote('never-shown', 'WAVE')).toBe(false);
+
+    expect(stage.live()[0]!.anim).toBe('WAVE');
+
+    expect(view.playEmote('player-b', null)).toBe(true);
+
+    // Clears to the look's own idle emote (DANCE here), not a fixed default.
+    expect(stage.live()[0]!.anim).toBe('DANCE');
   });
 
   it('notifies onBubbleChange(playerId, null) when a remote Penguin is removed (#44 review fix F1)', () => {

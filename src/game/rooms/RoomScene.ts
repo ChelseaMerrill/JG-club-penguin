@@ -399,6 +399,37 @@ export class RoomScene extends Scene {
     return true;
   }
 
+  /**
+   * Plays a #47 Emote pose on the local Penguin immediately, replacing
+   * whatever idle/walk anim was showing. Returns `false` while no local
+   * Penguin is spawned.
+   */
+  playEmoteLocal(anim: PenguinAnim): boolean {
+    if (!this.penguin) return false;
+    this.penguin.play(anim);
+    this.currentAnim = anim;
+    return true;
+  }
+
+  /**
+   * Ends a local Emote (#47): if the Penguin is currently mid-step, walking
+   * already won (`advanceStep` calls `penguin.walk()` the moment a step
+   * starts, visually overriding the Emote pose on its own), so this only
+   * re-affirms `WALK`; otherwise it returns to the look's own idle emote.
+   * Returns `false` while no local Penguin is spawned.
+   */
+  clearEmoteLocal(): boolean {
+    if (!this.penguin) return false;
+    if (this.controller?.isMoving()) {
+      this.penguin.walk();
+      this.currentAnim = 'WALK';
+    } else {
+      this.penguin.idle();
+      this.currentAnim = this.currentLook.emote;
+    }
+    return true;
+  }
+
   private spawnLocalPenguin(room: RoomDefinition): void {
     const registered = this.registry.get(PLAYER_REGISTRY_KEY) as RegisteredPlayer | undefined;
     const look = resolveRegisteredLook(registered);
@@ -765,6 +796,7 @@ function placePenguinsIn(scene: Scene): PlacePenguin {
         penguin.container.setDepth(nextDepth);
       },
       say: (text) => penguin.say(text),
+      play: (anim) => penguin.play(anim),
       destroy: () => penguin.destroy(),
     };
   };

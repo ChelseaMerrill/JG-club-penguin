@@ -612,6 +612,78 @@ body {
   color: var(--fg-primary);
 }
 
+/* The EMOTE picker overlay (#47), reproducing `design/Club JenGuin HUD
+   Menus.dc.html`'s HUD-EMOTE screen: a title bar over a row of the eight HUD
+   Emotes, sitting just above the bottom bar's own 52px-tall row. */
+.emote-picker {
+  position: absolute;
+  left: var(--hud-inset-x);
+  right: var(--hud-inset-x);
+  bottom: calc(var(--hud-inset-y) + 52px + 10px);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 18px 24px;
+  background: rgba(var(--jg-dark-rgb), 0.94);
+  border: 2px solid var(--jg-secondary);
+  pointer-events: auto;
+}
+
+.emote-picker[hidden] {
+  display: none;
+}
+
+.emote-picker__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.emote-picker__title {
+  font-family: var(--font-game-display);
+  font-size: 26px;
+  color: var(--jg-primary);
+  -webkit-text-stroke: 4px var(--jg-secondary);
+  paint-order: stroke fill;
+}
+
+.emote-picker__hint {
+  font: 400 12px var(--font-display);
+  letter-spacing: 0.2em;
+  color: var(--jg-inactive);
+}
+
+.emote-picker__grid {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.emote-picker__tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 96px;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+.emote-picker__icon {
+  width: 76px;
+  height: 86px;
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  background: var(--jg-primary);
+}
+
+.emote-picker__label {
+  font: 400 12px var(--font-display);
+  letter-spacing: 0.14em;
+  color: var(--fg-primary);
+}
+
 /* Debug overlay (stand-in for #15/#33/#35), mounted only under `?debug`.
    Stage pixels: on the left, below the HUD's Room title block and above its
    bottom bar (which starts at 900 - 28 - 52 = 820px), so it never sits under

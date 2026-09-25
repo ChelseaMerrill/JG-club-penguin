@@ -56,6 +56,14 @@ export interface Penguin {
   readonly container: GameObjects.Container;
   idle(): void;
   walk(): void;
+  /**
+   * Plays `anim` immediately, replacing whatever idle/walk anim was showing
+   * (#47's Emote picker). Unlike `idle()`/`walk()`, this takes an arbitrary
+   * `PenguinAnim` (e.g. one of the four Emote-only poses); the caller
+   * managing anim state (`RoomScene`'s Emote handling, `room-penguin-view.ts`
+   * for remote Penguins) decides when to return to `idle()`/`walk()`.
+   */
+  play(anim: PenguinAnim): void;
   setFacing(facing: Facing): void;
   setLook(look: PenguinLook): void;
   /** Shows a chat speech bubble above the Penguin's head, or clears it (`null`) (#44). */
@@ -239,6 +247,9 @@ export function createPenguin(
     },
     walk() {
       play('WALK');
+    },
+    play(anim: PenguinAnim) {
+      play(anim);
     },
     setFacing(next: Facing) {
       facing = next;

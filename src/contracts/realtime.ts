@@ -1,3 +1,4 @@
+import type { EmoteId } from './emotes';
 import type { Facing, PenguinLook } from './penguin';
 import type { RoomId, Tile } from './rooms';
 
@@ -38,6 +39,12 @@ export interface RoomBroadcastMap {
   /** Producer/consumer: #44. `sentAt` is epoch milliseconds. */
   chat: { playerId: string; text: string; sentAt: number };
   /**
+   * Producer/consumer: #47. A one-off Emote pick, played on the sender's
+   * Penguin for `EMOTE_DURATION_MS` (`./emotes.ts`) and broadcast so every
+   * other Penguin in the Room plays it too.
+   */
+  emote: { playerId: string; emoteId: EmoteId };
+  /**
    * Producer/consumer: #28, internal to the Room channel. Sent after every
    * acknowledged `track()` outside the Igloo, and once in reply to a hello
    * from a Penguin not yet shown, so a Penguin appears before Presence
@@ -58,8 +65,9 @@ export interface RoomBroadcastMap {
 export type RoomBroadcastEvent = keyof RoomBroadcastMap;
 
 /**
- * Reserved for #47 (emote) and #53 (snowball); not implemented. Because
- * these names are not keys of `RoomBroadcastMap`, sending one today is a
- * compile-time type error until those tickets add them.
+ * Reserved for #53 (snowball); not implemented. Because these names are not
+ * keys of `RoomBroadcastMap`, sending one today is a compile-time type error
+ * until that ticket adds them. `emote` (#47) is no longer reserved: it is a
+ * real `RoomBroadcastMap` key above.
  */
-export type ReservedBroadcastEvent = 'emote' | 'snowball:throw' | 'snowball:hit';
+export type ReservedBroadcastEvent = 'snowball:throw' | 'snowball:hit';

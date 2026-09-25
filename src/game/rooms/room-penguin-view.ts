@@ -6,6 +6,7 @@ import {
 } from '../../contracts';
 import type { RemotePenguinView } from '../../realtime/room-channel';
 import { maskName } from '../../ui/mask-names';
+import type { PenguinAnim } from '../penguin';
 import { depthForTile, tileToScreen, type GridOrigin, type ScreenPoint } from './iso';
 
 /** One Penguin placed on the rendering stage (a #31 `Penguin` in `RoomScene`). */
@@ -15,6 +16,8 @@ export interface PlacedPenguin {
   moveTo(point: ScreenPoint, depth: number): void;
   /** Shows a chat speech bubble above the Penguin, or clears it (`null`) (#44). */
   say(text: string | null): void;
+  /** Plays `anim` immediately, e.g. a #47 Emote pose. */
+  play(anim: PenguinAnim): void;
   destroy(): void;
 }
 
@@ -123,10 +126,33 @@ export class RoomPenguinView implements RemotePenguinView {
     return this.sayAt(LOCAL_KEY, text);
   }
 
+  /**
+   * Plays (or clears, given `null`) a #47 Emote pose on a remote Penguin.
+   * Clearing returns it to its own look's idle emote: remote Penguins have
+   * no local walk-anim state to prefer instead (unlike the local Penguin,
+   * `RoomScene` owns that). No-op (returns `false`) for a Player not
+   * currently shown.
+   */
+  playEmote(playerId: string, anim: PenguinAnim | null): boolean {
+    return this.playEmoteAt(playerId, anim);
+  }
+
   private sayAt(key: PenguinKey, text: string | null): boolean {
     const placed = this.placed.get(key);
     if (!placed) return false;
     placed.say(text);
+    return true;
+  }
+
+  private playEmoteAt(key: PenguinKey, anim: PenguinAnim | null): boolean {
+    const placed = this.placed.get(key);
+    if (!placed) return false;
+    if (anim !== null) {
+      placed.play(anim);
+      return true;
+    }
+    const payload = this.payloads.get(key);
+    placed.play(payload ? payload.look.emote : 'WADDLE');
     return true;
   }
 

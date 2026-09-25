@@ -29,7 +29,13 @@ describe('contract type-level guarantees', () => {
   });
 
   it('rejects a reserved event name as a RoomBroadcastEvent', () => {
-    // @ts-expect-error 'emote' is reserved (#47) but not a key of RoomBroadcastMap yet.
+    // @ts-expect-error 'snowball:throw' is reserved (#53) but not a key of RoomBroadcastMap yet.
+    const event: RoomBroadcastEvent = 'snowball:throw';
+
+    expect(event).toBe('snowball:throw');
+  });
+
+  it('accepts emote (#47) as a RoomBroadcastEvent, now that it is a real RoomBroadcastMap key', () => {
     const event: RoomBroadcastEvent = 'emote';
 
     expect(event).toBe('emote');
