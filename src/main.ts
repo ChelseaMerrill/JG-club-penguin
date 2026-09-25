@@ -42,6 +42,9 @@ import { MINIGAME_OVERLAY_ID } from './minigames/minigame-shell';
 import { createPenguinCreator } from './ui/penguin-creator';
 import { createPenguinEditor } from './penguin/penguin-editor';
 import { initDevCreatorHook } from './penguin/dev-creator-hook';
+import { createTrophyCase, TROPHY_CASE_OVERLAY_ID } from './ui/trophy-case';
+import { createMarket, MARKET_OVERLAY_ID } from './ui/market';
+import { wireBadgeToast } from './ui/badge-toast';
 
 // Fail fast on a missing or malformed .env before anything boots.
 loadEnv();
@@ -297,6 +300,40 @@ const minigameLauncher = createMinigameLauncher({
   registry: createDefaultMinigameRegistry(),
 });
 
+// The Igloo's Trophy Case (#42): reloads `store.loadAll()` on every open
+// (no live update, no persistence -- #34), registered with `hud.overlays` so
+// Escape closes it and it closes any other open overlay first.
+const trophyCase = createTrophyCase(uiLayer, {
+  store: progressStore,
+  onClose: () => hud.overlays.close(TROPHY_CASE_OVERLAY_ID),
+});
+
+gameEvents.on('hotspot:click', ({ hotspotId }) => {
+  if (hotspotId !== 'trophy-case') return;
+  hud.overlays.open(TROPHY_CASE_OVERLAY_ID, () => trophyCase.close());
+  void trophyCase.open();
+});
+
+// The Roof Deck Market's Igloo Gear stall (#40): Casey's own NPC dialog
+// (#36) isn't merged yet, so this hotspot opens the Market panel directly;
+// `market.open()` is public so #36 can later open the same panel from
+// Casey's dialog instead. Reloads `store.loadAll()` on every open, same as
+// the Trophy Case.
+const market = createMarket(uiLayer, {
+  store: progressStore,
+  onClose: () => hud.overlays.close(MARKET_OVERLAY_ID),
+});
+
+gameEvents.on('hotspot:click', ({ hotspotId }) => {
+  if (hotspotId !== 'igloo-gear-stall') return;
+  hud.overlays.open(MARKET_OVERLAY_ID, () => market.close());
+  void market.open();
+});
+
+// A toast "wherever the Player is" for every earned Badge (#42), not just
+// while the Trophy Case happens to be open.
+wireBadgeToast();
+
 // Must run before `startAuth`: Supabase's `onAuthStateChange` always fires
 // asynchronously, so `devHudActive`/`devMinigameActive` need to be settled
 // before its first (later-tick) SIGNED_OUT/SIGNED_IN callback checks them
@@ -398,6 +435,8 @@ const auth = startAuth({
     // Quits any in-progress round (no `recordRound`) rather than leaving it
     // open behind a signed-out session.
     hud.overlays.close(MINIGAME_OVERLAY_ID);
+    hud.overlays.close(TROPHY_CASE_OVERLAY_ID);
+    hud.overlays.close(MARKET_OVERLAY_ID);
     overlay.showSignedOut();
     hud.hide();
   },

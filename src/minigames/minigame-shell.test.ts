@@ -31,7 +31,7 @@ interface FakeGameHandle {
 function createFakeGame(durationSec = 5, opts: { endThrows?: boolean } = {}): FakeGameHandle {
   let ctx: MinigameContext<'bug-squash'> | undefined;
   let score = 0;
-  let stats: MinigameStatsMap['bug-squash'] = { squashed: 0 };
+  let stats: MinigameStatsMap['bug-squash'] = { squashed: 0, score: 0, bestCombo: 0, escaped: 0 };
 
   const handle: FakeGameHandle = {
     pauseCalls: 0,
@@ -171,11 +171,16 @@ describe('minigame shell: finish vs quit', () => {
     const { layer, store, gameHandle, launcher } = setup();
     startPlaying(layer, launcher);
 
-    gameHandle.setScoreAndStats(80, { squashed: 8 });
+    gameHandle.setScoreAndStats(80, { squashed: 8, score: 0, bestCombo: 0, escaped: 0 });
     gameHandle.finishNow();
 
     await vi.waitFor(() => expect(store.recordRound).toHaveBeenCalledTimes(1));
-    expect(store.recordRound).toHaveBeenCalledWith('bug-squash', 80, { squashed: 8 });
+    expect(store.recordRound).toHaveBeenCalledWith('bug-squash', 80, {
+      squashed: 8,
+      score: 0,
+      bestCombo: 0,
+      escaped: 0,
+    });
 
     // Settles; still exactly once.
     await vi.waitFor(() => expect(isHidden(layer, '.minigame__done')).toBe(false));
@@ -227,7 +232,7 @@ describe('minigame shell: finish vs quit', () => {
       store: createFakeStore({ recordRound }),
     });
     startPlaying(layer, launcher);
-    gameHandle.setScoreAndStats(20, { squashed: 2 });
+    gameHandle.setScoreAndStats(20, { squashed: 2, score: 0, bestCombo: 0, escaped: 0 });
     gameHandle.finishNow();
 
     expect(recordRound).toHaveBeenCalledTimes(1);
@@ -246,7 +251,7 @@ describe('minigame shell: finish vs quit', () => {
   it('calling finish() twice (or a timer racing finish) still records exactly once', async () => {
     const { layer, store, gameHandle, launcher } = setup();
     startPlaying(layer, launcher);
-    gameHandle.setScoreAndStats(15, { squashed: 1 });
+    gameHandle.setScoreAndStats(15, { squashed: 1, score: 0, bestCombo: 0, escaped: 0 });
 
     gameHandle.finishNow();
     gameHandle.finishNow();
@@ -262,12 +267,16 @@ describe('minigame shell: finish vs quit', () => {
 
     const finishRun = setup();
     startPlaying(finishRun.layer, finishRun.launcher);
-    finishRun.gameHandle.setScoreAndStats(50, { squashed: 5 });
+    finishRun.gameHandle.setScoreAndStats(50, { squashed: 5, score: 0, bestCombo: 0, escaped: 0 });
     finishRun.gameHandle.finishNow();
     await vi.waitFor(() => expect(finishRun.store.recordRound).toHaveBeenCalledTimes(1));
     await vi.waitFor(() => expect(completedSpy).toHaveBeenCalledTimes(1));
     const payload = completedSpy.mock.calls[0][0] as MinigameCompleted;
-    expect(payload).toEqual({ minigameId: 'bug-squash', score: 50, stats: { squashed: 5 } });
+    expect(payload).toEqual({
+      minigameId: 'bug-squash',
+      score: 50,
+      stats: { squashed: 5, score: 0, bestCombo: 0, escaped: 0 },
+    });
 
     const quitRun = setup();
     startPlaying(quitRun.layer, quitRun.launcher);
@@ -291,14 +300,14 @@ describe('minigame shell: finish vs quit', () => {
       }),
     });
     startPlaying(layer, launcher);
-    gameHandle.setScoreAndStats(33, { squashed: 3 });
+    gameHandle.setScoreAndStats(33, { squashed: 3, score: 0, bestCombo: 0, escaped: 0 });
     gameHandle.finishNow();
 
     await vi.waitFor(() => expect(completedSpy).toHaveBeenCalledTimes(1));
     expect(completedSpy.mock.calls[0][0]).toEqual({
       minigameId: 'bug-squash',
       score: 33,
-      stats: { squashed: 3 },
+      stats: { squashed: 3, score: 0, bestCombo: 0, escaped: 0 },
     });
 
     unsubscribe();
@@ -329,7 +338,7 @@ describe('minigame shell: pending state', () => {
       store: createFakeStore({ recordRound: vi.fn(() => gate.promise) }),
     });
     startPlaying(layer, launcher);
-    gameHandle.setScoreAndStats(40, { squashed: 4 });
+    gameHandle.setScoreAndStats(40, { squashed: 4, score: 0, bestCombo: 0, escaped: 0 });
     gameHandle.finishNow();
 
     expect(isHidden(layer, '.minigame__done')).toBe(false);
@@ -484,7 +493,12 @@ describe('minigame shell: done screen', () => {
       }),
     });
     startPlaying(withBadge.layer, withBadge.launcher);
-    withBadge.gameHandle.setScoreAndStats(500, { squashed: 50 });
+    withBadge.gameHandle.setScoreAndStats(500, {
+      squashed: 50,
+      score: 0,
+      bestCombo: 0,
+      escaped: 0,
+    });
     withBadge.gameHandle.finishNow();
     await vi.waitFor(() => expect(isHidden(withBadge.layer, '.minigame__done-badge')).toBe(false));
     expect(withBadge.layer.querySelector('.minigame__done-badge-name')?.textContent).toContain(
@@ -493,7 +507,12 @@ describe('minigame shell: done screen', () => {
 
     const withoutBadge = setup();
     startPlaying(withoutBadge.layer, withoutBadge.launcher);
-    withoutBadge.gameHandle.setScoreAndStats(10, { squashed: 1 });
+    withoutBadge.gameHandle.setScoreAndStats(10, {
+      squashed: 1,
+      score: 0,
+      bestCombo: 0,
+      escaped: 0,
+    });
     withoutBadge.gameHandle.finishNow();
     await vi.waitFor(() => expect(withoutBadge.store.recordRound).toHaveBeenCalledTimes(1));
     expect(isHidden(withoutBadge.layer, '.minigame__done-badge')).toBe(true);
@@ -511,7 +530,7 @@ describe('minigame shell: done screen', () => {
       }),
     });
     startPlaying(layer, launcher);
-    gameHandle.setScoreAndStats(999, { squashed: 99 }); // deliberately not 77/10
+    gameHandle.setScoreAndStats(999, { squashed: 99, score: 0, bestCombo: 0, escaped: 0 }); // deliberately not 77/10
 
     gameHandle.finishNow();
 
@@ -537,7 +556,7 @@ describe('minigame shell: done screen', () => {
       }),
     });
     startPlaying(layer, launcher);
-    gameHandle.setScoreAndStats(300, { squashed: 30 });
+    gameHandle.setScoreAndStats(300, { squashed: 30, score: 0, bestCombo: 0, escaped: 0 });
     gameHandle.finishNow();
 
     await vi.waitFor(() => expect(isHidden(layer, '.minigame__done-newbest')).toBe(false));
@@ -557,7 +576,7 @@ describe('minigame shell: done screen', () => {
       }),
     });
     startPlaying(notBest.layer, notBest.launcher);
-    notBest.gameHandle.setScoreAndStats(300, { squashed: 30 });
+    notBest.gameHandle.setScoreAndStats(300, { squashed: 30, score: 0, bestCombo: 0, escaped: 0 });
     notBest.gameHandle.finishNow();
 
     await vi.waitFor(() => expect(isHidden(notBest.layer, '.minigame__done-saving')).toBe(true));
@@ -583,7 +602,7 @@ describe('minigame shell: done screen', () => {
       }),
     });
     startPlaying(layer, launcher);
-    gameHandle.setScoreAndStats(200, { squashed: 20 });
+    gameHandle.setScoreAndStats(200, { squashed: 20, score: 0, bestCombo: 0, escaped: 0 });
     gameHandle.finishNow();
 
     await vi.waitFor(() => expect(isHidden(layer, '[data-done-stat="tokens"]')).toBe(false));
@@ -600,7 +619,7 @@ describe('minigame shell: done screen', () => {
       }),
     });
     startPlaying(layer, launcher);
-    gameHandle.setScoreAndStats(60, { squashed: 6 });
+    gameHandle.setScoreAndStats(60, { squashed: 6, score: 0, bestCombo: 0, escaped: 0 });
 
     expect(() => gameHandle.finishNow()).not.toThrow();
 

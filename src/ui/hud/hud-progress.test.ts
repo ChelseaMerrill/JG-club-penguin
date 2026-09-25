@@ -77,7 +77,12 @@ describe('HUD balance', () => {
     expect(root.querySelector('.hud__tokens-value')?.textContent).toBe('250');
 
     const wrapped = registry.get(PROGRESS_STORE_KEY) as ProgressStore;
-    await wrapped.recordRound('bug-squash', 520, { squashed: 520 });
+    await wrapped.recordRound('bug-squash', 520, {
+      score: 520,
+      squashed: 520,
+      bestCombo: 0,
+      escaped: 0,
+    });
 
     expect(root.querySelector('.hud__tokens-value')?.textContent).toBe('302');
 
