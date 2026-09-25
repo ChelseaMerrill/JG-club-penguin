@@ -1,7 +1,7 @@
 import { gameEvents, SPAWN_ROOM_ID, type MinigameId, type RoomId } from '../contracts';
 import type { ProgressStore } from '../persistence/progress-store';
 import type { OverlayManager } from '../ui/hud/overlay-manager';
-import type { RoomTitle } from '../ui/hud/room-titles';
+import type { RoomTitle } from '../ui/hud/hud';
 import { createMinigameShell, MINIGAME_OVERLAY_ID } from './minigame-shell';
 import type { Minigame, MinigameRegistry } from './minigame';
 
