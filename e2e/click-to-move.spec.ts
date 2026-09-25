@@ -263,7 +263,9 @@ test('click-to-move', async ({ page }) => {
     .toMatchObject({ tile: doorApproachTile, moving: false });
   expect((await debugInfo(page))?.doorReachedLog).toContain(door.label);
 
-  // The Penguin and its name tag, visible at rest.
+  // The Penguin, visible at rest. Its look is still `DEFAULT_LOOK` here
+  // (the name is set below), so the World's name gate (#75) hides the name
+  // tag: no placeholder for an unnamed Penguin.
   await page.evaluate(() => document.fonts.ready);
   await page.screenshot({ path: 'test-results/click-to-move/screenshot.png' });
 
