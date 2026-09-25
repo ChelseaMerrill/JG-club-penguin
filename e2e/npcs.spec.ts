@@ -1,63 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
-import type { Facing, HexColor, PenguinLook, RoomId, Tile } from '../src/contracts';
-import type { RegisteredPlayer } from '../src/game/movement/registered-player';
-import type { PenguinAnim } from '../src/game/penguin/poses';
+import type { RoomId } from '../src/contracts';
 import { devPit } from '../src/game/rooms/definitions/dev-pit';
 import { roofDeck } from '../src/game/rooms/definitions/roof-deck';
 import { tileToScreen } from '../src/game/rooms/iso';
 import { GAME_HEIGHT, GAME_WIDTH } from '../src/game/stage-size';
-
-// Mirrors `src/game/rooms/dev-room-hook.ts`'s debug shape (see
-// `e2e/click-to-move.spec.ts` for why this is redeclared rather than
-// imported).
-interface LocalPenguinDebugInfo {
-  tile: Tile;
-  target?: Tile;
-  anim: PenguinAnim;
-  facing: Facing;
-  moving: boolean;
-  flipX: boolean;
-  lookName: string;
-  lookBody: HexColor;
-  playerId: string;
-}
-
-// Kept field-for-field identical to `click-to-move.spec.ts`'s and
-// `room-framework.spec.ts`'s own copies: TypeScript's global `Window`
-// augmentation requires every redeclaration of `__roomDebug` across the whole
-// `e2e` program to resolve to the same type. `npcTalkedLog`/`openStallLog`
-// (#36) aren't part of that shared shape, so `debugInfo` below reads them via
-// a separate, loosely-typed helper instead of widening this interface.
-interface RoomDebugInfo {
-  roomId: RoomId;
-  scrollX: number;
-  scrollY: number;
-  localPenguin?: LocalPenguinDebugInfo;
-  textureListenerCount?: number;
-  npcArrivedLog?: string[];
-  doorReachedLog?: string[];
-  localPenguinMoveLog?: Tile[];
-  localPenguinArrivedLog?: Tile[];
-  restartRoom?: () => void;
-  restartCount?: number;
-  penguinCount?: number;
-  remotePenguinCount?: number;
-  remotePenguins?: Array<{
-    playerId: string;
-    tile: Tile;
-    moving: boolean;
-    placedTile: Tile;
-    walkStartedAt?: number;
-  }>;
-  setRegisteredPlayer?: (player: RegisteredPlayer) => void;
-  spawnDebugPenguin?: (tile: Tile, look: PenguinLook) => void;
-}
-
-declare global {
-  interface Window {
-    __roomDebug?: RoomDebugInfo;
-  }
-}
+import type { RoomDebugInfo } from './support/room-debug-types';
 
 const BOOT_TIMEOUT = 15_000;
 const LONG_WALK_TIMEOUT = 15_000;
@@ -80,18 +27,6 @@ async function hideLandingPage(page: Page): Promise<void> {
 
 async function debugInfo(page: Page): Promise<RoomDebugInfo | undefined> {
   return page.evaluate(() => window.__roomDebug);
-}
-
-/** `npcTalkedLog`/`openStallLog` (#36): not part of the shared `RoomDebugInfo`
- *  shape above, read via a loose cast instead of widening it. */
-async function npcDebugInfo(
-  page: Page,
-): Promise<{ npcTalkedLog?: string[]; openStallLog?: string[] } | undefined> {
-  return page.evaluate(
-    () =>
-      window.__roomDebug as unknown as
-        { npcTalkedLog?: string[]; openStallLog?: string[] } | undefined,
-  );
 }
 
 async function clickStagePoint(page: Page, point: { x: number; y: number }): Promise<void> {
@@ -160,7 +95,35 @@ test('Dev Pit: clicking Ian arrives, opens his dialog, and GRAB THE HAMMER opens
   expect(errors).toEqual([]);
 });
 
-test('Roof Deck: clicking Casey arrives, opens her dialog, and her stall button logs openStall("igloo-gear")', async ({
+/**
+ * Clicking near Ian's head (not just his own tile centre) still opens his
+ * dialog (#36 round-1 review item 6): the hit `Zone` covers roughly
+ * feet-105..feet+5, so a click well above the tile centre -- toward the
+ * figure's head, not its feet -- must still land on it.
+ */
+test("Dev Pit: clicking near Ian's head (not just his feet) still opens his dialog", async ({
+  page,
+}) => {
+  const errors = await bootRoom(page, 'dev-pit');
+
+  const ian = devPit.npcSlots.find((slot) => slot.npcId === 'ian');
+  if (!ian) throw new Error('expected dev-pit to have an "ian" NPC slot');
+  const feetPoint = tileToScreen(ian.tile, devPit.grid.origin);
+  // Comfortably inside the hit zone's feet-105..feet+5 vertical range,
+  // clearly above the tile centre (toward the head, not the feet).
+  const headPoint = { x: feetPoint.x, y: feetPoint.y - 70 };
+
+  await clickStagePoint(page, headPoint);
+
+  await expect
+    .poll(async () => (await debugInfo(page))?.npcArrivedLog, { timeout: LONG_WALK_TIMEOUT })
+    .toContain('ian');
+  await expect(page.locator('.npc-dialog')).toBeVisible();
+
+  expect(errors).toEqual([]);
+});
+
+test('Roof Deck: clicking Casey arrives, opens her dialog, and her stall button opens the real Market panel', async ({
   page,
 }) => {
   const errors = await bootRoom(page, 'roof-deck');
@@ -181,7 +144,11 @@ test('Roof Deck: clicking Casey arrives, opens her dialog, and her stall button 
 
   await dialog.locator('.npc-dialog__actions button').click();
 
-  await expect.poll(async () => (await npcDebugInfo(page))?.openStallLog).toContain('igloo-gear');
+  await expect
+    .poll(async () => (await debugInfo(page))?.openStallLog, { timeout: LONG_WALK_TIMEOUT })
+    .toContain('igloo-gear');
+  // #40 is on `main`: the real Market panel opens, not just a logged no-op.
+  await expect(page.locator('.market')).toBeVisible();
   await expect(dialog).toBeHidden();
 
   expect(errors).toEqual([]);
