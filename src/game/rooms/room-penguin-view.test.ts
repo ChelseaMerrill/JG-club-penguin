@@ -20,11 +20,11 @@ interface ShownPenguin {
   facing: Facing;
   anim: 'idle' | 'walk';
   destroyed: boolean;
-  /** How many times `moveTo` has been called (#43 fix F1's regression check). */
+  /** How many times `moveTo` has been called; must stay 0 mid-step, since a Presence upsert can never cut a walk short (#43 D4). */
   moveToCalls: number;
-  /** How many times `setFacing` has been called (#43 fix F1's regression check). */
+  /** How many times `setFacing` has been called; must stay 0 mid-step, for the same reason as `moveToCalls` (#43 D4). */
   setFacingCalls: number;
-  /** How many times `walk` has been called: a re-routed walk must call it once, not restart it per step (#43 fix F2). */
+  /** How many times `walk` has been called: a re-routed walk must call it once, not restart it per step (#43 D3). */
   walkCalls: number;
 }
 
@@ -42,11 +42,11 @@ interface StepCall {
  * tile by tile with `resolveNextStep()`, simulating the tween the real
  * `placePenguinsIn` runs completing.
  *
- * Honours `placePenguinsIn`'s real `PlacedPenguin` contract (#43 fix F3):
- * `moveTo`, a new `step`, and `destroy` each cut an in-flight `step` short,
- * resolving its promise early without landing it on its target tile —
- * exactly the mechanism that let a stray `moveTo` mid-walk snap a walker
- * back and skip a tile before fix F1.
+ * Honours `placePenguinsIn`'s real `PlacedPenguin` contract (#43): `moveTo`,
+ * a new `step`, and `destroy` each cut an in-flight `step` short, resolving
+ * its promise early without landing it on its target tile — the mechanism a
+ * stray `moveTo` mid-walk must never trigger, since that would snap a
+ * walker back and skip a tile.
  */
 function createFakeStage() {
   const placed: ShownPenguin[] = [];
@@ -164,6 +164,40 @@ function createClock(start = 0) {
   };
 }
 
+/**
+ * A fake clock that also drives the D4 settle-window recheck timer (#43
+ * D4): `advance` moves the clock forward and fires any timer whose delay has
+ * elapsed, exactly like `setTimeout`/`clearTimeout` would, but on a manually
+ * driven clock instead of real wall time.
+ */
+function createFakeTimerClock(start = 0) {
+  let time = start;
+  let nextId = 1;
+  const timers = new Map<number, { fireAt: number; handler: () => void }>();
+
+  return {
+    now: () => time,
+    setTimeout: (handler: () => void, ms: number): number => {
+      const id = nextId++;
+      timers.set(id, { fireAt: time + ms, handler });
+      return id;
+    },
+    clearTimeout: (id: number): void => {
+      timers.delete(id);
+    },
+    advance: (ms: number): void => {
+      time += ms;
+      for (const [id, timer] of [...timers.entries()]) {
+        if (timer.fireAt <= time) {
+          timers.delete(id);
+          timer.handler();
+        }
+      }
+    },
+    pendingTimerCount: (): number => timers.size,
+  };
+}
+
 // Town Center's grid origin (tile {0,0}'s north corner).
 const TOWN_CENTER_ORIGIN = { x: 800, y: 250 };
 // Dev Pit-style second origin, to prove a Room switch re-projects.
@@ -191,10 +225,17 @@ function attachedView(
     search?: string;
     walkable?: WalkableGrid;
     now?: () => number;
+    setTimeout?: (handler: () => void, ms: number) => number;
+    clearTimeout?: (handle: number) => void;
   } = {},
 ) {
   const stage = createFakeStage();
-  const view = new RoomPenguinView({ search: options.search ?? '', now: options.now });
+  const view = new RoomPenguinView({
+    search: options.search ?? '',
+    now: options.now,
+    setTimeout: options.setTimeout,
+    clearTimeout: options.clearTimeout,
+  });
   view.attach(stage.place, TOWN_CENTER_ORIGIN, options.walkable ?? FULLY_WALKABLE);
   return { stage, view };
 }
@@ -369,7 +410,7 @@ describe('RoomPenguinView', () => {
       expect(stage.live()[0].point).toEqual({ x: 650, y: 600 });
     });
 
-    it('an upsert mid-step touches only the look: the step still lands on the very next tile (#43 fix F1)', async () => {
+    it('an upsert mid-step touches only the look: the step still lands on the very next tile (#43 D4)', async () => {
       const { stage, view } = attachedView();
       view.upsert(payload({ tile: { col: 5, row: 5 }, facing: 'right' }));
 
@@ -379,9 +420,9 @@ describe('RoomPenguinView', () => {
       const setFacingCallsBeforeUpsert = penguin.setFacingCalls;
       expect(stage.pendingStepCount()).toBe(1);
 
-      // A Presence sync arrives mid-step (today's bug: this used to call
-      // `moveTo`/`setFacing`, which cuts the in-flight step short and
-      // snaps the Penguin back, so the *next* step then skips a tile).
+      // A Presence sync arrives mid-step: it must never call
+      // `moveTo`/`setFacing` directly, since either would cut the in-flight
+      // step short and snap the Penguin back, skipping the next tile.
       view.upsert(
         payload({
           tile: { col: 0, row: 0 },
@@ -406,7 +447,7 @@ describe('RoomPenguinView', () => {
       expect(penguin.point).toEqual({ x: 750, y: 550 });
     });
 
-    it("re-paths a walkTo received mid-step from the landed tile, at that one step's boundary, not after the old path ends (#43 fix F2)", async () => {
+    it("re-paths a walkTo received mid-step from the landed tile, at that one step's boundary, not after the old path ends (#43 D3)", async () => {
       const { stage, view } = attachedView();
       view.upsert(payload({ tile: { col: 5, row: 5 } }));
 
@@ -465,7 +506,7 @@ describe('RoomPenguinView', () => {
       });
     });
 
-    it('cancels the walk on remove: destroy resolves the in-flight step early, harmlessly (#43 fix F3)', async () => {
+    it('cancels the walk on remove: destroy resolves the in-flight step early, harmlessly (#43)', async () => {
       const { stage, view } = attachedView();
       view.upsert(payload({ tile: { col: 5, row: 5 } }));
       view.walkTo('player-b', { col: 5, row: 8 });
@@ -484,7 +525,7 @@ describe('RoomPenguinView', () => {
       expect(view.debugRemotePenguins()).toEqual([]);
     });
 
-    it('cancels the walk on clear: destroy resolves the in-flight step early, harmlessly (#43 fix F3)', async () => {
+    it('cancels the walk on clear: destroy resolves the in-flight step early, harmlessly (#43)', async () => {
       const { stage, view } = attachedView();
       view.upsert(payload({ tile: { col: 5, row: 5 } }));
       view.walkTo('player-b', { col: 5, row: 8 });
@@ -522,6 +563,66 @@ describe('RoomPenguinView', () => {
       // = (550, 550).
       expect(nextStage.live()[0].point).toEqual({ x: 550, y: 550 });
     });
+
+    it("detach with a queued re-route pending remembers its target, not the active path's end (#43 D3)", () => {
+      const { view } = attachedView();
+      view.upsert(payload({ tile: { col: 5, row: 5 } }));
+      view.walkTo('player-b', { col: 5, row: 8 }); // active path ends at {5,8}
+      view.walkTo('player-b', { col: 8, row: 6 }); // queued while the first step is in flight
+      expect(view.debugRemotePenguins()[0].moving).toBe(true);
+
+      view.detach();
+
+      const nextStage = createFakeStage();
+      view.attach(nextStage.place, OTHER_ORIGIN, FULLY_WALKABLE);
+
+      // The queued re-route's own target, not {5,8} (the path in flight when
+      // it queued), is where this walk was actually headed.
+      expect(view.debugRemotePenguins()[0]).toMatchObject({
+        tile: { col: 8, row: 6 },
+        moving: false,
+      });
+    });
+
+    it('a remove -> upsert -> walkTo for the same id within one task keeps the old walk from touching the new one (#43 D3)', async () => {
+      const { stage, view } = attachedView();
+      view.upsert(payload({ playerId: 'player-b', tile: { col: 5, row: 5 } }));
+      view.walkTo('player-b', { col: 5, row: 8 });
+      expect(stage.pendingStepCount()).toBe(1);
+
+      // All synchronous, in one task: `remove`'s `destroy` resolves the old
+      // walk's in-flight step early, but its stale continuation is only a
+      // microtask — it hasn't run yet by the time the id is walking again.
+      view.remove('player-b');
+      view.upsert(payload({ playerId: 'player-b', tile: { col: 0, row: 0 } }));
+      view.walkTo('player-b', { col: 0, row: 2 });
+
+      // Let the old walk's stale continuation run; it must not advance the
+      // brand-new walk it no longer owns.
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(view.debugRemotePenguins()[0]).toMatchObject({
+        tile: { col: 0, row: 0 },
+        moving: true,
+      });
+      expect(stage.pendingStepCount()).toBe(1);
+
+      await stage.resolveNextStep();
+      expect(view.debugRemotePenguins()[0]).toMatchObject({
+        tile: { col: 0, row: 1 },
+        moving: true,
+      });
+
+      await stage.resolveNextStep();
+      expect(view.debugRemotePenguins()[0]).toEqual({
+        playerId: 'player-b',
+        tile: { col: 0, row: 2 },
+        moving: false,
+        placedTile: { col: 0, row: 0 },
+        walkStartedAt: expect.any(Number),
+      });
+    });
   });
 
   describe('Presence vs. walk (#43 D4)', () => {
@@ -538,31 +639,80 @@ describe('RoomPenguinView', () => {
       expect(view.debugRemotePenguins()[0].tile).toEqual({ col: 5, row: 5 });
     });
 
-    it('defers to Presence only after the settle window elapses', () => {
+    it('defers to Presence only after the settle window elapses', async () => {
       const clock = createClock(0);
       const { stage, view } = attachedView({ now: clock.now });
       view.upsert(payload({ tile: { col: 5, row: 5 } }));
 
       // Walks one tile, so it "just arrived" (at t = 0) once this resolves.
       view.walkTo('player-b', { col: 5, row: 6 });
-      return stage.resolveNextStep().then(() => {
-        expect(view.debugRemotePenguins()[0].moving).toBe(false);
+      await stage.resolveNextStep();
+      expect(view.debugRemotePenguins()[0].moving).toBe(false);
 
-        // Within the 1500ms settle window: look updates, tile does not.
-        clock.advance(500);
-        const duringSettle: PenguinLook = { ...PEBBLE, name: 'DuringSettle' };
-        view.upsert(payload({ tile: { col: 9, row: 9 }, look: duringSettle }));
-        expect(stage.live()[0].look).toEqual(duringSettle);
-        expect(view.debugRemotePenguins()[0].tile).toEqual({ col: 5, row: 6 });
+      // Within the 1500ms settle window: look updates, tile does not.
+      clock.advance(500);
+      const duringSettle: PenguinLook = { ...PEBBLE, name: 'DuringSettle' };
+      view.upsert(payload({ tile: { col: 9, row: 9 }, look: duringSettle }));
+      expect(stage.live()[0].look).toEqual(duringSettle);
+      expect(view.debugRemotePenguins()[0].tile).toEqual({ col: 5, row: 6 });
 
-        // Past the settle window: a differing Presence tile wins.
-        clock.advance(1100); // total 1600ms since arrival
-        const afterSettle: PenguinLook = { ...PEBBLE, name: 'AfterSettle' };
-        view.upsert(payload({ tile: { col: 9, row: 9 }, look: afterSettle }));
-        expect(view.debugRemotePenguins()[0].tile).toEqual({ col: 9, row: 9 });
-        // Tile {9,9}: corner (800, 700), centre (800, 725).
-        expect(stage.live()[0].point).toEqual({ x: 800, y: 725 });
+      // Past the settle window: a differing Presence tile wins.
+      clock.advance(1100); // total 1600ms since arrival
+      const afterSettle: PenguinLook = { ...PEBBLE, name: 'AfterSettle' };
+      view.upsert(payload({ tile: { col: 9, row: 9 }, look: afterSettle }));
+      expect(view.debugRemotePenguins()[0].tile).toEqual({ col: 9, row: 9 });
+      // Tile {9,9}: corner (800, 700), centre (800, 725).
+      expect(stage.live()[0].point).toEqual({ x: 800, y: 725 });
+    });
+
+    it('applies a differing Presence tile once the settle window elapses with no intervening upsert (#43 D4)', async () => {
+      const clock = createFakeTimerClock(0);
+      const { stage, view } = attachedView({
+        now: clock.now,
+        setTimeout: clock.setTimeout,
+        clearTimeout: clock.clearTimeout,
       });
+      view.upsert(payload({ tile: { col: 5, row: 5 } }));
+
+      view.walkTo('player-b', { col: 5, row: 6 });
+      await stage.resolveNextStep();
+      expect(view.debugRemotePenguins()[0].moving).toBe(false);
+
+      // A stale Presence payload lands within the settle window: deferred,
+      // same as the upsert-driven check above.
+      view.upsert(payload({ tile: { col: 9, row: 9 } }));
+      expect(view.debugRemotePenguins()[0].tile).toEqual({ col: 5, row: 6 });
+
+      // No further upsert ever arrives; the scheduled recheck itself applies
+      // the still-differing Presence tile once the settle window elapses.
+      clock.advance(1500);
+
+      expect(view.debugRemotePenguins()[0].tile).toEqual({ col: 9, row: 9 });
+      // Tile {9,9}: corner (800, 700), centre (800, 725).
+      expect(stage.live()[0].point).toEqual({ x: 800, y: 725 });
+    });
+
+    it('cancels the pending settle recheck as soon as a new walk starts (#43 D4)', async () => {
+      const clock = createFakeTimerClock(0);
+      const { stage, view } = attachedView({
+        now: clock.now,
+        setTimeout: clock.setTimeout,
+        clearTimeout: clock.clearTimeout,
+      });
+      view.upsert(payload({ tile: { col: 5, row: 5 } }));
+
+      view.walkTo('player-b', { col: 5, row: 6 });
+      await stage.resolveNextStep();
+      expect(view.debugRemotePenguins()[0].moving).toBe(false);
+      // The just-finished walk scheduled its own settle recheck.
+      expect(clock.pendingTimerCount()).toBe(1);
+
+      // A brand-new walk starting must drop that timer immediately, not
+      // merely once (and if) the new walk itself later ends and schedules
+      // its own: were the stale timer left pending, it could fire mid-walk
+      // and misapply Presence before this walk even finishes.
+      view.walkTo('player-b', { col: 5, row: 7 });
+      expect(clock.pendingTimerCount()).toBe(0);
     });
   });
 });

@@ -49,6 +49,7 @@ interface RoomDebugInfo {
   npcArrivedLog?: string[];
   doorReachedLog?: string[];
   localPenguinMoveLog?: Tile[];
+  localPenguinArrivedLog?: Tile[];
   restartRoom?: () => void;
   restartCount?: number;
   penguinCount?: number;
@@ -98,7 +99,7 @@ async function shownRoomId(page: Page): Promise<string | undefined> {
 /**
  * Converts a Town Center tile to a page click point via the canvas's own
  * bounding box (`e2e/click-to-move.spec.ts`'s technique). Split out from the
- * actual click (fix F4) so AC1's latency timing can start its clock right
+ * actual click (#43) so AC1's latency timing can start its clock right
  * before `page.mouse.click`, excluding this bounding-box round trip.
  */
 async function townCenterClickPoint(page: Page, tile: Tile): Promise<{ x: number; y: number }> {
@@ -152,14 +153,15 @@ test('movement-sync', async ({ browser, baseURL }) => {
     await waitUntilJoined(pageB);
 
     const idA = await readOwnPlayerId(pageA);
+    expect((await debugInfo(pageA))?.localPenguin?.tile).toEqual(townCenter.spawnTile);
 
     // --- AC1: A clicks a Town Center tile far from its current tile
-    // (spawnTile {6,8}; {2,2} is 10 tiles away by Manhattan distance, and
-    // reachable — the same far tile `e2e/click-to-move.spec.ts` uses).
+    // (townCenter.spawnTile; {2,2} is 10 tiles away by Manhattan distance,
+    // and reachable — the same far tile `e2e/click-to-move.spec.ts` uses).
     // The click point is computed *before* `clickedAt` starts the clock
-    // (fix F4): a standalone run showed the previous number folded in this
-    // bounding-box round trip, the whole-`__roomDebug` CDP poll below, and
-    // its 50ms sleeps — none of which are the sync latency AC1 measures.
+    // (#43): folding this bounding-box round trip, the whole-`__roomDebug`
+    // CDP poll below, or its 50ms sleeps into the measured latency would
+    // overstate it — none of those are the sync latency AC1 measures.
     // `walkStartedAt` (below) is `Date.now()` taken in B's own page the
     // instant `RoomPenguinView` starts A's remote walk, so the latency this
     // asserts is exactly "click to remote walk start", on this machine's
@@ -196,6 +198,7 @@ test('movement-sync', async ({ browser, baseURL }) => {
 
     expect(walkStartedAt, 'B never observed A moving').not.toBeNull();
     const movingLatencyMs = (walkStartedAt as number) - clickedAt;
+    // The PR description cites this line as AC1's measured latency evidence.
     console.log(
       `[movement-sync] AC1: B observed A's remote walk start ${movingLatencyMs}ms after the click`,
     );

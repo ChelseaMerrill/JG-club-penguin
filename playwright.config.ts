@@ -19,9 +19,9 @@ export default defineConfig({
       testIgnore: ['**/presence-two-browsers.spec.ts', '**/movement-sync.spec.ts'],
     },
     // presence-two-browsers.spec.ts and movement-sync.spec.ts both sign in
-    // the same shared test users A/B (#43 fix F5): run concurrently, they'd
-    // race each other's Presence roster and Room state, so they get their
-    // own single-worker project instead of `chromium`'s parallel workers.
+    // the same shared test users A/B (#43): run concurrently, they'd race
+    // each other's Presence roster and Room state, so they get their own
+    // single-worker project instead of `chromium`'s parallel workers.
     {
       name: 'realtime-shared-users',
       use: { ...devices['Desktop Chrome'] },

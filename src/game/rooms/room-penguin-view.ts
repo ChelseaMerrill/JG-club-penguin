@@ -46,6 +46,16 @@ export interface RoomPenguinViewOptions {
   search?: string;
   /** Clock for the Presence-vs-walk settle window (#43 D4). Defaults to `Date.now`. */
   now?: () => number;
+  /**
+   * Schedules the D4 settle-window recheck that fires `MOVE_SETTLE_MS`
+   * after a walk ends, so a differing Presence tile wins even when no
+   * further `upsert` arrives to trigger the check. Defaults to the real
+   * `setTimeout`; unit tests inject a fake clock's own scheduler instead of
+   * waiting out real time.
+   */
+  setTimeout?: (handler: () => void, ms: number) => number;
+  /** Cancels a timer `setTimeout` returned. Defaults to the real `clearTimeout`. */
+  clearTimeout?: (handle: number) => void;
 }
 
 interface Attachment {
@@ -62,6 +72,26 @@ interface WalkState {
   index: number;
   /** A `walkTo` that arrived mid-step; applied once the current step lands. */
   queuedTarget: Tile | null;
+}
+
+/** One remote Penguin's shown state, as `debugRemotePenguins()` reports it (#43 D6). */
+export interface RemotePenguinDebugInfo {
+  playerId: string;
+  tile: Tile;
+  moving: boolean;
+  /**
+   * The tile it was first placed at since the last `attach()` — e.g. from
+   * Presence on a late join — distinct from `tile` so a test can tell them
+   * apart without racing a `move` broadcast that arrives moments later.
+   */
+  placedTile: Tile;
+  /**
+   * `Date.now()` (this view's `now()`) when its current or last walk
+   * started, absent when it has never walked (#43): an e2e latency
+   * measurement reads this directly instead of paying a round trip and poll
+   * interval as measurement noise.
+   */
+  walkStartedAt?: number;
 }
 
 const LOCAL_KEY = Symbol('local');
@@ -101,14 +131,19 @@ function lerpTile(from: Tile, to: Tile, t: number): Tile {
  * forward. While a Penguin walks, and for `MOVE_SETTLE_MS` after it arrives,
  * a Presence `upsert` updates only its look: Presence's own tile/facing are
  * deferred to so a lagging sync can never snap a walker back mid-stride
- * (#43 D4). The tile actually shown (`shownTile`/`shownFacing`) is tracked
- * independently of the last Presence payload for exactly this reason, and
- * survives a `detach()`/`attach()` Room switch so a Player who leaves and
- * returns mid-walk still sees the walker's last known tile.
+ * (#43 D4). Once that window elapses with no further `upsert`, a scheduled
+ * recheck itself applies a still-differing Presence tile, rather than
+ * waiting on the next `upsert` to notice. The tile actually shown
+ * (`shownTile`/`shownFacing`) is tracked independently of the last Presence
+ * payload for exactly this reason, and survives a `detach()`/`attach()` Room
+ * switch so a Player who leaves and returns mid-walk still sees the
+ * walker's last known tile.
  */
 export class RoomPenguinView implements RemotePenguinView {
   private readonly search: string;
   private readonly now: () => number;
+  private readonly scheduleTimeout: (handler: () => void, ms: number) => number;
+  private readonly cancelTimeout: (handle: number) => void;
   private attachment: Attachment | null = null;
   private readonly payloads = new Map<PenguinKey, PresencePayload>();
   private readonly placed = new Map<PenguinKey, PlacedPenguin>();
@@ -116,19 +151,37 @@ export class RoomPenguinView implements RemotePenguinView {
   // Remote-only tracking (never keyed by `LOCAL_KEY`): the tile/facing
   // actually shown (which a walk in progress may differ from the last
   // Presence payload), the active walk, when each last arrived (the D4
-  // settle window), the tile first placed at since the last `attach()`
-  // (the e2e `placedTile` hook field, #43 D6), and when its current or last
-  // walk started (the e2e `walkStartedAt` latency hook field, fix F4).
+  // settle window), a pending D4 settle-window recheck timer, the tile
+  // first placed at since the last `attach()` (the e2e `placedTile` hook
+  // field, #43 D6), and when its current or last walk started (the e2e
+  // `walkStartedAt` latency hook field, #43).
   private readonly shownTile = new Map<string, Tile>();
   private readonly shownFacing = new Map<string, Facing>();
   private readonly walks = new Map<string, WalkState>();
   private readonly lastArrivedAt = new Map<string, number>();
+  private readonly settleTimers = new Map<string, number>();
   private readonly firstPlacedTile = new Map<string, Tile>();
   private readonly walkStartedAt = new Map<string, number>();
 
   constructor(options: RoomPenguinViewOptions = {}) {
     this.search = options.search ?? window.location.search;
     this.now = options.now ?? Date.now;
+    this.scheduleTimeout =
+      options.setTimeout ??
+      ((handler, ms): number => {
+        // `setTimeout`'s ambient global type resolves differently across
+        // this project's Node- and DOM-typed compilations; going through
+        // `unknown` keeps this default working under either.
+        const handle = setTimeout(handler, ms) as unknown;
+        // Never hold a test (or any other unattended caller) open on a
+        // settle-window timer nobody is driving; a no-op in the browser,
+        // where the returned handle is already a plain number.
+        (handle as { unref?: () => void }).unref?.();
+        return handle as number;
+      });
+    this.cancelTimeout =
+      options.clearTimeout ??
+      ((handle) => clearTimeout(handle as unknown as Parameters<typeof clearTimeout>[0]));
   }
 
   /** Draws into a (new) scene whose Room grid starts at `origin`, re-placing every remembered Penguin. */
@@ -142,16 +195,19 @@ export class RoomPenguinView implements RemotePenguinView {
   /**
    * Forgets the current scene's Penguins without destroying them: the scene
    * is tearing them down itself. Any Penguin mid-walk drops its walk,
-   * remembering the walk's final target as the tile it's shown at, so a
-   * later re-`attach()` (or a Presence upsert) places it there rather than
-   * wherever the walk's tween happened to be mid-step (#43 D3).
+   * remembering its eventual destination as the tile it's shown at — a
+   * pending re-route's `queuedTarget` when one is queued, else the active
+   * path's last tile — so a later re-`attach()` (or a Presence upsert)
+   * places it there rather than wherever the walk's tween happened to be
+   * mid-step (#43 D3).
    */
   detach(): void {
     for (const [playerId, walk] of this.walks) {
-      const finalTile = walk.path[walk.path.length - 1];
+      const finalTile = walk.queuedTarget ?? walk.path[walk.path.length - 1];
       this.shownTile.set(playerId, finalTile);
     }
     this.walks.clear();
+    for (const playerId of [...this.settleTimers.keys()]) this.clearSettleTimer(playerId);
     this.attachment = null;
     this.placed.clear();
     this.firstPlacedTile.clear();
@@ -210,7 +266,6 @@ export class RoomPenguinView implements RemotePenguinView {
    * animation.
    */
   walkTo(playerId: string, target: Tile): void {
-    if (!this.payloads.has(playerId)) return;
     if (!this.attachment) return;
 
     const existingWalk = this.walks.get(playerId);
@@ -219,7 +274,9 @@ export class RoomPenguinView implements RemotePenguinView {
       return;
     }
 
-    const payload = this.payloads.get(playerId)!;
+    const payload = this.payloads.get(playerId);
+    if (!payload) return;
+
     const from = this.shownTile.get(playerId) ?? payload.tile;
     if (tilesEqual(from, target)) return;
 
@@ -232,10 +289,48 @@ export class RoomPenguinView implements RemotePenguinView {
     return this.now() - arrivedAt < MOVE_SETTLE_MS;
   }
 
+  /** Schedules (replacing any prior) `MOVE_SETTLE_MS` recheck for `playerId` (#43 D4). */
+  private scheduleSettleCheck(playerId: string): void {
+    this.clearSettleTimer(playerId);
+    const handle = this.scheduleTimeout(() => {
+      this.settleTimers.delete(playerId);
+      this.recheckSettle(playerId);
+    }, MOVE_SETTLE_MS);
+    this.settleTimers.set(playerId, handle);
+  }
+
+  private clearSettleTimer(playerId: string): void {
+    const handle = this.settleTimers.get(playerId);
+    if (handle === undefined) return;
+    this.cancelTimeout(handle);
+    this.settleTimers.delete(playerId);
+  }
+
+  /**
+   * Fires once, `MOVE_SETTLE_MS` after a walk ended, when nothing since has
+   * re-checked Presence against the shown tile (#43 D4): applies a still
+   * differing Presence tile without waiting for another `upsert` to notice.
+   * A no-op once the Penguin is no longer shown, is walking again, or
+   * already agrees with Presence.
+   */
+  private recheckSettle(playerId: string): void {
+    if (this.walks.has(playerId)) return;
+    const payload = this.payloads.get(playerId);
+    const shown = this.shownTile.get(playerId);
+    if (!payload || !shown) return;
+    if (tilesEqual(shown, payload.tile)) return;
+
+    this.shownTile.set(playerId, payload.tile);
+    this.shownFacing.set(playerId, payload.facing);
+    this.render(playerId);
+  }
+
   private startWalk(playerId: string, from: Tile, target: Tile): void {
     const attachment = this.attachment;
     const placed = this.placed.get(playerId);
     if (!attachment || !placed) return;
+
+    this.clearSettleTimer(playerId);
 
     const path = findPath(attachment.walkable, from, target);
     if (!path || path.length <= 1) {
@@ -260,12 +355,14 @@ export class RoomPenguinView implements RemotePenguinView {
     placed.idle();
     this.shownTile.set(playerId, target);
     this.lastArrivedAt.set(playerId, this.now());
+    this.scheduleSettleCheck(playerId);
   }
 
   private async runWalk(playerId: string): Promise<void> {
     const placed = this.placed.get(playerId);
     const attachment = this.attachment;
-    if (!placed || !attachment) {
+    const thatWalk = this.walks.get(playerId);
+    if (!placed || !attachment || !thatWalk) {
       this.walks.delete(playerId);
       return;
     }
@@ -273,12 +370,17 @@ export class RoomPenguinView implements RemotePenguinView {
     placed.walk();
 
     for (;;) {
-      const walk = this.walks.get(playerId);
-      if (!walk) return; // cancelled: remove/clear/detach
-      if (walk.index >= walk.path.length - 1) break;
+      // A remove/upsert/walkTo for the same `playerId` within one task can
+      // replace this walk with a brand-new `WalkState` before this
+      // continuation resumes (#43 D3): comparing identity against `thatWalk`
+      // catches that, where a plain falsy check on `this.walks.get` would
+      // not, since the map still holds *a* walk for this id — just not this
+      // one.
+      if (this.walks.get(playerId) !== thatWalk) return;
+      if (thatWalk.index >= thatWalk.path.length - 1) break;
 
-      const from = walk.path[walk.index];
-      const to = walk.path[walk.index + 1];
+      const from = thatWalk.path[thatWalk.index];
+      const to = thatWalk.path[thatWalk.index + 1];
       const facing = facingForStep(from, to);
       placed.setFacing(facing);
       this.shownFacing.set(playerId, facing);
@@ -287,43 +389,52 @@ export class RoomPenguinView implements RemotePenguinView {
         depthForTile(lerpTile(from, to, t)),
       );
 
-      const stillWalking = this.walks.get(playerId);
-      if (!stillWalking) return; // cancelled mid-step
-      stillWalking.index += 1;
+      if (this.walks.get(playerId) !== thatWalk) return; // cancelled or replaced mid-step
+      thatWalk.index += 1;
       this.shownTile.set(playerId, to);
 
       // A `walkTo` that arrived mid-step re-paths right here, from the tile
       // this step just landed on, rather than waiting for the rest of the
-      // old path to play out (#43 D3 fix): `placed.walk()` is never called
+      // old path to play out (#43 D3): `placed.walk()` is never called
       // again, so the walk animation carries on across the re-route with no
       // restart/flicker.
-      const queuedTarget = stillWalking.queuedTarget;
+      const queuedTarget = thatWalk.queuedTarget;
       if (queuedTarget) {
-        stillWalking.queuedTarget = null;
-        const finished = this.applyQueuedTarget(playerId, to, queuedTarget, placed, attachment);
+        thatWalk.queuedTarget = null;
+        const finished = this.applyQueuedTarget(
+          playerId,
+          thatWalk,
+          to,
+          queuedTarget,
+          placed,
+          attachment,
+        );
         if (finished) {
-          this.walks.delete(playerId);
+          if (this.walks.get(playerId) === thatWalk) this.walks.delete(playerId);
           return;
         }
       }
     }
 
-    this.walks.delete(playerId);
+    if (this.walks.get(playerId) === thatWalk) this.walks.delete(playerId);
     placed.idle();
     this.lastArrivedAt.set(playerId, this.now());
+    this.scheduleSettleCheck(playerId);
   }
 
   /**
    * Applies a `walkTo` that queued while `landed` was mid-step (#43 D3):
-   * re-paths from `landed` toward `queuedTarget`. Returns `true` when the
-   * walk is finished (either `landed` already is `queuedTarget`, or
-   * `queuedTarget` is unreachable and the Penguin was placed there
-   * directly) — `runWalk`'s loop should stop. Returns `false` to keep
-   * walking the same `WalkState` object (now carrying the new path) without
-   * restarting its animation.
+   * re-paths from `landed` toward `queuedTarget`, mutating `walk` (the
+   * exact `WalkState` `runWalk`'s loop is iterating) in place. Returns
+   * `true` when the walk is finished (either `landed` already is
+   * `queuedTarget`, or `queuedTarget` is unreachable and the Penguin was
+   * placed there directly) — `runWalk`'s loop should stop. Returns `false`
+   * to keep walking the same `WalkState` (now carrying the new path)
+   * without restarting its animation.
    */
   private applyQueuedTarget(
     playerId: string,
+    walk: WalkState,
     landed: Tile,
     queuedTarget: Tile,
     placed: PlacedPenguin,
@@ -332,6 +443,7 @@ export class RoomPenguinView implements RemotePenguinView {
     if (tilesEqual(landed, queuedTarget)) {
       placed.idle();
       this.lastArrivedAt.set(playerId, this.now());
+      this.scheduleSettleCheck(playerId);
       return true;
     }
 
@@ -341,8 +453,6 @@ export class RoomPenguinView implements RemotePenguinView {
       return true;
     }
 
-    const walk = this.walks.get(playerId);
-    if (!walk) return true; // cancelled concurrently (remove/clear/detach)
     walk.path = path;
     walk.index = 0;
     return false;
@@ -365,8 +475,8 @@ export class RoomPenguinView implements RemotePenguinView {
     const existing = this.placed.get(key);
     if (existing) {
       existing.setLook(look);
-      // Mid-walk, only the look updates (#43 D4/fix F1): `runWalk`'s own
-      // `step` calls already drive facing and position tile by tile, so a
+      // Mid-walk, only the look updates (#43 D4): `runWalk`'s own `step`
+      // calls already drive facing and position tile by tile, so a
       // `moveTo`/`setFacing` here would cut the in-flight step short
       // (`PlacePenguin.step`'s contract resolves early on either call),
       // snapping the Penguin back and skipping the next tile.
@@ -394,6 +504,7 @@ export class RoomPenguinView implements RemotePenguinView {
       this.lastArrivedAt.delete(key);
       this.firstPlacedTile.delete(key);
       this.walkStartedAt.delete(key);
+      this.clearSettleTimer(key);
     }
     this.placed.get(key)?.destroy();
     this.placed.delete(key);
@@ -401,30 +512,11 @@ export class RoomPenguinView implements RemotePenguinView {
   }
 
   /**
-   * e2e-only snapshot of every remote Penguin's shown state (#43 D6):
-   * `placedTile` is the tile it was first placed at since the last
-   * `attach()`, distinct from `tile` (its current, possibly re-routed,
-   * shown tile) so a test can tell a late Room join placed it from Presence
-   * without racing a `move` broadcast that arrives moments later.
-   * `walkStartedAt` is `Date.now()` (this view's `now()`) when its current
-   * or last walk started, absent when it has never walked (fix F4: an e2e
-   * latency measurement reads this directly, rather than polling the whole
-   * hook and paying the round trip/poll interval as measurement noise).
+   * e2e-only snapshot of every remote Penguin's shown state (#43 D6). See
+   * `RemotePenguinDebugInfo` for each field's meaning.
    */
-  debugRemotePenguins(): Array<{
-    playerId: string;
-    tile: Tile;
-    moving: boolean;
-    placedTile: Tile;
-    walkStartedAt?: number;
-  }> {
-    const result: Array<{
-      playerId: string;
-      tile: Tile;
-      moving: boolean;
-      placedTile: Tile;
-      walkStartedAt?: number;
-    }> = [];
+  debugRemotePenguins(): RemotePenguinDebugInfo[] {
+    const result: RemotePenguinDebugInfo[] = [];
     for (const [key, payload] of this.payloads) {
       if (!isPlayerKey(key)) continue;
       const tile = this.shownTile.get(key) ?? payload.tile;

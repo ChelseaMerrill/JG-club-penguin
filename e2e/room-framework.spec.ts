@@ -34,6 +34,7 @@ interface RoomDebugInfo {
   npcArrivedLog?: string[];
   doorReachedLog?: string[];
   localPenguinMoveLog?: Tile[];
+  localPenguinArrivedLog?: Tile[];
   restartRoom?: () => void;
   restartCount?: number;
   penguinCount?: number;
