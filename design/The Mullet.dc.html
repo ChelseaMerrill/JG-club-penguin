@@ -17,6 +17,41 @@
     @keyframes confetti { 0% { transform: translate(0,-20px); opacity:.95; } 25% { transform: translate(10px,210px); } 50% { transform: translate(-8px,440px); } 75% { transform: translate(8px,670px); } 100% { transform: translate(0,920px); opacity:.7; } }
     @keyframes blink { 50% { opacity: .35; } }
   </style>
+  <script>
+  (function(){
+    function lift(){
+      var svg=document.querySelector('svg[viewBox="0 0 1600 900"]');
+      if(!svg)return;
+      var NS='http://www.w3.org/2000/svg',layer=svg.__layer;
+      if(!layer){layer=document.createElementNS(NS,'g');layer.setAttribute('data-label-layer','');svg.__layer=layer;svg.__items=[];}
+      var items=svg.__items;
+      function take(nodes){
+        var ph=document.createElementNS(NS,'g');nodes[0].parentNode.insertBefore(ph,nodes[0]);
+        var w=document.createElementNS(NS,'g');nodes.forEach(function(n){w.appendChild(n);});layer.appendChild(w);items.push([ph,w]);
+      }
+      Array.prototype.slice.call(svg.querySelectorAll('text')).forEach(function(t){
+        if(layer.contains(t))return;
+        var p=t.previousElementSibling;
+        if(p&&p.tagName==='rect'&&p.getAttribute('rx')==='10'){take([p,t]);return;}
+        if(t.getAttribute('fill')==='#161719'&&p&&p.tagName==='polygon'){
+          var r=p.previousElementSibling;if(!r||r.tagName!=='rect'||r.getAttribute('fill')!=='#F4F4F4')return;
+          var g=t.parentNode;
+          if(g!==svg&&g.tagName==='g'&&g.getAttribute('opacity')!==null&&g.querySelectorAll('text').length===1)take([g]);else take([r,p,t]);
+        }
+      });
+      if(svg.lastElementChild!==layer)svg.appendChild(layer);
+      if(svg.__ticking)return;svg.__ticking=true;
+      function tick(){
+        var inv=svg.getScreenCTM();if(inv){inv=inv.inverse();
+        items.forEach(function(it){var m=it[0].getScreenCTM();if(!m)return;m=inv.multiply(m);it[1].setAttribute('transform','matrix('+m.a+' '+m.b+' '+m.c+' '+m.d+' '+m.e+' '+m.f+')');});}
+        requestAnimationFrame(tick);
+      }
+      tick();
+    }
+    var n=0,iv=setInterval(function(){lift();if(++n>60)clearInterval(iv);},250);
+    window.addEventListener('load',function(){setTimeout(lift,300);});
+  })();
+  </script>
 </helmet>
 <section style="display:flex; flex-direction:column; gap:14px; padding:40px; align-items:flex-start;">
   <div style="display:flex; align-items:center; gap:18px; font: 400 14px 'Anton', sans-serif; letter-spacing:.24em; color:#B3B6C9;"><a href="Club JenGuin Map.dc.html" style="color:#00BDFF; text-decoration:none;">← MAP</a><span>15 · THE MULLET (MEZZANINE)</span></div>
