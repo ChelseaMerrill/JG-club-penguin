@@ -1,4 +1,4 @@
-import { gameEvents, SPAWN_ROOM_ID, type RoomId } from '../../contracts';
+import { CHAT_TEXT_MAX, gameEvents, SPAWN_ROOM_ID, type RoomId } from '../../contracts';
 import { createOverlayManager, type OverlayManager } from './overlay-manager';
 
 /** A Room's HUD header text: the big title and the small subtitle beneath it. */
@@ -16,8 +16,15 @@ export interface HudDeps {
   onIgloo: () => void;
   /** The existing `auth.signOut`. */
   onSignOut: () => void;
-  /** 0 until #34 loads the real Token balance. */
+  /** 0 until #34's progress session loads the saved balance via `tokens:changed`. */
   initialBalance: number;
+  /**
+   * Sends a chat message (#44): the field itself does no trimming, cutting,
+   * or rate limiting; it awaits this to decide whether to clear. Resolves
+   * `true` only for an accepted, sent message; the field keeps its text on
+   * `false` (e.g. rate-limited).
+   */
+  onChatSend: (text: string) => Promise<boolean>;
 }
 
 export interface Hud {
@@ -31,6 +38,9 @@ export interface Hud {
 }
 
 const MENU_OVERLAY_ID = 'menu';
+
+/** How long a toast (`ui:toast`) stays up before it auto-hides. */
+const TOAST_DURATION_MS = 4000;
 
 /**
  * The HUD every Room shares: Room title (top left), Token balance / PENGUIN /
@@ -114,14 +124,50 @@ export function createHud(layer: HTMLElement, deps: HudDeps): Hud {
     deps.onSignOut();
   });
 
-  // Bottom bar: chat slot (#44 fills this in), MAP and IGLOO. EMOTE,
-  // SNOWBALL and QUESTS stay hidden until their stretch tickets land.
+  // Bottom bar: chat field (#44), MAP and IGLOO. EMOTE, SNOWBALL and QUESTS
+  // stay hidden until their stretch tickets land.
   const bottomBar = document.createElement('div');
   bottomBar.className = 'hud__bottom-bar';
 
   const chatSlot = document.createElement('div');
   chatSlot.className = 'hud__chat-slot';
-  chatSlot.textContent = 'Say something...';
+
+  const chatInput = document.createElement('input');
+  chatInput.type = 'text';
+  chatInput.className = 'hud__chat-input';
+  chatInput.placeholder = 'Say something...';
+  chatInput.maxLength = CHAT_TEXT_MAX;
+
+  // Every keyboard event stops here: the field never lets a keystroke reach
+  // a `window` listener (the overlay manager's Escape, the Minigame shell's
+  // P), so typing never triggers game input or click-to-move (#44 D3).
+  function stopKeyPropagation(event: KeyboardEvent): void {
+    event.stopPropagation();
+  }
+  chatInput.addEventListener('keyup', stopKeyPropagation);
+  chatInput.addEventListener('keypress', stopKeyPropagation);
+  chatInput.addEventListener('keydown', (event) => {
+    event.stopPropagation();
+    if (event.key !== 'Enter') return;
+    // An IME composition's confirming Enter (e.g. finishing a CJK candidate)
+    // must not submit; browsers that don't set `isComposing` mark it with
+    // the legacy keyCode 229 instead (#44 review fix F6).
+    if (event.isComposing || event.keyCode === 229) return;
+    event.preventDefault();
+    const text = chatInput.value;
+    void deps
+      .onChatSend(text)
+      .then((accepted) => {
+        // Only clear a field the Player hasn't since typed something new
+        // into while the send was pending (#44 review fix F7).
+        if (accepted && chatInput.value === text) chatInput.value = '';
+      })
+      .catch(() => {
+        // Treat a rejected send as not accepted: keep the typed text.
+      });
+  });
+
+  chatSlot.append(chatInput);
 
   const emoteButton = document.createElement('button');
   emoteButton.type = 'button';
@@ -160,7 +206,26 @@ export function createHud(layer: HTMLElement, deps: HudDeps): Hud {
 
   bottomBar.append(chatSlot, emoteButton, snowballButton, mapButton, iglooButton, questsButton);
 
-  root.append(titleBlock, topRight, menuPanel, bottomBar);
+  // The toast layer (`ui:toast`, #42): shown wherever the Player is, since
+  // the HUD is mounted across every Room. Producers: #34 (a save error) and
+  // #42 (a Badge earned via `badge:earned`, translated in `main.ts`).
+  const toastEl = document.createElement('div');
+  toastEl.className = 'hud__toast';
+  toastEl.hidden = true;
+  toastEl.setAttribute('role', 'status');
+  let toastTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function showToast(message: string): void {
+    if (toastTimer !== null) clearTimeout(toastTimer);
+    toastEl.textContent = message;
+    toastEl.hidden = false;
+    toastTimer = setTimeout(() => {
+      toastEl.hidden = true;
+      toastTimer = null;
+    }, TOAST_DURATION_MS);
+  }
+
+  root.append(titleBlock, topRight, menuPanel, bottomBar, toastEl);
   layer.append(root);
 
   function setBalance(balance: number): void {
@@ -181,6 +246,7 @@ export function createHud(layer: HTMLElement, deps: HudDeps): Hud {
 
   const unsubscribeRoomEnter = gameEvents.on('room:enter', ({ roomId }) => setRoom(roomId));
   const unsubscribeTokens = gameEvents.on('tokens:changed', ({ balance }) => setBalance(balance));
+  const unsubscribeToast = gameEvents.on('ui:toast', ({ message }) => showToast(message));
 
   return {
     overlays,
@@ -195,6 +261,8 @@ export function createHud(layer: HTMLElement, deps: HudDeps): Hud {
     destroy() {
       unsubscribeRoomEnter();
       unsubscribeTokens();
+      unsubscribeToast();
+      if (toastTimer !== null) clearTimeout(toastTimer);
       overlays.destroy();
       root.remove();
     },
