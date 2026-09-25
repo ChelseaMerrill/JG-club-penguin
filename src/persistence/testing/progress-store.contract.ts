@@ -291,6 +291,8 @@ export function describeProgressStoreContract(
         medium: 5,
         large: 5,
         perfect: 2,
+        spilled: 0,
+        lost: 0,
       });
 
       expect(result.tokensAwarded).toBe(160);

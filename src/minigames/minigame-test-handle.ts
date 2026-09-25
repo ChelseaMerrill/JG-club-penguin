@@ -17,4 +17,8 @@ export interface MinigameTestHandle {
    *  isn't the loaded Minigame. Additive alongside `finishNow`, which stays
    *  `bug-squash`-only. */
   finishPancakeFlipNow(): void;
+  /** Ends a Coffee Rush round now, as if the shell's timer reached 0: same
+   *  reason as `finishPancakeFlipNow` (a 90s round). A no-op when Coffee
+   *  Rush isn't the loaded Minigame. */
+  finishCoffeeRushNow(): void;
 }
