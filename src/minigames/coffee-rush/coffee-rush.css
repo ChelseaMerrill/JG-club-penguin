@@ -1,0 +1,264 @@
+/* Coffee Rush (#50): the ticket line, cups, and fill-line legend ported from
+   `design/Minigame Coffee Rush.dc.html` into the shell's generic play area
+   (`.minigame__play-area`, `minigame-shell.ts`). Uses the JG design tokens
+   (`--jg-*`, `--font-*`) from `src/style.css`, the same exception
+   `pancake-flip.css` takes for cup/coffee-only shades with no named token.
+   All sizes are Stage pixels: the `#ui` layer is a fixed 1600x900 canvas,
+   already scaled to fit the viewport. */
+
+.coffee-rush {
+  display: flex;
+  gap: 24px;
+  width: 100%;
+  height: 100%;
+  align-items: stretch;
+}
+
+.coffee-rush__board {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+.coffee-rush__tickets {
+  display: flex;
+  gap: 10px;
+}
+
+.coffee-rush__ticket {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 12px;
+  background: var(--bg-panel);
+  border-top: 6px solid var(--jg-secondary);
+  color: var(--fg-primary);
+}
+
+.coffee-rush__ticket:first-child {
+  border-top-color: var(--jg-primary);
+}
+
+.coffee-rush__ticket--urgent {
+  border-top-color: var(--jg-light);
+}
+
+.coffee-rush__ticket-size {
+  font: 400 12px var(--font-display);
+  letter-spacing: 0.08em;
+}
+
+.coffee-rush__ticket-bar {
+  height: 5px;
+  background: var(--stage-bg);
+}
+
+.coffee-rush__ticket-bar-fill {
+  height: 100%;
+  width: 100%;
+  background: var(--jg-primary);
+  transition: width 100ms linear;
+}
+
+.coffee-rush__ticket--urgent .coffee-rush__ticket-bar-fill {
+  background: var(--jg-light);
+}
+
+.coffee-rush__counter {
+  position: relative;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 24px;
+  background: #2f3338;
+  border: 3px solid var(--jg-secondary);
+  border-radius: 12px;
+}
+
+.coffee-rush__cups {
+  position: relative;
+  display: flex;
+  justify-content: space-around;
+  align-items: flex-end;
+  width: 100%;
+  gap: 16px;
+  padding: 70px 0 10px;
+}
+
+.coffee-rush__cup-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.coffee-rush__cup {
+  position: relative;
+  width: 84px;
+  height: 94px;
+  background: #f4f4f4;
+  border: 3px solid var(--jg-secondary);
+  border-radius: 0 0 20px 20px;
+  overflow: hidden;
+  padding: 0;
+  cursor: pointer;
+}
+
+.coffee-rush__cup--selected .coffee-rush__cup {
+  border-color: var(--jg-primary);
+}
+
+.coffee-rush__cup-fill {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 0%;
+  background: var(--jg-secondary);
+  transition: height 100ms linear;
+}
+
+.coffee-rush__cup-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background: var(--jg-primary);
+}
+
+.coffee-rush__cup-label {
+  font: 400 11px var(--font-display);
+  letter-spacing: 0.1em;
+  color: var(--fg-muted);
+}
+
+.coffee-rush__toast {
+  position: absolute;
+  left: 50%;
+  top: 10px;
+  transform: translateX(-50%);
+  padding: 8px 20px;
+  background: var(--jg-primary);
+  font-family: var(--font-game-display);
+  font-size: 20px;
+  letter-spacing: 0.06em;
+  color: var(--jg-dark);
+  z-index: 1;
+}
+
+.coffee-rush__toast[hidden] {
+  display: none;
+}
+
+.coffee-rush__toast[data-tone='bad'] {
+  background: var(--jg-light);
+  color: var(--jg-dark);
+}
+
+.coffee-rush__controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.coffee-rush__hint {
+  display: grid;
+  place-items: center;
+  height: 34px;
+  padding: 0 12px;
+  background: var(--jg-dark);
+  border: 2px solid var(--jg-secondary);
+  font: 400 12px var(--font-display);
+  letter-spacing: 0.08em;
+  color: var(--fg-primary);
+}
+
+.coffee-rush__pour-button {
+  display: grid;
+  place-items: center;
+  height: 34px;
+  padding: 0 22px;
+  background: var(--jg-primary);
+  border: 2px solid var(--jg-secondary);
+  font: 400 12px var(--font-display);
+  letter-spacing: 0.1em;
+  color: var(--jg-dark);
+  cursor: pointer;
+}
+
+.coffee-rush__side {
+  width: 240px;
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px;
+  background: var(--stage-bg);
+  border: 2px solid var(--jg-secondary);
+}
+
+.coffee-rush__side-label {
+  font: 400 11px var(--font-display);
+  letter-spacing: 0.2em;
+  color: var(--jg-primary);
+}
+
+.coffee-rush__legend {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.coffee-rush__legend-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--bg-panel);
+  border: 1px solid var(--jg-secondary);
+  font: 700 12px var(--font-body);
+  color: var(--fg-primary);
+}
+
+.coffee-rush__legend-fillto {
+  font: 400 11px var(--font-display);
+  letter-spacing: 0.05em;
+  color: var(--fg-muted);
+}
+
+.coffee-rush__legend-value {
+  color: var(--jg-primary);
+}
+
+.coffee-rush__note {
+  padding: 12px;
+  background: rgba(12, 75, 95, 0.35);
+  border: 2px solid var(--jg-primary);
+  font: 700 12px var(--font-body);
+  color: var(--fg-primary);
+}
+
+.coffee-rush__badge-label {
+  margin-top: auto;
+  font: 700 13px var(--font-body);
+  color: var(--fg-primary);
+}
+
+.coffee-rush__badge-bar {
+  height: 8px;
+  background: var(--stage-bg);
+  border: 2px solid var(--jg-secondary);
+}
+
+.coffee-rush__badge-bar-fill {
+  height: 100%;
+  width: 0%;
+  background: var(--jg-primary);
+  transition: width 100ms linear;
+}
