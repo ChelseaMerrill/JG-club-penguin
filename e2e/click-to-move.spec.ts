@@ -250,8 +250,10 @@ test('click-to-move', async ({ page }) => {
   // row 1's has nothing at col 8). The lowest-row-then-column tie-break
   // reaches row 0 first, where col 10 (checked before the closer-looking but
   // unwalkable col 6) is the first walkable hit, so (10, 0) wins.
-  const door = townCenter.doors.find((candidate) => candidate.targetRoomId !== null);
-  if (!door) throw new Error('expected town-center to have at least one enabled door');
+  // By label, not "the first enabled door": THE ICEBOX became a real door
+  // in #51 and now comes first in Town Center's list.
+  const door = townCenter.doors.find((candidate) => candidate.label === 'DEV PIT');
+  if (!door) throw new Error('expected town-center to have a DEV PIT door');
   const doorApproachTile: Tile = { col: 10, row: 0 };
   const doorCenter = {
     x: door.hotspot.x + door.hotspot.width / 2,
