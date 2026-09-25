@@ -10,32 +10,29 @@ import { townCenter } from './town-center';
 // `door()` isolib helper).
 const DOOR_HOTSPOT_SIZE = { width: 70, height: 165 };
 
-// Traced from `design/Kitchen.dc.html`'s fixtures (#92 D3 resync -- the
-// walls, counters and doors are unchanged from the pre-resync trace, only
-// the NPCs moved): the back-wall counter/"FREE SNACKS" bar (rows 0-1), the
-// central island counter and fridge cluster (rows 3-6), and the front
-// counter/table run (rows 7-9). Row 4's cols 7-10 and row 9's cols 0-1
-// sample as the same floor colour as the rest of the open floor in the
-// exported art (not the counters' white/teal), so they're walkable rather
-// than blocked under the counter cluster or the floor-arrow decal near the
-// TOWN CENTER door (#16 fix 5). Tonya's tile already sat on an unwalkable
-// counter. Chelsea, Tom and Jesse (see `npcSlots` below) all resync (#92 D3)
-// onto row 2, this Room's only aisle between the back and island counters --
-// unlike every other NPC tile in this prototype, blocking their own tiles
-// would cut that single-tile-wide aisle into disconnected pockets
-// (`reachability.test.ts` catches this), so, like Roof Deck's Kevin/Josh
-// exception, their tiles are left walkable as a documented exception rather
-// than fabricating an unverified mask change to widen the aisle.
+// Traced from `design/Kitchen.dc.html`'s fixtures (#92 D3 round 2 --
+// re-checked against the art after round 1 blocked too much of row 1): the
+// back counter/oven itself is a thin strip -- design-fraction rows 0.2-1.2,
+// so only row 0 and a sliver of row 1 -- with row 1 otherwise open floor
+// (Chelsea stands on it), the central island counter and fridge cluster
+// (rows 3-6), and the front counter/table run (rows 7-9). Row 4's cols 7-10
+// and row 9's cols 0-1 sample as the same floor colour as the rest of the
+// open floor in the exported art (not the counters' white/teal), so they're
+// walkable rather than blocked under the counter cluster or the floor-arrow
+// decal near the TOWN CENTER door (#16 fix 5). Chelsea's and Jesse's own
+// tiles are blocked (#92 D3 round 2); Tom's is left walkable since he walks
+// in the design, so there's no single tile that's "his" the way there is for
+// every stationary NPC; Tonya's tile already sat on an unwalkable counter.
 const WALKABLE: readonly (readonly boolean[])[] = [
   [false, false, false, false, false, false, false, false, false, false, true, true],
-  [false, false, false, false, false, false, false, false, false, false, true, true],
-  [true, true, true, true, true, true, true, true, true, true, true, false],
+  [false, true, true, true, true, true, true, true, true, true, true, true],
+  [true, true, true, false, true, true, true, true, true, true, false, true],
   [true, true, true, false, false, false, false, true, true, true, true, true],
   [true, true, true, false, false, false, false, true, true, true, true, true],
   [true, true, false, false, false, false, false, false, false, false, false, false],
   [true, true, true, false, false, false, false, false, false, false, false, false],
   [false, true, true, true, true, true, true, true, false, false, false, false],
-  [false, false, true, true, false, true, true, true, true, false, false, true],
+  [false, false, true, true, true, true, true, true, true, false, false, true],
   [true, true, true, true, true, true, true, true, true, true, true, true],
 ];
 
@@ -59,8 +56,8 @@ export const theMelt: RoomDefinition = {
       label: 'TOWN CENTER',
       hotspot: { x: 420, y: 275, ...DOOR_HOTSPOT_SIZE },
       targetRoomId: 'town-center',
-      // Town Center has no door of its own back to The Melt (see below), so
-      // this lands on Town Center's own spawn tile (#16 fix 4) -- a
+      // Town Center has no door of its own back to the Kitchen (see below),
+      // so this lands on Town Center's own spawn tile (#16 fix 4) -- a
       // judgment call reported on the #16 execution plan, same as Roof
       // Deck's doors below.
       entryTile: townCenter.spawnTile,
