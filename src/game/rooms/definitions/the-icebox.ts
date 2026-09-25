@@ -26,8 +26,9 @@ const DOOR_HOTSPOT_SIZE = { width: 70, height: 165 };
 //   - the corner planter: cols 11-11.8, rows 8.8-9.6 -> (11,9).
 // Every NPC's own tile (see `npcSlots` below) is additionally blocked so a
 // Penguin can't walk through them (#16 fix 5): Millie (1,0), Jason (8,0),
-// Darrin (10,6), Nicole (1,7) and Jethro (4,9). The floor arrow decal by the
-// left wall is flat floor art and stays walkable.
+// Darrin (10,6), Nicole (1,7) and Jethro (4,9). The floor-arrow decal by the
+// left wall is hidden from the exported art (#132 -- it wasn't a working
+// door); its tile stays walkable floor regardless.
 const WALKABLE: readonly (readonly boolean[])[] = [
   [true, false, true, true, false, false, true, true, false, true, true, true],
   [true, true, true, true, true, true, true, true, true, true, true, true],
