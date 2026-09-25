@@ -16,11 +16,13 @@ const LONG_WALK_TIMEOUT = 15_000;
 const PROOF_ROOT = 'test-results/npc-motion-dev-pit';
 /** `RoomScene`'s NPC click zone sits this far above the feet (`NPC_HIT_ZONE_OFFSET_Y`). */
 const HIT_ZONE_OFFSET_Y = -50;
-/** Dom hops a loop, Ryan walks-and-dances, Sam walks-and-spins. */
-const MOVING_NPCS = ['dom', 'ryan', 'sam'];
-/** Ashley, Ian and Steven stay at their slot: Steven's scribbling pen is an
+/** Ian walks an authored loop (owner request, 2026-09-25, Track D), Ryan
+ *  walks-and-dances, Sam walks-and-spins. Dom was removed from this Room
+ *  (same request). */
+const MOVING_NPCS = ['ian', 'ryan', 'sam'];
+/** Ashley and Steven stay at their slot: Steven's scribbling pen is an
  *  in-place prop only, so his own feet never move. */
-const STILL_NPCS = ['ashley', 'ian', 'steven'];
+const STILL_NPCS = ['ashley', 'steven'];
 
 test.use({ viewport: { width: 1600, height: 900 } });
 
@@ -68,47 +70,49 @@ async function bootDevPit(page: Page): Promise<string[]> {
     document.querySelector<HTMLElement>('#ui .landing')!.hidden = true;
   });
   await expect
-    .poll(async () => (await debugInfo(page))?.npcs?.dom, { timeout: BOOT_TIMEOUT })
+    .poll(async () => (await debugInfo(page))?.npcs?.steven, { timeout: BOOT_TIMEOUT })
     .not.toBeUndefined();
   await page.evaluate(() => document.fonts.ready);
   return errors;
 }
 
-test('Dev Pit NPCs perform their designed motions: Dom hops, Ryan and Sam walk', async ({
-  page,
-}) => {
+test('Dev Pit NPCs perform their designed motions: Ian, Ryan and Sam walk', async ({ page }) => {
   const dir = proofDir('npcs-move');
   const errors = await bootDevPit(page);
 
   for (const id of MOVING_NPCS) expect((await npc(page, id)).moving).toBe(true);
-  // Ashley, Ian and Steven never leave their slot tile.
+  // Ashley and Steven never leave their slot tile.
   for (const id of STILL_NPCS) {
     const slot = devPit.npcSlots.find((s) => s.npcId === id);
     if (!slot) throw new Error(`expected dev-pit to have a "${id}" NPC slot`);
     const rest = tileToScreen(slot.tile, devPit.grid.origin);
     expect(await npc(page, id)).toMatchObject({ x: rest.x, y: rest.y, moving: false });
   }
+  // Dom removed from the Dev Pit (owner request, 2026-09-25, Track D): no
+  // slot, and no `__roomDebug.npcs` entry either.
+  expect(devPit.npcSlots.some((slot) => slot.npcId === 'dom')).toBe(false);
+  expect((await debugInfo(page))?.npcs?.dom).toBeUndefined();
 
-  const start = await npc(page, 'dom');
+  const start = await npc(page, 'ian');
   const seen = [start];
   for (let shot = 1; shot <= 4; shot += 1) {
     await page.waitForTimeout(1_500);
-    seen.push(await npc(page, 'dom'));
+    seen.push(await npc(page, 'ian'));
     await page.screenshot({ path: `${dir}/t${shot * 1.5}s.png` });
   }
-  // domHop's first hop heads toward translate(170px, -85px): up and right.
-  // domHop holds at each waypoint for a few percent of its 18s loop, so
+  // ianWalk's first leg heads toward translate(-50px,-25px): west and up.
+  // ianWalk holds at each waypoint for a few percent of its 18s loop, so
   // two of these five samples can legitimately land in the same hold.
   const last = seen[seen.length - 1];
   expect(new Set(seen.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`)).size).toBeGreaterThan(1);
   expect(last.x).not.toBeCloseTo(start.x);
 
-  // Close-ups: Dom mid-hop, Ryan and Sam with their scribbling pens, and
+  // Close-ups: Ian mid-walk, Ryan and Sam with their scribbling pens, and
   // Steven at his slot (still, but his pen prop moves in place).
-  const dom = await npc(page, 'dom');
+  const ian = await npc(page, 'ian');
   await page.screenshot({
-    path: `${dir}/dom-hop-close-up.png`,
-    clip: { x: dom.x - 110, y: dom.y - 170, width: 220, height: 210 },
+    path: `${dir}/ian-walk-close-up.png`,
+    clip: { x: ian.x - 110, y: ian.y - 170, width: 220, height: 210 },
   });
   const ryan = await npc(page, 'ryan');
   await page.screenshot({
@@ -129,7 +133,7 @@ test('Dev Pit NPCs perform their designed motions: Dom hops, Ryan and Sam walk',
   expect(errors).toEqual([]);
 });
 
-test('clicking a walking Ryan pauses him, opens his dialog, and closing it resumes his loop', async ({
+test('clicking a walking Ian pauses him, opens his dialog, and GRAB THE HAMMER opens Bug Squash (then resumes his loop)', async ({
   page,
 }) => {
   const dir = proofDir('click-pauses');
@@ -137,38 +141,46 @@ test('clicking a walking Ryan pauses him, opens his dialog, and closing it resum
 
   // Let him get going, then click his (moving) click target.
   await page.waitForTimeout(2_000);
-  const before = await npc(page, 'ryan');
+  const before = await npc(page, 'ian');
   await clickStagePoint(page, { x: before.x, y: before.y + HIT_ZONE_OFFSET_Y });
 
-  await expect.poll(async () => (await npc(page, 'ryan')).paused).toBe(true);
-  const pausedAt = await npc(page, 'ryan');
+  await expect.poll(async () => (await npc(page, 'ian')).paused).toBe(true);
+  const pausedAt = await npc(page, 'ian');
   expect(pausedAt.moving).toBe(false);
   expect(Math.hypot(pausedAt.x - before.x, pausedAt.y - before.y)).toBeLessThan(30);
 
   await expect
     .poll(async () => (await debugInfo(page))?.npcArrivedLog, { timeout: LONG_WALK_TIMEOUT })
-    .toContain('ryan');
+    .toContain('ian');
   const dialog = page.locator('.npc-dialog');
   await expect(dialog).toBeVisible();
-  await expect(dialog.locator('.npc-dialog__name')).toHaveText('Ryan Shendler');
+  await expect(dialog.locator('.npc-dialog__name')).toHaveText('Ian Ballard');
 
   await page.waitForTimeout(1_000);
-  const stillPaused = await npc(page, 'ryan');
+  const stillPaused = await npc(page, 'ian');
   expect(stillPaused).toMatchObject({ x: pausedAt.x, y: pausedAt.y, paused: true });
   await page.screenshot({ path: `${dir}/paused-with-dialog.png` });
 
-  await dialog.locator('.npc-dialog__close').click();
+  // GRAB THE HAMMER launches Bug Squash and closes the dialog (still true
+  // now that Ian moves -- `npc-dialog.ts` emits `npc:dialog-closed` however
+  // the dialog closes, which is what resumes a paused, roaming NPC's loop).
+  const grabButton = dialog.getByRole('button', { name: 'GRAB THE HAMMER' });
+  await expect(grabButton).toBeVisible();
+  await grabButton.click();
+  await expect(page.locator('.minigame__howto')).toBeVisible();
+  await expect(page.locator('.minigame__howto-subtitle')).toContainText('BUG SQUASH');
   await expect(dialog).toBeHidden();
-  await expect.poll(async () => (await npc(page, 'ryan')).moving).toBe(true);
-  // ryanWalk holds at (0,0) for the first 38% of its 24s loop (~9.1s): poll
-  // rather than a fixed wait, in case the pause landed inside that hold.
+
+  await expect.poll(async () => (await npc(page, 'ian')).moving).toBe(true);
+  // ianWalk holds at each waypoint for a few percent of its 18s loop: poll
+  // rather than a fixed wait, in case the pause landed inside one.
   await expect
     .poll(
       async () => {
-        const p = await npc(page, 'ryan');
+        const p = await npc(page, 'ian');
         return p.x !== pausedAt.x || p.y !== pausedAt.y;
       },
-      { timeout: 12_000 },
+      { timeout: 8_000 },
     )
     .toBe(true);
   await page.screenshot({ path: `${dir}/resumed.png` });

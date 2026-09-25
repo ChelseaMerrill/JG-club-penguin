@@ -10,12 +10,15 @@ import type { NpcId } from '../npcs';
 import { DEV_PIT_MOTIONS } from './dev-pit';
 
 const ORIGIN = { x: 800, y: 250 };
-const REST = { x: 630, y: 456.5 }; // Dom's own slot point in the design
+const REST = { x: 600, y: 425 }; // Ian's own slot point (1,5)
 
 describe('Dev Pit NPC motions (#113)', () => {
   it('registers a motion for every Dev Pit NPC with a designed one, and no other', () => {
+    // Dom removed (owner request, 2026-09-25, Track D): no longer a Dev Pit
+    // NPC. Ian's own loop is authored (see `dev-pit.ts`'s comment), not from
+    // the design.
     expect((Object.keys(DEV_PIT_MOTIONS) as NpcId[]).sort()).toEqual([
-      'dom',
+      'ian',
       'ryan',
       'sam',
       'steven',
@@ -28,23 +31,20 @@ describe('Dev Pit NPC motions (#113)', () => {
     }
   });
 
-  it("samples Dom's domHop path at its 20% stop, 3.6s into the 18s loop", () => {
-    const compiled = compileCssAnimation(DEV_PIT_MOTIONS.dom!.path!);
-    const point = transformPoint(sampleCssAnimation(compiled, 3_600), { x: 0, y: 0 });
-    expect(point.x).toBeCloseTo(170);
-    expect(point.y).toBeCloseTo(-85);
+  it("samples Ian's authored ianWalk path at its 22% stop, 3.96s into the 18s loop", () => {
+    const compiled = compileCssAnimation(DEV_PIT_MOTIONS.ian!.path!);
+    const point = transformPoint(sampleCssAnimation(compiled, 3_960), { x: 0, y: 0 });
+    // The (0,5) waypoint, one tile west of his (1,5) slot.
+    expect(point.x).toBeCloseTo(-50);
+    expect(point.y).toBeCloseTo(-25);
   });
 
-  it("samples Dom's hop2 figure squash-and-stretch at its 50% stop, .3s into the .6s hop", () => {
-    const compiled = compileCssAnimation(DEV_PIT_MOTIONS.dom!.figure!);
-    const matrix = sampleCssAnimation(compiled, 300);
-    // translateY(-14px): the figure's own feet (the 60px,120px transform
-    // origin) rise straight up by 14px, however the scale below also
-    // stretches the figure about that same point.
-    const feet = transformPoint(matrix, { x: 60, y: 120 });
-    expect(feet.x).toBeCloseTo(60);
-    expect(feet.y).toBeCloseTo(106);
-    expect(decomposeAffine(matrix).scaleY).toBeCloseTo(1.06); // scaleY(1.06)
+  it("samples Ian's reused idle figure bob at its 50% stop, 1.5s into the 3s loop", () => {
+    const compiled = compileCssAnimation(DEV_PIT_MOTIONS.ian!.figure!);
+    const matrix = sampleCssAnimation(compiled, 1_500);
+    const point = transformPoint(matrix, { x: 0, y: 0 });
+    expect(point.x).toBeCloseTo(0);
+    expect(point.y).toBeCloseTo(-3);
   });
 
   it("samples Ryan's scribble prop rotation at its 50% stop, .25s into the .5s loop", () => {
