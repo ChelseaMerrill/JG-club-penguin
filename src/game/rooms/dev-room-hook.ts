@@ -10,6 +10,7 @@ import {
 } from '../../contracts';
 import type { RegisteredPlayer } from '../movement/registered-player';
 import type { PenguinAnim } from '../penguin';
+import type { RemotePenguinDebugInfo } from './room-penguin-view';
 
 /**
  * Gates every hook in this module. `true` in local `npm run dev` and in the
@@ -71,6 +72,12 @@ export interface LocalPenguinDebugInfo {
   playerId: string;
 }
 
+/** One `room:leave`/`room:enter` #15's navigator has emitted, in emission order. */
+export interface RoomDebugEventLogEntry {
+  type: 'room:leave' | 'room:enter';
+  roomId: RoomId;
+}
+
 export interface RoomDebugInfo {
   roomId: RoomId;
   scrollX: number;
@@ -85,6 +92,20 @@ export interface RoomDebugInfo {
   doorReachedLog?: string[];
   /** Target tile per `local-penguin:move` emission (walk start or re-route), oldest first. */
   localPenguinMoveLog?: Tile[];
+  /** The disabled door's label while its "COMING SOON" hint (#15 D3) is shown; `null` otherwise. */
+  comingSoonHint?: string | null;
+  /**
+   * Test-only: #15's navigator's own `changeRoom`, so a test can change Room
+   * directly rather than clicking a door or the HUD. Set once, by
+   * `registerRoomDebugNavigatorHooks`, and merged onto every later
+   * `exposeRoomDebug` snapshot (`RoomScene`'s own per-frame call knows
+   * nothing about the navigator and would otherwise overwrite it).
+   */
+  changeRoom?: (roomId: RoomId) => void;
+  /** Test-only: every `room:leave`/`room:enter` #15's navigator has emitted, oldest first. Same merge story as `changeRoom`. */
+  roomEventLog?: RoomDebugEventLogEntry[];
+  /** Tile per `local-penguin:arrived` emission, oldest first (#43). */
+  localPenguinArrivedLog?: Tile[];
   /** Restarts the Scene (`this.scene.restart()`), for the cleanup e2e test. */
   restartRoom?: () => void;
   /**
@@ -102,6 +123,11 @@ export interface RoomDebugInfo {
   penguinCount?: number;
   /** Count of remote Penguin `Container`s (#28's `RoomPenguinView`) in the Scene's display list. */
   remotePenguinCount?: number;
+  /**
+   * One entry per remote Penguin `RoomPenguinView` currently shows (#43 D6);
+   * see `RemotePenguinDebugInfo` for each field's meaning.
+   */
+  remotePenguins?: RemotePenguinDebugInfo[];
   /**
    * Test-only: sets `registry.player`, exercising the real sign-in
    * look/id-update path end to end (review fixes 1 and 4) rather than
@@ -123,15 +149,32 @@ declare global {
   }
 }
 
+/** #15's navigator-owned fields, set once by `registerRoomDebugNavigatorHooks` and merged onto every `exposeRoomDebug` snapshot below. */
+let navigatorHooks: Pick<RoomDebugInfo, 'changeRoom' | 'roomEventLog'> = {};
+
+/**
+ * Test-only: publishes #15's navigator `changeRoom` and its `room:leave`/
+ * `room:enter` log onto every future `window.__roomDebug` snapshot. Call
+ * once, after the navigator exists (`main.ts`): `RoomScene`'s own per-frame
+ * `exposeRoomDebug` call knows nothing about the navigator, so without this
+ * merge it would overwrite these fields with `undefined` on every frame.
+ */
+export function registerRoomDebugNavigatorHooks(
+  hooks: Pick<RoomDebugInfo, 'changeRoom' | 'roomEventLog'>,
+): void {
+  navigatorHooks = hooks;
+}
+
 /**
  * Publishes `RoomScene`'s current debug snapshot to `window.__roomDebug`,
  * only when `HOOKS_ENABLED`, so `e2e/room-framework.spec.ts` and
  * `e2e/click-to-move.spec.ts` can assert Room/movement state without
- * reaching into Phaser internals. Each call replaces the whole object.
+ * reaching into Phaser internals. Each call replaces the whole object,
+ * merging in `navigatorHooks` last so those fields always survive.
  */
 export function exposeRoomDebug(info: RoomDebugInfo): void {
   if (!HOOKS_ENABLED) {
     return;
   }
-  window.__roomDebug = info;
+  window.__roomDebug = { ...info, ...navigatorHooks };
 }

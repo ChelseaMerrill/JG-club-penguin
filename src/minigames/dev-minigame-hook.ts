@@ -5,6 +5,7 @@ import type { CoffeeRushTestHooks } from './coffee-rush/coffee-rush';
 import type { LaunchedMinigame, MinigameLauncher } from './minigame-launcher';
 import type { MinigameTestHandle } from './minigame-test-handle';
 import type { PancakeFlipTestHooks } from './pancake-flip/pancake-flip';
+import type { SnowConeStandTestHooks } from './snow-cone-stand/snow-cone-stand';
 import type { StubMinigameTestHooks } from './stub-minigame';
 
 declare global {
@@ -27,6 +28,10 @@ function hasPancakeFlipHooks(value: unknown): value is PancakeFlipTestHooks {
 
 function hasCoffeeRushHooks(value: unknown): value is CoffeeRushTestHooks {
   return !!value && typeof (value as Partial<CoffeeRushTestHooks>).debugFinishNow === 'function';
+}
+
+function hasSnowConeStandHooks(value: unknown): value is SnowConeStandTestHooks {
+  return !!value && typeof (value as Partial<SnowConeStandTestHooks>).debugFinishNow === 'function';
 }
 
 /** True when `value` is one of `MINIGAME_RULES`'s registered ids. */
@@ -83,6 +88,11 @@ export function initDevMinigameHook(hud: Hud, launcher: MinigameLauncher): boole
     finishCoffeeRushNow() {
       // Same duck-typing gate as `finishPancakeFlipNow`.
       if (rawId === 'coffee-rush' && hasCoffeeRushHooks(hooks)) hooks.debugFinishNow();
+    },
+    finishSnowConeStandNow() {
+      // Gated on the requested id for the same reason as
+      // `finishPancakeFlipNow` above.
+      if (rawId === 'snow-cone-stand' && hasSnowConeStandHooks(hooks)) hooks.debugFinishNow();
     },
   };
 

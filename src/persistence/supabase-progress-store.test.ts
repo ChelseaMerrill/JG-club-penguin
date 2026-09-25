@@ -477,4 +477,120 @@ describe('createSupabaseProgressStore', () => {
       await expect(store.purchase('desk')).rejects.toMatchObject({ code: 'insufficient_tokens' });
     });
   });
+
+  describe('leaderboard', () => {
+    it('sends the exact rpc name and args, with the default max_rows when omitted', async () => {
+      const { client, calls } = makeFakeClient();
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID });
+
+      await store.leaderboard('bug-squash');
+
+      expect(calls).toContainEqual([
+        'rpc.leaderboard',
+        { minigame_id: 'bug-squash', max_rows: 10 },
+      ]);
+    });
+
+    it('forwards an explicit maxRows', async () => {
+      const { client, calls } = makeFakeClient();
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID });
+
+      await store.leaderboard('bug-squash', 3);
+
+      expect(calls).toContainEqual(['rpc.leaderboard', { minigame_id: 'bug-squash', max_rows: 3 }]);
+    });
+
+    it('clamps maxRows the same way the fake and the SQL function do (round 2, 2026-09-25)', async () => {
+      const { client, calls } = makeFakeClient();
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID });
+
+      await store.leaderboard('bug-squash', 0);
+      await store.leaderboard('bug-squash', -5);
+      await store.leaderboard('bug-squash', 100_000);
+
+      const sentMaxRows = calls
+        .filter((call) => call[0] === 'rpc.leaderboard')
+        .map((call) => (call[1] as { max_rows: number }).max_rows);
+      expect(sentMaxRows).toEqual([1, 1, 50]);
+    });
+
+    it('maps exactly the 4 known keys, even when the RPC returns extra ones', async () => {
+      const { client } = makeFakeClient({
+        leaderboard: {
+          data: [
+            {
+              rank: 1,
+              penguin_name: 'ALPHA',
+              best_score: 300,
+              is_me: true,
+              player_id: 'should-never-reach-a-caller',
+              updated_at: '2026-09-24T00:00:00.000Z',
+            },
+          ],
+          error: null,
+        },
+      });
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID });
+
+      const rows = await store.leaderboard('bug-squash');
+
+      expect(rows).toEqual([{ rank: 1, penguinName: 'ALPHA', bestScore: 300, isMe: true }]);
+      expect(Object.keys(rows[0])).toEqual(['rank', 'penguinName', 'bestScore', 'isMe']);
+    });
+
+    it('rejects unknown_minigame and not_authenticated as typed ProgressStoreErrors', async () => {
+      const unknown = makeFakeClient({
+        leaderboard: { data: null, error: { message: 'unknown_minigame' } },
+      });
+      const unknownStore = createSupabaseProgressStore({
+        client: unknown.client,
+        playerId: PLAYER_ID,
+      });
+      await expect(unknownStore.leaderboard('bug-squash')).rejects.toMatchObject({
+        code: 'unknown_minigame',
+      });
+
+      const unauth = makeFakeClient({
+        leaderboard: { data: null, error: { message: 'not_authenticated', code: '42501' } },
+      });
+      const unauthStore = createSupabaseProgressStore({
+        client: unauth.client,
+        playerId: PLAYER_ID,
+      });
+      await expect(unauthStore.leaderboard('bug-squash')).rejects.toMatchObject({
+        code: 'not_authenticated',
+      });
+    });
+
+    it('never emits ui:toast on failure, unlike every write method', async () => {
+      const { client } = makeFakeClient({
+        leaderboard: { data: null, error: { message: 'connection reset' } },
+      });
+      const messages: string[] = [];
+      const emitter = createEmitter<GameEventMap>();
+      emitter.on('ui:toast', ({ message }) => messages.push(message));
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID, emitter });
+
+      await expect(store.leaderboard('bug-squash')).rejects.toThrow('connection reset');
+      expect(messages).toEqual([]);
+    });
+
+    it('rejects an unrecognized error as a plain, non-ProgressStoreError Error', async () => {
+      const { client } = makeFakeClient({
+        leaderboard: { data: null, error: { message: 'connection reset' } },
+      });
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID });
+
+      const rejection = store.leaderboard('bug-squash');
+      await expect(rejection).rejects.toThrow('connection reset');
+      await expect(rejection).rejects.not.toBeInstanceOf(ProgressStoreError);
+    });
+
+    it('treats a null data response as an empty board', async () => {
+      const { client } = makeFakeClient({ leaderboard: { data: null, error: null } });
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID });
+
+      await expect(store.leaderboard('bug-squash')).resolves.toEqual([]);
+    });
+  });
 });

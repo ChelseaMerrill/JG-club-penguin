@@ -53,8 +53,11 @@ export const FLAKY_CHANCE = 0.25;
  *  probability and lifetime constant below is calibrated to this step size.
  *  `tick` divides whatever `dtSeconds` it's given into steps of this size,
  *  tracked internally as whole milliseconds so repeated calls never drift
- *  off an exact elapsed-time boundary the way repeated float addition would. */
-const STEP_MS = 100;
+ *  off an exact elapsed-time boundary the way repeated float addition would.
+ *  Exported (not just used internally) so `leaderboard-rules.ts` can derive
+ *  `LEADERBOARD_SCORE_CEILINGS['bug-squash']` from this engine's own
+ *  constants instead of a second, hand-copied `100`. */
+export const STEP_MS = 100;
 
 interface Bug {
   flaky: boolean;

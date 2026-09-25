@@ -43,13 +43,13 @@ test('penguin-creator', async ({ page }) => {
     'SIT',
   ]);
 
-  // WADDLE IN needs a name.
-  await page.locator('.penguin-creator__submit').click();
-  await expect(page.locator('.penguin-creator__error')).toHaveText('Your Penguin needs a name.');
+  // WADDLE IN is disabled without a name (#75); filling one in enables it.
+  const submitButton = page.locator('.penguin-creator__submit');
+  await expect(submitButton).toBeDisabled();
   await expect(creator).toBeVisible();
 
   await name.fill('Waddles');
-  await expect(page.locator('.penguin-creator__error')).toHaveText('');
+  await expect(submitButton).toBeEnabled();
   await page.locator('.penguin-creator [aria-label="BODY"] [data-color="#0C4B5F"]').click();
   await chip(page, 'HAT', 'HEADPHONES').click();
   await chip(page, 'BELLY PATTERN', 'SNOWFLAKE').click();

@@ -1,7 +1,8 @@
-// Generates SVG path data for the Penguin design's three fixed text strings
+// Generates SVG path data for the Penguin design's four fixed text strings
 // ("HA HA" in the LAUGH idle, "JG" on the JG LOGO belly pattern, "WAR WEEK"
-// on the WAR WEEK BAND hat -- see `design/Penguin Creator.dc.html` L47, L62,
-// L64) using their design fonts (Bumbastika, Anton), so `render-svg.ts` can
+// on the WAR WEEK BAND hat, and "JG" on the JG CAP's crown -- see
+// `design/Penguin Creator.dc.html` L47, L59, L62, L64) using their design
+// fonts (Bumbastika, Anton), so `render-svg.ts` can
 // draw them as `<path>` outlines instead of `<text>` elements. Browsers
 // don't let an SVG loaded as an `<img>`/Phaser texture use the page's web
 // fonts, so `<text>` there falls back to a system font in Rooms (#62); a
@@ -17,7 +18,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import opentype from 'opentype.js';
 import * as prettier from 'prettier';
-import { ACCENT, EYE_PUPIL } from '../src/game/penguin/palette.ts';
+import { ACCENT, EYE_PUPIL, EYE_WHITE } from '../src/game/penguin/palette.ts';
 
 // `scripts/` sits directly under the repo root, so its parent is the root
 // regardless of the caller's own working directory (unlike `process.cwd()`,
@@ -31,13 +32,14 @@ const OUTPUT_PATH = path.join(REPO_ROOT, 'src', 'game', 'penguin', 'text-paths.t
 type TextAnchor = 'start' | 'middle';
 
 // One design string's layout spec, verbatim from `design/Penguin
-// Creator.dc.html`'s three `<text>` elements (#62 D2): "HA HA" (L64,
-// default/`start` anchor), "JG" (L47) and "WAR WEEK" (L62, both `middle`).
-// `fill` values come from `palette.ts` (#62 review fix 6), the same module
-// `render-svg.ts` reads its own colours from, rather than repeating the hex
-// literals here.
+// Creator.dc.html`'s four `<text>` elements (#62 D2, #92 D4): "HA HA" (L64,
+// default/`start` anchor), "JG" on the belly (L47), "WAR WEEK" (L62) and "JG"
+// on the cap's crown (L59, added by #92's redraw), all three "JG"/"WAR WEEK"
+// strings using `middle` anchor. `fill` values come from `palette.ts` (#62
+// review fix 6), the same module `render-svg.ts` reads its own colours from,
+// rather than repeating the hex literals here.
 interface TextSpec {
-  key: 'haha' | 'jgLogo' | 'warWeek';
+  key: 'haha' | 'jgLogo' | 'warWeek' | 'jgCap';
   text: string;
   fontPath: string;
   fontSize: number;
@@ -81,6 +83,17 @@ const TEXT_SPECS: TextSpec[] = [
     anchor: 'middle',
     letterSpacing: 1,
     fill: EYE_PUPIL,
+  },
+  {
+    key: 'jgCap',
+    text: 'JG',
+    fontPath: ANTON_PATH,
+    fontSize: 5,
+    x: 60,
+    y: 19.4,
+    anchor: 'middle',
+    letterSpacing: 0,
+    fill: EYE_WHITE,
   },
 ];
 
@@ -161,6 +174,7 @@ async function main(): Promise<void> {
     '  haha: PenguinTextPath;\n' +
     '  jgLogo: PenguinTextPath;\n' +
     '  warWeek: PenguinTextPath;\n' +
+    '  jgCap: PenguinTextPath;\n' +
     '} = {\n' +
     entries.join('\n') +
     '\n' +

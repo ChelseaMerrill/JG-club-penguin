@@ -68,6 +68,52 @@ describe('createOverlayManager', () => {
     expect(manager.current()).toBe('menu');
   });
 
+  it('onOpen fires once per new open (#53 O1)', () => {
+    manager = createOverlayManager();
+    const onOpen = vi.fn();
+    manager.onOpen(onOpen);
+
+    manager.open('a', () => {});
+
+    expect(onOpen).toHaveBeenCalledTimes(1);
+    expect(onOpen).toHaveBeenCalledWith('a');
+  });
+
+  it('onOpen does not fire on a no-op re-open of the already-current id (#53 O1)', () => {
+    manager = createOverlayManager();
+    manager.open('a', () => {});
+    const onOpen = vi.fn();
+    manager.onOpen(onOpen);
+
+    manager.open('a', () => {});
+
+    expect(onOpen).not.toHaveBeenCalled();
+  });
+
+  it('onOpen fires again when a different overlay opens next (#53 O1)', () => {
+    manager = createOverlayManager();
+    const onOpen = vi.fn();
+    manager.onOpen(onOpen);
+
+    manager.open('a', () => {});
+    manager.open('b', () => {});
+
+    expect(onOpen).toHaveBeenNthCalledWith(1, 'a');
+    expect(onOpen).toHaveBeenNthCalledWith(2, 'b');
+    expect(onOpen).toHaveBeenCalledTimes(2);
+  });
+
+  it('onOpen unsubscribe stops further notifications (#53 O1)', () => {
+    manager = createOverlayManager();
+    const onOpen = vi.fn();
+    const unsubscribe = manager.onOpen(onOpen);
+
+    unsubscribe();
+    manager.open('a', () => {});
+
+    expect(onOpen).not.toHaveBeenCalled();
+  });
+
   it('destroy() removes the Escape listener', () => {
     manager = createOverlayManager();
     const onClose = vi.fn();

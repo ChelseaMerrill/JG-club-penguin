@@ -7,6 +7,7 @@ import {
   HATS,
   PATTERNS,
   PENGUIN_NAME_MAX,
+  UNSAFE_NAME_CHARS_RE,
   isHexColor,
   type HexColor,
   type PenguinLook,
@@ -23,18 +24,44 @@ export const SWATCHES: Record<ColorPart, readonly HexColor[]> = {
   feet: FEET_COLORS,
 };
 
+/** Drops control, bidi and zero-width characters, then collapses whitespace and trims (#75). */
+function cleanName(raw: string): string {
+  return raw.replace(UNSAFE_NAME_CHARS_RE, '').replace(/\s+/g, ' ').trim();
+}
+
 /**
- * Trims, collapses whitespace, drops control characters and caps the name at
+ * Trims, collapses whitespace, drops unsafe characters and caps the name at
  * `PENGUIN_NAME_MAX` code points, the same way `ProgressStore.saveLook`
- * counts them.
+ * counts them. Used for live previews (the Creator's nameplate); saving and
+ * WADDLE IN go through `validatePenguinName`, which never truncates.
  */
 export function normalizeName(raw: string): string {
-  const cleaned = raw
-    // eslint-disable-next-line no-control-regex
-    .replace(/[\u0000-\u001f\u007f]/g, '')
-    .replace(/\s+/g, ' ')
-    .trim();
+  const cleaned = cleanName(raw);
   return Array.from(cleaned).slice(0, PENGUIN_NAME_MAX).join('').trim();
+}
+
+export type PenguinNameValidation =
+  { ok: true; name: string } | { ok: false; reason: 'empty' | 'too-long' };
+
+/**
+ * Cleans `raw` the same way `normalizeName` does (unsafe characters stripped,
+ * whitespace collapsed, trimmed) but never truncates: it counts the cleaned
+ * name's code points against `PENGUIN_NAME_MAX` and rejects instead of
+ * cutting it short, matching `players_penguin_name_check` (#75). A name made
+ * only of unsafe characters (e.g. a zero-width space) cleans to `''` and is
+ * `empty`, not a false positive.
+ */
+export function validatePenguinName(raw: string): PenguinNameValidation {
+  const cleaned = cleanName(raw);
+  const length = Array.from(cleaned).length;
+  if (length === 0) return { ok: false, reason: 'empty' };
+  if (length > PENGUIN_NAME_MAX) return { ok: false, reason: 'too-long' };
+  return { ok: true, name: cleaned };
+}
+
+/** True when `look.name` validates as a real Penguin name (#75). */
+export function isNamedLook(look: Pick<PenguinLook, 'name'>): boolean {
+  return validatePenguinName(look.name).ok;
 }
 
 /** Returns `value` as a colour if it is a 6-digit hex string, else null. */

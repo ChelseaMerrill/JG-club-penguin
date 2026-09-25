@@ -1,7 +1,19 @@
+/**
+ * Runs against the real shared Supabase project (#81): other Players can be
+ * in Town Center at the same time, so this only asserts on the specific
+ * test-user Player ids (`idA`/`idB`), never on the roster's total count. See
+ * "Running the two-browser e2e specs" in the README.
+ */
 import { mkdirSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { expect, test, type Locator, type Page } from '@playwright/test';
 import { hasTestUsers, passwordSessionState } from './support/password-session';
+import { assertTestUsersAbsent, playerIdFromStorageState } from './support/presence-guard';
+import {
+  completeCreatorIfShown,
+  readOwnPlayerId,
+  waitUntilJoined,
+} from './support/two-browser-session';
 
 const AUTH_STATE_A = process.env.AUTH_STATE_A;
 const AUTH_STATE_B = process.env.AUTH_STATE_B;
@@ -17,48 +29,6 @@ const SYNC_TIMEOUT = 2000;
  * a different server (~20 ms on the same one), so 2 s would be flaky here.
  */
 const PROPAGATION_TIMEOUT = 5000;
-/** Boot, sign-in and the first Room channel join, before the budget starts. */
-const READY_TIMEOUT = 15_000;
-
-function decodeJwtSub(token: string): string {
-  const payload = token.split('.')[1];
-  const json = Buffer.from(payload, 'base64url').toString('utf8');
-  return (JSON.parse(json) as { sub: string }).sub;
-}
-
-/** Reads the signed-in Player's own id out of the `sb-*-auth-token` JWT in localStorage. */
-async function readOwnPlayerId(page: Page): Promise<string> {
-  const accessToken = await page.evaluate(() => {
-    const entry = Object.entries(localStorage).find(([key]) => /^sb-.*-auth-token$/.test(key));
-    if (!entry) throw new Error('no sb-*-auth-token in localStorage');
-    return (JSON.parse(entry[1]) as { access_token: string }).access_token;
-  });
-  return decodeJwtSub(accessToken);
-}
-
-/**
- * Finishes the Penguin Creator when the Player lands in it (every fresh
- * Session does until #34's real ProgressStore remembers a saved look): the
- * Session, and so the Room channel, starts only after the first save. A
- * Player who has already completed it goes straight to Town Center.
- */
-async function completeCreatorIfShown(page: Page, name: string): Promise<void> {
-  const creator = page.locator('.penguin-creator');
-  const joined = page.locator('.debug-overlay[data-current-room="town-center"]');
-  await expect(creator.or(joined).first()).toBeVisible({ timeout: READY_TIMEOUT });
-  if (!(await creator.isVisible())) return;
-  await page.locator('#penguin-creator-name').fill(name);
-  await page.locator('.penguin-creator__submit').click();
-  await expect(creator).toBeHidden();
-}
-/** Waits until the page is in Town Center with its Room channel joined. */
-async function waitUntilJoined(page: Page): Promise<void> {
-  const overlay = page.locator('.debug-overlay');
-  await expect(overlay).toHaveAttribute('data-current-room', 'town-center', {
-    timeout: READY_TIMEOUT,
-  });
-  await expect(overlay).toHaveAttribute('data-subscribed', 'true', { timeout: READY_TIMEOUT });
-}
 
 /** The Room `RoomScene` is showing, via the `VITE_E2E_HOOKS` `window.__roomDebug` hook. */
 async function shownRoom(page: Page): Promise<string | undefined> {
@@ -95,6 +65,13 @@ test('presence-two-browsers', async ({ browser, baseURL }) => {
   const origin = new URL(baseURL ?? 'http://localhost:4173').origin;
   const stateA = haveStateFiles ? AUTH_STATE_A : await passwordSessionState('A', origin);
   const stateB = haveStateFiles ? AUTH_STATE_B : await passwordSessionState('B', origin);
+
+  // #81: fail fast if another run is still using this pair of test users
+  // in Town Center, before opening any browser context.
+  await assertTestUsersAbsent([
+    { label: 'A', playerId: playerIdFromStorageState(stateA) },
+    { label: 'B', playerId: playerIdFromStorageState(stateB) },
+  ]);
 
   rmSync(OUTPUT_DIR, { recursive: true, force: true });
   mkdirSync(OUTPUT_DIR, { recursive: true });
@@ -136,7 +113,9 @@ test('presence-two-browsers', async ({ browser, baseURL }) => {
     await expectLookMatches(rosterOnB(idA), pageA);
 
     // AC2: five Room round trips. B loses/regains exactly one li for A each
-    // time; A's own roster (which never shows A) never grows duplicates.
+    // time; A's own roster shows B exactly once and never A. It isn't
+    // checked by total count: on the shared Supabase project it can also
+    // list Players other than B (#81).
     for (let i = 0; i < 5; i++) {
       await pageA.click('button[data-room="dev-pit"]');
       await expect(rosterOnB(idA)).toHaveCount(0, { timeout: PROPAGATION_TIMEOUT });
@@ -146,7 +125,8 @@ test('presence-two-browsers', async ({ browser, baseURL }) => {
       await expect(rosterOnB(idA)).toHaveCount(1, { timeout: PROPAGATION_TIMEOUT });
       await expect.poll(() => shownRoom(pageA)).toBe('town-center');
 
-      expect(await pageA.locator('ul.debug-roster li').count()).toBeLessThanOrEqual(1);
+      await expect(rosterOnA(idB)).toHaveCount(1, { timeout: PROPAGATION_TIMEOUT });
+      await expect(rosterOnA(idA)).toHaveCount(0, { timeout: PROPAGATION_TIMEOUT });
     }
 
     // AC3: a look change (including a new name) propagates to the other

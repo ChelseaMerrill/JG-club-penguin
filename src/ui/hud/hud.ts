@@ -12,7 +12,7 @@ export interface HudDeps {
   /** Room title/subtitle for the HUD header (#32 D3). Wired from
    *  `getRoomDefinition(id).title/subtitle` in `src/main.ts` (#16 D7). */
   resolveRoomTitle: (roomId: RoomId) => RoomTitle;
-  /** #15 `changeRoom('igloo')` once it lands; a no-op until then. */
+  /** #15 D5: `navigator.changeRoom('igloo')`. */
   onIgloo: () => void;
   /** The existing `auth.signOut`. */
   onSignOut: () => void;
@@ -25,6 +25,13 @@ export interface HudDeps {
    * `false` (e.g. rate-limited).
    */
   onChatSend: (text: string) => Promise<boolean>;
+  /**
+   * Asks to enter (`true`) or leave (`false`) Snowball mode (#53). The HUD
+   * never flips its own mode: the caller decides, then reports the outcome
+   * through `Hud.setSnowballMode`. Entering first closes MENU and is refused
+   * outright (no call) while any other HUD overlay is open.
+   */
+  onSnowballToggle?: (on: boolean) => void;
 }
 
 export interface Hud {
@@ -35,6 +42,10 @@ export interface Hud {
    *  (Map) and #35 (Penguin Creator) can register their own overlays on the
    *  same manager instead of each building their own. */
   overlays: OverlayManager;
+  /** Shows Snowball mode as on (active SNOWBALL button, mode panel) or off (#53). */
+  setSnowballMode(on: boolean): void;
+  /** Updates the mode panel's ammo pips and "N LEFT · REFILLS 1 / 4S" line (#53). */
+  setSnowballAmmo(count: number, capacity: number): void;
 }
 
 const MENU_OVERLAY_ID = 'menu';
@@ -98,6 +109,7 @@ export function createHud(layer: HTMLElement, deps: HudDeps): Hud {
   const menuPanel = document.createElement('div');
   menuPanel.className = 'hud__menu-panel';
   menuPanel.hidden = true;
+
   const signOutButton = document.createElement('button');
   signOutButton.type = 'button';
   signOutButton.className = 'hud__menu-signout';
@@ -124,8 +136,8 @@ export function createHud(layer: HTMLElement, deps: HudDeps): Hud {
     deps.onSignOut();
   });
 
-  // Bottom bar: chat field (#44), MAP and IGLOO. EMOTE, SNOWBALL and QUESTS
-  // stay hidden until their stretch tickets land.
+  // Bottom bar: chat field (#44), SNOWBALL (#53), MAP and IGLOO. EMOTE and
+  // QUESTS stay hidden until their stretch tickets land.
   const bottomBar = document.createElement('div');
   bottomBar.className = 'hud__bottom-bar';
 
@@ -179,15 +191,29 @@ export function createHud(layer: HTMLElement, deps: HudDeps): Hud {
   snowballButton.type = 'button';
   snowballButton.className = 'hud__button hud__button--bottom hud__button--snowball';
   snowballButton.textContent = 'SNOWBALL';
-  snowballButton.hidden = true;
+  let snowballMode = false;
+  snowballButton.addEventListener('click', () => {
+    if (snowballMode) {
+      deps.onSnowballToggle?.(false);
+      return;
+    }
+    // As MAP does: MENU closes first (#32 D6). Any other overlay (Creator,
+    // Minigame, Trophy Case, Market) refuses the mode outright (#53 v4 #12).
+    overlays.close(MENU_OVERLAY_ID);
+    closeMenu();
+    if (overlays.current() !== null) return;
+    deps.onSnowballToggle?.(true);
+  });
 
   const mapButton = document.createElement('button');
   mapButton.type = 'button';
   mapButton.className = 'hud__button hud__button--bottom hud__button--map';
   mapButton.textContent = 'MAP';
   mapButton.addEventListener('click', () => {
-    // Closing MENU first keeps one overlay open at a time (#32 D6) even
-    // though the Map itself isn't wired up yet.
+    // Closes MENU directly (#32 D6) rather than relying on the Map (#33) to
+    // do it: the Map's own `ui:open-map` handler only calls
+    // `overlays.open` when a Session is active, so this is what actually
+    // closes MENU on the rare click before one has started.
     overlays.close(MENU_OVERLAY_ID);
     gameEvents.emit('ui:open-map');
   });
@@ -225,7 +251,48 @@ export function createHud(layer: HTMLElement, deps: HudDeps): Hud {
     }, TOAST_DURATION_MS);
   }
 
-  root.append(titleBlock, topRight, menuPanel, bottomBar, toastEl);
+  // Snowball mode's bottom-centre panel (#53, design HUD-SNOWBALL): title,
+  // ammo pips, refill line and the hit hint. The design's Snowmageddon badge
+  // copy is omitted (no rewards for hits). Never a widget: `pointer-events:
+  // none` in style.css, so it never swallows a throw click on the canvas.
+  const snowballPanel = document.createElement('div');
+  snowballPanel.className = 'hud__snowball-panel';
+  snowballPanel.hidden = true;
+  const snowballTitle = document.createElement('div');
+  snowballTitle.className = 'hud__snowball-title';
+  snowballTitle.textContent = 'SNOWBALL MODE';
+  const snowballAmmo = document.createElement('div');
+  snowballAmmo.className = 'hud__snowball-ammo';
+  const snowballPips = document.createElement('div');
+  snowballPips.className = 'hud__snowball-pips';
+  const snowballAmmoText = document.createElement('span');
+  snowballAmmoText.className = 'hud__snowball-ammo-text';
+  snowballAmmo.append(snowballPips, snowballAmmoText);
+  const snowballDivider = document.createElement('div');
+  snowballDivider.className = 'hud__snowball-divider';
+  const snowballHint = document.createElement('div');
+  snowballHint.className = 'hud__snowball-hint';
+  snowballHint.textContent = 'Hit a penguin: they get a snow hat for 10s.';
+  snowballPanel.append(snowballTitle, snowballAmmo, snowballDivider, snowballHint);
+
+  function setSnowballAmmo(count: number, capacity: number): void {
+    const pips: HTMLElement[] = [];
+    for (let i = 0; i < capacity; i += 1) {
+      const pip = document.createElement('span');
+      pip.className = i < count ? 'hud__snowball-pip hud__snowball-pip--full' : 'hud__snowball-pip';
+      pips.push(pip);
+    }
+    snowballPips.replaceChildren(...pips);
+    snowballAmmoText.textContent = `${count} LEFT · REFILLS 1 / 4S`;
+  }
+
+  function setSnowballMode(on: boolean): void {
+    snowballMode = on;
+    snowballPanel.hidden = !on;
+    snowballButton.classList.toggle('hud__button--active', on);
+  }
+
+  root.append(titleBlock, topRight, menuPanel, snowballPanel, bottomBar, toastEl);
   layer.append(root);
 
   function setBalance(balance: number): void {
@@ -250,6 +317,8 @@ export function createHud(layer: HTMLElement, deps: HudDeps): Hud {
 
   return {
     overlays,
+    setSnowballMode,
+    setSnowballAmmo,
     show() {
       root.hidden = false;
     },

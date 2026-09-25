@@ -52,6 +52,7 @@ function deferredStore(): { store: ProgressStore; resolve: (snapshot: ProgressSn
       recordRound: () => Promise.reject(new Error('unused in this test')),
       purchase: () => Promise.reject(new Error('unused in this test')),
       setSlot: () => Promise.reject(new Error('unused in this test')),
+      leaderboard: () => Promise.reject(new Error('unused in this test')),
     },
     resolve: resolveFn,
   };
@@ -65,6 +66,7 @@ function failingStore(): ProgressStore {
     recordRound: () => Promise.reject(new Error('unused in this test')),
     purchase: () => Promise.reject(new Error('unused in this test')),
     setSlot: () => Promise.reject(new Error('unused in this test')),
+    leaderboard: () => Promise.reject(new Error('unused in this test')),
   };
 }
 
@@ -230,6 +232,7 @@ describe('createProgressSession', () => {
         },
         purchase: () => Promise.reject(new Error('unused in this test')),
         setSlot: () => Promise.reject(new Error('unused in this test')),
+        leaderboard: () => Promise.reject(new Error('unused in this test')),
       };
       await session.start(PLAYER, store);
       const wrapped = registry.get(PROGRESS_STORE_KEY) as ProgressStore;
@@ -288,6 +291,16 @@ describe('createProgressSession', () => {
 
       await wrapped.setSlot(2, null);
       expect((registry.get(PROGRESS_KEY) as ProgressSnapshot).slots[2]).toBeNull();
+    });
+
+    it('leaderboard forwards straight to the store, without touching the snapshot', async () => {
+      const { registry, wrapped } = await setup();
+      const before = registry.get(PROGRESS_KEY);
+
+      const entries = await wrapped.leaderboard('bug-squash', 5);
+
+      expect(entries).toEqual([]);
+      expect(registry.get(PROGRESS_KEY)).toBe(before);
     });
 
     it('a saveLook that resolves after stop() leaves `player` and `progress` absent', async () => {
@@ -377,5 +390,8 @@ describe('createActiveProgressStore', () => {
 
     await expect(active.loadAll()).rejects.toMatchObject({ code: 'not_authenticated' });
     await expect(active.setSlot(1, null)).rejects.toMatchObject({ code: 'not_authenticated' });
+    await expect(active.leaderboard('bug-squash')).rejects.toMatchObject({
+      code: 'not_authenticated',
+    });
   });
 });

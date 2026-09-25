@@ -543,6 +543,119 @@ describe('createRoomChannel', () => {
     expect(calls).toEqual([]);
   });
 
+  it('sends snowball:throw stamped with playerId, and forwards a valid incoming one from a shown sender (#53 T3)', async () => {
+    const { client, events, view } = setup();
+    const rc = createChannel(client, events, view, 'me');
+
+    const ch = await joinTownCenter(client, events);
+    showOther(ch, 'other');
+    await flush();
+
+    const result = await rc.send('snowball:throw', {
+      throwId: 'abc123',
+      target: { col: 2, row: 3 },
+    });
+    expect(result).toBe(true);
+    expect(sendsOf(ch, 'snowball:throw')).toEqual([
+      { playerId: 'me', throwId: 'abc123', target: { col: 2, row: 3 } },
+    ]);
+
+    const throwCalls: unknown[] = [];
+    rc.on('snowball:throw', (event) => throwCalls.push(event));
+    ch.emitBroadcast('snowball:throw', {
+      playerId: 'other',
+      throwId: 'xyz789',
+      target: { col: 1, row: 1 },
+    });
+    // Dropped: not from a shown sender.
+    ch.emitBroadcast('snowball:throw', {
+      playerId: 'not-shown',
+      throwId: 'zzz999',
+      target: { col: 1, row: 1 },
+    });
+    // Dropped: own origin.
+    ch.emitBroadcast('snowball:throw', {
+      playerId: 'me',
+      throwId: 'own000',
+      target: { col: 1, row: 1 },
+    });
+
+    expect(throwCalls).toEqual([
+      { playerId: 'other', throwId: 'xyz789', target: { col: 1, row: 1 } },
+    ]);
+  });
+
+  it('rejects a malformed snowball:throw (invalid throwId, out-of-range target) at send and at receipt (#53 T3)', async () => {
+    const { client, events, view } = setup();
+    const rc = createChannel(client, events, view, 'me');
+    const ch = await joinTownCenter(client, events);
+    showOther(ch, 'other');
+    await flush();
+
+    const badThrowId = await rc.send('snowball:throw', {
+      throwId: 'not valid!',
+      target: { col: 0, row: 0 },
+    });
+    const badTarget = await rc.send('snowball:throw', {
+      throwId: 'ok1',
+      target: { col: 999, row: 0 },
+    });
+    expect(badThrowId).toBe(false);
+    expect(badTarget).toBe(false);
+    expect(sendsOf(ch, 'snowball:throw')).toEqual([]);
+
+    const throwCalls: unknown[] = [];
+    rc.on('snowball:throw', (event) => throwCalls.push(event));
+    ch.emitBroadcast('snowball:throw', {
+      playerId: 'other',
+      throwId: 'not valid!',
+      target: { col: 0, row: 0 },
+    });
+    ch.emitBroadcast('snowball:throw', {
+      playerId: 'other',
+      throwId: 'ok1',
+      target: { col: 999, row: 0 },
+    });
+    expect(throwCalls).toEqual([]);
+  });
+
+  it('sends snowball:hit stamped with playerId, and rejects a self-targeted hit (#53 T3)', async () => {
+    const { client, events, view } = setup();
+    const rc = createChannel(client, events, view, 'me');
+    const ch = await joinTownCenter(client, events);
+    showOther(ch, 'other');
+    await flush();
+
+    const result = await rc.send('snowball:hit', { throwId: 'abc123', targetId: 'other' });
+    expect(result).toBe(true);
+    expect(sendsOf(ch, 'snowball:hit')).toEqual([
+      { playerId: 'me', throwId: 'abc123', targetId: 'other' },
+    ]);
+
+    const selfHit = await rc.send('snowball:hit', { throwId: 'abc124', targetId: 'me' });
+    expect(selfHit).toBe(false);
+    expect(sendsOf(ch, 'snowball:hit')).toHaveLength(1);
+  });
+
+  it('drops an incoming snowball:hit reporting a self-target or an invalid throwId at parse time (#53 T3)', async () => {
+    const { client, events, view } = setup();
+    const rc = createChannel(client, events, view, 'me');
+    const ch = await joinTownCenter(client, events);
+    showOther(ch, 'other');
+    await flush();
+
+    const hitCalls: unknown[] = [];
+    rc.on('snowball:hit', (event) => hitCalls.push(event));
+    // Self-targeted (the sender names itself as the target): parser rejects it.
+    ch.emitBroadcast('snowball:hit', { playerId: 'other', throwId: 'abc1', targetId: 'other' });
+    // Invalid throwId shape.
+    ch.emitBroadcast('snowball:hit', { playerId: 'other', throwId: '***', targetId: 'me' });
+    // Valid: accepted.
+    ch.emitBroadcast('snowball:hit', { playerId: 'other', throwId: 'abc1', targetId: 'me' });
+
+    expect(hitCalls).toEqual([{ playerId: 'other', throwId: 'abc1', targetId: 'me' }]);
+  });
+
   it('reports the current room and clears it on leave', async () => {
     const { client, events, view } = setup();
     const rc = createChannel(client, events, view);
@@ -1048,6 +1161,12 @@ describe('parsePresencePayload', () => {
       meta('other', { look: { ...DEFAULT_LOOK, name: 'A\u200Bd\u202Aa' } }),
     );
     expect(result?.look.name).toBe('Ada');
+  });
+
+  it('counts code points rather than UTF-16 units, so 9 penguin emoji survive (review round 1)', () => {
+    const name = '\uD83D\uDC27'.repeat(9);
+    const result = parsePresencePayload(meta('other', { look: { ...DEFAULT_LOOK, name } }));
+    expect(result?.look.name).toBe(name);
   });
 
   it('rejects a facing that is not left or right', () => {

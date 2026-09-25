@@ -2,10 +2,10 @@
   "tool": "claude-design",
   "source": "6050d967-ba2e-4edd-819f-f7dcf4ed9d61",
   "source_url": "https://claude.ai/design/p/6050d967-ba2e-4edd-819f-f7dcf4ed9d61",
-  "synced": "2026-09-24",
+  "synced": "2026-09-25",
   "synced_by": "milliehime",
   "snapshot": "Club JenGuin logo directions.zip",
-  "plan_id": "67c1efa4da78",
+  "plan_id": "7f1d152274be",
   "files": {
     "Characters.dc.html": {
       "sha256": "6a357a2adf750ce56651c90ddbfa39fec7e3bfb085588638d0d3bb44fdcd1dff",
@@ -28,8 +28,8 @@
       "bytes": 16937
     },
     "Club JenGuin Map.dc.html": {
-      "sha256": "bb0f141635dac21cbf256bdf14cfe649ba16e9bc9b8bad9667830b6b3f391b9a",
-      "bytes": 728106
+      "sha256": "f7e81256d80d2892646c8fcd3c90e5c4a52faa0686d3ace2980fb08ac37584e9",
+      "bytes": 791806
     },
     "Club JenGuin Rooms.dc.html": {
       "sha256": "8d390f900d8e33591cbfac205711753d251887e0fc9444be945bcebbc7d5126f",
@@ -39,9 +39,17 @@
       "sha256": "4b6b9fcb05c5d26121a26f76c1c6619adffab7f5f49d6311b5836f692d6c97e7",
       "bytes": 52153
     },
+    "Kitchen.dc.html": {
+      "sha256": "6b8822b2152314c36581ee4a7939bfa5195c571b89925e128df728f6629768b7",
+      "bytes": 52563
+    },
+    "Minigame Beystadium.dc.html": {
+      "sha256": "1363c7d1c4cdac31194b29b9876c23ef3ae0b829e4a93fbf21fdb5125b446f60",
+      "bytes": 88163
+    },
     "Minigame Bug Squash.dc.html": {
-      "sha256": "902f21b5a651cce6e8fdb5ae4f51c04210c6320b13fd478de2955cb29f526766",
-      "bytes": 45613
+      "sha256": "67fa58c29081675890708668bd57b191a8250a6e32fac572ac3c5f9f68cc46ec",
+      "bytes": 49782
     },
     "Minigame Coffee Rush.dc.html": {
       "sha256": "47b8e7523cd48054bf84c277bf692f804d014803c8a61d1bb3dd44f8a3e08d13",
@@ -51,73 +59,73 @@
       "sha256": "4380db3bb02277cacf9cf7753ee0d164e856488f5dedb9d4426e6260b26e9b97",
       "bytes": 53286
     },
+    "Minigame Phishing Quiz.dc.html": {
+      "sha256": "cd9326efa62b7a0ad714fe469e3d8e6ce599e954174d4d5c47ff20e5a54a093e",
+      "bytes": 59176
+    },
     "Minigame Snow Cone Stand.dc.html": {
       "sha256": "cbfd32cc5050e280182ab77bad2a767387b4feca6df322c8fdf591ff990d2504",
       "bytes": 80935
     },
     "Penguin Creator.dc.html": {
-      "sha256": "b67c195b61e411de7f448952d20145112a701b6cb8010621e021eb4f0a2ccc4e",
-      "bytes": 22895
+      "sha256": "3e4991a48b60d5060161b6dca1b1c391ce318f5044bd806bc0b06bcf11020f61",
+      "bytes": 23310
     },
     "Room 01 Town Center.dc.html": {
-      "sha256": "fe57def1efb74e6f9dad95e41c61c7c108963c493b8681590cbec1ac6b440ceb",
-      "bytes": 75215
+      "sha256": "ec10ef86b4dbe37e004648c5dda1e1845d404d51789450a3f4563e68e58d37cd",
+      "bytes": 77975
     },
     "Room 02 Dev Pit.dc.html": {
-      "sha256": "9f41138537e4db5b8e8c926c56f2db3ecc015a9fab53f8d19953d24f519daddb",
-      "bytes": 55293
+      "sha256": "a55ea429b80c5f9e5aac0400a26635e1f3571db6b1c5474a8143092c262e7737",
+      "bytes": 72867
     },
     "Room 03 The Icebox.dc.html": {
-      "sha256": "73d2bfab29c89f8357cfb73c6f4abd00714ba2b257530b47278fedbfb0e2fc66",
-      "bytes": 54107
-    },
-    "Room 04 Kitchen.dc.html": {
-      "sha256": "49f1d96263086efc2e35fbd1eb5b2724f9a66a49722e2b38c4d7d95faee9e391",
-      "bytes": 51094
+      "sha256": "8f40382c1a07870ccaf481521b7ed300afc92ffd074fd8b648f0b425b9ed11fe",
+      "bytes": 69351
     },
     "Room 05 Roof Deck.dc.html": {
-      "sha256": "585355bf0f27f10869ba39c2da9486617d7ae3d0a3af6c92ce8ed86e069355bb",
-      "bytes": 96375
+      "sha256": "079476b0f6413774263e9dd23bf9f67aca9aa952b7502f802be09a622c29029c",
+      "bytes": 96979
     },
     "Room 05b Roof Deck Day.dc.html": {
-      "sha256": "21d9740d0f9057f97bdf710abf4f6310403526d31af351aaf4181a850a9c52e4",
-      "bytes": 87765
+      "sha256": "62005ab38ae8130ff5f674706acdfe624b226966eaa92e855f6bf70701ef8c3a",
+      "bytes": 88369
     },
     "Room 06 Igloo.dc.html": {
       "sha256": "a71da5d8a4c6b8afc44ca7e7a36b1ef0cae3527d538ad6930eb82f25f603d50f",
       "bytes": 46118
     },
     "Room 11 Office Hallway.dc.html": {
-      "sha256": "3712c69d295d9f482eab307e8d99359e0c7a407f9a171e891a2c007fa84604aa",
-      "bytes": 31699
+      "sha256": "462b85f8f654a0390548b1ae5ffa8df8d97342b8a821be6fc5e7b07bbee9e789",
+      "bytes": 32014
     },
     "Room 13 Bathroom.dc.html": {
       "sha256": "a4ffc1c625baf468e5e67d16aedff2d965d06185321f0b7654a88b98d3fdf0c4",
       "bytes": 21688
     },
     "Stairwell.dc.html": {
-      "sha256": "b3f9f0677a0e3f86c9141a618e2ff82718214d2718d58f6f79c429d17a39102d",
-      "bytes": 154158
+      "sha256": "a437d06f9b87090b7fbd9c4d2ac84303243d9c4a309fb85ff5166f74005e37a2",
+      "bytes": 212695
     },
     "Team Room 1.dc.html": {
       "sha256": "1bbda1e22488df3fb7d763db865635e91c3ddb321212506903d4bde545292959",
       "bytes": 49474
     },
     "Team Room 2.dc.html": {
-      "sha256": "c72d46c476f06a0921657443e97e9ec06e06f54b2ab30d3c3452f15fb013c78c",
-      "bytes": 44051
+      "sha256": "555052e5ae758b2a854581502ca1683a9a44132bf8a718d2092ef4e5ba99b7b7",
+      "bytes": 39625
     },
     "Team Room 3.dc.html": {
       "sha256": "8368762e1d0d1ab5098d7b15db6db9d45f9e1cab5ea1fd5ca808ae721f5b966a",
       "bytes": 43771
     },
     "Team Room 4.dc.html": {
-      "sha256": "d61589e2ef1461bee472bca38acac4786225c8fe21348a84af75f295b78a8a82",
-      "bytes": 51640
+      "sha256": "1e461fc2fedab11be3a7546b6b5109b3b9e9e021e32cc4dbdc18e4ea81cd4ed5",
+      "bytes": 51644
     },
     "The Mullet.dc.html": {
-      "sha256": "fae68105f8479d992549620adbd9cd294a3603e9f63d70b1a56433f4ab34a0ce",
-      "bytes": 88094
+      "sha256": "c2fed01af5a4315ee08f63e951ae20253b7f8a057ba4908c2f452e25ca8ba537",
+      "bytes": 89963
     },
     "Trophy Case.dc.html": {
       "sha256": "d0dfd5d8930fe8022c94b25f1ed61a33c03b67a7e77402e31ebfbeefb1fe95e8",
@@ -178,6 +186,10 @@
     "assets/jg-pin.png": {
       "sha256": "993af4f628fa69ea550f646c413e81973d8c76e7f444dac741e19703fef82d22",
       "bytes": 4091
+    },
+    "assets/knowbe4-logo.svg": {
+      "sha256": "60af4a5a3c5ea25a659f8ce198af7dfc5e31e92fce3b22e4434ef24d8f651969",
+      "bytes": 11841
     },
     "build/01-tr3.jpg": {
       "sha256": "9162ea62f6c1c9b62a4c80069a468fb894f8530a2e250ec8bdc2a13140bd2dac",
