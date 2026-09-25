@@ -212,10 +212,14 @@ test('every defined Room is reachable from the Map, including the Roof Deck / Th
   await page.goto('/?asPlayer&hud');
   await waitForBoot(page);
 
-  // Roof Deck has no exit door (`doors: []`), and The Kitchen (`the-melt`)
-  // has no entry door (no other Room's doors target it) -- #33 revision 2's
-  // "dead ends": only the Map can leave Roof Deck, and only the Map can
-  // enter The Kitchen.
+  // #33 revision 2's "dead ends": at the time this test was written, Roof
+  // Deck had no exit door and The Kitchen (`the-melt`) had no entry door, so
+  // only the Map could make either trip. #100 gives the Roof Deck a real
+  // KITCHEN door (a floor arrow) that covers this same Roof Deck -> Kitchen
+  // leg in-world too, but the Map must still make it: The Kitchen still has
+  // no door back to Town Center or Dev Pit, and this spec never clicks the
+  // in-world arrow itself (see `e2e/roof-deck-kitchen-exit.spec.ts` for
+  // that) -- both legs below still exercise the Map, not the new door.
   await page.evaluate(() => window.__roomDebug?.changeRoom?.('roof-deck'));
   await expect
     .poll(async () => (await debugInfo(page))?.roomId, { timeout: WALK_TIMEOUT })

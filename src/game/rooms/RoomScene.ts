@@ -20,6 +20,8 @@ import {
   type RegisteredPlayer,
 } from '../movement/registered-player';
 import { doorApproachTile, npcInteractionTile } from '../movement/targets';
+import { getNpcDefinition } from '../../npcs/npcs';
+import { createNpcSprite, type NpcSprite } from '../npcs/npc-sprite';
 import { createPenguin, type Penguin, type PenguinAnim } from '../penguin';
 import { GAME_HEIGHT, GAME_WIDTH } from '../stage-size';
 import { planBackgroundDraw } from './background';
@@ -32,6 +34,7 @@ import {
 import {
   depthForTile,
   screenToTile,
+  SNOWBALL_LAYER,
   tileCornerToScreen,
   tileToScreen,
   TILE_HEIGHT,
@@ -131,8 +134,20 @@ const HOTSPOT_LABEL_FONT_SIZE = '14px';
 const LABEL_FONT_FAMILY = 'sans-serif';
 const LABEL_TEXT_COLOR = '#F4F4F4';
 const DOOR_LABEL_FONT_SIZE = '14px';
-const NPC_LABEL_FONT_SIZE = '12px';
-const NPC_LABEL_OFFSET_Y = -30;
+/**
+ * The invisible click zone over each NPC sprite (#36 D3/A4, sized per #36
+ * round-1 review item 6): centred above the sprite's feet-anchor point,
+ * covering roughly feet-105 to feet+5 -- the figure's own body/head, not just
+ * its feet -- not an alpha-0 shape, which Phaser drops from input
+ * hit-testing the same way `drawDoors`'s own image-background `Zone` avoids
+ * that trap. Confirmed against Town Center's actual NPC/click tile geometry
+ * (`e2e/click-to-move.spec.ts` clicks tiles as close as one column/two rows
+ * from an NPC slot) to still exclude every one of that spec's own click
+ * points.
+ */
+const NPC_HIT_ZONE_WIDTH = 64;
+const NPC_HIT_ZONE_HEIGHT = 110;
+const NPC_HIT_ZONE_OFFSET_Y = -50;
 
 // #15 D3/A4: a disabled door's (`targetRoomId: null`) "COMING SOON" hint, in
 // the Stage's own display font (`--font-game-display`, `style.css`).
@@ -147,9 +162,10 @@ export const DOOR_HINT_DURATION_MS = 2000;
 // Snowball mode (#53), after `design/Club JenGuin HUD Menus.dc.html`'s
 // HUD-SNOWBALL screen: cyan reticle ellipse + ticks on the aimed Tile, a
 // dashed white preview arc from the local Penguin, and the cursor hint under
-// the reticle. Drawn above every Room object and Penguin (tile depths top
-// out near 10^4).
-const SNOWBALL_DEPTH = 1_000_000;
+// the reticle. Drawn above every Room object and Penguin, and above every
+// NPC's speech bubble (`iso.ts`'s shared `SNOWBALL_LAYER`, one whole layer
+// above `NPC_BUBBLE_LAYER` -- #36 round-2 review item 3).
+const SNOWBALL_DEPTH = SNOWBALL_LAYER;
 const SNOWBALL_CYAN = 0x00bdff;
 const SNOWBALL_WHITE = 0xf4f4f4;
 const SNOWBALL_OUTLINE = 0x0c4b5f;
@@ -160,9 +176,6 @@ const SNOWBALL_PREVIEW_SEGMENTS = 28;
 const SNOWBALL_SPLAT_MS = 400;
 const SNOWBALL_HINT_TEXT = 'CLICK TO THROW · RIGHT-CLICK TO CANCEL';
 const SNOWBALL_HINT_OFFSET_Y = 56;
-
-const NPC_RADIUS = 18;
-const NPC_COLOR = 0x00bdff;
 
 const FURNITURE_WIDTH = 40;
 const FURNITURE_HEIGHT = 28;
@@ -177,6 +190,14 @@ const PLAYER_REGISTRY_KEY = 'player';
 
 /** The `Container` name `placePenguinsIn` gives each remote Penguin (#28). */
 const REMOTE_PENGUIN_NAME = 'remote-penguin';
+
+/**
+ * The `Container` name `drawNpcs` gives each NPC sprite (#36), so
+ * `publishRoomDebug`'s `penguinCount` (a Penguin-only count, #14 review fix
+ * 8's restart-leak check) doesn't also count every NPC standing in the Room
+ * as a "Penguin" the way an unnamed Container otherwise would.
+ */
+const NPC_CONTAINER_NAME = 'npc';
 
 /** One entry in an interactive hit-area lookup table (`onPointerDown`). */
 interface HitArea<T> {
@@ -253,6 +274,7 @@ export class RoomScene extends Scene {
   private queuedMove: QueuedMove | null = null;
   private npcHitAreas: HitArea<RoomNpcSlot>[] = [];
   private doorHitAreas: HitArea<RoomDoor>[] = [];
+  private npcSprites: NpcSprite[] = [];
   private hotspotHitAreas: HitArea<RoomHotspot>[] = [];
   private npcArrivedLog: string[] = [];
   private doorReachedLog: string[] = [];
@@ -362,6 +384,8 @@ export class RoomScene extends Scene {
     this.queuedMove = null;
     this.debugPenguins.forEach((debugPenguin) => debugPenguin.destroy());
     this.debugPenguins = [];
+    this.npcSprites.forEach((npcSprite) => npcSprite.destroy());
+    this.npcSprites = [];
     this.clearComingSoonHint();
   };
 
@@ -389,6 +413,7 @@ export class RoomScene extends Scene {
     this.localPenguinMoveLog = [];
     this.localPenguinArrivedLog = [];
     this.debugPenguins = [];
+    this.npcSprites = [];
     this.resetSnowballState();
   }
 
@@ -571,7 +596,9 @@ export class RoomScene extends Scene {
       localPenguinArrivedLog: this.localPenguinArrivedLog,
       restartRoom: () => this.scene.restart(),
       restartCount: this.restartCount,
-      penguinCount: this.countPenguinContainers((name) => name !== REMOTE_PENGUIN_NAME),
+      penguinCount: this.countPenguinContainers(
+        (name) => name !== REMOTE_PENGUIN_NAME && name !== NPC_CONTAINER_NAME,
+      ),
       remotePenguinCount: this.countPenguinContainers((name) => name === REMOTE_PENGUIN_NAME),
       remotePenguins: this.penguins.debugRemotePenguins(),
       setRegisteredPlayer: (player) => this.registry.set(PLAYER_REGISTRY_KEY, player),
@@ -589,7 +616,9 @@ export class RoomScene extends Scene {
   /**
    * Penguin `Container`s in the Scene's display list whose name matches
    * (#14 review fix 8's restart-leak check). Remote Penguins (#28) are named
-   * `REMOTE_PENGUIN_NAME`; the local and debug Penguins are unnamed.
+   * `REMOTE_PENGUIN_NAME`; the local and debug Penguins are unnamed; NPCs
+   * (#36) are named `NPC_CONTAINER_NAME`, excluded from `penguinCount` the
+   * same way remote Penguins are.
    */
   private countPenguinContainers(matches: (name: string) => boolean): number {
     return this.children.list.filter(
@@ -649,9 +678,21 @@ export class RoomScene extends Scene {
    * moving; the reticle appears on the next pointer move. Off hides the
    * reticle, preview arc and cursor hint. `init()` resets it to off, so a
    * Room change always starts outside the mode.
+   *
+   * Turning aiming *on* also drops any pending NPC-arrival callback (#36
+   * round-2 review item 2a): an NPC click queues a walk whose `onArrive`
+   * opens its dialog once the Penguin reaches the interaction tile, and
+   * SNOWBALL/EMOTE/MAP/PENGUIN/MENU firing mid-walk must not let that dialog
+   * open later and steal focus from (and close) whatever overlay the Player
+   * just opened -- the Penguin still finishes walking there, it just no
+   * longer opens the dialog on arrival.
    */
   setAiming(on: boolean): void {
     this.aiming = on;
+    if (on) {
+      this.pendingArrival = null;
+      if (this.queuedMove) this.queuedMove.onArrive = undefined;
+    }
     if (!on) this.cancelAim();
   }
 
@@ -1229,21 +1270,36 @@ export class RoomScene extends Scene {
     }
   }
 
+  /**
+   * Draws each Room's NPCs (#36 D3/A4, replacing #13's placeholder circle and
+   * id label): the NPC's own sprite (figure, name tag, speech bubble) from
+   * `src/npcs/npcs.ts`'s data, at the slot's tile, depth-sorted the same way
+   * as the local/remote Penguins. A slot naming an id with no `NpcDefinition`
+   * is skipped (should never happen once `npcs.ts` covers every slot; #36
+   * reports any gap instead of inventing one).
+   *
+   * The click target stays a separate invisible `Zone` (#14's own
+   * `npcHitAreas`/`handleNpcClick` path is unchanged): an alpha-0 shape is
+   * excluded from Phaser's input hit-testing, the same trap #16 already
+   * worked around for a door drawn over image art.
+   */
   private drawNpcs(room: RoomDefinition): void {
     for (const slot of room.npcSlots) {
+      const npc = getNpcDefinition(slot.npcId);
+      if (!npc) continue;
+
       const point = tileToScreen(slot.tile, room.grid.origin);
       const depth = depthForTile(slot.tile);
-      const circle = this.add.circle(point.x, point.y, NPC_RADIUS, NPC_COLOR).setDepth(depth);
-      circle.setInteractive({ useHandCursor: true });
-      this.npcHitAreas.push({ object: circle, data: slot });
-      this.add
-        .text(point.x, point.y + NPC_LABEL_OFFSET_Y, slot.npcId, {
-          fontFamily: LABEL_FONT_FAMILY,
-          fontSize: NPC_LABEL_FONT_SIZE,
-          color: LABEL_TEXT_COLOR,
-        })
-        .setOrigin(0.5)
-        .setDepth(depth + 1);
+
+      const npcSprite = createNpcSprite(this, point.x, point.y, npc, depth);
+      npcSprite.container.setName(NPC_CONTAINER_NAME);
+      this.npcSprites.push(npcSprite);
+
+      const zone = this.add
+        .zone(point.x, point.y + NPC_HIT_ZONE_OFFSET_Y, NPC_HIT_ZONE_WIDTH, NPC_HIT_ZONE_HEIGHT)
+        .setDepth(depth)
+        .setInteractive({ useHandCursor: true });
+      this.npcHitAreas.push({ object: zone, data: slot });
     }
   }
 }
