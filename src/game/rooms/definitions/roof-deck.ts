@@ -63,12 +63,34 @@ export const roofDeck: RoomDefinition = {
       // href="Kitchen.dc.html">` group (#100): its `<g transform=
       // "translate(125,122)">` wraps the arrow's two polygons (the #00BDFF
       // arrow and its #0C4B5F drop-shadow, points 480-585 x 467.5-524 in
-      // local design px) and the "KITCHEN" label. This `rect` is the
-      // translated arrow+shadow bounding box only (480+125=605 .. 585+125=
-      // 710 x, 467.5+122=589.5 .. 524+122=646 y in Stage px, floored/ceiled
-      // outward to whole pixels), not the label -- matching this ticket's
-      // own execution-plan estimate ("roughly Stage 605-710 x 589-646").
-      hotspot: { x: 605, y: 589, width: 105, height: 57 },
+      // local design px, so Stage 605-710 x 589.5-646) and the "KITCHEN"
+      // label.
+      //
+      // Top edge, y = 561, the label's top (#100 review nit 3, so the sign is
+      // clickable like every other door's): the label's `<text transform=
+      // "matrix(1 0.5 0 1 497 465.5)">` puts its baseline anchor at Stage
+      // (497+125, 465.5+122) = (622, 587.5), skewed 0.5 px down per px
+      // right. It's `text-anchor="middle"` and about 54 px wide (Anton 14px,
+      // letter-spacing 2), so its left end (x ~595) sits 27 * 0.5 = 13.5 px
+      // above the anchor, at y ~574, and Anton's ~12.5 px cap height at
+      // font-size 14 puts the top of its first glyph at y ~561 -- matching
+      // the exported `public/rooms/roof-deck.png`'s ink, whose topmost
+      // label pixel is at y 561-562.
+      //
+      // Left edge, x = 619, not the arrow's 605 (#100 review minor 2):
+      // Tristin's NPC slot { col: 5, row: 9 } centres at Stage (600, 625)
+      // with an 18 px hit circle (x 582-618, y 607-643), and `RoomScene`
+      // checks NPC hits before doors, so any part of this rect left of 619
+      // -- the arrow's tip and the label's first letters -- would open
+      // Tristin's Interaction instead. Starting at 619 keeps the two hit
+      // zones disjoint. Right (710) and bottom (646) are still the arrow's
+      // own edges; Brandon's hit circle (centre (700, 525), bottom y 543) sits
+      // above the new top edge.
+      //
+      // Approach tile: the centre (664.5, 603.5) still maps via
+      // `screenToTile` to { col: 5, row: 8 } -- the same walkable tile the
+      // old 605-710 x 589-646 rect's centre (657.5, 617.5) mapped to.
+      hotspot: { x: 619, y: 561, width: 91, height: 85 },
       targetRoomId: 'the-melt',
       // The Kitchen tile next to its own "ROOF DECK" door (#100, the same
       // rule `reachability.test.ts` uses for a door's approach tile): the

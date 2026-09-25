@@ -81,11 +81,12 @@ test('roof-deck-kitchen-exit: clicking the KITCHEN arrow walks the Penguin to th
   // the leave/enter pair this one door click produced, whatever came before
   // it (the Session's own initial Town Center enter, then the `changeRoom`
   // above).
-  const log = (await debugInfo(page))?.roomEventLog;
-  expect(log?.slice(-2)).toEqual([
-    { type: 'room:leave', roomId: 'roof-deck' },
-    { type: 'room:enter', roomId: 'the-melt' },
-  ]);
+  await expect
+    .poll(async () => (await debugInfo(page))?.roomEventLog?.slice(-2))
+    .toEqual([
+      { type: 'room:leave', roomId: 'roof-deck' },
+      { type: 'room:enter', roomId: 'the-melt' },
+    ]);
 
   await page.screenshot({ path: 'test-results/roof-deck-kitchen-exit/the-kitchen-arrival.png' });
 
