@@ -256,7 +256,7 @@ describe('createChatController', () => {
     ]);
   });
 
-  it('clears a remote bubble once its 5000ms lifetime elapses', () => {
+  it('clears a remote bubble once its 8000ms lifetime elapses', () => {
     const fakeChannel = createFakeChannel();
     const { view, calls } = createFakeView();
     const timer = createManualTimer();

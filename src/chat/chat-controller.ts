@@ -3,7 +3,7 @@ import { CHAT_RECEIVE_MIN_GAP_MS, ChatRateGate } from './chat-rate-gate';
 import { prepareChatSend } from './chat-rules';
 
 /** How long a speech bubble stays up before it's cleared (#44). */
-export const CHAT_BUBBLE_LIFETIME_MS = 5000;
+export const CHAT_BUBBLE_LIFETIME_MS = 8000;
 
 /** A single, unchanging key: the sender-side rate gate only ever tracks the local Player. */
 const SENDER_KEY = 'self';
