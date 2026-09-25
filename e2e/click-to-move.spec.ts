@@ -1,7 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
 import { DEFAULT_LOOK, type PenguinLook, type Tile } from '../src/contracts';
+import { npcInteractionTile } from '../src/game/movement/targets';
 import { townCenter } from '../src/game/rooms/definitions/town-center';
-import { tileToScreen } from '../src/game/rooms/iso';
+import { screenToTile, tileToScreen } from '../src/game/rooms/iso';
 import { GAME_HEIGHT, GAME_WIDTH } from '../src/game/stage-size';
 import type { RoomDebugInfo } from './support/room-debug-types';
 import { TILE_STEP_MS } from '../src/game/movement/speed';
@@ -218,25 +219,40 @@ test('click-to-move', async ({ page }) => {
     .toBe(false);
 
   // --- Clicking the NPC walks to its interaction tile and logs npc:arrived.
+  // Darrin (#113) roams a designed loop around Town Center, so -- unlike
+  // this test's earlier tile clicks -- both his own click target and his
+  // interaction tile move with him: read his live point off
+  // `__roomDebug.npcs` right before each click, and compute the expected
+  // interaction tile the same way `RoomScene.handleNpcClick` does (via
+  // `npcInteractionTile`) instead of assuming his static `npcSlots` tile.
   const npc = townCenter.npcSlots[0];
-  // Masking the NPC's own tile leaves all 4 of its neighbors walkable and
-  // tied at distance 1; the lowest-row tie-break picks the one directly
-  // above it.
-  const npcInteractionTile: Tile = { col: npc.tile.col, row: npc.tile.row - 1 };
-  await clickStagePoint(page, tileToScreen(npc.tile, origin));
+  async function npcPoint(): Promise<{ x: number; y: number }> {
+    const point = (await debugInfo(page))?.npcs?.[npc.npcId];
+    if (!point) throw new Error(`no __roomDebug.npcs entry for ${npc.npcId}`);
+    return point;
+  }
+
+  const beforeClick = await npcPoint();
+  const npcInteractionTileNow = npcInteractionTile(townCenter.walkable, {
+    ...npc,
+    tile: screenToTile(beforeClick, origin),
+  });
+  await clickStagePoint(page, beforeClick);
   await expect
     .poll(async () => (await debugInfo(page))?.localPenguin, { timeout: LONG_WALK_TIMEOUT })
-    .toMatchObject({ tile: npcInteractionTile, moving: false });
+    .toMatchObject({ tile: npcInteractionTileNow, moving: false });
   expect((await debugInfo(page))?.npcArrivedLog).toContain(npc.npcId);
 
   // Clicking the same NPC again while already on its interaction tile still
   // counts as arriving (no walk needed), so its dialog can reopen (#36).
+  // The first click already paused Darrin where he stood (#113), so his
+  // live point -- and therefore his interaction tile -- hasn't moved since.
   const arrivalsBefore = (await debugInfo(page))?.npcArrivedLog?.length ?? 0;
-  await clickStagePoint(page, tileToScreen(npc.tile, origin));
+  await clickStagePoint(page, await npcPoint());
   await expect
     .poll(async () => (await debugInfo(page))?.npcArrivedLog?.length)
     .toBe(arrivalsBefore + 1);
-  expect((await debugInfo(page))?.localPenguin).toMatchObject({ tile: npcInteractionTile });
+  expect((await debugInfo(page))?.localPenguin).toMatchObject({ tile: npcInteractionTileNow });
 
   // --- Clicking a door hotspot walks to its approach tile and logs
   // door:reached. Hand-computed like the NPC case above, against DEV PIT's
