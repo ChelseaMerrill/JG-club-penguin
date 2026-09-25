@@ -2,6 +2,15 @@
 
 Newest first. Written by design_resync.py apply.
 
+## 2026-09-25 · plan 7f1d152274be
+
+From Club JenGuin logo directions.zip by milliehime.
+
+Roof Deck (night and day): KITCHEN floor arrow linking to the Kitchen
+
+- changed: `Room 05 Roof Deck.dc.html`
+- changed: `Room 05b Roof Deck Day.dc.html`
+
 ## 2026-09-24 · plan 513587b3d1b8
 
 From Club JenGuin logo directions.zip by milliehime.
