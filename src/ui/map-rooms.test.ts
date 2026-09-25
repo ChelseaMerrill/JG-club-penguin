@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ROOM_DEFINITIONS } from '../game/rooms/registry';
 import { isMapTileClickable, MAP_ROOMS } from './map-rooms';
 
@@ -58,15 +58,28 @@ describe('MAP_ROOMS', () => {
       expect(isMapTileClickable(matches[0]!)).toBe(true);
     }
   });
+});
 
-  it('never names a roomId with no registered RoomDefinition', () => {
-    // Every roomId this build's RoomId union can name already has a
-    // RoomDefinition (#13's five prototype Rooms), so no tile should ever
-    // resolve `isMapTileClickable` to false via a *missing* definition alone;
-    // this pins that invariant rather than re-deriving it from `hasRoomDefinition`.
-    const roomTiles = MAP_ROOMS.filter((tile) => tile.roomId !== null);
-    for (const tile of roomTiles) {
-      expect(isMapTileClickable(tile)).toBe(true);
-    }
+describe('isMapTileClickable, with hasRoomDefinition mocked out (#33 review round 1 nit 8)', () => {
+  afterEach(() => {
+    vi.doUnmock('../game/rooms/registry');
+    vi.resetModules();
+  });
+
+  it('is false for a tile naming a RoomId that has no registered RoomDefinition', async () => {
+    // Every real RoomId currently has a RoomDefinition (#13's five prototype
+    // Rooms), so exercising the `hasRoomDefinition === false` branch needs a
+    // mock rather than a real gap in the registry. `resetModules` first, so
+    // the dynamic import below re-resolves `./map-rooms` (and, through it,
+    // the registry) against the mock instead of the file's already-cached,
+    // real top-level import.
+    vi.resetModules();
+    vi.doMock('../game/rooms/registry', () => ({ hasRoomDefinition: () => false }));
+    const { isMapTileClickable: isMapTileClickableWithMock, MAP_ROOMS: mockedMapRooms } =
+      await import('./map-rooms');
+
+    const townCenter = mockedMapRooms.find((tile) => tile.number === '01')!;
+
+    expect(isMapTileClickableWithMock(townCenter)).toBe(false);
   });
 });
