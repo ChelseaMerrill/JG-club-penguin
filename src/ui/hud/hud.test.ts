@@ -362,6 +362,69 @@ describe('createHud', () => {
 
       expect(onSnowballToggle).toHaveBeenCalledWith(true);
     });
+
+    it('shows SNOWBALL as aria-disabled with the disabled class at 0 ammo while the mode is off, clearing once ammo returns (#109)', () => {
+      const { root, hud } = setup();
+
+      hud.setSnowballAmmo(0, 3);
+
+      expect(snowballButton(root).getAttribute('aria-disabled')).toBe('true');
+      expect(snowballButton(root).classList.contains('hud__button--disabled')).toBe(true);
+
+      hud.setSnowballAmmo(1, 3);
+
+      expect(snowballButton(root).hasAttribute('aria-disabled')).toBe(false);
+      expect(snowballButton(root).classList.contains('hud__button--disabled')).toBe(false);
+    });
+
+    it('does not show SNOWBALL disabled at 0 ammo while the mode is already on (#109)', () => {
+      const { root, hud } = setup();
+
+      hud.setSnowballMode(true);
+      hud.setSnowballAmmo(0, 3);
+
+      expect(snowballButton(root).hasAttribute('aria-disabled')).toBe(false);
+      expect(snowballButton(root).classList.contains('hud__button--disabled')).toBe(false);
+    });
+
+    it('clicking SNOWBALL at 0 ammo still closes an open MENU (#109)', () => {
+      const onSnowballToggle = vi.fn();
+      const { root, hud } = setup({ onSnowballToggle });
+      hud.setSnowballAmmo(0, 3);
+      (root.querySelector('.hud__button--menu') as HTMLButtonElement).click();
+      expect(hud.overlays.current()).toBe('menu');
+
+      snowballButton(root).click();
+
+      expect(hud.overlays.current()).toBeNull();
+      expect((root.querySelector('.hud__menu-panel') as HTMLElement).hidden).toBe(true);
+      expect(onSnowballToggle).not.toHaveBeenCalled();
+    });
+
+    it('destroy() removes the Escape listener (mirrors overlay-manager.test.ts)', () => {
+      const onSnowballToggle = vi.fn();
+      const { hud } = setup({ onSnowballToggle });
+      hud.setSnowballMode(true);
+
+      hud.destroy();
+      currentHud = undefined; // already destroyed; afterEach must not double-destroy
+
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+
+      expect(onSnowballToggle).not.toHaveBeenCalled();
+    });
+
+    it('the HUD requests mode off itself when any overlay opens, without relying on external overlays.onOpen wiring (#109)', () => {
+      const onSnowballToggle = vi.fn();
+      const { hud } = setup({ onSnowballToggle });
+      hud.setSnowballMode(true);
+
+      // No caller-side `hud.overlays.onOpen(...)` is wired in this test:
+      // the HUD's own internal subscription is what turns the mode off.
+      hud.overlays.open('penguin-creator', () => {});
+
+      expect(onSnowballToggle).toHaveBeenCalledWith(false);
+    });
   });
 
   it('renders the chat field with the shared 120 maxlength and its placeholder', () => {

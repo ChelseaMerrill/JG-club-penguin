@@ -4,6 +4,7 @@ import { townCenter } from '../src/game/rooms/definitions/town-center';
 import { tileToScreen } from '../src/game/rooms/iso';
 import { GAME_HEIGHT, GAME_WIDTH } from '../src/game/stage-size';
 import type { HudTestHandle } from '../src/ui/hud/hud-test-handle';
+import type { RoomDebugInfo } from './support/room-debug-types';
 import type { SnowballDebugInfo } from './support/snowball-debug-types';
 
 declare global {
@@ -161,6 +162,10 @@ async function snowballDebug(page: Page): Promise<SnowballDebugInfo | undefined>
   return page.evaluate(() => window.__snowballDebug);
 }
 
+async function roomDebug(page: Page): Promise<RoomDebugInfo | undefined> {
+  return page.evaluate(() => window.__roomDebug);
+}
+
 /** A Stage-pixel point as a page point, via the canvas's own bounding box (`e2e/snowball-hit.spec.ts`'s technique). */
 async function pagePoint(page: Page, stage: { x: number; y: number }) {
   const canvasBox = await page.locator('#game canvas').boundingBox();
@@ -177,6 +182,8 @@ async function tilePoint(page: Page, tile: Tile) {
 
 /** An empty Town Center Tile, clear of NPCs and HUD widgets, for aiming/throwing. */
 const EMPTY_TILE: Tile = { col: 11, row: 0 };
+/** A second empty Tile, distinct from `EMPTY_TILE`, for post-exit pointer moves. */
+const AFTER_EXIT_TILE: Tile = { col: 10, row: 1 };
 
 // #109: single-browser coverage of Snowball mode's two exits, via the
 // `?asPlayer` hook's local-only stub controller (`src/main.ts`
@@ -195,6 +202,15 @@ test('snowball-escape-exits-the-mode', async ({ page }) => {
   await expect(page.locator('.hud__snowball-panel')).toBeVisible();
   await expect(page.locator('.hud__button--snowball')).toHaveClass(/hud__button--active/);
 
+  // Hovering while aiming moves the reticle onto the hovered Tile.
+  const empty = await tilePoint(page, EMPTY_TILE);
+  await page.mouse.move(empty.x, empty.y);
+  await expect.poll(async () => (await snowballDebug(page))?.reticle).toEqual(EMPTY_TILE);
+
+  const beforeEscape = await roomDebug(page);
+  const tileBeforeEscape = beforeEscape?.localPenguin?.tile;
+  const moveLogBeforeEscape = beforeEscape?.localPenguinMoveLog ?? [];
+
   await page.keyboard.press('Escape');
 
   await expect.poll(async () => (await snowballDebug(page))?.mode).toBe(false);
@@ -203,6 +219,15 @@ test('snowball-escape-exits-the-mode', async ({ page }) => {
   // Escape neither threw nor moved the Penguin.
   expect((await snowballDebug(page))?.throwLog).toEqual([]);
   expect((await snowballDebug(page))?.ammo).toBe(3);
+  expect((await snowballDebug(page))?.reticle).toBeNull();
+  const afterEscape = await roomDebug(page);
+  expect(afterEscape?.localPenguin?.tile).toEqual(tileBeforeEscape);
+  expect(afterEscape?.localPenguinMoveLog).toEqual(moveLogBeforeEscape);
+
+  // After exiting, the scene is no longer aiming: moving the pointer leaves the reticle null.
+  const afterExit = await tilePoint(page, AFTER_EXIT_TILE);
+  await page.mouse.move(afterExit.x, afterExit.y);
+  expect((await snowballDebug(page))?.reticle).toBeNull();
 
   expect(errors).toEqual([]);
 });

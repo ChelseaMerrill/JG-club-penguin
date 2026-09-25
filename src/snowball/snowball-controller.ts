@@ -95,11 +95,17 @@ export interface SnowballController {
   /** Fires on every ammo change (a throw, a refund, or a refill tick). */
   onAmmoChange(listener: (ammo: { count: number; capacity: number }) => void): () => void;
   /**
-   * Fires once a throw's send resolves `true` and that reservation leaves
-   * the bucket at 0 ammo (#109): the signal `main.ts` uses to leave Snowball
-   * mode once ammo runs out. Never fires for a throw whose send is rejected
-   * or resolves `false` (refunded, not exhausted), and never fires from a
-   * refill tick alone.
+   * Fires once a throw's send resolves `true` and that throw's reservation
+   * (captured immediately after `ammo.reserve()` succeeds, before the send
+   * is awaited) left the bucket at 0 ammo (#109): the signal `main.ts` uses
+   * to leave Snowball mode once ammo runs out. Refill race: if a refill tick
+   * adds ammo back while this throw's send is still in flight, this still
+   * fires — the throw took the last snowball at the moment it was reserved,
+   * even though the bucket may show ammo again by the time the send
+   * resolves. Never fires for a throw whose send is rejected or resolves
+   * `false` (refunded, not exhausted), never fires from a refill tick alone,
+   * and never fires when a Room change or `stop()` intervened before the
+   * send resolved (see `throwAt`).
    */
   onAmmoEmptied(listener: () => void): () => void;
   /** A snapshot of every active snow hat, keyed by playerId (the local Player included). */
@@ -258,6 +264,11 @@ export function createSnowballController(options: SnowballControllerOptions): Sn
     async throwAt(target: Tile): Promise<boolean> {
       if (stopped) return false;
       if (!ammo.reserve(now())) return false;
+      // Captured immediately after the reservation succeeds, before the
+      // send is awaited (#109): whether *this* throw took the last
+      // snowball, independent of any refill tick or further reserve/refund
+      // activity while the send is in flight.
+      const emptiedByThis = ammo.count(now()) === 0;
       notifyAmmoChange();
       scheduleRefillNotification();
 
@@ -277,13 +288,13 @@ export function createSnowballController(options: SnowballControllerOptions): Sn
         return false;
       }
 
-      // #109: once a *sent* throw leaves the bucket empty, signal the exit
-      // (never for a refunded one, handled in the `!ok` branch above).
-      if (!stopped && ammo.count(now()) === 0) notifyAmmoEmptied();
-
       // A Room change or stop() while the send was in flight: the throw was
       // sent, but this Player has left the Room it would land in.
       if (stopped || generation !== startGeneration) return true;
+
+      // #109: the send resolved true and this reservation emptied the
+      // bucket -> exactly one fire from the throw that emptied it.
+      if (emptiedByThis) notifyAmmoEmptied();
 
       view.drawArc(throwId, from, to, SNOWBALL_FLIGHT_MS);
       const timer = scheduleTimer(() => {
