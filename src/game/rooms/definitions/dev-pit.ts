@@ -80,11 +80,13 @@ export const devPit: RoomDefinition = {
     { npcId: 'ashley', tile: { col: 1, row: 8 } },
     { npcId: 'ian', tile: { col: 1, row: 5 } },
     { npcId: 'steven', tile: { col: 7, row: 1 } },
-    // Dom's new shadow sits almost on desk B's own body tile (2,6); placed
-    // one tile south, on the open floor in front of the desk instead, so he
-    // doesn't render standing inside the furniture (still his nearest
-    // walkable neighbour by `reachability.test.ts`'s rule).
-    { npcId: 'dom', tile: { col: 2, row: 5 } },
+    // Dom removed from the Dev Pit (owner request, 2026-09-25, Track D): his
+    // `NpcDefinition` stays in `npcs.ts` (other tests still reference his
+    // name/title/figure), but he no longer has a slot in any Room. (2,5) --
+    // his former tile, blocked in `WALKABLE` above only because he stood
+    // there -- is left blocked: nothing in this file's own tests or
+    // `reachability.test.ts` requires it to open back up (that test only
+    // walks `npcSlots`, which no longer names him).
     { npcId: 'ryan', tile: { col: 5, row: 1 } },
     { npcId: 'sam', tile: { col: 9, row: 1 } },
     // Matt is a Penguin (a Player), like "You", not an NPC -- see the export

@@ -890,6 +890,13 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: 'One more for the recap.', periodS: 21, delayS: -9 },
       { text: 'Say hackathon!', periodS: 21, delayS: -16 },
     ],
+    // Confirmed via an e2e screenshot (#113): at their own tiles' derived
+    // screen positions, Jethro's bubble (his row+col puts his feet, and so
+    // his head-top, far enough down-screen that HEAD_TOP_OFFSET_Y alone
+    // isn't enough clearance) crowded right up against Nicole's nameplate
+    // just above and to his left. Nudged up to clear it, the same fix
+    // Roof Deck's Tristin got against Millie's nameplate.
+    bubbleOffsetY: -60,
     dialog: LINE_DIALOG,
     figure: {
       style: 'short',

@@ -21,14 +21,25 @@ describe('NPCS', () => {
     const slotIdsByRoom = new Map(
       ROOM_DEFINITIONS.map((room) => [room.id, room.npcSlots.map((slot) => slot.npcId)]),
     );
+    // Dom removed from the Dev Pit's own `npcSlots` (owner request,
+    // 2026-09-25, Track D), but his `NpcDefinition` stays (other tests here
+    // still reference his name/title/figure) -- so he's an intentional
+    // exception to "every NPC has exactly one Room slot".
+    const NO_LONGER_PLACED: NpcId[] = ['dom'];
 
     for (const npc of Object.values(NPCS)) {
+      if (NO_LONGER_PLACED.includes(npc.id)) continue;
       const roomsContainingIt = ROOM_DEFINITIONS.filter((room) =>
         (slotIdsByRoom.get(room.id) ?? []).includes(npc.id),
       );
       expect(roomsContainingIt, `NPC "${npc.id}"`).toHaveLength(1);
       expect(roomsContainingIt[0]?.id).toBe(npc.roomId);
     }
+  });
+
+  it('no longer places Dom in the Dev Pit (owner request, 2026-09-25, Track D)', () => {
+    expect(devPit.npcSlots.some((slot) => slot.npcId === 'dom')).toBe(false);
+    expect(NPCS.dom).toBeDefined();
   });
 
   it('covers every npcSlot exactly once across every Room (no duplicate npcId)', () => {
@@ -98,10 +109,11 @@ describe('NPCS', () => {
   });
 
   it(
-    "keeps Ian/Dom's and Ryan/Steven/Sam's bubble rects from intersecting at the shared " +
-      "max bubble width, each rect still spanning its own NPC's tile x (#36 round-2 review " +
+    "keeps Ryan/Steven/Sam's bubble rects from intersecting at the shared max bubble width, " +
+      "each rect (including Ian's) still spanning its own NPC's tile x (#36 round-2 review " +
       'item 4: replaces a constants-only assertion after #92 moved them close together, ' +
-      'confirmed overlapping via an e2e screenshot)',
+      'confirmed overlapping via an e2e screenshot; Dom dropped, owner request 2026-09-25 ' +
+      'removed him from this Room, so his own pairing with Ian no longer applies)',
     () => {
       const halfWidth = MAX_BUBBLE_WIDTH / 2;
 
@@ -117,7 +129,7 @@ describe('NPCS', () => {
         return { min: center - halfWidth, max: center + halfWidth, npcTileX: tileX };
       }
 
-      const ids: NpcId[] = ['ian', 'dom', 'ryan', 'steven', 'sam'];
+      const ids: NpcId[] = ['ian', 'ryan', 'steven', 'sam'];
       const rects = new Map(ids.map((id) => [id, bubbleRect(id)]));
 
       for (const id of ids) {
@@ -127,7 +139,6 @@ describe('NPCS', () => {
       }
 
       const adjacentPairs: [NpcId, NpcId][] = [
-        ['ian', 'dom'],
         ['ryan', 'steven'],
         ['steven', 'sam'],
       ];
