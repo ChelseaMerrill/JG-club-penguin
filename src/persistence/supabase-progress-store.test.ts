@@ -500,6 +500,20 @@ describe('createSupabaseProgressStore', () => {
       expect(calls).toContainEqual(['rpc.leaderboard', { minigame_id: 'bug-squash', max_rows: 3 }]);
     });
 
+    it('clamps maxRows the same way the fake and the SQL function do (round 2, 2026-09-25)', async () => {
+      const { client, calls } = makeFakeClient();
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID });
+
+      await store.leaderboard('bug-squash', 0);
+      await store.leaderboard('bug-squash', -5);
+      await store.leaderboard('bug-squash', 100_000);
+
+      const sentMaxRows = calls
+        .filter((call) => call[0] === 'rpc.leaderboard')
+        .map((call) => (call[1] as { max_rows: number }).max_rows);
+      expect(sentMaxRows).toEqual([1, 1, 50]);
+    });
+
     it('maps exactly the 4 known keys, even when the RPC returns extra ones', async () => {
       const { client } = makeFakeClient({
         leaderboard: {

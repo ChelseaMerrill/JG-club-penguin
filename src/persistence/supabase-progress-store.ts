@@ -10,7 +10,7 @@ import type { BadgeId, GameEventMap, MinigameId, MinigameStatsMap } from '../con
 import type { Eyes, Hat, IdleEmote, Pattern, PenguinLook } from '../contracts/penguin';
 import { MINIGAME_RULES } from './minigame-rules';
 import {
-  LEADERBOARD_DEFAULT_ROWS,
+  clampLeaderboardRows,
   ProgressStoreError,
   emptySlots,
   isIglooSlot,
@@ -497,7 +497,11 @@ export function createSupabaseProgressStore(
   ): Promise<LeaderboardEntry[]> {
     const { data, error } = await client.rpc('leaderboard', {
       minigame_id: minigameId,
-      max_rows: maxRows ?? LEADERBOARD_DEFAULT_ROWS,
+      // Clamped client-side too (round 2 red-team, 2026-09-25), the same
+      // way the fake does: the server clamps again regardless, but this
+      // keeps every caller of this store sending the same, already-valid
+      // value the SQL function would otherwise have to correct.
+      max_rows: clampLeaderboardRows(maxRows),
     });
     if (error) {
       throw toProgressError(error);

@@ -19,12 +19,15 @@ function root(container: HTMLElement): HTMLElement {
   return container.querySelector('.minigame-leaderboard') as HTMLElement;
 }
 
+const ORIGINAL_URL = window.location.href;
+
 beforeEach(() => {
   document.body.innerHTML = '';
 });
 
 afterEach(() => {
   vi.restoreAllMocks();
+  window.history.pushState({}, '', ORIGINAL_URL);
 });
 
 describe('mountMinigameLeaderboard', () => {
@@ -114,6 +117,24 @@ describe('mountMinigameLeaderboard', () => {
     await vi.waitFor(() => expect(root(container).dataset.state).toBe('error'));
   });
 
+  it('round 2: a throw while rendering the resolved entries still shows the error state', async () => {
+    const container = document.createElement('div');
+    document.body.append(container);
+    // Not a real array: triggers a genuine throw inside renderReady's own
+    // rendering logic (`entries.length`), rather than faking one via a
+    // store-level rejection -- this is what `.then(render).catch(...)`
+    // (not `.then(render, renderError)`) exists to catch.
+    const malformed = null as unknown as LeaderboardEntry[];
+    const store = createFakeStore({ leaderboard: vi.fn(async () => malformed) });
+
+    mountMinigameLeaderboard(container, { store, minigameId: 'bug-squash' });
+
+    await vi.waitFor(() => expect(root(container).dataset.state).toBe('error'));
+    expect(root(container).querySelector('.minigame-leaderboard__body')?.textContent).toBe(
+      'Leaderboard unavailable',
+    );
+  });
+
   it("R5: a gap separates the top rows from the caller's own row only when its rank jumps", async () => {
     const container = document.createElement('div');
     document.body.append(container);
@@ -188,5 +209,25 @@ describe('mountMinigameLeaderboard', () => {
 
     const nameEl = root(container).querySelector('.minigame-leaderboard__name') as HTMLElement;
     expect(nameEl.getAttribute('dir')).toBe('auto');
+  });
+
+  it('R6: ?masknames masks every row name, and leaves them alone without it', async () => {
+    window.history.pushState({}, '', '/?masknames');
+    const container = document.createElement('div');
+    document.body.append(container);
+    const store = createFakeStore({
+      leaderboard: vi.fn(async () => [
+        { rank: 1, penguinName: 'ALPHA', bestScore: 300, isMe: false },
+        { rank: 2, penguinName: 'BRAVO', bestScore: 200, isMe: true },
+      ]),
+    });
+
+    mountMinigameLeaderboard(container, { store, minigameId: 'bug-squash' });
+    await vi.waitFor(() => expect(root(container).dataset.state).toBe('ready'));
+
+    const names = Array.from(root(container).querySelectorAll('.minigame-leaderboard__name')).map(
+      (el) => el.textContent,
+    );
+    expect(names).toEqual(['•••', '•••']);
   });
 });

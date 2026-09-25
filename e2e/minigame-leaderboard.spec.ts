@@ -44,6 +44,17 @@ test("leaderboard panel: outside the top 10 shows a gap and the caller's own ran
   await expect(ownRow.locator('.minigame-leaderboard__name')).toHaveText('E2E PENGUIN');
   await expect(ownRow.locator('.minigame-leaderboard__score')).toHaveText('250');
 
+  // A3: with the tallest possible board (top 10 + a gap + the own row), the
+  // whole done column still fits inside the Stage (`#ui`'s box covers the
+  // canvas exactly -- see e2e/smoke.spec.ts), not just visually clipped.
+  const doneBox = await page.locator('.minigame__done').boundingBox();
+  const uiBox = await page.locator('#ui').boundingBox();
+  if (!doneBox || !uiBox) throw new Error('expected both .minigame__done and #ui to have a box');
+  expect(doneBox.x).toBeGreaterThanOrEqual(uiBox.x);
+  expect(doneBox.y).toBeGreaterThanOrEqual(uiBox.y);
+  expect(doneBox.x + doneBox.width).toBeLessThanOrEqual(uiBox.x + uiBox.width);
+  expect(doneBox.y + doneBox.height).toBeLessThanOrEqual(uiBox.y + uiBox.height);
+
   await page.screenshot({
     path: 'test-results/minigame-leaderboard/outside-top-10/screenshot.png',
   });

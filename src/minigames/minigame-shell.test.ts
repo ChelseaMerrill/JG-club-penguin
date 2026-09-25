@@ -689,6 +689,27 @@ describe('minigame shell: leaderboard panel (R4)', () => {
     );
   });
 
+  it('round 2: quitting while recordRound is pending never mounts the panel or calls the RPC', async () => {
+    const gate = deferred<RoundResult>();
+    const leaderboard = vi.fn(async () => []);
+    const { layer, gameHandle, launcher, overlays } = setup({
+      store: createFakeStore({ recordRound: vi.fn(() => gate.promise), leaderboard }),
+    });
+    startPlaying(layer, launcher);
+    gameHandle.setScoreAndStats(20, { squashed: 2, score: 0, bestCombo: 0, escaped: 0 });
+    gameHandle.finishNow();
+
+    expect(() => overlays.close(MINIGAME_OVERLAY_ID)).not.toThrow();
+    expect(layer.querySelector('.minigame')).toBeNull();
+
+    gate.resolve({ tokensAwarded: 2, balance: 102, newBest: false, badgeEarned: false });
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(leaderboard).not.toHaveBeenCalled();
+  });
+
   it('a throwing minigame.end() shows no panel', async () => {
     const throwingGame = createFakeGame(5, { endThrows: true });
     const leaderboard = vi.fn(async () => []);

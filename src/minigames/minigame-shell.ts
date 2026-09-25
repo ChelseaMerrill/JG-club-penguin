@@ -83,6 +83,13 @@ export function createMinigameShell<K extends MinigameId>(deps: MinigameShellDep
   let phase: Phase = 'howto';
   let started = false;
   let roundEnded = false;
+  // Round 2 (2026-09-25): a quit while `recordRound` is still pending tears
+  // the shell down (`root.remove()`) without waiting for that promise;
+  // `deps.store`/`minigame` may not even still be meaningful by the time it
+  // settles. Checked right before mounting the leaderboard panel, so a quit
+  // mid-save never mounts a panel into a removed `doneLeaderboard`, and
+  // never calls the leaderboard RPC for a round nobody is looking at.
+  let torndown = false;
   let paused = false;
   // The play-phase countdown: `deadline` (a `performance.now()` timestamp)
   // while running, `remainingMs` (frozen) while not running (before start,
@@ -108,6 +115,7 @@ export function createMinigameShell<K extends MinigameId>(deps: MinigameShellDep
   }
 
   function teardown(): void {
+    torndown = true;
     stopTicking();
     window.removeEventListener('keydown', handleKeydown);
     setMinigameOpen(false);
@@ -494,6 +502,10 @@ export function createMinigameShell<K extends MinigameId>(deps: MinigameShellDep
     // ever reaches this point once per round (the `roundEnded` guard at the
     // top), mounted at most once. Its own internal `Promise.resolve().then`
     // wrapping means a broken `leaderboard()` can't throw back in here.
+    // Round 2: skipped entirely once torn down (a quit while `recordRound`
+    // above was still pending) -- no panel mounted into removed DOM, and no
+    // leaderboard RPC call for a round nobody is looking at.
+    if (torndown) return;
     mountMinigameLeaderboard(doneLeaderboard, { store: deps.store, minigameId: minigame.id });
   }
 

@@ -29,7 +29,12 @@
 .minigame-leaderboard__body {
   display: flex;
   flex-direction: column;
-  max-height: 300px;
+  /* 11 rows (top 10 + an appended own row) at 26px plus one 20px gap =
+     306px; 312px leaves a little headroom. Without `flex-shrink: 0` below,
+     a flex column this full would compress every row to fit `max-height`
+     instead of actually overflowing into the scrollbar (round 2 red-team,
+     2026-09-25). */
+  max-height: 312px;
   overflow-y: auto;
   border: 2px solid var(--jg-secondary);
   background: var(--jg-dark-inlay);
@@ -53,6 +58,7 @@
   align-items: center;
   gap: 10px;
   height: 26px;
+  flex-shrink: 0;
   padding: 0 10px;
   font: 400 13px var(--font-display);
   color: var(--fg-primary);
@@ -89,6 +95,7 @@
 
 .minigame-leaderboard__gap {
   height: 20px;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;

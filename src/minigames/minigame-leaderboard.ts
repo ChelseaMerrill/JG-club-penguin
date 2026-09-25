@@ -117,10 +117,14 @@ export function mountMinigameLeaderboard(
   root.append(title, body);
   container.append(root);
 
+  // `.then(render).catch(renderError)`, not `.then(render, renderError)`:
+  // the two-argument form's second callback only ever catches a rejection
+  // from the *preceding* promise, never a throw from the first callback
+  // itself -- so a bug inside `renderReady` (round 2 red-team, 2026-09-25)
+  // would otherwise become a silent unhandled rejection, leaving the panel
+  // stuck on LOADING forever instead of showing the error state.
   Promise.resolve()
     .then(() => deps.store.leaderboard(deps.minigameId, deps.maxRows ?? LEADERBOARD_DEFAULT_ROWS))
-    .then(
-      (entries) => renderReady(root, body, entries),
-      () => renderError(root, body),
-    );
+    .then((entries) => renderReady(root, body, entries))
+    .catch(() => renderError(root, body));
 }
