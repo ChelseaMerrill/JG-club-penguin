@@ -146,6 +146,10 @@ type HideRule =
   // in front of it), which no text-anchored rule can reach without also
   // sweeping up that furniture. Each selector pins the element by its own
   // position attributes, so a design resync that moves it stops the export.
+  // Also used for a standalone non-working floor-arrow decal (#132): these
+  // are bare, unlabelled `<polygon>`s with no nearby text or animation name
+  // to anchor a `labels`/`animation` rule, so each is pinned by its own
+  // exact `points` attribute instead.
   | { kind: 'selector'; selectors: string[]; comment: string }
   // HTML/DIV HUD chrome. `anchor` is a literal text string known to be
   // unique on the page; `companions` (which includes the anchor) is the
@@ -575,6 +579,14 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
         'The local player, the Michael S., Samantha and Daniel Penguins, and Emily Smith and Anthony Conway, with their nameplates and speech bubbles.',
     },
     {
+      kind: 'selector',
+      selectors: [
+        'polygon[points="720,384 655,416.5 720,449 745,436.5 710,419 770,419 770,399 725,411.5"]',
+      ],
+      comment:
+        "The Hallway's unlabelled floor arrow pointing toward TOWN CENTER (#132): unlike the labelled 'TEAM ROOM 7/8/9 ↓' floor markers (disabled doors, kept), clicking this one does nothing. The wall's own '↙ TOWN CENTER' door stays -- see the 'blink' rule below.",
+    },
+    {
       kind: 'animation',
       names: ['blink'],
       comment: "Blinking '↙ TOWN CENTER' and 'TEAM ROOMS 1–6 ↘' room-exit nav pills (HUD).",
@@ -624,6 +636,14 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
       comment: "The local player's static figure and nameplate.",
     },
     {
+      kind: 'selector',
+      selectors: [
+        'polygon[points="700,605 730,620 695,637.5 705,642.5 650,645 655,617.5 665,622.5"]',
+      ],
+      comment:
+        "Non-working floor arrow decal (#132): this Room's only working exit is the 'HALLWAY ↓' HUD nav pill below, not this floor paint.",
+    },
+    {
       kind: 'animation',
       names: ['blink'],
       comment: "Blinking 'HALLWAY ↓' room-exit nav pill (HUD).",
@@ -665,6 +685,21 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
       kind: 'labels',
       texts: ['You'],
       comment: "The local player's static figure and nameplate.",
+    },
+    {
+      kind: 'selector',
+      selectors: [
+        'polygon[points="675,605.5 705,620.5 670,638 680,643 625,645.5 630,618 640,623"]',
+      ],
+      comment:
+        "First of two non-working floor arrow decals in this Room (#132): this Room's only working exit is the 'HALLWAY ↓' HUD nav pill below, not this floor paint.",
+    },
+    {
+      kind: 'selector',
+      selectors: [
+        'polygon[points="890,713 920,728 885,745.5 895,750.5 840,753 845,725.5 855,730.5"]',
+      ],
+      comment: 'Second non-working floor arrow decal in this Room (#132), same reasoning as above.',
     },
     {
       kind: 'animation',
@@ -725,6 +760,14 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
       comment: "The local player's own Penguin: a translated <g> of shadow, figure and nameplate.",
     },
     {
+      kind: 'selector',
+      selectors: [
+        'polygon[points="890,713 920,728 885,745.5 895,750.5 840,753 845,725.5 855,730.5"]',
+      ],
+      comment:
+        "Non-working floor arrow decal (#132): this Room's only working exit is the 'HALLWAY ↓' HUD nav pill below, not this floor paint.",
+    },
+    {
       kind: 'animation',
       names: ['blink'],
       comment: "Blinking 'HALLWAY ↓' room-exit nav pill (HUD).",
@@ -782,6 +825,14 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
         'Michael Prete: a translated <g> of shadow, figure, nameplate and his Beyblade-challenge bubble.',
     },
     {
+      kind: 'selector',
+      selectors: [
+        'polygon[points="700,605 730,620 695,637.5 705,642.5 650,645 655,617.5 665,622.5"]',
+      ],
+      comment:
+        "Non-working floor arrow decal (#132): this Room's only working exit is the 'HALLWAY ↓' HUD nav pill below, not this floor paint.",
+    },
+    {
       kind: 'animation',
       names: ['blink'],
       comment: "Blinking 'HALLWAY ↓' room-exit nav pill (HUD).",
@@ -820,6 +871,14 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
       texts: ['You', 'no snowballs in here', 'Jessie', 'occupied since standup'],
       comment:
         'The local player and the Jessie Penguin, each a flat run of shadow, figure, nameplate and speech bubble. The Penguin icons on the wall signs are signage and stay.',
+    },
+    {
+      kind: 'selector',
+      selectors: [
+        'polygon[points="940,675 970,690 935,707.5 945,712.5 890,715 895,687.5 905,692.5"]',
+      ],
+      comment:
+        "Non-working floor arrow decal (#132): this Room's only working exit is the 'HALLWAY ↘' HUD nav pill below, not this floor paint.",
     },
     {
       kind: 'animation',
