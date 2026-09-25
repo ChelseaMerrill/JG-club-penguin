@@ -542,17 +542,30 @@ function hideLiveElements(rules: HideRule[]): void {
   // the `text-only` HideRule variant's own comment for why: text content
   // alone isn't unique enough on this page).
   function hideTextOnly(entries: { text: string; transform: string }[]): void {
+    // #77 review round 1 nit 8: tracks which `entries` actually matched
+    // something, so a design resync that renames/moves/removes a targeted
+    // label fails the export loudly instead of silently leaving a baked
+    // label in the art that a live DOM overlay is also drawing over.
+    const matchCounts = new Map<(typeof entries)[number], number>(entries.map((e) => [e, 0]));
     const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
     let node: Node | null;
     while ((node = walker.nextNode())) {
       const value = node.nodeValue ? node.nodeValue.trim() : '';
       const el = node.parentElement;
       if (!el) continue;
-      const isMatch = entries.some(
+      const match = entries.find(
         (entry) => entry.text === value && el.getAttribute('transform') === entry.transform,
       );
-      if (isMatch) {
+      if (match) {
+        matchCounts.set(match, (matchCounts.get(match) ?? 0) + 1);
         (el as HTMLElement | SVGElement).style.setProperty('display', 'none', 'important');
+      }
+    }
+    for (const [entry, count] of matchCounts) {
+      if (count === 0) {
+        throw new Error(
+          `text-only hide rule matched nothing for "${entry.text}" (transform: ${entry.transform})`,
+        );
       }
     }
   }
