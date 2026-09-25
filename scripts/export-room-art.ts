@@ -65,8 +65,14 @@ type HideRule =
   // Elements whose inline style plays one of these CSS @keyframes. Used for
   // moving/blinking figures and props; hiding a character's outer wrapper
   // also hides anything the design nests inside it (name bubble, held
-  // props, etc.) for free.
-  | { kind: 'animation'; names: string[]; comment: string }
+  // props, etc.) for free. `except` (#100) protects elements that would
+  // otherwise match by shared animation name but must stay in the art. A
+  // matching element that is, or sits inside, a node matching one of these
+  // selectors is skipped whole. A matching element that merely *contains* a
+  // protected node is not skipped wholesale: only the branch leading down to
+  // the protected node is kept, and every sibling subtree along that branch
+  // is hidden (see `hideAnimationNames`).
+  | { kind: 'animation'; names: string[]; except?: string[]; comment: string }
   // Static (non-animated) SVG <text> labels — name plates and speech
   // bubbles. The design draws each as a flat, ungrouped run of sibling
   // elements (an optional character <svg>, then a <rect> background, then
@@ -329,6 +335,16 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
     {
       kind: 'animation',
       names: ['idle'],
+      // #100: the new KITCHEN floor arrow's `<a>` is the first child of
+      // Kevin's own `idle` vendor wrapper (which also holds his shadow,
+      // penguin svg, nameplate and say bubbles). Without this exception the
+      // arrow, its shadow and its label would be hidden along with Kevin.
+      // With it, the wrapper itself stays displayed but every child that
+      // isn't the arrow's `<a>` -- i.e. all of Kevin -- is still hidden
+      // (`hideAnimationNames`'s ancestor branch). Keeping the wrapper is safe
+      // because `freezeAnimations` pins `idle` at its 0% frame,
+      // `translateY(0)`, so the arrow isn't offset.
+      except: ["a[href='Kitchen.dc.html']"],
       comment: 'Subtle idle motion inside stationary vendor NPCs (Kevin, Ann Marie, Josh, Casey).',
     },
     {
@@ -372,6 +388,11 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
     {
       kind: 'animation',
       names: ['blink'],
+      // #100: the new KITCHEN floor arrow's own polygon group also plays
+      // `blink` (it's a real, in-scene door-equivalent, meant to stay in
+      // the art); without this exception it would be hidden alongside the
+      // unrelated HUD nav pill below, which shares the same keyframe name.
+      except: ["a[href='Kitchen.dc.html']"],
       comment: "Blinking '↙ ELEVATOR · STAIRS · KITCHEN' room-exit nav pill (HUD).",
     },
     {
@@ -444,6 +465,62 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
     },
   ],
 };
+
+// Art fixes: geometry corrections applied to the rendered design before
+// the screenshot, for flaws in the design itself that the byte-exact
+// design/ mirror can't be edited to fix (see design/SYNC-LOG.md). Each fix
+// finds its element by an exact `points` attribute of one of its polygons
+// and fails the export if that polygon is missing, so a design resync that
+// moves or fixes the shape stops the export instead of nudging the wrong
+// thing.
+type ArtFix = {
+  // The exact `points` of a polygon inside the element to move.
+  points: string;
+  // How many levels to climb from that polygon to the element to move
+  // (0 = the polygon itself).
+  up: number;
+  // Offset in Stage pixels, applied as an SVG `transform="translate(...)"`.
+  dx: number;
+  dy: number;
+  comment: string;
+};
+
+const ART_FIXES: Partial<Record<RoomId, ArtFix[]>> = {
+  'the-melt': [
+    {
+      points: '736.0,183.0 800.0,215.0 750.0,240.0 686.0,208.0',
+      up: 1,
+      // One iso step along the back counter is (+50, +25). The oven's
+      // left edge sits at iso a = -1.08 (a = 0 is the left wall plane
+      // through the back corner at (800, 250)), so it drew about a tile
+      // through the wall. Moving it +1.08 steps (+54, +27) puts its left
+      // edge flush on the wall, over the counter's first tile.
+      dx: 54,
+      dy: 27,
+      comment: "The oven/stove at the back counter's left end, which poked through the left wall.",
+    },
+  ],
+};
+
+// Runs in the browser context (page.evaluate) against one Room's fixes.
+function applyArtFixes(fixes: ArtFix[]): void {
+  for (const fix of fixes) {
+    const matches = Array.from(document.querySelectorAll('polygon')).filter(
+      (p) => p.getAttribute('points') === fix.points,
+    );
+    if (matches.length !== 1) {
+      throw new Error(
+        `art fix expected exactly one polygon with points "${fix.points}", found ${matches.length}`,
+      );
+    }
+    let el: Element | null = matches[0] ?? null;
+    for (let i = 0; i < fix.up && el; i++) el = el.parentElement;
+    if (!el) throw new Error(`art fix could not climb ${fix.up} level(s) from "${fix.points}"`);
+    const existing = el.getAttribute('transform');
+    const offset = `translate(${fix.dx} ${fix.dy})`;
+    el.setAttribute('transform', existing ? `${offset} ${existing}` : offset);
+  }
+}
 
 const MIME_TYPES: Record<string, string> = {
   '.html': 'text/html; charset=utf-8',
@@ -529,18 +606,78 @@ function freezeSmilAnimations(): void {
 function hideLiveElements(rules: HideRule[]): void {
   const CHROME_TAGS = new Set(['rect', 'polygon', 'svg', 'path', 'circle', 'ellipse', 'line']);
 
-  function hideAnimationNames(names: string[]): void {
+  const hide = (el: Element): void =>
+    (el as HTMLElement | SVGElement).style.setProperty('display', 'none', 'important');
+
+  function hideAnimationNames(names: string[], except: string[] = []): void {
     const wanted = new Set(names);
+    // Elements matching an `except` selector (#100). The two tree directions
+    // are handled differently:
+    // - A candidate that is, or sits inside, a protected node (the Kitchen
+    //   arrow's inner `blink` group is a *descendant* of its `<a>`) is
+    //   skipped whole.
+    // - A candidate that *contains* a protected node (Kevin's `idle` vendor
+    //   wrapper is an *ancestor* of that `<a>`) is not exempted wholesale --
+    //   that let all of Kevin survive in the art. Instead it stays displayed
+    //   and `hideAllButProtectedBranch` hides everything in it that neither
+    //   is nor contains a protected node.
+    const protectedEls =
+      except.length > 0 ? Array.from(document.querySelectorAll(except.join(','))) : [];
+    const isInsideProtected = (el: Element): boolean =>
+      protectedEls.some((p) => p === el || p.contains(el));
+    const containsProtected = (el: Element): boolean => protectedEls.some((p) => el.contains(p));
+
+    // Walks down only the branch(es) leading to a protected node, hiding every
+    // sibling subtree along the way that has no protected descendant.
+    function hideAllButProtectedBranch(el: Element): void {
+      for (const child of Array.from(el.children)) {
+        if (isInsideProtected(child)) continue;
+        if (containsProtected(child)) hideAllButProtectedBranch(child);
+        else hide(child);
+      }
+    }
+
+    const keptAncestors: Element[] = [];
     document.querySelectorAll<HTMLElement | SVGElement>('[style]').forEach((el) => {
       const raw = el.getAttribute('style') ?? '';
       if (!raw.includes('animation')) return;
       const animationName = getComputedStyle(el).animationName;
       if (!animationName || animationName === 'none') return;
       const active = animationName.split(',').map((n) => n.trim());
-      if (active.some((n) => wanted.has(n))) {
-        el.style.setProperty('display', 'none', 'important');
+      if (!active.some((n) => wanted.has(n))) return;
+      if (isInsideProtected(el)) return;
+      if (containsProtected(el)) {
+        hideAllButProtectedBranch(el);
+        keptAncestors.push(el);
+        return;
       }
+      hide(el);
     });
+
+    // Guard (#100 review): an animated ancestor kept only for a protected
+    // node's sake must not still render any other drawable content -- that
+    // is exactly how Kevin leaked into `roof-deck.png`. Fails the export
+    // loudly instead of baking a stray figure into the art. Walks each
+    // element's own ancestor chain for a computed `display: none` rather
+    // than using `Element.checkVisibility()`, which Chromium reports as
+    // visible for an SVG shape inside a `display: none` `<g>`.
+    const DRAWABLE = 'rect, polygon, svg, path, circle, ellipse, line, polyline, text, image, use';
+    const isDisplayedWithin = (el: Element, root: Element): boolean => {
+      for (let n: Element | null = el; n && n !== root.parentElement; n = n.parentElement) {
+        if (getComputedStyle(n).display === 'none') return false;
+      }
+      return true;
+    };
+    for (const ancestor of keptAncestors) {
+      const leaked = Array.from(ancestor.querySelectorAll(DRAWABLE)).filter(
+        (d) => !isInsideProtected(d) && !containsProtected(d) && isDisplayedWithin(d, ancestor),
+      );
+      if (leaked.length > 0) {
+        throw new Error(
+          `animation hide rule kept an ancestor of a protected node that still draws ${leaked.length} non-protected element(s), e.g. <${leaked[0]?.tagName.toLowerCase()}>`,
+        );
+      }
+    }
   }
 
   function hideLabels(texts: string[]): void {
@@ -641,7 +778,7 @@ function hideLiveElements(rules: HideRule[]): void {
   }
 
   for (const rule of rules) {
-    if (rule.kind === 'animation') hideAnimationNames(rule.names);
+    if (rule.kind === 'animation') hideAnimationNames(rule.names, rule.except);
     else if (rule.kind === 'labels') hideLabels(rule.texts);
     else if (rule.kind === 'text-only') hideTextOnly(rule.entries);
     else hideCluster(rule.anchor, rule.companions);
@@ -679,6 +816,7 @@ async function exportRoom(
   }
 
   await page.evaluate(hideLiveElements, rules);
+  await page.evaluate(applyArtFixes, ART_FIXES[roomId] ?? []);
   await page.waitForTimeout(POST_HIDE_SETTLE_MS);
 
   const outPath = path.join(OUTPUT_DIR, `${roomId}.png`);
