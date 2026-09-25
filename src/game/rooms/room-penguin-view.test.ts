@@ -160,6 +160,14 @@ describe('RoomPenguinView', () => {
     expect(stage.placed).toHaveLength(0);
   });
 
+  it('does not draw a nameless Penguin even under ?masknames (review round 1)', () => {
+    const { stage, view } = attachedView('?masknames');
+
+    view.upsert(payload({ look: { ...PEBBLE, name: '' } }));
+
+    expect(stage.placed).toHaveLength(0);
+  });
+
   it('masks every name tag, including on an update, under ?masknames', () => {
     const { stage, view } = attachedView('?debug&masknames');
 
@@ -264,6 +272,19 @@ describe('RoomPenguinView', () => {
     view.detach();
 
     expect(changes).toEqual([['player-b', null]]);
+  });
+
+  it('clears a shown chat bubble and notifies onBubbleChange when a Penguin goes nameless (review round 1)', () => {
+    const { view } = attachedView();
+    const changes: Array<[string, string | null]> = [];
+    view.upsert(payload({ playerId: 'player-b' }));
+    view.say('player-b', 'hello there');
+    view.onBubbleChange = (playerId, text) => changes.push([playerId, text]);
+
+    view.upsert(payload({ playerId: 'player-b', look: { ...PEBBLE, name: '' } }));
+
+    expect(changes).toEqual([['player-b', null]]);
+    expect(view.say('player-b', 'still there?')).toBe(false);
   });
 
   it('never notifies onBubbleChange for a Player never shown', () => {

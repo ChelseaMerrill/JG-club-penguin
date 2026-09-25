@@ -207,6 +207,27 @@ describe('createPenguinCreator', () => {
     expect(q<HTMLButtonElement>('.penguin-creator__submit').disabled).toBe(true);
   });
 
+  it('setSaving(true) then setSaving(false) with a valid name re-enables the button (review round 1)', () => {
+    const { q, creator } = setup();
+    creator.open(initial, { dismissible: false });
+
+    creator.setSaving(true);
+    creator.setSaving(false);
+
+    expect(q<HTMLButtonElement>('.penguin-creator__submit').disabled).toBe(false);
+  });
+
+  it('clearing the name in dismissible (HUD-edit) mode disables the button (review round 1)', () => {
+    const { q, creator } = setup();
+    creator.open(initial, { dismissible: true });
+    const name = q<HTMLInputElement>('#penguin-creator-name');
+
+    name.value = '';
+    name.dispatchEvent(new Event('input'));
+
+    expect(q<HTMLButtonElement>('.penguin-creator__submit').disabled).toBe(true);
+  });
+
   it('Enter in the name field cannot bypass an invalid name', () => {
     const { q, creator, onSubmit } = setup();
     creator.open(DEFAULT_LOOK, { dismissible: false });

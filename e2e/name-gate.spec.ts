@@ -95,6 +95,13 @@ test('a new Player is held on the Creator until they enter a name', async ({ pag
   await expectHeldOnCreator(page);
   await clickPreviewColumn(page);
 
+  // Reloading while still gated (before typing a name) re-runs the same
+  // first-run hook against a fresh in-memory store: still the Creator, still
+  // no HUD (review round 1 — this is a different moment from reloading
+  // after WADDLE IN, which the earlier revision checked instead).
+  await page.reload();
+  await expectHeldOnCreator(page);
+
   const name = page.locator('#penguin-creator-name');
   const submit = page.locator('.penguin-creator__submit');
 
@@ -110,11 +117,6 @@ test('a new Player is held on the Creator until they enter a name', async ({ pag
   await expect(page.locator('.hud')).toBeVisible();
   await expect(page.locator('.penguin-creator')).toBeHidden();
   await page.screenshot({ path: 'test-results/name-gate/new-player/entered-world.png' });
-
-  // Reloading re-runs the same first-run hook against a fresh in-memory
-  // store, so an unnamed Player lands back on the Creator.
-  await page.reload();
-  await expectHeldOnCreator(page);
 
   expect(errors).toEqual([]);
 });
