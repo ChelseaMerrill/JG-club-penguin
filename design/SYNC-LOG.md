@@ -2,6 +2,15 @@
 
 Newest first. Written by design_resync.py apply.
 
+## 2026-09-25 · plan b98436c5f966
+
+From Club JenGuin logo directions.zip by milliehime.
+
+Characters: Linda Martin (CFO) and Zach Hartman (CSO) added; Canvas placeholder
+
+- added: `Canvas.dc.html`
+- changed: `Characters.dc.html`
+
 ## 2026-09-25 · plan 7f1d152274be
 
 From Club JenGuin logo directions.zip by milliehime.
