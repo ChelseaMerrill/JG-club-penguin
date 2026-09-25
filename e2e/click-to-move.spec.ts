@@ -141,7 +141,9 @@ test('click-to-move', async ({ page }) => {
 
   // --- Click a far walkable tile: shortest path, WALK anim while moving,
   // idle on arrival, and the move log grows by one, recording that target
-  // (#14 review fix 8).
+  // (#14 review fix 8). (2, 2) is still walkable under Town Center's real
+  // mask (#16): row 2's mask keeps cols 0-3 open, and it's still reachable
+  // from spawnTile (6, 8) via row 3's and row 5's fully-walkable rows.
   const farTile: Tile = { col: 2, row: 2 };
   const logBeforeFarClick = (await debugInfo(page))?.localPenguinMoveLog?.length ?? 0;
   await clickStagePoint(page, tileToScreen(farTile, origin));
@@ -157,19 +159,29 @@ test('click-to-move', async ({ page }) => {
 
   // --- Click an off-grid point: snaps to the nearest walkable tile.
   // Stage (800, 100) -- 150px above the grid origin -- inverts to tile
-  // (-3, -3), off the 12x10 walkable mask. Reaching col >= 0 *and* row >= 0
-  // both takes at least 3 one-axis-at-a-time steps, so the unique 6-step
-  // nearest walkable tile is exactly (0, 0).
+  // (-3, -3), off the 12x10 grid. `nearestWalkable`'s BFS expands in
+  // Manhattan rings, so its distance to any in-bounds tile (col, row) is
+  // (col + row + 6) (both offsets are already positive past 3 steps each
+  // way). Under Town Center's real mask (#16, not the old fully-walkable
+  // layout #14 was written against), the walkable tile minimizing col + row
+  // is a tie at col + row = 2 between (2, 0) and (0, 2) -- no walkable tile
+  // reaches col + row = 0 or 1 (row 0's mask opens at col 2 earliest; row 1's
+  // and col 0's/col 1's masks are closed at the low end). The BFS's
+  // lowest-row-then-column tie-break checks row 0 first, so (2, 0) wins.
   await clickStagePoint(page, { x: origin.x, y: origin.y - 150 });
   await expect
     .poll(async () => (await debugInfo(page))?.localPenguin, { timeout: LONG_WALK_TIMEOUT })
-    .toMatchObject({ tile: { col: 0, row: 0 }, moving: false });
+    .toMatchObject({ tile: { col: 2, row: 0 }, moving: false });
 
   // --- A new click mid-walk queues a re-route rather than snapping forward
   // (#14 review fix 3): it's applied once the in-flight tile step
   // completes, so the move log only grows by 2 (one per click) once both
   // moves have actually started, and its last entry is the re-route's own
-  // target, not some snapped intermediate tile (#14 review fix 8).
+  // target, not some snapped intermediate tile (#14 review fix 8). Both
+  // corners are still walkable under the real mask (row 9's and row 0's
+  // masks both keep col 11 open), and both stay reachable from the current
+  // tile: row 3 and row 5 are fully walkable end to end, so they connect
+  // every other walkable tile in the grid into one component.
   const rerouteFirstTarget: Tile = { col: 11, row: 9 };
   const rerouteSecondTarget: Tile = { col: 11, row: 0 };
   const logBeforeReroute = (await debugInfo(page))?.localPenguinMoveLog?.length ?? 0;
@@ -192,8 +204,12 @@ test('click-to-move', async ({ page }) => {
     .toMatchObject({ tile: rerouteSecondTarget, moving: false });
 
   // --- Walking toward decreasing col (screen x) faces the Penguin left, and
-  // mirrors its sprite (`flipX`, #14 review fix 8).
-  const westOfCurrent: Tile = { col: 0, row: 0 };
+  // mirrors its sprite (`flipX`, #14 review fix 8). The Penguin is currently
+  // at rerouteSecondTarget, (11, 0); row 0's real mask only keeps cols 2, 10
+  // and 11 walkable (#16), so the nearest walkable tile west of col 11 is
+  // the adjacent col 10 -- a single leftward step, still enough to exercise
+  // facing/flipX.
+  const westOfCurrent: Tile = { col: 10, row: 0 };
   await clickStagePoint(page, tileToScreen(westOfCurrent, origin));
   await expect.poll(async () => (await debugInfo(page))?.localPenguin?.facing).toBe('left');
   expect((await debugInfo(page))?.localPenguin?.flipX).toBe(true);
@@ -223,15 +239,20 @@ test('click-to-move', async ({ page }) => {
   expect((await debugInfo(page))?.localPenguin).toMatchObject({ tile: npcInteractionTile });
 
   // --- Clicking a door hotspot walks to its approach tile and logs
-  // door:reached. Hand-computed like the NPC case above: DEV PIT's hotspot
-  // centre (1180+75, 340+45) = (1255, 385) inverts, via `screenToTile`'s
-  // linear map, to raw tile (7, -2) -- off the 12x10 grid on the row axis
-  // only (col 7 is already in range). The nearest walkable tile is 2 rows
-  // down, at (7, 0): every other tile at BFS distance 2 from (7, -2) still
-  // has a negative row.
+  // door:reached. Hand-computed like the NPC case above, against DEV PIT's
+  // real `door()`-styled hotspot (#16): centre (1270 + 35, 355 + 82.5) =
+  // (1305, 437.5) inverts, via `screenToTile`'s linear map, to raw tile
+  // (8, -2) -- off the 12x10 grid on the row axis only (col 8 is already in
+  // range). `nearestWalkable`'s BFS distance from (8, -2) to an in-bounds
+  // tile (col, row) is |col - 8| + (row + 2); minimizing that over the real
+  // mask's walkable tiles ties at distance 4 between (10, 0) and (9, 1) --
+  // no walkable tile gets closer (row 0's mask has nothing at col 6 or 7;
+  // row 1's has nothing at col 8). The lowest-row-then-column tie-break
+  // reaches row 0 first, where col 10 (checked before the closer-looking but
+  // unwalkable col 6) is the first walkable hit, so (10, 0) wins.
   const door = townCenter.doors.find((candidate) => candidate.targetRoomId !== null);
   if (!door) throw new Error('expected town-center to have at least one enabled door');
-  const doorApproachTile: Tile = { col: 7, row: 0 };
+  const doorApproachTile: Tile = { col: 10, row: 0 };
   const doorCenter = {
     x: door.hotspot.x + door.hotspot.width / 2,
     y: door.hotspot.y + door.hotspot.height / 2,

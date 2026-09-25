@@ -10,10 +10,10 @@ import { bindPlayer, type Player } from './auth/player';
 import { createLoginOverlay } from './ui/login-overlay';
 import { mountStage } from './ui/stage';
 import { getUiLayer } from './ui/ui-layer';
-import { gameEvents } from './contracts';
+import { gameEvents, type RoomId } from './contracts';
 import { createHud } from './ui/hud/hud';
-import { resolveRoomTitle } from './ui/hud/room-titles';
 import { initDevHudHook } from './ui/hud/dev-hud-hook';
+import { getRoomDefinition } from './game/rooms/registry';
 import { createDebugOverlay, isDebugEnabled } from './ui/debug-overlay';
 import {
   createRoomChannel,
@@ -190,6 +190,14 @@ const overlay = createLoginOverlay(uiLayer, {
     void auth.signOut();
   },
 });
+
+// #13's `getRoomDefinition` replaces the standalone `room-titles.ts` map
+// (#16 D7): title/subtitle are just the registered Room's own fields. The HUD
+// and the mini-game launcher (#37) share this one resolver.
+function resolveRoomTitle(roomId: RoomId): { title: string; subtitle: string } {
+  const room = getRoomDefinition(roomId);
+  return { title: room.title, subtitle: room.subtitle };
+}
 
 const hud = createHud(getUiLayer(), {
   resolveRoomTitle,
