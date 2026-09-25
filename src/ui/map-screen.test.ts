@@ -6,11 +6,13 @@ import { createMapScreen, MAP_OVERLAY_ID, type MapScreen } from './map-screen';
 
 let currentMapScreen: MapScreen | undefined;
 
-function setup(initialRoomId: RoomId | null = 'town-center') {
+function setup(
+  initialRoomId: RoomId | null = 'town-center',
+  changeRoom = vi.fn<(roomId: RoomId) => void>(),
+) {
   const root = document.createElement('div');
   document.body.append(root);
   const overlays = createOverlayManager();
-  const changeRoom = vi.fn();
   let currentRoomId = initialRoomId;
   const mapScreen = createMapScreen(root, {
     overlays,
@@ -104,6 +106,23 @@ describe('createMapScreen', () => {
 
     expect(changeRoom).toHaveBeenCalledWith('dev-pit');
     expect(q('.map-screen').hidden).toBe(true);
+  });
+
+  it('pins the order (#33 review round 1 fix 2): the Map is hidden and the overlay released before changeRoom runs', () => {
+    let hiddenAtCall: boolean | undefined;
+    let overlayAtCall: string | null | undefined;
+    const changeRoom = vi.fn<(roomId: RoomId) => void>(() => {
+      hiddenAtCall = q('.map-screen').hidden;
+      overlayAtCall = overlays.current();
+    });
+    const { q, overlays } = setup('town-center', changeRoom);
+    openMap();
+
+    q<HTMLButtonElement>('[data-map-room="dev-pit"]').click();
+
+    expect(changeRoom).toHaveBeenCalledTimes(1);
+    expect(hiddenAtCall).toBe(true);
+    expect(overlayAtCall).toBeNull();
   });
 
   it('clicking the current Room only closes the Map (no changeRoom call)', () => {

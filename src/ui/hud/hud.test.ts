@@ -153,6 +153,16 @@ describe('createHud', () => {
     expect(menuPanel().hidden).toBe(true);
   });
 
+  it('the MENU panel has exactly the Sign out button (RETURN TO TOWN CENTER removed, #33 D7/review round 1 fix 3)', () => {
+    const { root } = setup();
+
+    const buttonClasses = [...root.querySelectorAll('.hud__menu-panel button')].map(
+      (button) => button.className,
+    );
+
+    expect(buttonClasses).toEqual(['hud__menu-signout']);
+  });
+
   it('Sign out in the MENU panel calls the injected onSignOut and closes the menu', () => {
     const { root, onSignOut } = setup();
 
