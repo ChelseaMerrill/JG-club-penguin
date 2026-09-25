@@ -68,7 +68,10 @@ test('room transitions: doors, changeRoom, HUD, reload (#15)', async ({ page }) 
 
   // --- A disabled door (`targetRoomId: null`) shows the "coming soon" hint
   // and leaves the Room unchanged. Whichever Town Center door is still
-  // disabled (THE ICEBOX was, until #51 built its Room).
+  // disabled (THE ICEBOX was, until #51 built its Room; STAIRWELL still is).
+  // When #51's Stairwell slice enables Town Center's last disabled door,
+  // move this example to the Hallway's TEAM ROOM 5-9 doors, which stay
+  // disabled (no designs).
   const disabledDoor = townCenter.doors.find((door) => door.targetRoomId === null);
   if (!disabledDoor) throw new Error('expected town-center to have a disabled door');
   await clickStagePoint(page, doorCenter(disabledDoor));

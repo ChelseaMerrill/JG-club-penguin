@@ -140,7 +140,8 @@ test('Clicking a disabled (COMING SOON) Room does nothing: the Map stays open, l
   const logBefore = (await debugInfo(page))?.roomEventLog;
 
   // Whichever tile is still COMING SOON (03 THE ICEBOX was, until #51
-  // built its Room).
+  // built its Room; 12 THE SLIDE and 15 THE MULLET still are). Once #51's
+  // last Rooms land none remain, and this needs a fixture tile.
   const comingSoonTile = page.locator('.map-screen [aria-disabled="true"]').first();
   await expect(comingSoonTile).toHaveAttribute('aria-disabled', 'true');
   await expect(comingSoonTile.locator('.map-screen__pill')).toHaveText('COMING SOON');
