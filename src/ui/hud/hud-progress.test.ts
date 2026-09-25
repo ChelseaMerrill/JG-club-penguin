@@ -46,6 +46,7 @@ describe('HUD balance', () => {
     const hud = createHud(root, {
       resolveRoomTitle: () => ({ title: '', subtitle: '' }),
       onIgloo: () => {},
+      onReturnToTownCenter: () => {},
       onSignOut: () => {},
       onChatSend: () => Promise.resolve(true),
       initialBalance: 0,

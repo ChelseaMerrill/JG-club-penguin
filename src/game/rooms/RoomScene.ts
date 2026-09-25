@@ -1,4 +1,4 @@
-import { Data, GameObjects, Scene, Scenes, type Input, type Tweens } from 'phaser';
+import { Data, GameObjects, Scene, Scenes, type Input, type Time, type Tweens } from 'phaser';
 import {
   gameEvents,
   SPAWN_ROOM_ID,
@@ -104,6 +104,7 @@ const WALL_DEPTH = -1;
 const FLOOR_DEPTH = -1;
 const DOOR_DEPTH = 0;
 const DOOR_LABEL_DEPTH = 1;
+const DOOR_HINT_DEPTH = 2;
 
 // A hotspot (e.g. the Igloo's Trophy Case) shares the door's depth tier and
 // procedural fallback styling (#16 D5/#42): both are non-walking clickable
@@ -132,6 +133,16 @@ const DOOR_LABEL_FONT_SIZE = '14px';
 const NPC_HIT_ZONE_WIDTH = 64;
 const NPC_HIT_ZONE_HEIGHT = 110;
 const NPC_HIT_ZONE_OFFSET_Y = -50;
+
+// #15 D3/A4: a disabled door's (`targetRoomId: null`) "COMING SOON" hint, in
+// the Stage's own display font (`--font-game-display`, `style.css`).
+const DOOR_HINT_FONT_FAMILY = "'Bumbastika', sans-serif";
+const DOOR_HINT_FONT_SIZE = '22px';
+const DOOR_HINT_STROKE_COLOR = '#0a0b0d';
+const DOOR_HINT_STROKE_THICKNESS = 4;
+const DOOR_HINT_TEXT = 'COMING SOON';
+/** How long the "coming soon" hint stays up (#15 D3). */
+export const DOOR_HINT_DURATION_MS = 2000;
 
 const FURNITURE_WIDTH = 40;
 const FURNITURE_HEIGHT = 28;
@@ -240,6 +251,12 @@ export class RoomScene extends Scene {
   private debugPenguins: Penguin[] = [];
   /** Persists across restarts (never reset in `init()`); see `restartCount` on `RoomDebugInfo`. */
   private restartCount = 0;
+  /** The "coming soon" hint currently shown for a disabled door (#15 D3), or `null`. Not reset in `init()`: `cleanup()` (SHUTDOWN) always clears it first. */
+  private comingSoonHint: {
+    door: RoomDoor;
+    text: GameObjects.Text;
+    timer: Time.TimerEvent;
+  } | null = null;
 
   /** A stable reference so `cleanup` can `off` exactly what `create` `on`'d. */
   private readonly handlePointerDown = (
@@ -287,6 +304,7 @@ export class RoomScene extends Scene {
     this.debugPenguins = [];
     this.npcSprites.forEach((npcSprite) => npcSprite.destroy());
     this.npcSprites = [];
+    this.clearComingSoonHint();
   };
 
   constructor() {
@@ -321,6 +339,62 @@ export class RoomScene extends Scene {
     return this.readyPromise;
   }
 
+  /**
+   * Resolves once the *next* restart's `create()` finishes — unlike
+   * `whenReady()`, which only ever resolves for the very first one. #15's
+   * navigator calls this right after `showRoom()` (deferred by Phaser to its
+   * own scene-transition tick, so subscribing here is never too late) and
+   * awaits it before emitting `room:enter`.
+   */
+  whenNextReady(): Promise<void> {
+    return new Promise((resolve) => {
+      this.events.once(Scenes.Events.CREATE, () => resolve());
+    });
+  }
+
+  /**
+   * Registers `handler` for every door the local Penguin reaches, enabled or
+   * disabled alike (#15 D3). Call once: `this.events` (and any listener
+   * already attached to it) survives every `scene.restart()`, so calling
+   * this again on a later Room change would only stack a duplicate.
+   */
+  onDoorReached(handler: (door: RoomDoor) => void): void {
+    this.events.on(DOOR_REACHED_EVENT, ({ door }: DoorReachedEvent) => handler(door));
+  }
+
+  /**
+   * Shows the "COMING SOON" hint for a disabled door (#15 D3/A4) near its
+   * hotspot for `DOOR_HINT_DURATION_MS`, replacing any hint already shown
+   * rather than stacking two.
+   */
+  showComingSoonHint(door: RoomDoor): void {
+    this.clearComingSoonHint();
+    const centerX = door.hotspot.x + door.hotspot.width / 2;
+    const centerY = door.hotspot.y + door.hotspot.height / 2;
+    const text = this.add
+      .text(centerX, centerY, DOOR_HINT_TEXT, {
+        fontFamily: DOOR_HINT_FONT_FAMILY,
+        fontSize: DOOR_HINT_FONT_SIZE,
+        color: LABEL_TEXT_COLOR,
+        stroke: DOOR_HINT_STROKE_COLOR,
+        strokeThickness: DOOR_HINT_STROKE_THICKNESS,
+      })
+      .setOrigin(0.5)
+      .setDepth(DOOR_HINT_DEPTH);
+    const timer = this.time.delayedCall(DOOR_HINT_DURATION_MS, () => {
+      text.destroy();
+      this.comingSoonHint = null;
+    });
+    this.comingSoonHint = { door, text, timer };
+  }
+
+  private clearComingSoonHint(): void {
+    if (!this.comingSoonHint) return;
+    this.comingSoonHint.timer.remove();
+    this.comingSoonHint.text.destroy();
+    this.comingSoonHint = null;
+  }
+
   /** The Room currently shown (or being restarted into). */
   get currentRoomId(): RoomId {
     return this.roomId;
@@ -328,13 +402,16 @@ export class RoomScene extends Scene {
 
   /**
    * Restarts this scene to show `roomId` (a Room change). A no-op for the
-   * Room already shown, and for a Room with no `RoomDefinition` yet (#16),
-   * which leaves the current Room's art on screen. Returns whether it switched.
-   * The local Penguin spawns at `entryTile` when given, else at the Room's
-   * `spawnTile` (#14's `init`).
+   * Room already shown, unless `force` (#15 review round 1: `enterSpawnRoom`
+   * passes `true` so a repeat Session-start still truly restarts and
+   * respawns even when the Room already showing happens to be Town Center,
+   * e.g. after a dev `?room=` override), and always a no-op for a Room with
+   * no `RoomDefinition` yet (#16), which leaves the current Room's art on
+   * screen. Returns whether it switched. The local Penguin spawns at
+   * `entryTile` when given, else at the Room's `spawnTile` (#14's `init`).
    */
-  showRoom(roomId: RoomId, entryTile?: Tile): boolean {
-    if (roomId === this.roomId || !hasRoomDefinition(roomId)) return false;
+  showRoom(roomId: RoomId, entryTile?: Tile, force = false): boolean {
+    if ((roomId === this.roomId && !force) || !hasRoomDefinition(roomId)) return false;
     this.roomId = roomId;
     this.scene.restart({ roomId, entryTile } satisfies RoomSceneData);
     return true;
@@ -413,6 +490,7 @@ export class RoomScene extends Scene {
       npcArrivedLog: this.npcArrivedLog,
       doorReachedLog: this.doorReachedLog,
       localPenguinMoveLog: this.localPenguinMoveLog,
+      comingSoonHint: this.comingSoonHint?.door.label ?? null,
       localPenguinArrivedLog: this.localPenguinArrivedLog,
       restartRoom: () => this.scene.restart(),
       restartCount: this.restartCount,

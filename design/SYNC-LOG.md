@@ -2,6 +2,29 @@
 
 Newest first. Written by design_resync.py apply.
 
+## 2026-09-24 · plan 513587b3d1b8
+
+From Club JenGuin logo directions.zip by milliehime.
+
+Map room renames (The Melt -> The Kitchen, Team Rooms 1-4); Kitchen file renamed; Bug Squash 5 lights; Creator cap redrawn; new Beystadium and Phishing Quiz designs
+
+- added: `Kitchen.dc.html`
+- added: `Minigame Beystadium.dc.html`
+- added: `Minigame Phishing Quiz.dc.html`
+- added: `assets/knowbe4-logo.svg`
+- changed: `Club JenGuin Map.dc.html`
+- changed: `Minigame Bug Squash.dc.html`
+- changed: `Penguin Creator.dc.html`
+- changed: `Room 01 Town Center.dc.html`
+- changed: `Room 02 Dev Pit.dc.html`
+- changed: `Room 03 The Icebox.dc.html`
+- changed: `Room 11 Office Hallway.dc.html`
+- changed: `Stairwell.dc.html`
+- changed: `Team Room 2.dc.html`
+- changed: `Team Room 4.dc.html`
+- changed: `The Mullet.dc.html`
+- removed: `Room 04 Kitchen.dc.html`
+
 ## 2026-09-24 · plan 67c1efa4da78
 
 From Club JenGuin logo directions.zip by milliehime.
