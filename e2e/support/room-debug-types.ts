@@ -31,6 +31,9 @@ export interface LocalPenguinDebugInfo {
   spriteX?: number;
   spriteY?: number;
   bodyTweenCount?: number;
+  containerX?: number;
+  containerY?: number;
+  nameTagY?: number;
 }
 
 /** One remote Penguin's movement state (#43). */

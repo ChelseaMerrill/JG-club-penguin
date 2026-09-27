@@ -87,6 +87,12 @@ export interface LocalPenguinDebugInfo {
   spriteY?: number;
   /** `Penguin.bodyMotionTweenCount()`: 1 while a body motion plays, 0 without one, more only on a leak (#68). */
   bodyTweenCount?: number;
+  /** The Penguin container's `x`: its world position, which the #68 body motion never moves. */
+  containerX?: number;
+  /** The Penguin container's `y`: its world position, which the #68 body motion never moves. */
+  containerY?: number;
+  /** The name tag's `y` in container px: the #68 body motion never moves it. */
+  nameTagY?: number;
 }
 
 /** One `room:leave`/`room:enter` #15's navigator has emitted, in emission order. */

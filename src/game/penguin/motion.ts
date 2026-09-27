@@ -1,6 +1,11 @@
 import { DESIGN_TO_VIEWBOX_SCALE } from './design-scale';
 import { PLAYER_PENGUIN_SCALE } from './player-penguin-scale';
-import { PENGUIN_FRAME_MS, resolvePenguinFramePose, type PenguinAnim } from './poses';
+import {
+  PENGUIN_ANIMS,
+  PENGUIN_FRAME_MS,
+  resolvePenguinFramePose,
+  type PenguinAnim,
+} from './poses';
 
 /**
  * One pose of a Penguin's body motion (#68): the figure's tilt in degrees
@@ -31,7 +36,7 @@ export interface PenguinBodyMotion {
  * and 25% tilt and lift are the same extremes `poses.ts` bakes into WADDLE's
  * two frames.
  */
-export const DESIGN_WADDLE_KEYFRAMES: readonly BodyKeyframe[] = [
+const DESIGN_WADDLE_KEYFRAMES: readonly BodyKeyframe[] = [
   { x: -26, angle: -5, y: 0 },
   { x: -12, angle: 4, y: -6 },
   { x: 26, angle: 5, y: 0 },
@@ -70,6 +75,18 @@ function twoPoseMotion(anim: PenguinAnim): PenguinBodyMotion {
 }
 
 /**
+ * Every anim's body motion, built once at module load (so the per-frame
+ * `usesNeutralBody` lookup never rebuilds a spec). `null` means no body
+ * motion.
+ */
+const MOTION_BY_ANIM: Readonly<Record<PenguinAnim, PenguinBodyMotion | null>> = Object.fromEntries(
+  PENGUIN_ANIMS.map((anim) => [
+    anim,
+    anim === 'WADDLE' ? WADDLE_MOTION : TWO_POSE_ANIMS.includes(anim) ? twoPoseMotion(anim) : null,
+  ]),
+) as Record<PenguinAnim, PenguinBodyMotion | null>;
+
+/**
  * The body motion for `anim`, or `null` when `anim` has no body motion
  * (WAVE, SIT and the #47 Emote-only poses keep their baked frames as today).
  * WADDLE follows the design's four keyframes, including its sideways sway;
@@ -77,13 +94,11 @@ function twoPoseMotion(anim: PenguinAnim): PenguinBodyMotion {
  * sideways offset (WALK has no design keyframes at all).
  */
 export function penguinMotionFor(anim: PenguinAnim): PenguinBodyMotion | null {
-  if (anim === 'WADDLE') return WADDLE_MOTION;
-  if (TWO_POSE_ANIMS.includes(anim)) return twoPoseMotion(anim);
-  return null;
+  return MOTION_BY_ANIM[anim] ?? null;
 }
 
 /** Phaser's `Sine.easeInOut`, reimplemented so this module stays Phaser-free. */
-export function sineEaseInOut(t: number): number {
+function sineEaseInOut(t: number): number {
   return -0.5 * (Math.cos(Math.PI * t) - 1);
 }
 
@@ -139,10 +154,12 @@ export interface BodyMotionProxy {
 export interface BodyMotionTweenConfig {
   targets: BodyMotionProxy;
   props: {
-    phase: { from: number; to: number; duration: number; repeat: number; ease: 'Linear' };
+    /** The cycle position; absent on a blend back to neutral (a `null` spec). */
+    phase?: { from: number; to: number; duration: number; repeat: number; ease: 'Linear' };
     blend: { from: number; to: number; duration: number; repeat: 0; ease: 'Sine.easeInOut' };
   };
   onUpdate: () => void;
+  onComplete?: () => void;
 }
 
 /** The slice of Phaser's `TweenManager` this module needs. */
@@ -151,13 +168,22 @@ export interface BodyMotionTweens {
 }
 
 export interface BodyMotion {
-  /** Stops any running motion, then starts `spec` with a lead-in from neutral. `null` just stops. */
+  /**
+   * Stops any running motion, then starts `spec`, blending in from the
+   * targets' current pose (neutral at first; mid-sway on an anim switch) so
+   * nothing snaps. `null` blends the current pose back to neutral, then stops.
+   */
   start(spec: PenguinBodyMotion | null): void;
-  /** Mirrors the tilt and sway for a left-facing sprite (#147's flip), from the next tick on. */
+  /** Mirrors the tilt and sway for a left-facing sprite (#147's flip), applied at once. */
   setFlipped(flipped: boolean): void;
   /** Removes the tween and, unless `resetTargets` is `false`, returns every target to neutral. */
   stop(resetTargets?: boolean): void;
 }
+
+const NEUTRAL: BodyKeyframe = { angle: 0, x: 0, y: 0 };
+
+/** How long a `null` spec takes to ease a non-neutral pose back to neutral. */
+const BLEND_TO_NEUTRAL_MS = 300;
 
 function applyPose(targets: readonly BodyMotionTarget[], pose: BodyKeyframe): void {
   for (const target of targets) {
@@ -167,13 +193,20 @@ function applyPose(targets: readonly BodyMotionTarget[], pose: BodyKeyframe): vo
   }
 }
 
+/** `(1 - t) * a + t * b`: exactly `a` at 0 and exactly `b` at 1. `|| 0` folds a `-0` into 0. */
+function mix(a: number, b: number, t: number): number {
+  return (1 - t) * a + t * b || 0;
+}
+
 /**
  * The figure's body motion (#68 D3). `start` adds exactly one tween, on
  * `proxy`: `phase` loops 0 -> 1 linearly over the cycle, and `blend` eases
- * 0 -> 1 over one segment, once, so the body fades in from neutral rather
- * than popping into the sway. Every tick applies the sampled pose, scaled by
- * `blend` and mirrored when flipped, to every target. Phaser-free: written
- * against the structural `BodyMotionTweens`.
+ * 0 -> 1 over one segment, once. Every tick applies
+ * `from + blend * (sample * sign - from)` to every target, where `from` is
+ * the targets' pose when `start` was called, so the body eases from wherever
+ * it was (neutral, or mid-sway on an anim switch) into the new motion rather
+ * than snapping. Phaser-free: written against the structural
+ * `BodyMotionTweens`.
  */
 export function createBodyMotion(
   tweens: BodyMotionTweens,
@@ -182,17 +215,17 @@ export function createBodyMotion(
 ): BodyMotion {
   let tween: { remove(): unknown } | null = null;
   let spec: PenguinBodyMotion | null = null;
+  let from: BodyKeyframe = NEUTRAL;
   let sign = 1;
 
   function tick(): void {
-    if (spec === null) return;
-    const k = sampleBodyMotion(spec, proxy.phase);
+    if (tween === null) return;
+    const k = spec === null ? NEUTRAL : sampleBodyMotion(spec, proxy.phase);
     const blend = proxy.blend;
-    // `|| 0` folds a `-0` (a zero offset times a negative sign) into a plain 0.
     applyPose(targets, {
-      angle: sign * blend * k.angle || 0,
-      x: sign * blend * k.x || 0,
-      y: blend * k.y || 0,
+      angle: mix(from.angle, sign * k.angle, blend),
+      x: mix(from.x, sign * k.x, blend),
+      y: mix(from.y, k.y, blend),
     });
   }
 
@@ -200,13 +233,41 @@ export function createBodyMotion(
     tween?.remove();
     tween = null;
     spec = null;
-    if (resetTargets) applyPose(targets, { angle: 0, x: 0, y: 0 });
+    if (resetTargets) applyPose(targets, NEUTRAL);
+  }
+
+  function currentPose(): BodyKeyframe {
+    const first = targets[0];
+    return first ? { angle: first.angle, x: first.x, y: first.y } : NEUTRAL;
   }
 
   return {
     start(next) {
-      stop();
-      if (next === null) return;
+      from = currentPose();
+      stop(false);
+      if (next === null) {
+        if (from.angle === 0 && from.x === 0 && from.y === 0) return;
+        proxy.blend = 0;
+        tween = tweens.add({
+          targets: proxy,
+          props: {
+            blend: {
+              from: 0,
+              to: 1,
+              duration: BLEND_TO_NEUTRAL_MS,
+              repeat: 0,
+              ease: 'Sine.easeInOut',
+            },
+          },
+          onUpdate: tick,
+          onComplete: () => {
+            // The last update left the pose at exactly neutral.
+            tween = null;
+            applyPose(targets, NEUTRAL);
+          },
+        });
+        return;
+      }
       spec = next;
       proxy.phase = 0;
       proxy.blend = 0;
@@ -226,7 +287,13 @@ export function createBodyMotion(
       });
     },
     setFlipped(flipped) {
-      sign = flipped ? -1 : 1;
+      const nextSign = flipped ? -1 : 1;
+      if (nextSign === sign) return;
+      sign = nextSign;
+      // Mirror the pose being blended from too, so the whole figure mirrors
+      // together, and apply it now rather than one frame late.
+      from = { angle: -from.angle || 0, x: -from.x || 0, y: from.y };
+      tick();
     },
     stop,
   };

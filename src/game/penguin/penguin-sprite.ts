@@ -103,8 +103,9 @@ export interface Penguin {
   hasSnowHat(): boolean;
   /**
    * Test support (#68 D3): how many tweens are running on this Penguin's
-   * body motion. 1 while an anim with a body motion plays, 0 otherwise (and
-   * always 0 under reduced motion); anything more is a leaked tween.
+   * body motion. 1 while an anim with a body motion plays (or while the body
+   * eases back to neutral after one), 0 otherwise (and always 0 under
+   * reduced motion); anything more is a leaked tween.
    */
   bodyMotionTweenCount(): number;
   destroy(): void;
@@ -345,7 +346,9 @@ export function createPenguin(
 
   function play(anim: PenguinAnim): void {
     stopFrameTimer();
-    motion.stop();
+    // No `motion.stop()` here: resetting the pose to neutral would snap the
+    // body mid-sway. `motion.start` below replaces the tween and blends from
+    // wherever the body is now into the next anim (or back to neutral).
     currentAnim = anim;
     currentFrame = 0;
     applyFrame();
@@ -361,7 +364,8 @@ export function createPenguin(
       });
     }
     // Started alongside the frame timer, so a two-pose motion reaches its
-    // second keyframe as the timer swaps to frame 1 (#68 D3).
+    // second keyframe as the timer swaps to frame 1 (#68 D3). Under reduced
+    // motion nothing ever moves the body, so it stays at neutral.
     if (bodyMotion) motion.start(penguinMotionFor(anim));
   }
 

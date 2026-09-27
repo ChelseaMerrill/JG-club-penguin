@@ -171,7 +171,6 @@ describe('createBodyMotion', () => {
     };
     const sprite: BodyMotionTarget = { angle: 0, x: 0, y: 0 };
     const hat: BodyMotionTarget = { angle: 0, x: 0, y: 0 };
-    const nameTag = { angle: 0, x: 0, y: 12 };
     const proxy: BodyMotionProxy = { phase: 0, blend: 0 };
     const motion = createBodyMotion(tweens, [sprite, hat], proxy);
     const live = () => added.filter((a) => !a.removed);
@@ -180,7 +179,7 @@ describe('createBodyMotion', () => {
       proxy.blend = blend;
       live().forEach((a) => a.config.onUpdate());
     };
-    return { added, live, tick, sprite, hat, nameTag, proxy, motion };
+    return { added, live, tick, sprite, hat, proxy, motion };
   }
 
   it('adds exactly one tween, on the proxy: a looping linear phase and a one-off eased lead-in', () => {
@@ -199,13 +198,12 @@ describe('createBodyMotion', () => {
     });
   });
 
-  it('applies the same pose to the sprite and the snow hat, and nothing else', () => {
-    const { tick, sprite, hat, nameTag, motion } = setup();
+  it('applies the same pose to the sprite and the snow hat', () => {
+    const { tick, sprite, hat, motion } = setup();
     motion.start(penguinMotionFor('WADDLE'));
     tick(0.5, 1);
     expectPose(sprite, WADDLE_EXPECTED[2]);
     expectPose(hat, WADDLE_EXPECTED[2]);
-    expect(nameTag).toEqual({ angle: 0, x: 0, y: 12 });
   });
 
   it('starts from neutral: blend 0 gives no tilt, sway or lift', () => {
@@ -258,5 +256,81 @@ describe('createBodyMotion', () => {
     motion.start(penguinMotionFor('WAVE'));
     expect(added).toHaveLength(0);
     expect(sprite).toEqual({ angle: 0, x: 0, y: 0 });
+  });
+
+  it('blends from a non-neutral pose into the next anim instead of snapping (walk start)', () => {
+    const { tick, sprite, hat, motion } = setup();
+    // Mid-WADDLE, as measured at a walk start: tilted, swayed and lifted.
+    const from = { angle: 4.56, x: 5.18, y: -0.4 };
+    Object.assign(sprite, from);
+    Object.assign(hat, from);
+    motion.start(penguinMotionFor('WALK'));
+    // `start` itself leaves the pose where it was.
+    expect(sprite).toEqual(from);
+    tick(0.25, 0);
+    expectPose(sprite, from);
+    expectPose(hat, from);
+    // WALK at phase 0.25 is the eased midpoint of -3 and 3: 0 deg, no sway or lift.
+    tick(0.25, 0.5);
+    expectPose(sprite, { angle: 2.28, x: 2.59, y: -0.2 });
+    tick(0.5, 1);
+    expectPose(sprite, { angle: 3, x: 0, y: 0 });
+    expect(sprite.x).toBe(0);
+    expectPose(hat, { angle: 3, x: 0, y: 0 });
+  });
+
+  it('blends from the pose a previous motion left, when mirrored', () => {
+    const { tick, sprite, motion } = setup();
+    motion.start(penguinMotionFor('WALK'));
+    motion.setFlipped(true);
+    tick(0, 1);
+    expectPose(sprite, { angle: 3, x: 0, y: 0 });
+    // Arrival: WALK -> WADDLE starts from the WALK pose, not from 0.
+    motion.start(penguinMotionFor('WADDLE'));
+    tick(0, 0);
+    expectPose(sprite, { angle: 3, x: 0, y: 0 });
+    tick(0, 1);
+    expectPose(sprite, { angle: 5, x: 5.322, y: 0 });
+  });
+
+  it('eases a non-neutral pose back to neutral for an anim with no body motion', () => {
+    const { added, live, tick, sprite, motion } = setup();
+    Object.assign(sprite, { angle: -2.48, x: 1, y: -0.5 });
+    motion.start(penguinMotionFor('WAVE'));
+    expect(added).toHaveLength(1);
+    expect(added[0].config.props.phase).toBeUndefined();
+    expect(added[0].config.props.blend).toMatchObject({ from: 0, to: 1, repeat: 0 });
+    tick(0, 0);
+    expectPose(sprite, { angle: -2.48, x: 1, y: -0.5 });
+    tick(0, 0.5);
+    expectPose(sprite, { angle: -1.24, x: 0.5, y: -0.25 });
+    tick(0, 1);
+    expect(sprite).toEqual({ angle: 0, x: 0, y: 0 });
+    added[0].config.onComplete?.();
+    added[0].removed = true;
+    expect(live()).toHaveLength(0);
+    expect(sprite).toEqual({ angle: 0, x: 0, y: 0 });
+  });
+
+  it('mirrors a running motion as soon as the facing flips, not a frame later', () => {
+    const { tick, sprite, motion } = setup();
+    motion.start(penguinMotionFor('WADDLE'));
+    tick(0.25, 1);
+    expectPose(sprite, WADDLE_EXPECTED[1]);
+    motion.setFlipped(true);
+    expectPose(sprite, { angle: -4, x: 2.456, y: -1.228 });
+    // No change of sign, no re-apply.
+    sprite.angle = 99;
+    motion.setFlipped(true);
+    expect(sprite.angle).toBe(99);
+  });
+
+  it('flipping mid-blend mirrors the pose being blended from too', () => {
+    const { tick, sprite, motion } = setup();
+    Object.assign(sprite, { angle: 4, x: 2, y: -1 });
+    motion.start(penguinMotionFor('WALK'));
+    tick(0.25, 0);
+    motion.setFlipped(true);
+    expectPose(sprite, { angle: -4, x: -2, y: -1 });
   });
 });

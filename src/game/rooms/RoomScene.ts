@@ -696,6 +696,12 @@ export class RoomScene extends Scene {
             spriteX: this.penguinSprite()?.x,
             spriteY: this.penguinSprite()?.y,
             bodyTweenCount: this.penguin?.bodyMotionTweenCount(),
+            containerX: this.penguin?.container.x,
+            containerY: this.penguin?.container.y,
+            // The name tag is the container's first `Text`; the chat bubble's comes after it.
+            nameTagY: this.penguin?.container.list.find(
+              (child): child is GameObjects.Text => child instanceof GameObjects.Text,
+            )?.y,
           }
         : undefined,
       textureListenerCount: countActiveTextureListeners(this),

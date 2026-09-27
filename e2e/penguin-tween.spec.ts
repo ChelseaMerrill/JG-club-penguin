@@ -25,6 +25,16 @@ const SAMPLE_EVERY_MS = 80;
 const MAX_SWAY_PX = 5.322;
 /** WADDLE's lift at Room scale: the design's 6 px x (120 / 340) x 0.58. */
 const MAX_LIFT_PX = 1.228;
+/** WALK's blend-in from the idle pose: one 300 ms WALK segment. */
+const WALK_BLEND_MS = 300;
+/**
+ * The most the figure may tilt (deg) or sway (px) between two consecutive
+ * per-frame samples across the walk-start and arrival transitions: a snap
+ * to or from neutral jumps several degrees at once.
+ */
+const MAX_TRANSITION_STEP = 1.5;
+/** How long after the walk starts, and around the arrival, the transition checks look. */
+const TRANSITION_WINDOW_MS = 700;
 /** A far, reachable Town Center Tile whose path from spawn includes left-facing steps. */
 const FAR_TILE: Tile = { col: 2, row: 2 };
 
@@ -86,16 +96,25 @@ type Sample = Pick<
   | 'spriteX'
   | 'spriteY'
   | 'bodyTweenCount'
+  | 'containerX'
+  | 'containerY'
+  | 'nameTagY'
 > & { t: number };
 
 /**
- * Samples `__roomDebug.localPenguin` inside the page every `everyMs` for
- * `durationMs`, or, with `untilArrived`, until the Penguin has started moving
- * and then stopped for `settleMs`.
+ * Samples `__roomDebug.localPenguin` inside the page every `everyMs` (or, with
+ * `'frame'`, on every animation frame) for `durationMs`, or, with
+ * `untilArrived`, until the Penguin has started moving and then stopped for
+ * `settleMs`.
  */
 async function sampleLocalPenguin(
   page: Page,
-  options: { durationMs: number; everyMs: number; untilArrived?: boolean; settleMs?: number },
+  options: {
+    durationMs: number;
+    everyMs: number | 'frame';
+    untilArrived?: boolean;
+    settleMs?: number;
+  },
 ): Promise<Sample[]> {
   return page.evaluate(
     ({ durationMs, everyMs, untilArrived, settleMs }) =>
@@ -104,7 +123,8 @@ async function sampleLocalPenguin(
         const start = performance.now();
         let sawMoving = false;
         let stoppedAt: number | null = null;
-        const timer = setInterval(() => {
+        let finished = false;
+        const sample = (): void => {
           const p = window.__roomDebug?.localPenguin;
           const t = performance.now() - start;
           if (p) {
@@ -119,6 +139,9 @@ async function sampleLocalPenguin(
               spriteX: p.spriteX,
               spriteY: p.spriteY,
               bodyTweenCount: p.bodyTweenCount,
+              containerX: p.containerX,
+              containerY: p.containerY,
+              nameTagY: p.nameTagY,
             });
             if (p.moving) sawMoving = true;
             if (untilArrived && sawMoving && !p.moving && stoppedAt === null) stoppedAt = t;
@@ -127,10 +150,17 @@ async function sampleLocalPenguin(
             ? stoppedAt !== null && t - stoppedAt >= (settleMs ?? 0)
             : t >= durationMs;
           if (done || t >= durationMs) {
-            clearInterval(timer);
+            finished = true;
+            if (timer !== undefined) clearInterval(timer);
             resolve(samples);
           }
-        }, everyMs);
+        };
+        const onFrame = (): void => {
+          sample();
+          if (!finished) requestAnimationFrame(onFrame);
+        };
+        const timer = everyMs === 'frame' ? undefined : setInterval(sample, everyMs);
+        if (everyMs === 'frame') requestAnimationFrame(onFrame);
       }),
     options,
   );
@@ -153,10 +183,18 @@ test('WADDLE glides through intermediate tilts and sways side to side, on its Ti
 
   expect(samples.length).toBeGreaterThan(20);
   const spawn = samples[0].tile;
+  const { containerX, containerY, nameTagY } = samples[0];
+  expect(typeof containerX).toBe('number');
+  expect(typeof containerY).toBe('number');
+  expect(typeof nameTagY).toBe('number');
   for (const s of samples) {
     expect(s.bodyTweenCount).toBe(1);
     expect(s.tile).toEqual(spawn);
     expect(s.textureKey).toMatch(/:neutral$/);
+    // Only the figure moves: the Penguin's position and its name tag stay put.
+    expect(s.containerX).toBe(containerX);
+    expect(s.containerY).toBe(containerY);
+    expect(s.nameTagY).toBe(nameTagY);
   }
   // Normalised for the left-facing mirror, so the ranges read as facing right.
   const angles = samples.map((s) => (s.flipX ? -1 : 1) * s.spriteAngle!);
@@ -188,21 +226,68 @@ test('WALK tilts step to step with no sideways drift, and settles back into WADD
   const errors = await bootTownCenter(page);
   await page.waitForTimeout(LEAD_IN_MS);
 
+  // Every frame, so the transition checks below see each step the figure takes.
   const sampling = sampleLocalPenguin(page, {
     durationMs: LONG_WALK_TIMEOUT,
-    everyMs: 40,
+    everyMs: 'frame',
     untilArrived: true,
-    settleMs: 400,
+    settleMs: TRANSITION_WINDOW_MS,
   });
   await clickTile(page, FAR_TILE);
   const samples = await sampling;
+
+  const startIndex = samples.findIndex((s) => s.moving);
+  expect(startIndex).toBeGreaterThan(0);
+  const startedAt = samples[startIndex].t;
+  const stopIndex = samples.findIndex((s, i) => i > 0 && samples[i - 1].moving && !s.moving);
+  expect(stopIndex).toBeGreaterThan(0);
+  const stoppedAt = samples[stopIndex].t;
+
+  // No snap into or out of the walk: the figure blends from wherever the
+  // waddle left it into WALK, and from the last WALK pose back into WADDLE.
+  // A facing change mirrors the figure on purpose, so a pair of samples
+  // either side of a flip is skipped.
+  function maxSteps(from: number, to: number): { angle: number; x: number; pairs: number } {
+    let angle = 0;
+    let x = 0;
+    let pairs = 0;
+    for (let i = 1; i < samples.length; i += 1) {
+      const a = samples[i - 1];
+      const b = samples[i];
+      if (b.t < from || a.t > to || a.flipX !== b.flipX) continue;
+      angle = Math.max(angle, Math.abs(b.spriteAngle! - a.spriteAngle!));
+      x = Math.max(x, Math.abs(b.spriteX! - a.spriteX!));
+      pairs += 1;
+    }
+    return { angle, x, pairs };
+  }
+  const walkStart = maxSteps(samples[startIndex - 1].t, startedAt + TRANSITION_WINDOW_MS);
+  const arrival = maxSteps(stoppedAt - TRANSITION_WINDOW_MS, stoppedAt + TRANSITION_WINDOW_MS);
   writeFileSync(`${dir}/samples.json`, JSON.stringify(samples, null, 2));
+  writeFileSync(
+    `${dir}/transitions.json`,
+    JSON.stringify({ maxStep: MAX_TRANSITION_STEP, walkStart, arrival }, null, 2),
+  );
+  // The idle pose just before the walk is mid-sway, so blending from it is a real test.
+  expect(Math.abs(samples[startIndex - 1].spriteAngle!)).toBeGreaterThan(0);
+  for (const transition of [walkStart, arrival]) {
+    expect(transition.pairs).toBeGreaterThan(10);
+    expect(transition.angle).toBeLessThanOrEqual(MAX_TRANSITION_STEP);
+    expect(transition.x).toBeLessThanOrEqual(MAX_TRANSITION_STEP);
+  }
 
   const walking = samples.filter((s) => s.moving);
   expect(walking.length).toBeGreaterThan(10);
   for (const s of walking) {
     expect(s.anim).toBe('WALK');
     expect(s.bodyTweenCount).toBe(1);
+    // The waddle's sway fades out over WALK's blend-in; WALK itself never sways.
+    expect(Math.abs(s.spriteX!)).toBeLessThanOrEqual(MAX_SWAY_PX + 0.01);
+    expect(Math.abs(s.spriteAngle!)).toBeLessThanOrEqual(5.01);
+  }
+  const blended = walking.filter((s) => s.t >= startedAt + WALK_BLEND_MS + 50);
+  expect(blended.length).toBeGreaterThan(10);
+  for (const s of blended) {
     expect(s.spriteX).toBe(0);
     expect(s.spriteAngle!).toBeGreaterThanOrEqual(-3.01);
     expect(s.spriteAngle!).toBeLessThanOrEqual(3.01);
@@ -219,9 +304,6 @@ test('WALK tilts step to step with no sideways drift, and settles back into WADD
   expect(walking.some((s) => /:WALK:0(:left)?:neutral$/.test(s.textureKey ?? ''))).toBe(true);
   expect(walking.some((s) => /:WALK:1(:left)?:neutral$/.test(s.textureKey ?? ''))).toBe(true);
 
-  const stopIndex = samples.findIndex((s, i) => i > 0 && samples[i - 1].moving && !s.moving);
-  expect(stopIndex).toBeGreaterThan(0);
-  const stoppedAt = samples[stopIndex].t;
   const justArrived = samples.filter((s) => s.t >= stoppedAt && s.t <= stoppedAt + 100);
   expect(justArrived.length).toBeGreaterThan(0);
   for (const s of justArrived) {
