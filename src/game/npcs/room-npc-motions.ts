@@ -71,7 +71,8 @@ function applyProps(views: PropView[], poses: NpcPropPose[]): void {
  * Plays a Room's NPC motions (#113) on the Phaser objects `RoomScene`
  * built: each frame it advances every NPC's `NpcMotion` and moves its
  * sprite (figure, name tag, speech bubble), click target and depth to the
- * sampled pose, and transforms the figure and any prop layers in place.
+ * sampled pose, and transforms the figure, its Stage-level `body` (figure
+ * plus name tag, #150) and any prop layers in place.
  * NPCs without a designed motion, and every NPC under reduced motion, are
  * only tracked (for `debug()`), never moved. Client-side only: nothing
  * here touches Presence.
