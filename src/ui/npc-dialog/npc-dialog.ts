@@ -1,5 +1,12 @@
 import { gameEvents, type MinigameId } from '../../contracts';
+import { dialogLinePool, pickDialogLine } from '../../npcs/dialog-lines';
 import { getNpcDefinition, type NpcDefinition } from '../../npcs/npcs';
+import {
+  QUEST_GIVER_BUTTON_LABEL,
+  resolveQuestGiverResponse,
+  type QuestGiverResponse,
+} from '../../npcs/quest-giver';
+import type { QuestStatus } from '../../quests/quest-engine';
 import type { OverlayManager } from '../hud/overlay-manager';
 // Styles live in the shared `src/style.css`'s `.npc-dialog` block (#36 D4),
 // not a co-located stylesheet: `main.ts` already imports `./style.css` once.
@@ -15,11 +22,25 @@ export interface NpcDialogActions {
   launchMinigame: (minigameId: MinigameId) => void;
   /** Wired to #40's real Market panel (`main.ts`); still logged to `window.__roomDebug` (#36 round-1). */
   openStall: (stallId: string) => void;
+  /** Starts a Quest from its giver's "Got any work for me?" (#144 D9). Optional until a caller needs it. */
+  startQuest?: (questId: string) => void;
+}
+
+/** What a quest giver's button reads about Quests (#144 D9). */
+export interface NpcDialogQuests {
+  /** The Quest's current status, or `undefined` when it isn't in this build or progress isn't loaded. */
+  status: (questId: string) => QuestStatus | undefined;
+  /** Whether the Quest has a registered starter (`quest-giver.ts`). */
+  canStart: (questId: string) => boolean;
 }
 
 export interface NpcDialogDeps {
   overlays: OverlayManager;
   actions: NpcDialogActions;
+  /** Omitted (tests, or before Quests are wired): every quest giver answers as if no Quest were connected. */
+  quests?: NpcDialogQuests;
+  /** Picks each dialog line (#144 D3); `Math.random` by default, injected by tests. */
+  random?: () => number;
 }
 
 export interface NpcDialog {
@@ -108,6 +129,11 @@ export function createNpcDialog(root: HTMLElement, deps: NpcDialogDeps): NpcDial
   let openNpcId: string | null = null;
   /** Focus to restore once the dialog closes (#36 round-1 review item 9). */
   let previouslyFocused: HTMLElement | null = null;
+  /**
+   * The last line each NPC's dialog showed, so the next open picks a
+   * different one (#144 D3). In memory for the page's lifetime only.
+   */
+  const lastLineByNpc = new Map<string, string>();
 
   function handleClose(): void {
     deps.overlays.close(NPC_DIALOG_OVERLAY_ID);
@@ -124,7 +150,44 @@ export function createNpcDialog(root: HTMLElement, deps: NpcDialogDeps): NpcDial
     restoreTo?.focus();
   }
 
-  function render(npc: NpcDefinition): void {
+  /** What this appearance's "Got any work for me?" would answer, or `null` for no button (#144 D6). */
+  function questGiverResponse(npc: NpcDefinition): QuestGiverResponse | null {
+    const giver = npc.questGiver;
+    if (giver === undefined) return null;
+    const status = giver.questId === undefined ? undefined : deps.quests?.status(giver.questId);
+    return resolveQuestGiverResponse(giver, status, (id) => deps.quests?.canStart(id) ?? false);
+  }
+
+  /**
+   * Appends "Got any work for me?" after any existing buttons (#144 D7/D8),
+   * when this appearance is a quest giver with something to say.
+   */
+  function appendQuestGiverButton(npc: NpcDefinition): void {
+    if (questGiverResponse(npc) === null) return;
+    actionsEl.append(
+      actionButton('npc-dialog__button npc-dialog__button--quest', QUEST_GIVER_BUTTON_LABEL, () => {
+        // Re-resolved on click: progress may have loaded since the dialog opened.
+        const response = questGiverResponse(npc);
+        if (response === null) return;
+        if (response.kind === 'start') {
+          deps.actions.startQuest?.(response.questId);
+          handleClose();
+          return;
+        }
+        lineEl.textContent = response.text;
+      }),
+    );
+  }
+
+  /** A fresh line for a line or stall NPC, never the one it showed last (#144 D3). */
+  function nextLine(npc: NpcDefinition): string {
+    const line = pickDialogLine(dialogLinePool(npc), lastLineByNpc.get(npc.id), deps.random);
+    lastLineByNpc.set(npc.id, line);
+    return line;
+  }
+
+  /** `line` is the text to show for a line or stall NPC; a Minigame NPC shows its trigger line. */
+  function render(npc: NpcDefinition, line: string): void {
     nameEl.textContent = npc.name;
 
     actionsEl.replaceChildren();
@@ -147,7 +210,7 @@ export function createNpcDialog(root: HTMLElement, deps: NpcDialogDeps): NpcDial
       subtitleEl.hidden = true;
       titleEl.textContent = npc.title ?? '';
       titleEl.hidden = npc.title === null;
-      lineEl.textContent = npc.dialogLine;
+      lineEl.textContent = line;
 
       if (npc.dialog.kind === 'stall') {
         const { stallId } = npc.dialog;
@@ -164,6 +227,7 @@ export function createNpcDialog(root: HTMLElement, deps: NpcDialogDeps): NpcDial
       }
       // 'line': no extra action buttons; the panel's own close button covers it.
     }
+    appendQuestGiverButton(npc);
   }
 
   /** The first action button when there is one, else the close button (#36 round-1 review item 9). */
@@ -178,8 +242,12 @@ export function createNpcDialog(root: HTMLElement, deps: NpcDialogDeps): NpcDial
     const npc = getNpcDefinition(npcId);
     if (!npc) return;
 
-    render(npc);
     const wasHidden = panel.hidden;
+    // A repeated `npc:arrived` for the dialog already open re-renders with
+    // the same line; only a fresh open picks a new one (#144 D3).
+    const reopening = !wasHidden && openNpcId === npcId;
+    const line = reopening ? (lastLineByNpc.get(npc.id) ?? nextLine(npc)) : nextLine(npc);
+    render(npc, line);
     panel.hidden = false;
     deps.overlays.open(NPC_DIALOG_OVERLAY_ID, close);
 

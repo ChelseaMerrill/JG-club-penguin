@@ -303,7 +303,7 @@ describe('NPCS', () => {
       title: 'Account Manager',
       roomId: 'the-icebox',
       tagName: 'Nicole',
-      dialogLine: "The client loved it. Next one's at 2.",
+      dialogLines: ["The client loved it. Next one's at 2."],
       idleLines: [
         { text: 'Client call in 5. Shh.', periodS: 15, delayS: -2 },
         { text: 'Account manager mode: on.', periodS: 15, delayS: -7 },
@@ -315,7 +315,7 @@ describe('NPCS', () => {
       title: 'COO',
       roomId: 'the-icebox',
       tagName: 'Jason',
-      dialogLine: 'Answer three and you may pass.',
+      dialogLines: ['Answer three and you may pass.'],
       idleLines: [
         { text: 'Stairs challenge. You are behind.', periodS: 26, delayS: -1 },
         { text: 'Three questions and you may pass.', periodS: 26, delayS: -10 },
@@ -327,7 +327,7 @@ describe('NPCS', () => {
       title: 'Director of Digital Media',
       roomId: 'the-icebox',
       tagName: 'Jethro',
-      dialogLine: "Act natural. Camera's rolling.",
+      dialogLines: ["Act natural. Camera's rolling.", 'One more for the recap.', 'Say hackathon!'],
       idleLines: [
         { text: 'Act natural. Camera is rolling.', periodS: 21, delayS: -2 },
         { text: 'One more for the recap.', periodS: 21, delayS: -9 },
@@ -339,7 +339,7 @@ describe('NPCS', () => {
       title: 'Founder & CEO',
       roomId: 'the-icebox',
       tagName: 'Darrin',
-      dialogLine: 'Show me energy.',
+      dialogLines: ['Show me energy.'],
       idleLines: [
         { text: 'Show me energy.', periodS: 15, delayS: -1 },
         { text: 'Serve. Grind. Grow. Inspire.', periodS: 15, delayS: -6 },
@@ -367,7 +367,7 @@ describe('NPCS', () => {
       title: null,
       roomId: 'office-hallway',
       tagName: 'Emily Smith',
-      dialogLine: 'Ever thought about joining JG?',
+      dialogLines: ['Ever thought about joining JG?'],
       idleLines: [{ text: 'Joining JG?', periodS: 0, delayS: 0 }],
     });
     expect(NPCS['anthony-hallway']).toMatchObject({
@@ -429,7 +429,7 @@ describe('NPCS', () => {
       title: 'IT Associate',
       roomId: 'team-room-4',
       tagName: 'Michael',
-      dialogLine: '3-0. Again.',
+      dialogLines: ['3-0. Again.'],
       idleLines: [{ text: 'I challenge you to a Beyblade battle!', periodS: 0, delayS: 0 }],
     });
     expect(NPCS['sam-team-room-4']).toMatchObject({
@@ -463,7 +463,7 @@ describe('NPCS', () => {
         throw new Error(`expected ${repeat} and ${first} to be Human NPCs`);
       }
       expect(again.figure, repeat).toBe(original.figure);
-      expect(again.dialogLine, repeat).toBe(original.dialogLine);
+      expect(again.dialogLines[0], repeat).toBe(original.dialogLines[0]);
     }
   });
 
@@ -484,7 +484,7 @@ describe('NPCS', () => {
         throw new Error(`expected ${roomOwn} and ${other} to be Human NPCs`);
       }
       expect(withOverride.figure, roomOwn).toEqual({ ...plain.figure, ...added });
-      expect(withOverride.dialogLine, roomOwn).toBe(plain.dialogLine);
+      expect(withOverride.dialogLines[0], roomOwn).toBe(plain.dialogLines[0]);
     }
   });
 
