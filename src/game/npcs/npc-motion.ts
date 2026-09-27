@@ -40,6 +40,12 @@ export interface NpcMotionPose {
   moving: boolean;
   /** The whole figure's in-place transform, relative to the feet; `null` without one. */
   figure: Affine | null;
+  /**
+   * The Stage-level transform of the figure plus its name tag (#150),
+   * relative to the NPC's rest point, where its unscaled `body` container's
+   * origin sits; `null` without one.
+   */
+  stage: Affine | null;
   props: NpcPropPose[];
 }
 
@@ -57,6 +63,15 @@ function feetRelative(m: Affine): Affine {
     ...IDENTITY,
     e: FEET.x,
     f: FEET.y,
+  });
+}
+
+/** Re-expresses a Stage-space transform relative to `rest`, where the NPC's `body` origin sits (#150). */
+function restRelative(m: Affine, rest: ScreenPoint): Affine {
+  return multiplyAffine(multiplyAffine({ ...IDENTITY, e: -rest.x, f: -rest.y }, m), {
+    ...IDENTITY,
+    e: rest.x,
+    f: rest.y,
   });
 }
 
@@ -88,6 +103,7 @@ export class NpcMotion {
   readonly roams: boolean;
   private readonly path: CompiledCssAnimation | null;
   private readonly figure: CompiledCssAnimation | null;
+  private readonly stage: CompiledCssAnimation | null;
   private readonly props: CompiledProp[];
   /** Drives the path; frozen while paused. */
   private pathMs = 0;
@@ -102,6 +118,7 @@ export class NpcMotion {
   ) {
     this.path = spec.path ? compileCssAnimation(spec.path) : null;
     this.figure = spec.figure ? compileCssAnimation(spec.figure) : null;
+    this.stage = spec.stage ? compileCssAnimation(spec.stage) : null;
     this.props = (spec.props ?? []).map(compileProp);
     this.roams = this.path !== null;
   }
@@ -133,6 +150,9 @@ export class NpcMotion {
       depth: depthForTile(fractionalTile(point, this.origin)),
       moving: this.roams && !this.isPaused,
       figure: this.figure ? feetRelative(sampleCssAnimation(this.figure, this.inPlaceMs)) : null,
+      stage: this.stage
+        ? restRelative(sampleCssAnimation(this.stage, this.inPlaceMs), this.rest)
+        : null,
       props: this.props.map((prop) => poseProp(prop, this.inPlaceMs)),
     };
   }
@@ -151,7 +171,7 @@ export function createNpcMotion(
   options: { reducedMotion: boolean },
 ): NpcMotion | null {
   if (!spec || options.reducedMotion) return null;
-  if (!spec.path && !spec.figure && !spec.props?.length) return null;
+  if (!spec.path && !spec.figure && !spec.stage && !spec.props?.length) return null;
   return new NpcMotion(spec, rest, origin);
 }
 

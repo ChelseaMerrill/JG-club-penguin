@@ -12,11 +12,6 @@ import type { NpcMotionSpec } from './types';
  *   in the design's markup (confirmed by grepping the design file for each
  *   name) -- dead CSS left over from an earlier design pass, animating
  *   nothing.
- * - `jump`: Jory Hutchins's bounce on the couch. Issue #137 gave her an
- *   `NpcId` and a fixed slot (her group is a sibling of Sydney's `walkSyd`,
- *   not nested in it; see `town-center.ts`'s `npcSlots`), her `sayJory`
- *   bubble and her "SURVIVOR" hat/tee, so she keeps #137's idle bob; porting
- *   `jump` here is follow-up work.
  * - `trophyReach`, `trophyShow`: Sydney reaching for, then holding up, a
  *   trophy. Every stop in both `@keyframes` rules sets only `opacity`, never
  *   `transform` -- exactly the case `css-keyframes.ts`'s own docs call out
@@ -63,6 +58,20 @@ export const TOWN_CENTER_MOTIONS: Partial<Record<NpcId, NpcMotionSpec>> = {
         },
       },
     ],
+  },
+  // Jory bounces on the couch (`jump`, #150). In the design the animation
+  // sits on a Stage-level group holding her figure and her nameplate (her
+  // `sayJory` bubble is a sibling outside it, so it stays still), so it's a
+  // `stage` track. The design sets no `transform-origin` on that group, so
+  // the browser scales about the Stage's top-left corner, and this port
+  // leaves the field unset to match (#150 H1): she stretches slightly at
+  // 30%, is about 28 px up and squashed at 60%, then falls back.
+  jory: {
+    stage: {
+      keyframes:
+        '@keyframes jump { 0%,100% { transform: translateY(0) scaleY(1);} 30% { transform: translateY(-26px) scaleY(1.05);} 60% { transform: translateY(0) scaleY(.94);} }',
+      animation: 'jump .9s ease-in-out infinite',
+    },
   },
   sydney: {
     path: {
