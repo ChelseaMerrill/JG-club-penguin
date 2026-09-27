@@ -6,6 +6,14 @@ export const QUEST_BANNER_MS = 4000;
 export interface QuestBanner {
   /** Shows "QUEST COMPLETE", the Quest's title and the server's `tokensAwarded`. */
   show(questTitle: string, tokensAwarded: number): void;
+  /** True while the banner is showing (#138: the Badge popup waits for it). */
+  isVisible(): boolean;
+  /**
+   * Calls `listener(true)` when `show()` makes the banner visible and
+   * `listener(false)` when its timer or `destroy()` hides it. Returns an
+   * unsubscribe function.
+   */
+  onVisibilityChange(listener: (visible: boolean) => void): () => void;
   destroy(): void;
 }
 
@@ -37,20 +45,36 @@ export function createQuestBanner(root: HTMLElement): QuestBanner {
   root.append(banner);
 
   let timer: ReturnType<typeof setTimeout> | null = null;
+  const listeners = new Set<(visible: boolean) => void>();
+
+  function setVisible(visible: boolean): void {
+    const changed = banner.hidden === visible;
+    banner.hidden = !visible;
+    if (!changed) return;
+    for (const listener of [...listeners]) listener(visible);
+  }
 
   return {
     show(questTitle, tokensAwarded) {
       if (timer !== null) clearTimeout(timer);
       title.textContent = questTitle;
       reward.textContent = `+${tokensAwarded} TOKENS`;
-      banner.hidden = false;
+      setVisible(true);
       timer = setTimeout(() => {
-        banner.hidden = true;
         timer = null;
+        setVisible(false);
       }, QUEST_BANNER_MS);
+    },
+    isVisible: () => !banner.hidden,
+    onVisibilityChange(listener) {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
     },
     destroy() {
       if (timer !== null) clearTimeout(timer);
+      timer = null;
+      setVisible(false);
+      listeners.clear();
       banner.remove();
     },
   };

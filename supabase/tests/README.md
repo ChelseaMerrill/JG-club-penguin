@@ -104,3 +104,81 @@ It also checks `security definer`/`search_path = ''`/one overload each and the
    rolled back) and prints only booleans, counts and Token amounts.
 3. Save the result table to `test-results/46-quests-proof-supabase/output.txt`,
    and paste the same table on #46.
+
+## #138 Badges (gate H1)
+
+`20260927000000_badges.sql` turns Badges into data (`public.badges`, all 15),
+adds the one award function (`award_badge`, internal only), the Interior
+Penguin trigger on `igloo_slots`, the Session check `check_session_badges()`
+(First Waddle, Night Owl), Ship It inside `complete_quest`, and a backfill.
+`138_badges_proof.sql` proves it against the same #9 H1 fixture Player, in
+`46_quests_proof.sql`'s style: the catalog is readable but not writable; no
+client can insert a Badge, change its Tokens or call any internal function;
+First Waddle, a Minigame Badge, Interior Penguin (placed through the
+client's own `igloo_slots` writes) and Ship It each award once and pay +50
+once; and as anon everything is denied. It also checks `security definer`/
+`search_path = ''`/one overload for the six new functions, the grants, the
+trigger and the foreign key.
+
+**Apply it before the PR merges or deploys**, including a Vercel preview
+(which uses this same Supabase project): a client built from the PR reads
+`public.badges` on sign-in and fails without it. An old client keeps working
+on the new schema.
+
+1. Local: covered automatically by `sql-badges.test.ts`'s PGlite run in
+   `npm test` (the proof, the anon and signed-in denials, fixed-time Night
+   Owl, the backfill, and the rerun chain).
+2. Real Supabase (gate H1), with #46's `20260925000000_quests.sql` (and #135's
+   igloo slots, if it merged first) already applied:
+   1. Review the migration (30 minutes, time-boxed): schema, RLS, Tokens,
+      the security-definer trigger, the internal-only grants and the rerun
+      chain in its header.
+   2. Apply it, then prove the rerun changes nothing, **in one paste** so no
+      live play lands in between (or do it in a quiet window with nobody
+      online). Paste this whole block into the SQL editor, with the migration
+      file's contents where marked, and run it once:
+
+      ```sql
+      -- <paste 20260927000000_badges.sql here: the apply and backfill>
+      create temp table h1_badges as
+        select badge_id, count(*) as n from public.player_badges group by 1;
+      create temp table h1_players as
+        select count(*) as player_count, sum(tokens) as token_total from public.players;
+      -- <paste 20260927000000_badges.sql here a second time: the rerun>
+      select
+        (select json_agg(b order by b.badge_id) from h1_badges b) as badges_after_apply,
+        (select row_to_json(p) from h1_players p) as players_after_apply,
+        not exists (
+          (select badge_id, count(*) from public.player_badges group by 1
+           except select badge_id, n from h1_badges)
+          union all
+          (select badge_id, n from h1_badges
+           except select badge_id, count(*) from public.player_badges group by 1)
+        ) as badges_unchanged_by_rerun,
+        (select count(*) = h.player_count and sum(pl.tokens) = h.token_total
+         from public.players pl, h1_players h group by h.player_count, h.token_total)
+          as tokens_unchanged_by_rerun;
+      ```
+
+      Expected: `badges_unchanged_by_rerun` and `tokens_unchanged_by_rerun`
+      are both `true`. `badges_after_apply` shows how many Players the
+      backfill granted each Badge (counts only).
+   3. Open `138_badges_proof.sql`, replace every occurrence of
+      `00000000-0000-0000-0000-00000000f1f0` with the real #9 H1 fixture
+      Player's id, and run it. Expect every row's `pass` column to read
+      `true`, including the final `ALL` row. It changes nothing (everything is
+      rolled back) and prints only booleans, counts and Token amounts.
+   4. Run the updated `46_quests_proof.sql` the same way (it now expects Ship
+      It's +50: a balance of 1150, and `badgesEarned`), then
+      `27_rls_proof.sql` (the proof, not the #27 migration).
+   5. Save the result tables, with ids and emails removed, to
+      `test-results/138-badges-proof-supabase/output.txt`, and paste the same
+      tables on #138.
+
+**Rerun chain.** After this migration, rerunning #27's migration fails and
+applies nothing once any Player holds a new Badge (and, if none does yet, it
+succeeds but breaks new-Badge awards until this file is rerun). Rerunning
+#9's migration drops the `players` column grants; this file re-issues them.
+Rerunning `20260925000000_quests.sql` silently removes Ship It from
+`complete_quest`. The rule: after rerunning any earlier migration, rerun this
+file and then every later one, in timestamp order.

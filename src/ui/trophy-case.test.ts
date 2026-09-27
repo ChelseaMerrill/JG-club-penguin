@@ -1,10 +1,23 @@
 // @vitest-environment jsdom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_LOOK, type BadgeId } from '../contracts';
-import { emptySlots, type ProgressSnapshot } from '../persistence/progress-store';
-import { createTrophyCase, TROPHY_CASE_BADGE_SLOTS, type TrophyCase } from './trophy-case';
+import { BADGE_CATALOG } from '../persistence/badge-catalog';
+import {
+  emptySlots,
+  type BadgeDefinition,
+  type ProgressSnapshot,
+} from '../persistence/progress-store';
+import {
+  createTrophyCase,
+  orderBadgeTiles,
+  TROPHY_CASE_PAGE_SIZE,
+  type TrophyCase,
+} from './trophy-case';
 
-function snapshotWith(badges: BadgeId[]): ProgressSnapshot {
+function snapshotWith(
+  badges: BadgeId[],
+  badgeCatalog: BadgeDefinition[] = [...BADGE_CATALOG],
+): ProgressSnapshot {
   return {
     look: DEFAULT_LOOK,
     profileCreatedAt: null,
@@ -14,23 +27,37 @@ function snapshotWith(badges: BadgeId[]): ProgressSnapshot {
     ownedItems: [],
     slots: emptySlots(),
     catalog: [],
+    badgeCatalog,
   };
+}
+
+/** A synthetic catalog of `count` Badges, the first `available` of them earnable. */
+function syntheticCatalog(count: number, available = count): BadgeDefinition[] {
+  return Array.from({ length: count }, (_, index) => ({
+    id: `badge-${index + 1}`,
+    name: `Badge ${index + 1}`,
+    howToEarn: `HINT ${index + 1}`,
+    sortOrder: index + 1,
+    available: index < available,
+  }));
 }
 
 let currentTrophyCase: TrophyCase | undefined;
 
-function setup(badges: BadgeId[] = []) {
+function setup(badges: BadgeId[] = [], badgeCatalog?: BadgeDefinition[]) {
   const root = document.createElement('div');
   document.body.append(root);
   const onClose = vi.fn();
-  const loadAll = vi.fn().mockResolvedValue(snapshotWith(badges));
+  const loadAll = vi.fn().mockResolvedValue(snapshotWith(badges, badgeCatalog));
   const trophyCase = createTrophyCase(root, { store: { loadAll }, onClose });
   currentTrophyCase = trophyCase;
   const q = <T extends Element = HTMLElement>(selector: string) => root.querySelector<T>(selector)!;
   const qa = <T extends Element = HTMLElement>(selector: string) => [
     ...root.querySelectorAll<T>(selector),
   ];
-  return { root, trophyCase, onClose, loadAll, q, qa };
+  const tileIds = () => qa('.trophy-case__badge').map((tile) => tile.dataset.badgeId);
+  const press = (key: string) => window.dispatchEvent(new KeyboardEvent('keydown', { key }));
+  return { root, trophyCase, onClose, loadAll, q, qa, tileIds, press };
 }
 
 beforeEach(() => {
@@ -40,6 +67,30 @@ beforeEach(() => {
 afterEach(() => {
   currentTrophyCase?.destroy();
   currentTrophyCase = undefined;
+});
+
+describe('orderBadgeTiles', () => {
+  it('puts earned Badges first, then locked, then coming soon, each by sortOrder', () => {
+    const ordered = orderBadgeTiles(BADGE_CATALOG, ['night-owl', 'exterminator']);
+
+    expect(ordered.map((badge) => badge.id)).toEqual([
+      'exterminator',
+      'night-owl',
+      'first-waddle',
+      'ship-it',
+      'breakfast-club',
+      'brain-freeze',
+      'barista',
+      'interior-penguin',
+      'snowmageddon',
+      'rail-rider',
+      'hexle-parent',
+      'mullet-mania',
+      'let-it-rip',
+      'stair-master',
+      'phish-fry',
+    ]);
+  });
 });
 
 describe('createTrophyCase', () => {
@@ -57,7 +108,7 @@ describe('createTrophyCase', () => {
     expect(tabs).toEqual(['BADGES', 'TROPHIES', 'JG AWARDS']);
   });
 
-  it('opens on the BADGES tab, loads the store, and shows the "n / 12 BADGES" count', async () => {
+  it('opens on the BADGES tab, loads the store, and counts earned Badges across the whole catalog', async () => {
     const { q, trophyCase, loadAll } = setup(['exterminator']);
 
     await trophyCase.open();
@@ -67,29 +118,40 @@ describe('createTrophyCase', () => {
     expect(q('[data-panel="badges"]').hidden).toBe(false);
     expect(q('[data-panel="trophies"]').hidden).toBe(true);
     expect(q('[data-panel="awards"]').hidden).toBe(true);
-    expect(q('.trophy-case__subtitle').textContent).toBe(
-      `YOUR IGLOO · 1 / ${TROPHY_CASE_BADGE_SLOTS} BADGES`,
-    );
+    expect(q('.trophy-case__subtitle').textContent).toBe('YOUR IGLOO · BADGES · 1 / 15');
   });
 
-  it("shows Coffee Rush's Barista in the design's Let It Rip slot, unlocked once earned", async () => {
-    const { q, qa, trophyCase } = setup(['barista']);
+  it('shows 15 Badges over two pages: 12 on page 1 and 3 on page 2', async () => {
+    const { q, qa, trophyCase } = setup([]);
 
     await trophyCase.open();
 
-    const barista = q('[data-badge-id="barista"]');
-    expect(barista.classList.contains('trophy-case__badge--earned')).toBe(true);
-    expect(barista.querySelector('.trophy-case__badge-name')?.textContent).toBe('Barista');
-    expect(barista.querySelector('.trophy-case__badge-hint')?.textContent).toBe(
-      '15 CUPS · COFFEE RUSH',
-    );
-    const names = qa('.trophy-case__badge-name').map((el) => el.textContent);
-    expect(names).not.toContain('Let It Rip');
-    expect(names).toHaveLength(12);
+    expect(qa('.trophy-case__badge')).toHaveLength(TROPHY_CASE_PAGE_SIZE);
+    expect(qa('.trophy-case__page-dot')).toHaveLength(2);
+    expect(q('.trophy-case__pager').hidden).toBe(false);
+
+    q<HTMLButtonElement>('[aria-label="Next page"]').click();
+
+    expect(qa('.trophy-case__badge')).toHaveLength(3);
   });
 
-  it('renders an earned Badge unlocked and the rest locked with their design hint', async () => {
-    const { q, qa, trophyCase } = setup(['exterminator']);
+  it.each([
+    [12, 1],
+    [13, 2],
+    [15, 2],
+    [25, 3],
+  ])('pages a %i-Badge catalog into %i page(s), with no code change', async (count, pages) => {
+    const { q, qa, trophyCase } = setup([], syntheticCatalog(count));
+
+    await trophyCase.open();
+
+    expect(q('.trophy-case__subtitle').textContent).toBe(`YOUR IGLOO · BADGES · 0 / ${count}`);
+    expect(q('.trophy-case__pager').hidden).toBe(pages === 1);
+    expect(qa('.trophy-case__page-dot')).toHaveLength(pages);
+  });
+
+  it('shows an earned Badge unlocked, a locked one with its hint, and a coming-soon one with its tag', async () => {
+    const { q, trophyCase } = setup(['exterminator']);
 
     await trophyCase.open();
 
@@ -103,20 +165,75 @@ describe('createTrophyCase', () => {
     const breakfastClub = q('[data-badge-id="breakfast-club"]');
     expect(breakfastClub.classList.contains('trophy-case__badge--earned')).toBe(false);
     expect(breakfastClub.querySelector('.trophy-case__badge-icon')?.textContent).toBe('?');
-    // Pancake Flip's Badge, not Coffee Rush's (the design's copy names the wrong game).
     expect(breakfastClub.querySelector('.trophy-case__badge-hint')?.textContent).toBe(
       '20 STACKED · PANCAKE FLIP',
     );
+    expect(breakfastClub.querySelector('.trophy-case__badge-tag')).toBeNull();
 
-    // All 12 design tiles are present, each with its own hint.
-    expect(qa('.trophy-case__badge')).toHaveLength(TROPHY_CASE_BADGE_SLOTS);
-    const firstWaddle = q('[data-badge-id=""]');
-    expect(firstWaddle.querySelector('.trophy-case__badge-name')?.textContent).toBe('First Waddle');
-    expect(firstWaddle.querySelector('.trophy-case__badge-hint')?.textContent).toBe('LOG IN');
-    expect(firstWaddle.classList.contains('trophy-case__badge--earned')).toBe(false);
+    const nightOwl = q('[data-badge-id="night-owl"]');
+    expect(nightOwl.querySelector('.trophy-case__badge-hint')?.textContent).toBe(
+      'ONLINE 2–5 AM ET',
+    );
+
+    const snowmageddon = q('[data-badge-id="snowmageddon"]');
+    expect(snowmageddon.classList.contains('trophy-case__badge--coming-soon')).toBe(true);
+    expect(snowmageddon.querySelector('.trophy-case__badge-tag')?.textContent).toBe('COMING SOON');
+    expect(snowmageddon.querySelector('.trophy-case__badge-hint')?.textContent).toBe(
+      '5 SNOWBALL HITS / DAY',
+    );
   });
 
-  it('re-reads the store every time it opens (no persistence yet, #34)', async () => {
+  it('pages with the arrows and the dots, disabling the arrows at the ends', async () => {
+    const { q, qa, trophyCase, tileIds } = setup([]);
+    await trophyCase.open();
+    const prev = q<HTMLButtonElement>('[aria-label="Previous page"]');
+    const next = q<HTMLButtonElement>('[aria-label="Next page"]');
+    const firstPage = tileIds();
+
+    expect(prev.disabled).toBe(true);
+    expect(next.disabled).toBe(false);
+    expect(q('[aria-label="Page 1"]').getAttribute('aria-current')).toBe('page');
+
+    next.click();
+    expect(tileIds()).toEqual(['let-it-rip', 'stair-master', 'phish-fry']);
+    expect(q<HTMLButtonElement>('[aria-label="Next page"]').disabled).toBe(true);
+    expect(q('[aria-label="Page 2"]').getAttribute('aria-current')).toBe('page');
+
+    qa<HTMLButtonElement>('.trophy-case__page-dot')[0].click();
+    expect(tileIds()).toEqual(firstPage);
+  });
+
+  it('pages with ArrowLeft and ArrowRight while the BADGES tab shows, and not on another tab', async () => {
+    const { q, trophyCase, tileIds, press } = setup([]);
+    await trophyCase.open();
+    const firstPage = tileIds();
+
+    press('ArrowRight');
+    expect(tileIds()).toHaveLength(3);
+    press('ArrowRight'); // Already on the last page.
+    expect(tileIds()).toHaveLength(3);
+    press('ArrowLeft');
+    expect(tileIds()).toEqual(firstPage);
+
+    q<HTMLButtonElement>('[data-tab="trophies"]').click();
+    press('ArrowRight');
+    q<HTMLButtonElement>('[data-tab="badges"]').click();
+    expect(tileIds()).toEqual(firstPage);
+  });
+
+  it('resets to page 1 every time it opens', async () => {
+    const { trophyCase, tileIds, press } = setup([]);
+    await trophyCase.open();
+    const firstPage = tileIds();
+    press('ArrowRight');
+
+    trophyCase.close();
+    await trophyCase.open();
+
+    expect(tileIds()).toEqual(firstPage);
+  });
+
+  it('re-reads the store every time it opens', async () => {
     const { trophyCase, loadAll, q } = setup([]);
 
     await trophyCase.open();

@@ -101,7 +101,7 @@ A tracked objective shown in the Quests panel and the HUD quest widget. Stretch 
 The in-game currency. Players earn Tokens from Minigame rounds and spend them at stalls. The balance changes only through validated database functions, never by a direct write from the client, so it cannot be cheated from the browser.
 
 **Badge**
-An award for reaching a Minigame's threshold (for example, the Exterminator Badge for Bug Squash). Earning a Badge the first time also pays a Token bonus.
+An award for a Minigame threshold (for example, the Exterminator Badge for Bug Squash), a Quest, the Igloo or play time, defined as data in the Badge catalog. Earning a Badge the first time pays +50 Tokens. A Badge can be *coming soon*: defined, shown in the Trophy Case, but not yet earnable.
 
 **Trophy**
 The visual form of an earned Badge, displayed in the Trophy Case.
