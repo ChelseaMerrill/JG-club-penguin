@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { RoomId } from '../../contracts';
 import { getRoomDefinition, ROOM_DEFINITIONS } from './registry';
+import { IGLOO_SLOT_PLACEMENT, IGLOO_SLOTS } from '../../persistence/progress-store';
+import { iglooSlotForSlotId } from './furniture-slots';
 import type { RoomDefinition } from './room-definition';
 import { validateRoomDefinitions } from './validate';
 
@@ -134,11 +136,50 @@ describe('validateRoomDefinitions', () => {
     });
   });
 
+  it('flags a wall or ceiling furniture slot outside the Stage', () => {
+    const rooms = [
+      room({
+        id: 'town-center',
+        furnitureSlots: [
+          { id: 'poster', placement: 'wall', wall: 'left', anchor: { x: 1700, y: 100 } },
+        ],
+      }),
+    ];
+
+    expect(validateRoomDefinitions(rooms)).toEqual(
+      expect.arrayContaining([
+        {
+          roomId: 'town-center',
+          message:
+            'furniture slot "poster" anchor { x: 1700, y: 100 } is outside the 1600x900 Stage',
+        },
+      ]),
+    );
+  });
+
+  it('flags a furniture slot whose placement contradicts its slot number', () => {
+    const rooms = [
+      room({
+        id: 'town-center',
+        furnitureSlots: [{ id: 'slot-7', placement: 'floor', tile: { col: 0, row: 0 } }],
+      }),
+    ];
+
+    expect(validateRoomDefinitions(rooms)).toEqual(
+      expect.arrayContaining([
+        {
+          roomId: 'town-center',
+          message: 'furniture slot "slot-7" is floor, but slot 7 is a wall slot',
+        },
+      ]),
+    );
+  });
+
   it('flags an out-of-bounds furniture slot', () => {
     const rooms = [
       room({
         id: 'town-center',
-        furnitureSlots: [{ id: 'sofa', tile: { col: -1, row: 0 } }],
+        furnitureSlots: [{ id: 'sofa', placement: 'floor', tile: { col: -1, row: 0 } }],
       }),
     ];
 
@@ -403,18 +444,72 @@ describe('validateRoomDefinitions', () => {
 // #16 fix 3: the verification-map assertions the execution plan named but
 // the original PR never actually wrote as tests.
 describe('ROOM_DEFINITIONS registry', () => {
-  it('gives the Igloo furniture slots 1-6 and a trophy-case hotspot', () => {
+  it('gives the Igloo furniture slots 1-11 and a trophy-case hotspot', () => {
     const igloo = getRoomDefinition('igloo');
 
-    expect((igloo.furnitureSlots ?? []).map((slot) => slot.id)).toEqual([
-      'slot-1',
-      'slot-2',
-      'slot-3',
-      'slot-4',
-      'slot-5',
-      'slot-6',
-    ]);
+    expect((igloo.furnitureSlots ?? []).map((slot) => slot.id)).toEqual(
+      IGLOO_SLOTS.map((slot) => `slot-${slot}`),
+    );
     expect((igloo.hotspots ?? []).map((hotspot) => hotspot.id)).toContain('trophy-case');
+  });
+
+  // #135: 6 floor, 4 wall and 1 ceiling slot, at the positions approved at
+  // the H4 mockup gate. Each slot's placement matches the database's.
+  it('gives each Igloo slot the placement IGLOO_SLOT_PLACEMENT names for its number', () => {
+    const igloo = getRoomDefinition('igloo');
+
+    for (const slot of igloo.furnitureSlots ?? []) {
+      const number = iglooSlotForSlotId(slot.id);
+      expect(number, slot.id).not.toBeNull();
+      expect(slot.placement, slot.id).toBe(IGLOO_SLOT_PLACEMENT[number!]);
+    }
+  });
+
+  it('puts the Igloo floor slots on walkable, non-spawn Tiles that never touch each other', () => {
+    const igloo = getRoomDefinition('igloo');
+    const floor = (igloo.furnitureSlots ?? []).flatMap((slot) =>
+      slot.placement === 'floor' ? [slot] : [],
+    );
+
+    expect(floor.map((slot) => slot.tile)).toEqual([
+      { col: 2, row: 0 },
+      { col: 4, row: 0 },
+      { col: 10, row: 0 },
+      { col: 11, row: 2 },
+      { col: 2, row: 2 },
+      { col: 0, row: 8 },
+    ]);
+    for (const slot of floor) {
+      expect(igloo.walkable[slot.tile.row][slot.tile.col], slot.id).toBe(true);
+      expect(slot.tile, slot.id).not.toEqual(igloo.spawnTile);
+    }
+    for (const [i, a] of floor.entries()) {
+      for (const b of floor.slice(i + 1)) {
+        const touching =
+          Math.abs(a.tile.col - b.tile.col) <= 1 && Math.abs(a.tile.row - b.tile.row) <= 1;
+        expect(touching, `${a.id} and ${b.id}`).toBe(false);
+      }
+    }
+  });
+
+  it('hangs the Igloo wall and ceiling slots at the approved Stage points', () => {
+    const igloo = getRoomDefinition('igloo');
+    const hanging = (igloo.furnitureSlots ?? []).filter((slot) => slot.placement !== 'floor');
+
+    expect(hanging).toEqual([
+      { id: 'slot-7', placement: 'wall', wall: 'left', anchor: { x: 527, y: 275 } },
+      { id: 'slot-8', placement: 'wall', wall: 'left', anchor: { x: 660, y: 212 } },
+      { id: 'slot-9', placement: 'wall', wall: 'right', anchor: { x: 843, y: 158 } },
+      { id: 'slot-10', placement: 'wall', wall: 'right', anchor: { x: 898, y: 186 } },
+      {
+        id: 'slot-11',
+        placement: 'ceiling',
+        anchor: { x: 850, y: 320 },
+        cordTopY: 40,
+        shadow: { x: 850, y: 525 },
+      },
+    ]);
+    expect(igloo.subtitle).toBe('PLAYER HOME · 1 PENGUIN · 1 HEXLE · 11 FURNITURE SLOTS');
   });
 
   it('gives Town Center a core-values-poster hotspot (#77 D5)', () => {
@@ -490,9 +585,10 @@ describe('ROOM_DEFINITIONS registry', () => {
       title: 'THE MARKET',
       subtitle: 'ROOF DECK MARKETPLACE · SPEND YOUR TOKENS',
     });
+    // #135 Q9: the design's '6 FURNITURE SLOTS', updated to the 11 slots.
     expect(getRoomDefinition('igloo')).toMatchObject({
       title: 'YOUR IGLOO',
-      subtitle: 'PLAYER HOME · 1 PENGUIN · 1 HEXLE · 6 FURNITURE SLOTS',
+      subtitle: 'PLAYER HOME · 1 PENGUIN · 1 HEXLE · 11 FURNITURE SLOTS',
     });
     // #51 D1: the design banner's "CONFERENCE · 604 SF · GLASS WALL ·
     // KICKOFF IN 04:32", minus its fabricated live countdown.

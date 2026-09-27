@@ -20,7 +20,7 @@ const room: RoomDefinition = {
     },
   ],
   npcSlots: [{ npcId: 'darrin', tile: { col: 1, row: 0 } }],
-  furnitureSlots: [{ id: 'slot-1', tile: { col: 0, row: 0 } }],
+  furnitureSlots: [{ id: 'slot-1', placement: 'floor', tile: { col: 0, row: 0 } }],
   hotspots: [
     { id: 'trophy-case', label: 'Trophy Case', rect: { x: 1, y: 2, width: 3, height: 4 } },
   ],

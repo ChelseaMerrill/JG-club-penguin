@@ -1,5 +1,6 @@
 import {
   ProgressStoreError,
+  type Placement,
   type ProgressStore,
   type ShopItem,
 } from '../persistence/progress-store';
@@ -68,7 +69,7 @@ function bar(widthPx: number, heightPx: number, modifier: string): HTMLElement {
  * of varying height/color, `design/Penguin Creator.dc.html`) for the
  * furniture that reads naturally as a bar (Desk, Speakers, Dual Monitors),
  * and a bespoke flat shape for the rest -- there is no dedicated art asset
- * for any of these seven items yet.
+ * for any of these items yet, except the JG awards (`ITEM_IMAGE_ICONS`).
  */
 const ITEM_ICON_BUILDERS: Record<string, (icon: HTMLElement) => void> = {
   beanbag: (icon) => icon.append(el('div', 'market__icon-beanbag')),
@@ -78,6 +79,28 @@ const ITEM_ICON_BUILDERS: Record<string, (icon: HTMLElement) => void> = {
   'dual-monitors': (icon) => icon.append(bar(20, 26, 'monitor'), bar(20, 26, 'monitor')),
   'disco-ball': (icon) => icon.append(el('div', 'market__icon-disco')),
   'arcade-cabinet': (icon) => icon.append(el('div', 'market__icon-cabinet')),
+  // #135: the four new wall items.
+  'jg-pennant': (icon) => icon.append(el('div', 'market__icon-pennant', 'JG')),
+  'framed-team-photo': (icon) => icon.append(el('div', 'market__icon-photo')),
+  'ship-it-sign': (icon) => icon.append(el('div', 'market__icon-neon', 'SHIP IT')),
+  dartboard: (icon) => icon.append(el('div', 'market__icon-dartboard')),
+};
+
+/**
+ * #135 D7: the three JG award wall items show their real logo, the same
+ * `public/awards/*.svg` files the Trophy Case uses (approved by JG's brand
+ * owner for use in the game).
+ */
+export const ITEM_IMAGE_ICONS: Readonly<Record<string, { src: string; alt: string }>> = {
+  'award-bptw': { src: 'awards/bptw.svg', alt: 'Best Places to Work' },
+  'award-inc5000': { src: 'awards/inc500.svg', alt: 'Inc. 5000' },
+  'award-top-workplaces': { src: 'awards/top-wp.svg', alt: 'Top Workplaces' },
+};
+
+/** #135 D10: the line under a wall or ceiling item's name. Floor items have none. */
+export const PLACEMENT_LINES: Readonly<Partial<Record<Placement, string>>> = {
+  wall: 'Hangs on the wall',
+  ceiling: 'Hangs from the ceiling',
 };
 
 /**
@@ -88,8 +111,14 @@ const ITEM_ICON_BUILDERS: Record<string, (icon: HTMLElement) => void> = {
 export function buildIcon(artKey: string): HTMLElement {
   const icon = el('div', 'market__item-icon');
   icon.dataset.artKey = artKey;
+  const image = ITEM_IMAGE_ICONS[artKey];
   const buildParts = ITEM_ICON_BUILDERS[artKey];
-  if (buildParts) {
+  if (image) {
+    const img = el('img', 'market__icon-image');
+    img.src = image.src;
+    img.alt = image.alt;
+    icon.append(img);
+  } else if (buildParts) {
     buildParts(icon);
   } else {
     icon.classList.add('market__icon-placeholder');
@@ -210,6 +239,7 @@ export function createMarket(root: HTMLElement, options: MarketOptions): Market 
 
       const icon = buildIcon(item.artKey);
       const name = el('div', 'market__item-name', item.name);
+      const placementLine = PLACEMENT_LINES[item.placement];
 
       const priceRow = el('div', 'market__item-price-row');
       const priceEl = el('div', 'market__item-price');
@@ -221,7 +251,11 @@ export function createMarket(root: HTMLElement, options: MarketOptions): Market 
       buyButton.addEventListener('click', () => void handleBuy(item, tileEl, buyButton));
 
       priceRow.append(priceEl, buyButton);
-      tileEl.append(icon, name, priceRow);
+      tileEl.append(icon, name);
+      if (placementLine) {
+        tileEl.append(el('div', 'market__item-placement', placementLine));
+      }
+      tileEl.append(priceRow);
       grid.append(tileEl);
 
       applyOwned(tileEl, buyButton, ownedItems.includes(item.id));

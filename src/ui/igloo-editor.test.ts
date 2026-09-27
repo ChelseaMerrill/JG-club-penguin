@@ -128,7 +128,7 @@ describe('createIglooEditor: the slot picker', () => {
     await editor.openPicker({ id: 'slot-3' });
 
     expect(q('.igloo-slot-picker').hidden).toBe(false);
-    expect(q('.igloo-slot-picker__title').textContent).toBe('SLOT 3');
+    expect(q('.igloo-slot-picker__title').textContent).toBe('SLOT 3 · FLOOR');
 
     const names = qa('.igloo-slot-picker__option-name').map((n) => n.textContent);
     expect(names).toEqual(['Empty', 'Beanbag', 'Desk']);
@@ -141,6 +141,54 @@ describe('createIglooEditor: the slot picker', () => {
       (b) => b.dataset.optionItemId === '',
     )!;
     expect(emptyOption.classList.contains('igloo-slot-picker__option--current')).toBe(false);
+  });
+
+  // #135 D9: the picker filters owned items by the slot's placement.
+  it('lists only owned wall items for a wall slot, including an award', async () => {
+    const store = createInMemoryProgressStore();
+    await store.purchase('beanbag');
+    await store.purchase('jg-pennant');
+    const { q, qa, editor } = setup(store);
+
+    await editor.openPicker({ id: 'slot-8' });
+
+    expect(q('.igloo-slot-picker__title').textContent).toBe('SLOT 8 · WALL');
+    expect(qa('.igloo-slot-picker__option-name').map((n) => n.textContent)).toEqual([
+      'Empty',
+      'JG Pennant',
+    ]);
+    expect(q('.igloo-slot-picker__hint').hidden).toBe(true);
+  });
+
+  it('lists the award with its logo for a wall slot, and never for a floor slot', async () => {
+    const store = createInMemoryProgressStore();
+    await store.purchase('award-bptw');
+    const { q, qa, editor } = setup(store);
+
+    await editor.openPicker({ id: 'slot-7' });
+    expect(qa('.igloo-slot-picker__option-name').map((n) => n.textContent)).toEqual([
+      'Empty',
+      'Best Places to Work',
+    ]);
+    expect(q<HTMLImageElement>('.igloo-slot-picker__option img').alt).toBe('Best Places to Work');
+
+    await editor.openPicker({ id: 'slot-1' });
+    expect(qa('.igloo-slot-picker__option-name').map((n) => n.textContent)).toEqual(['Empty']);
+  });
+
+  it('shows a hint to buy a fitting item when no owned item fits the slot', async () => {
+    const store = createInMemoryProgressStore();
+    await store.purchase('beanbag');
+    const { q, qa, editor } = setup(store);
+
+    await editor.openPicker({ id: 'slot-11' });
+
+    expect(q('.igloo-slot-picker__title').textContent).toBe('SLOT 11 · CEILING');
+    expect(qa('.igloo-slot-picker__option-name').map((n) => n.textContent)).toEqual(['Empty']);
+    expect(q('.igloo-slot-picker__hint').hidden).toBe(false);
+    expect(q('.igloo-slot-picker__hint').textContent).toBe(
+      'Nothing to hang here yet. Buy the Disco Ball at the Igloo Gear stall.',
+    );
   });
 
   it('marks Empty as current for an empty slot', async () => {

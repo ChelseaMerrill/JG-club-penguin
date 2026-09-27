@@ -41,7 +41,7 @@ const WALKABLE: readonly (readonly boolean[])[] = [
 export const igloo: RoomDefinition = {
   id: 'igloo',
   title: 'YOUR IGLOO',
-  subtitle: 'PLAYER HOME · 1 PENGUIN · 1 HEXLE · 6 FURNITURE SLOTS',
+  subtitle: 'PLAYER HOME · 1 PENGUIN · 1 HEXLE · 11 FURNITURE SLOTS',
   background: { kind: 'image', key: 'room-igloo', url: 'rooms/igloo.png' },
   grid: createStandardRoomGrid(),
   walkable: WALKABLE,
@@ -58,19 +58,32 @@ export const igloo: RoomDefinition = {
     },
   ],
   npcSlots: [],
-  // Six empty slots (#41) spread across the Igloo's open floor, clear of the
-  // built-in bed structure, the desk, the dresser, the door and the spawn
-  // tile. The design itself shows only the finished furnished state, not
-  // slot markers, so these positions are a judgment call reported on the
-  // #16 execution plan (#16 fix 4: kept as open floor, per that plan, since
-  // the design shows no distinct slot markers to trace).
+  // #135: 11 slots, positions approved by milliehime at the #135 mockup
+  // gate (H4, 2026-09-27). The design shows only the finished furnished
+  // state, not slot markers, so these are judgment calls. Floor slots 1-6
+  // (moved by #135 from the open floor to along the back walls) are
+  // walkable, never adjacent to each other, and clear of the bed, desk,
+  // dresser, door approach and spawn tile. Wall slots 7-10 sit in the gaps
+  // between the wall fixtures (sign, windows, door, poster), so wall art is
+  // at most 38 px wide. The ceiling slot hangs over the floor centre.
   furnitureSlots: [
-    { id: 'slot-1', tile: { col: 4, row: 3 } },
-    { id: 'slot-2', tile: { col: 6, row: 3 } },
-    { id: 'slot-3', tile: { col: 8, row: 3 } },
-    { id: 'slot-4', tile: { col: 4, row: 6 } },
-    { id: 'slot-5', tile: { col: 6, row: 6 } },
-    { id: 'slot-6', tile: { col: 8, row: 6 } },
+    { id: 'slot-1', placement: 'floor', tile: { col: 2, row: 0 } },
+    { id: 'slot-2', placement: 'floor', tile: { col: 4, row: 0 } },
+    { id: 'slot-3', placement: 'floor', tile: { col: 10, row: 0 } },
+    { id: 'slot-4', placement: 'floor', tile: { col: 11, row: 2 } },
+    { id: 'slot-5', placement: 'floor', tile: { col: 2, row: 2 } },
+    { id: 'slot-6', placement: 'floor', tile: { col: 0, row: 8 } },
+    { id: 'slot-7', placement: 'wall', wall: 'left', anchor: { x: 527, y: 275 } },
+    { id: 'slot-8', placement: 'wall', wall: 'left', anchor: { x: 660, y: 212 } },
+    { id: 'slot-9', placement: 'wall', wall: 'right', anchor: { x: 843, y: 158 } },
+    { id: 'slot-10', placement: 'wall', wall: 'right', anchor: { x: 898, y: 186 } },
+    {
+      id: 'slot-11',
+      placement: 'ceiling',
+      anchor: { x: 850, y: 320 },
+      cordTopY: 40,
+      shadow: { x: 850, y: 525 },
+    },
   ],
   hotspots: [
     {

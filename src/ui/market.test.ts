@@ -52,7 +52,7 @@ describe('createMarket', () => {
     expect(q('.market__balance').textContent).toBe('BALANCE 100');
 
     const tiles = qa('.market__item');
-    expect(tiles).toHaveLength(7);
+    expect(tiles).toHaveLength(14);
 
     const beanbag = q('[data-item-id="beanbag"]');
     expect(beanbag.querySelector('.market__item-name')?.textContent).toBe('Beanbag');
@@ -60,6 +60,49 @@ describe('createMarket', () => {
     const buyButton = beanbag.querySelector<HTMLButtonElement>('.market__item-buy')!;
     expect(buyButton.textContent).toBe('BUY');
     expect(buyButton.disabled).toBe(false);
+  });
+
+  // #135 D10: wall and ceiling items say where they go; floor items don't.
+  it('shows a placement line on wall and ceiling items only', async () => {
+    const { q, market } = setup();
+
+    await market.open();
+
+    const line = (id: string) =>
+      q(`[data-item-id="${id}"]`).querySelector('.market__item-placement')?.textContent;
+    expect(line('jg-pennant')).toBe('Hangs on the wall');
+    expect(line('rgb-light-strip')).toBe('Hangs on the wall');
+    expect(line('award-inc5000')).toBe('Hangs on the wall');
+    expect(line('disco-ball')).toBe('Hangs from the ceiling');
+    expect(line('beanbag')).toBeUndefined();
+  });
+
+  it('shows the three JG awards with their logos at 60 tokens', async () => {
+    const { q, market } = setup();
+
+    await market.open();
+
+    for (const [id, alt, src] of [
+      ['award-bptw', 'Best Places to Work', 'awards/bptw.svg'],
+      ['award-inc5000', 'Inc. 5000', 'awards/inc500.svg'],
+      ['award-top-workplaces', 'Top Workplaces', 'awards/top-wp.svg'],
+    ]) {
+      const card = q(`[data-item-id="${id}"]`);
+      const img = card.querySelector<HTMLImageElement>('.market__item-icon img')!;
+      expect(img.alt).toBe(alt);
+      expect(img.getAttribute('src')).toBe(src);
+      expect(card.querySelector('.market__item-price-value')?.textContent).toBe('60');
+    }
+  });
+
+  it('gives every catalog item a dedicated icon, never the placeholder', async () => {
+    const { qa, market } = setup();
+
+    await market.open();
+
+    for (const icon of qa('.market__item-icon')) {
+      expect(icon.classList.contains('market__icon-placeholder'), icon.dataset.artKey).toBe(false);
+    }
   });
 
   it('shows an already-owned item as OWNED, not BUY', async () => {
