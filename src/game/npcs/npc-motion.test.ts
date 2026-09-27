@@ -127,6 +127,62 @@ describe('NPC motion (#113)', () => {
     expect(getNpcMotion('not-an-npc')).toBeUndefined();
   });
 
+  describe('the Stage-level channel (#150)', () => {
+    const REST = { x: 600, y: 475 }; // Jory's slot point in Town Center
+    // A Stage-level scale about the Stage's top-left corner, as the design's
+    // `jump` group gets with no transform-origin: 0% identity, 50% scaleY(.5).
+    const spec = {
+      stage: {
+        keyframes:
+          '@keyframes squash { 0%,100% { transform: scaleY(1);} 50% { transform: translateY(-10px) scaleY(.5);} }',
+        animation: 'squash 1s linear infinite',
+      },
+    };
+    function staged() {
+      const motion = createNpcMotion(spec, REST, ORIGIN, { reducedMotion: false });
+      if (!motion) throw new Error('expected a stage-only spec to have a motion');
+      return motion;
+    }
+
+    it('creates a motion for a spec with only a stage track, identity at rest', () => {
+      const motion = staged();
+      expect(motion.roams).toBe(false);
+      expect(motion.pose().figure).toBeNull();
+      const feet = transformPoint(motion.pose().stage!, { x: 0, y: 0 });
+      expect(feet.x).toBeCloseTo(0);
+      expect(feet.y).toBeCloseTo(0);
+    });
+
+    it("re-expresses the Stage-space transform relative to the NPC's rest point", () => {
+      const motion = staged();
+      motion.advance(500);
+      // Stage y' = 0.5 * y - 10, so the feet (Stage y 475) land at 227.5,
+      // 247.5 px up; a point 100 px above the feet lands 50 px above that.
+      const feet = transformPoint(motion.pose().stage!, { x: 0, y: 0 });
+      const above = transformPoint(motion.pose().stage!, { x: 0, y: -100 });
+      expect(REST.y + feet.y).toBeCloseTo(227.5);
+      expect(REST.y + above.y).toBeCloseTo(177.5);
+      expect(feet.x).toBeCloseTo(0);
+    });
+
+    it('keeps the NPC on its slot and keeps playing while paused (dialog open)', () => {
+      const motion = staged();
+      motion.pause();
+      motion.advance(500);
+      expect(motion.pose().point).toEqual(REST);
+      expect(motion.pose().moving).toBe(false);
+      const feet = transformPoint(motion.pose().stage!, { x: 0, y: 0 });
+      expect(REST.y + feet.y).toBeCloseTo(227.5);
+    });
+
+    it('does nothing under prefers-reduced-motion', () => {
+      expect(createNpcMotion(spec, REST, ORIGIN, { reducedMotion: true })).toBeNull();
+      expect(
+        createNpcMotion(getNpcMotion('jory'), REST, ORIGIN, { reducedMotion: true }),
+      ).toBeNull();
+    });
+  });
+
   it('only gives a motion to an NPC placed in its own Room (a motion for an unplaced NPC is dead data)', () => {
     for (const id of Object.keys(NPCS) as NpcId[]) {
       if (!getNpcMotion(id)) continue;

@@ -80,6 +80,8 @@ export interface NpcMotionDebugInfo {
   y: number;
   moving: boolean;
   paused: boolean;
+  /** The live transform of its figure plus name tag, relative to its feet (#150). */
+  body: { x: number; y: number; scaleX: number; scaleY: number; rotation: number };
 }
 
 declare global {

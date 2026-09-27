@@ -59,6 +59,14 @@ export interface NpcSprite {
    * the name tag below it stays upright, as in the Room designs.
    */
   readonly figure: GameObjects.Container;
+  /**
+   * The figure (inside its draw-scale wrapper) together with the name tag,
+   * unscaled, with its origin at the feet (#150): the layer a designed
+   * Stage-level motion (`stage`, e.g. Jory's couch jump) transforms, in
+   * Stage pixels. Identity for every NPC without one. The speech bubble
+   * isn't inside it, as in the designs.
+   */
+  readonly body: GameObjects.Container;
   /** Moves the NPC (figure, name tag and speech bubble) to `(x, y)`, sorted at `depth` (#113). */
   setPoint(x: number, y: number, depth: number): void;
   destroy(): void;
@@ -111,7 +119,9 @@ export function createNpcSprite(
   const origin = penguinFeetOrigin();
   const reducedMotion = prefersReducedMotion();
   const motion = reducedMotion ? undefined : options.motion;
-  const hasDesignedMotion = Boolean(motion?.path || motion?.figure || motion?.props?.length);
+  const hasDesignedMotion = Boolean(
+    motion?.path || motion?.figure || motion?.stage || motion?.props?.length,
+  );
   const layout = npcLayout(npc);
 
   const sprite = new GameObjects.Sprite(scene, 0, 0, PLACEHOLDER_TEXTURE_KEY);
@@ -182,11 +192,14 @@ export function createNpcSprite(
   // that viewBox. So `figure` (the layer `room-npc-motions.ts` transforms and
   // parents prop layers under) sits inside a `scaled` wrapper: a designed
   // motion stays in figure units, as in the designs, and props shrink with
-  // the figure. The idle bob moves `scaled`, in Stage px.
+  // the figure. The idle bob moves `scaled`, in Stage px. `body` holds the
+  // scaled figure and the name tag, unscaled, for a Stage-level motion
+  // (#150) that moves both, as the design's own group around them does.
   const figure = new GameObjects.Container(scene, 0, 0, [sprite]);
   const scaled = new GameObjects.Container(scene, 0, 0, [figure]);
   scaled.setScale(layout.scale);
-  const container = scene.add.container(x, y, [scaled, namePill, nameText]);
+  const body = new GameObjects.Container(scene, 0, 0, [scaled, namePill, nameText]);
+  const container = scene.add.container(x, y, [body]);
   container.setDepth(depth);
 
   // --- Speech bubble: a separate top-layer pair, not a container child. ---
@@ -330,6 +343,7 @@ export function createNpcSprite(
   return {
     container,
     figure,
+    body,
     setPoint(nextX, nextY, nextDepth) {
       pointX = nextX;
       pointY = nextY;

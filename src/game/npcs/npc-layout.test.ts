@@ -85,8 +85,9 @@ describe('npcBob', () => {
       'ryan-team-room-4',
     ] as const;
     for (const id of stillInTheirDesigns) expect(npcBob(NPCS[id]), id).toBeNull();
-    // Team Room 2's Ian bobs in his design (`bob 2.4s`), and Town Center's
-    // Jory keeps the default bob as a stand-in for her designed `jump`.
+    // Team Room 2's Ian bobs in his design (`bob 2.4s`). Town Center's Jory
+    // still has a default bob without a motion, but her `stage` jump (#150)
+    // replaces it at draw time (`designedMotion: true`).
     expect(npcBob(NPCS['ian-team-room-2'])).not.toBeNull();
     expect(npcBob(NPCS.jory)).not.toBeNull();
   });
