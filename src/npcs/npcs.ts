@@ -170,11 +170,12 @@ interface NpcDefinitionBase {
   /** The idle speech-bubble cycle, from the Room design's own `say` bubbles. */
   idleLines: NpcBubbleLine[];
   /**
-   * This NPC's own dialog lines (#144): element 0 is the character sheet's
-   * short quote (#36's `dialogLine`), then any other lines the designs or the
-   * BA give the person (`humans.js`, the Mullet and HUD designs). The dialog
-   * shows `dialogLinePool()` of these plus this appearance's `idleLines`, one
-   * at random, never the same line twice in a row. A `kind: 'minigame'` NPC's
+   * This NPC's own dialog lines (#144): element 0 is #36's single
+   * `dialogLine` (usually the character sheet's quote, otherwise the
+   * `humans.js` `line`), then any other lines the designs or the BA give the
+   * person (`humans.js`, the Mullet and HUD designs). The dialog shows
+   * `dialogLinePool()` of these plus this appearance's `idleLines`, one at
+   * random, never the same line twice in a row. A `kind: 'minigame'` NPC's
    * dialog keeps its verbatim `dialog.triggerLine` instead (#144 Q15).
    */
   dialogLines: readonly [string, ...string[]];
@@ -481,7 +482,8 @@ const JETHRO_FIGURE: HumanFigureSpec = {
 /**
  * Person-wide dialog lines (#144 D2), shared by every appearance of the same
  * person like the `*_FIGURE` constants above, so the copies can't drift.
- * Element 0 is the character sheet's quote. Sources are the character sheet
+ * Element 0 is #36's single `dialogLine` (usually the character sheet's
+ * quote, otherwise the `humans.js` `line`). Sources are the character sheet
  * (`design/Characters.dc.html`), `design/build/humans.js`'s `line`, the
  * Mullet design (`design/The Mullet.dc.html`) and the BA (#144). A line tied
  * to one Room reaches that appearance only through its own `idleLines`.
@@ -531,7 +533,8 @@ const JETHRO_LINES = [
  * `design/build/humans.js`'s figure `spec`s are used for the Human NPCs'
  * rendered figures only, never for name/title. `idleLines` come from each
  * Room design's own `say`-cycling (or static) speech bubbles (round-1 item
- * 2), and `dialogLines` starts with the sheet's own short quote, shown in the
+ * 2), and `dialogLines` starts with #36's single `dialogLine` (usually the
+ * sheet's own short quote, otherwise the `humans.js` `line`), shown in the
  * dialog panel (#144).
  *
  * The 5 Penguin-kind background NPCs (Front Desk, Kevin, Tristin, Tonya,

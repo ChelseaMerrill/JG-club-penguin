@@ -22,8 +22,8 @@ export interface NpcDialogActions {
   launchMinigame: (minigameId: MinigameId) => void;
   /** Wired to #40's real Market panel (`main.ts`); still logged to `window.__roomDebug` (#36 round-1). */
   openStall: (stallId: string) => void;
-  /** Starts a Quest from its giver's "Got any work for me?" (#144 D9). Optional until a caller needs it. */
-  startQuest?: (questId: string) => void;
+  /** Starts a Quest from its giver's "Got any work for me?" (#144 D9). */
+  startQuest: (questId: string) => void;
 }
 
 /** What a quest giver's button reads about Quests (#144 D9). */
@@ -119,6 +119,7 @@ export function createNpcDialog(root: HTMLElement, deps: NpcDialogDeps): NpcDial
   const subtitleEl = el('div', 'npc-dialog__subtitle');
   const titleEl = el('div', 'npc-dialog__title');
   const lineEl = el('div', 'npc-dialog__line');
+  lineEl.setAttribute('aria-live', 'polite');
   const actionsEl = el('div', 'npc-dialog__actions');
 
   box.append(closeButton, nameEl, subtitleEl, titleEl, lineEl, actionsEl);
@@ -170,7 +171,7 @@ export function createNpcDialog(root: HTMLElement, deps: NpcDialogDeps): NpcDial
         const response = questGiverResponse(npc);
         if (response === null) return;
         if (response.kind === 'start') {
-          deps.actions.startQuest?.(response.questId);
+          deps.actions.startQuest(response.questId);
           handleClose();
           return;
         }

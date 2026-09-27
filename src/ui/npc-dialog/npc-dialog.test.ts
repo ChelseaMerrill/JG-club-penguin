@@ -17,7 +17,8 @@ let overlays: OverlayManager | undefined;
 
 /**
  * `random` defaults to always 0, so a fresh dialog shows the first line of
- * its pool: the character sheet's quote (`dialogLines[0]`).
+ * its pool: #36's single `dialogLine` (`dialogLines[0]`), usually the
+ * character sheet's quote, otherwise the `humans.js` `line`.
  */
 function setup(options: { random?: () => number; quests?: NpcDialogQuests } = {}) {
   const root = document.createElement('div');
@@ -296,6 +297,7 @@ describe('createNpcDialog', () => {
     const nameEl = root.querySelector('.npc-dialog__name') as HTMLElement;
     expect(nameEl.id).toBeTruthy();
     expect(panelEl.getAttribute('aria-labelledby')).toBe(nameEl.id);
+    expect(root.querySelector('.npc-dialog__line')?.getAttribute('aria-live')).toBe('polite');
   });
 
   it('moves focus to the first action button on open, and restores prior focus on close', () => {

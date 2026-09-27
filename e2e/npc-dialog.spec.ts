@@ -8,7 +8,7 @@ import { tileToScreen } from '../src/game/rooms/iso';
 import type { RoomDefinition } from '../src/game/rooms/room-definition';
 import { GAME_HEIGHT, GAME_WIDTH } from '../src/game/stage-size';
 import { dialogLinePool } from '../src/npcs/dialog-lines';
-import { NPCS } from '../src/npcs/npcs';
+import { NPCS, type NpcId } from '../src/npcs/npcs';
 import type { RoomDebugInfo } from './support/room-debug-types';
 
 /**
@@ -68,14 +68,14 @@ async function bootRoom(page: Page, roomId: RoomId): Promise<string[]> {
 }
 
 /** Clicks an NPC at its slot tile and waits for its dialog to open. */
-async function openDialog(page: Page, room: RoomDefinition, npcId: string): Promise<void> {
+async function openDialog(page: Page, room: RoomDefinition, npcId: NpcId): Promise<void> {
   const slot = room.npcSlots.find((s) => s.npcId === npcId);
   if (!slot) throw new Error(`no ${npcId} slot in ${room.id}`);
   const feet = tileToScreen(slot.tile, room.grid.origin);
   await clickStagePoint(page, { x: feet.x, y: feet.y + HIT_ZONE_OFFSET_Y });
   const dialog = page.locator('.npc-dialog');
   await expect(dialog).toBeVisible({ timeout: LONG_WALK_TIMEOUT });
-  await expect(dialog.locator('.npc-dialog__name')).toHaveText(NPCS[npcId as 'jon'].name);
+  await expect(dialog.locator('.npc-dialog__name')).toHaveText(NPCS[npcId].name);
 }
 
 async function closeDialog(page: Page): Promise<void> {
