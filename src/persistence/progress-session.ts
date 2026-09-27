@@ -3,13 +3,14 @@
 // writes are the one place every other track reads saved progress from.
 
 import type { TypedEmitter } from '../contracts/emitter';
-import type { GameEventMap, MinigameId, MinigameStatsMap } from '../contracts/game-events';
+import type { BadgeId, GameEventMap, MinigameId, MinigameStatsMap } from '../contracts/game-events';
 import type { PenguinLook } from '../contracts/penguin';
 import { bindPlayer, type Player } from '../auth/player';
 import { MINIGAME_RULES } from './minigame-rules';
 import {
   IGLOO_SLOTS,
   ProgressStoreError,
+  type BadgeCheckResult,
   type CompleteQuestResult,
   type IglooSlot,
   type LeaderboardEntry,
@@ -192,6 +193,14 @@ function wrapStore(
         slots[slot] = itemId;
       }
       setSnapshot({ ...previous, slots });
+      // #138 (D10): the igloo_slots trigger awards Interior Penguin silently.
+      // Announce it before this resolves, so a `loadAll` the caller starts
+      // next (the igloo editor refreshes its furniture) can't record it first
+      // and swallow the announcement. A failed check never fails the save.
+      const placed = IGLOO_SLOTS.filter((other) => slots[other] !== null).length;
+      if (placed >= 6 && !previous.badges.includes('interior-penguin')) {
+        await checkBadges().catch(() => undefined);
+      }
     }
   }
 
@@ -211,7 +220,40 @@ function wrapStore(
     const result = await store.completeQuest(questId);
     if (!isCurrent()) return result;
     const previous = currentSnapshot();
-    if (previous) setSnapshot({ ...previous, tokens: result.balance });
+    if (previous) {
+      // #138: the store already announced these; recording them here keeps
+      // the next `checkBadges` diff from announcing them a second time.
+      setSnapshot({
+        ...previous,
+        tokens: result.balance,
+        badges: unionBadges(previous.badges, result.badgesEarned),
+      });
+    }
+    return result;
+  }
+
+  /**
+   * #138 (D10): the Session Badge check. Badges the server awarded silently
+   * (the Interior Penguin trigger, First Waddle, Night Owl) are announced
+   * here, once each: every id the snapshot doesn't hold yet gets one
+   * `badge:earned`. The snapshot only ever gains ids. With no snapshot loaded
+   * yet, nothing is announced; the next `loadAll` picks the Badges up.
+   */
+  async function checkBadges(): Promise<BadgeCheckResult> {
+    const result = await store.checkBadges();
+    if (!isCurrent()) return result;
+    const previous = currentSnapshot();
+    if (!previous) return result;
+    const newBadges = result.badges.filter((badgeId) => !previous.badges.includes(badgeId));
+    setSnapshot({
+      ...previous,
+      tokens: result.balance,
+      badges: unionBadges(previous.badges, result.badges),
+    });
+    for (const badgeId of newBadges) {
+      emitter.emit('badge:earned', { badgeId });
+    }
+    emitter.emit('tokens:changed', { balance: result.balance });
     return result;
   }
 
@@ -226,9 +268,19 @@ function wrapStore(
       questProgress: () => store.questProgress(),
       markDevPitVisited: () => store.markDevPitVisited(),
       completeQuest,
+      checkBadges,
     },
     loadInitial: loadAll,
   };
+}
+
+/** `existing` plus every id in `added` it doesn't already hold, in order. */
+function unionBadges(existing: readonly BadgeId[], added: readonly BadgeId[]): BadgeId[] {
+  const badges = [...existing];
+  for (const badgeId of added) {
+    if (!badges.includes(badgeId)) badges.push(badgeId);
+  }
+  return badges;
 }
 
 /**
@@ -300,5 +352,6 @@ export function createActiveProgressStore(
     questProgress: async () => current().questProgress(),
     markDevPitVisited: async () => current().markDevPitVisited(),
     completeQuest: async (questId) => current().completeQuest(questId),
+    checkBadges: async () => current().checkBadges(),
   };
 }

@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { bindPlayer, type Player } from '../auth/player';
 import { createEmitter } from '../contracts/emitter';
-import type { GameEventMap } from '../contracts/game-events';
+import type { BadgeId, GameEventMap } from '../contracts/game-events';
 import { DEFAULT_LOOK } from '../contracts/penguin';
-import { createInMemoryProgressStore } from './in-memory-progress-store';
+import {
+  createInMemoryProgressStore,
+  createInMemoryProgressStoreWithControls,
+} from './in-memory-progress-store';
 import { emptySlots, type ProgressSnapshot, type ProgressStore } from './progress-store';
 import {
   createActiveProgressStore,
@@ -35,6 +38,7 @@ function makeSnapshot(overrides: Partial<ProgressSnapshot> = {}): ProgressSnapsh
     ownedItems: [],
     slots: emptySlots(),
     catalog: [],
+    badgeCatalog: [],
     ...overrides,
   };
 }
@@ -56,6 +60,7 @@ function deferredStore(): { store: ProgressStore; resolve: (snapshot: ProgressSn
       questProgress: () => Promise.reject(new Error('unused in this test')),
       markDevPitVisited: () => Promise.reject(new Error('unused in this test')),
       completeQuest: () => Promise.reject(new Error('unused in this test')),
+      checkBadges: () => Promise.reject(new Error('unused in this test')),
     },
     resolve: resolveFn,
   };
@@ -73,6 +78,7 @@ function failingStore(): ProgressStore {
     questProgress: () => Promise.reject(new Error('unused in this test')),
     markDevPitVisited: () => Promise.reject(new Error('unused in this test')),
     completeQuest: () => Promise.reject(new Error('unused in this test')),
+    checkBadges: () => Promise.reject(new Error('unused in this test')),
   };
 }
 
@@ -242,6 +248,7 @@ describe('createProgressSession', () => {
         questProgress: () => Promise.reject(new Error('unused in this test')),
         markDevPitVisited: () => Promise.reject(new Error('unused in this test')),
         completeQuest: () => Promise.reject(new Error('unused in this test')),
+        checkBadges: () => Promise.reject(new Error('unused in this test')),
       };
       await session.start(PLAYER, store);
       const wrapped = registry.get(PROGRESS_STORE_KEY) as ProgressStore;
@@ -307,8 +314,16 @@ describe('createProgressSession', () => {
       });
       const result = await wrapped.completeQuest('main');
 
-      expect(result).toEqual({ tokensAwarded: 150, balance: 200, alreadyCompleted: false });
-      expect((registry.get(PROGRESS_KEY) as ProgressSnapshot).tokens).toBe(200);
+      // #138: Ship It's +50 is in the balance and its id in badgesEarned.
+      expect(result).toEqual({
+        tokensAwarded: 150,
+        balance: 250,
+        alreadyCompleted: false,
+        badgesEarned: ['ship-it'],
+      });
+      const snapshot = registry.get(PROGRESS_KEY) as ProgressSnapshot;
+      expect(snapshot.tokens).toBe(250);
+      expect(snapshot.badges).toEqual(['ship-it']);
     });
 
     it('setSlot moves an item between slots and empties on null', async () => {
@@ -331,6 +346,138 @@ describe('createProgressSession', () => {
 
       await wrapped.setSlot(2, null);
       expect((registry.get(PROGRESS_KEY) as ProgressSnapshot).slots[2]).toBeNull();
+    });
+
+    describe('announces each badge exactly once (#138 D10)', () => {
+      // Midday Eastern, outside Night Owl's window, so only the Badge under
+      // test can be newly awarded.
+      const NOON_EASTERN = Date.parse('2026-09-27T16:00:00.000Z');
+      const FLOOR_ITEMS = ['beanbag', 'desk', 'speakers', 'dual-monitors', 'arcade-cabinet'];
+
+      async function announceSetup() {
+        const registry = createFakeRegistry();
+        const emitter = createEmitter<GameEventMap>();
+        const announced: BadgeId[] = [];
+        emitter.on('badge:earned', ({ badgeId }) => announced.push(badgeId));
+        const session = createProgressSession({ registry, emitter });
+        const controls = createInMemoryProgressStoreWithControls({
+          emitter,
+          now: () => NOON_EASTERN,
+        });
+        await session.start(PLAYER, controls.store);
+        const wrapped = registry.get(PROGRESS_STORE_KEY) as ProgressStore;
+        return { registry, wrapped, controls, announced };
+      }
+
+      async function placeSixItems(
+        wrapped: ProgressStore,
+        grantTokens: (tokens: number) => void,
+      ): Promise<void> {
+        grantTokens(700);
+        for (const itemId of [...FLOOR_ITEMS, 'rgb-light-strip']) {
+          await wrapped.purchase(itemId);
+        }
+        for (const [index, itemId] of [...FLOOR_ITEMS, 'rgb-light-strip'].entries()) {
+          await wrapped.setSlot((index + 1) as 1 | 2 | 3 | 4 | 5 | 6, itemId);
+        }
+      }
+
+      it('Ship It through completeQuest, then a Session check', async () => {
+        const { wrapped, announced } = await announceSetup();
+        await wrapped.saveLook({ ...DEFAULT_LOOK, name: 'Shipper' });
+        await wrapped.markDevPitVisited();
+        await wrapped.recordRound('bug-squash', 0, {
+          score: 0,
+          squashed: 0,
+          bestCombo: 0,
+          escaped: 0,
+        });
+        await wrapped.recordRound('pancake-flip', 0, {
+          golden: 0,
+          flipNow: 0,
+          raw: 0,
+          burnt: 0,
+          stacked: 0,
+          bestStreak: 0,
+        });
+        await wrapped.purchase('beanbag');
+        await wrapped.checkBadges(); // First Waddle, before the Quest.
+        announced.length = 0;
+
+        await wrapped.completeQuest('main');
+        await wrapped.checkBadges();
+
+        expect(announced).toEqual(['ship-it']);
+      });
+
+      it('a Minigame Badge through recordRound, then a Session check', async () => {
+        const { wrapped, announced } = await announceSetup();
+
+        await wrapped.recordRound('bug-squash', 520, {
+          score: 520,
+          squashed: 520,
+          bestCombo: 0,
+          escaped: 0,
+        });
+        await wrapped.checkBadges();
+
+        expect(announced).toEqual(['exterminator']);
+      });
+
+      it('Interior Penguin through the sixth setSlot, then a Session check', async () => {
+        const { wrapped, controls, announced } = await announceSetup();
+
+        await placeSixItems(wrapped, controls.grantTokens);
+        await wrapped.checkBadges();
+
+        expect(announced).toEqual(['interior-penguin']);
+      });
+
+      it('Interior Penguin with a loadAll right after the sixth setSlot, as the igloo editor refreshes', async () => {
+        const { registry, wrapped, controls, announced } = await announceSetup();
+
+        await placeSixItems(wrapped, controls.grantTokens);
+        await wrapped.loadAll();
+        await wrapped.checkBadges();
+
+        expect(announced).toEqual(['interior-penguin']);
+        expect((registry.get(PROGRESS_KEY) as ProgressSnapshot).badges).toContain(
+          'interior-penguin',
+        );
+      });
+
+      it('First Waddle through two Session checks', async () => {
+        const { registry, wrapped, announced } = await announceSetup();
+        await wrapped.saveLook({ ...DEFAULT_LOOK, name: 'Waddler' });
+
+        const first = await wrapped.checkBadges();
+        await wrapped.checkBadges();
+
+        expect(announced).toEqual(['first-waddle']);
+        const snapshot = registry.get(PROGRESS_KEY) as ProgressSnapshot;
+        expect(snapshot.badges).toEqual(['first-waddle']);
+        expect(snapshot.tokens).toBe(first.balance);
+      });
+
+      it('announces nothing, and changes nothing, with no snapshot loaded', async () => {
+        const registry = createFakeRegistry();
+        const emitter = createEmitter<GameEventMap>();
+        const announced: BadgeId[] = [];
+        emitter.on('badge:earned', ({ badgeId }) => announced.push(badgeId));
+        const session = createProgressSession({ registry, emitter });
+        const store = createInMemoryProgressStore({ emitter, now: () => NOON_EASTERN });
+        await store.saveLook({ ...DEFAULT_LOOK, name: 'Early' });
+        const { store: failing, resolve } = deferredStore();
+        const pending = session.start(PLAYER, { ...failing, checkBadges: store.checkBadges });
+        const wrapped = registry.get(PROGRESS_STORE_KEY) as ProgressStore;
+
+        await wrapped.checkBadges();
+
+        expect(announced).toEqual([]);
+        expect(registry.get(PROGRESS_KEY)).toBeUndefined();
+        resolve(makeSnapshot());
+        await pending;
+      });
     });
 
     it('leaderboard forwards straight to the store, without touching the snapshot', async () => {

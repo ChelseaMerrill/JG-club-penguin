@@ -16,6 +16,7 @@ import {
   isIglooSlot,
   isProgressErrorCode,
   validateLook,
+  type BadgeCheckResult,
   type CompleteQuestResult,
   type QuestProgress,
   type IglooSlot,
@@ -112,6 +113,15 @@ interface ShopItemRow {
   art_key: string;
 }
 
+/** A `public.badges` row (#138). */
+interface BadgeCatalogRow {
+  id: string;
+  name: string;
+  how_to_earn: string;
+  sort_order: number;
+  available: boolean;
+}
+
 export interface PlayersTable {
   select(columns: string): {
     eq(column: 'id', value: string): { maybeSingle(): PromiseLike<SelectResult<PlayerRow>> };
@@ -157,16 +167,27 @@ export interface ShopItemsTable {
   select(columns: string): OrderableRows<ShopItemRow>;
 }
 
+export interface BadgesTable {
+  select(columns: string): OrderableRows<BadgeCatalogRow>;
+}
+
 export type ProgressTable =
   | PlayersTable
   | PlayerBadgesTable
   | MinigameBestsTable
   | PlayerItemsTable
   | IglooSlotsTable
-  | ShopItemsTable;
+  | ShopItemsTable
+  | BadgesTable;
 
 export type ProgressTableName =
-  'players' | 'player_badges' | 'minigame_bests' | 'player_items' | 'igloo_slots' | 'shop_items';
+  | 'players'
+  | 'player_badges'
+  | 'minigame_bests'
+  | 'player_items'
+  | 'igloo_slots'
+  | 'shop_items'
+  | 'badges';
 
 /**
  * The narrow slice of a Supabase client `createSupabaseProgressStore` needs:
@@ -185,7 +206,8 @@ export interface ProgressClient {
       | 'leaderboard'
       | 'quest_progress'
       | 'mark_dev_pit_visited'
-      | 'complete_quest',
+      | 'complete_quest'
+      | 'check_session_badges',
     args: Record<string, unknown>,
   ): PromiseLike<RpcResult>;
 }
@@ -321,28 +343,42 @@ export function createSupabaseProgressStore(
       const playerItemsTable = client.from('player_items') as PlayerItemsTable;
       const iglooSlotsTable = client.from('igloo_slots') as IglooSlotsTable;
       const shopItemsTable = client.from('shop_items') as ShopItemsTable;
+      const badgesTable = client.from('badges') as BadgesTable;
 
-      const [playerRes, badgesRes, bestsRes, itemsRes, slotsRes, catalogRes] = await Promise.all([
-        playersTable.select(SELECT_PLAYER_COLUMNS).eq('id', playerId).maybeSingle(),
-        playerBadgesTable
-          .select('badge_id')
-          .eq('player_id', playerId)
-          .order('earned_at', { ascending: true })
-          .order('badge_id', { ascending: true }),
-        minigameBestsTable.select('minigame_id, best_score').eq('player_id', playerId),
-        playerItemsTable
-          .select('item_id')
-          .eq('player_id', playerId)
-          .order('acquired_at', { ascending: true })
-          .order('item_id', { ascending: true }),
-        iglooSlotsTable.select('slot, item_id').eq('player_id', playerId),
-        shopItemsTable
-          .select('id, stall, name, price, art_key')
-          .order('price', { ascending: true })
-          .order('id', { ascending: true }),
-      ]);
+      const [playerRes, badgesRes, bestsRes, itemsRes, slotsRes, catalogRes, badgeCatalogRes] =
+        await Promise.all([
+          playersTable.select(SELECT_PLAYER_COLUMNS).eq('id', playerId).maybeSingle(),
+          playerBadgesTable
+            .select('badge_id')
+            .eq('player_id', playerId)
+            .order('earned_at', { ascending: true })
+            .order('badge_id', { ascending: true }),
+          minigameBestsTable.select('minigame_id, best_score').eq('player_id', playerId),
+          playerItemsTable
+            .select('item_id')
+            .eq('player_id', playerId)
+            .order('acquired_at', { ascending: true })
+            .order('item_id', { ascending: true }),
+          iglooSlotsTable.select('slot, item_id').eq('player_id', playerId),
+          shopItemsTable
+            .select('id, stall, name, price, art_key')
+            .order('price', { ascending: true })
+            .order('id', { ascending: true }),
+          badgesTable
+            .select('id, name, how_to_earn, sort_order, available')
+            .order('sort_order', { ascending: true })
+            .order('id', { ascending: true }),
+        ]);
 
-      for (const res of [playerRes, badgesRes, bestsRes, itemsRes, slotsRes, catalogRes]) {
+      for (const res of [
+        playerRes,
+        badgesRes,
+        bestsRes,
+        itemsRes,
+        slotsRes,
+        catalogRes,
+        badgeCatalogRes,
+      ]) {
         if (res.error) {
           throw toProgressError(res.error);
         }
@@ -376,6 +412,13 @@ export function createSupabaseProgressStore(
           name: row.name,
           price: row.price,
           artKey: row.art_key,
+        })),
+        badgeCatalog: (badgeCatalogRes.data ?? []).map((row) => ({
+          id: row.id,
+          name: row.name,
+          howToEarn: row.how_to_earn,
+          sortOrder: row.sort_order,
+          available: row.available,
         })),
       };
     });
@@ -556,10 +599,33 @@ export function createSupabaseProgressStore(
       if (error) {
         throw toProgressError(error);
       }
-      const result = data as CompleteQuestResult;
+      const raw = data as Omit<CompleteQuestResult, 'badgesEarned'> & { badgesEarned?: unknown };
+      const result: CompleteQuestResult = {
+        ...raw,
+        badgesEarned: Array.isArray(raw.badgesEarned) ? (raw.badgesEarned as BadgeId[]) : [],
+      };
       emitter?.emit('tokens:changed', { balance: result.balance });
+      // #138: one announcement per Badge the call awarded (Ship It today).
+      for (const badgeId of result.badgesEarned) {
+        emitter?.emit('badge:earned', { badgeId });
+      }
       return result;
     });
+  }
+
+  // #138: a background check (the Session timer), so no `guarded()` toast,
+  // like `questProgress`. It emits nothing: the session wrapper announces
+  // any Badge the check awarded.
+  async function checkBadges(): Promise<BadgeCheckResult> {
+    const { data, error } = await client.rpc('check_session_badges', {});
+    if (error) {
+      throw toProgressError(error);
+    }
+    const result = (data ?? {}) as Partial<BadgeCheckResult>;
+    return {
+      badges: Array.isArray(result.badges) ? result.badges : [],
+      balance: typeof result.balance === 'number' ? result.balance : 0,
+    };
   }
 
   return {
@@ -572,6 +638,7 @@ export function createSupabaseProgressStore(
     questProgress,
     markDevPitVisited,
     completeQuest,
+    checkBadges,
   };
 }
 
@@ -669,6 +736,13 @@ export function toProgressClient(client: SupabaseClient): ProgressClient {
     return { select: (columns) => table.select(columns) };
   }
 
+  function badgesTable(): BadgesTable {
+    const table = client.from('badges');
+    return {
+      select: (columns) => table.select(columns) as unknown as OrderableRows<BadgeCatalogRow>,
+    };
+  }
+
   return {
     from: (table: ProgressTableName): ProgressTable => {
       switch (table) {
@@ -684,6 +758,8 @@ export function toProgressClient(client: SupabaseClient): ProgressClient {
           return iglooSlotsTable();
         case 'shop_items':
           return shopItemsTable();
+        case 'badges':
+          return badgesTable();
         default: {
           const exhaustiveCheck: never = table;
           throw new Error(`Unknown ProgressClient table: ${String(exhaustiveCheck)}`);
