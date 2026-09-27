@@ -26,6 +26,7 @@ import {
   type QuestProgress,
   type IglooSlot,
   type LeaderboardEntry,
+  type Placement,
   type ProgressSnapshot,
   type ProgressStore,
   type PurchaseResult,
@@ -36,7 +37,7 @@ import type { ProgressStoreHarness } from './progress-store.contract';
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(currentDir, '../../..');
 
-function readSqlFile(...segments: string[]): string {
+export function readSqlFile(...segments: string[]): string {
   return readFileSync(path.join(REPO_ROOT, ...segments), 'utf8');
 }
 
@@ -47,6 +48,7 @@ export const MIGRATIONS = [
   ['leaderboard', '20260924020000_leaderboard.sql'],
   ['quests', '20260925000000_quests.sql'],
   ['badges', '20260927000000_badges.sql'],
+  ['igloo-wall-slots', '20260927010000_igloo_wall_slots.sql'],
 ] as const;
 
 export type MigrationName = (typeof MIGRATIONS)[number][0];
@@ -207,7 +209,10 @@ function createSqlProgressStore(db: PGliteInterface, playerId: string): Progress
         name: string;
         price: number;
         art_key: string;
-      }>('select id, stall, name, price, art_key from public.shop_items order by price, id');
+        placement: Placement;
+      }>(
+        'select id, stall, name, price, art_key, placement from public.shop_items order by price, id',
+      );
       const badgeCatalogRes = await tx.query<{
         id: string;
         name: string;
@@ -241,6 +246,7 @@ function createSqlProgressStore(db: PGliteInterface, playerId: string): Progress
           name: row.name,
           price: row.price,
           artKey: row.art_key,
+          placement: row.placement,
         })),
         badgeCatalog: badgeCatalogRes.rows.map((row): BadgeDefinition => ({
           id: row.id,

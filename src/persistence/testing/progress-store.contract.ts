@@ -3,7 +3,7 @@ import { DEFAULT_LOOK, PENGUIN_NAME_MAX, type PenguinLook } from '../../contract
 import type { BadgeId, MinigameId, MinigameStatsMap } from '../../contracts/game-events';
 import { BADGE_CATALOG } from '../badge-catalog';
 import { IGLOO_GEAR_CATALOG } from '../minigame-rules';
-import type { IglooSlot, ProgressStore, ShopItem } from '../progress-store';
+import { emptySlots, type IglooSlot, type ProgressStore, type ShopItem } from '../progress-store';
 
 /** One fresh Player, wired to whichever `ProgressStore` implementation is under test. */
 export interface ProgressStoreHarness {
@@ -68,7 +68,7 @@ export function describeProgressStoreContract(
       expect(snapshot.badges).toEqual([]);
       expect(snapshot.bests).toEqual({});
       expect(snapshot.ownedItems).toEqual([]);
-      expect(snapshot.slots).toEqual({ 1: null, 2: null, 3: null, 4: null, 5: null, 6: null });
+      expect(snapshot.slots).toEqual(emptySlots());
       expect(sortById(snapshot.catalog)).toEqual(sortById(IGLOO_GEAR_CATALOG));
       expect(snapshot.badgeCatalog).toEqual(BADGE_CATALOG);
     });
@@ -368,9 +368,111 @@ export function describeProgressStoreContract(
       await store.setSlot(3, null);
       expect((await store.loadAll()).slots[3]).toBeNull();
 
-      await expect(store.setSlot(7 as IglooSlot, 'beanbag')).rejects.toMatchObject({
-        code: 'invalid_slot',
+      for (const outOfRange of [0, 12]) {
+        await expect(store.setSlot(outOfRange as IglooSlot, 'beanbag')).rejects.toMatchObject({
+          code: 'invalid_slot',
+        });
+      }
+    });
+
+    // #135: every item has one placement and fits only slots of that
+    // placement (1-6 floor, 7-10 wall, 11 ceiling).
+    it('hangs a wall item in any wall slot, moves it between wall slots, and rejects it elsewhere without moving it', async () => {
+      const { store } = await makeHarness();
+      await store.purchase('beanbag');
+      await store.purchase('jg-pennant');
+
+      for (const wallSlot of [7, 8, 9, 10] as const) {
+        await store.setSlot(wallSlot, 'jg-pennant');
+        const snapshot = await store.loadAll();
+        expect(snapshot.slots[wallSlot]).toBe('jg-pennant');
+        expect(Object.values(snapshot.slots).filter((id) => id === 'jg-pennant')).toHaveLength(1);
+      }
+
+      await store.setSlot(7, 'jg-pennant');
+      await store.setSlot(9, 'jg-pennant');
+      let slots = (await store.loadAll()).slots;
+      expect(slots[7]).toBeNull();
+      expect(slots[9]).toBe('jg-pennant');
+
+      // A rejected move leaves the item where it was (no half-move).
+      for (const wrongSlot of [1, 6, 11] as const) {
+        await expect(store.setSlot(wrongSlot, 'jg-pennant')).rejects.toMatchObject({
+          code: 'wrong_placement',
+        });
+      }
+      slots = (await store.loadAll()).slots;
+      expect(slots[9]).toBe('jg-pennant');
+      expect(slots[1]).toBeNull();
+
+      // A floor item never goes in a wall or ceiling slot.
+      await store.setSlot(1, 'beanbag');
+      for (const wrongSlot of [7, 10, 11] as const) {
+        await expect(store.setSlot(wrongSlot, 'beanbag')).rejects.toMatchObject({
+          code: 'wrong_placement',
+        });
+      }
+      expect((await store.loadAll()).slots[1]).toBe('beanbag');
+    });
+
+    it('puts the Disco Ball only in the ceiling slot and the RGB Light Strip only in wall slots', async () => {
+      const { store, advanceSeconds } = await makeHarness();
+      await store.recordRound('bug-squash', 520, {
+        score: 520,
+        squashed: 520,
+        bestCombo: 0,
+        escaped: 0,
       });
+      await advanceSeconds(120);
+      await store.recordRound('bug-squash', 520, {
+        score: 520,
+        squashed: 520,
+        bestCombo: 0,
+        escaped: 0,
+      });
+      await store.purchase('disco-ball');
+      await store.purchase('rgb-light-strip');
+
+      await store.setSlot(11, 'disco-ball');
+      expect((await store.loadAll()).slots[11]).toBe('disco-ball');
+      for (const wrongSlot of [1, 6, 7, 10] as const) {
+        await expect(store.setSlot(wrongSlot, 'disco-ball')).rejects.toMatchObject({
+          code: 'wrong_placement',
+        });
+      }
+
+      await store.setSlot(8, 'rgb-light-strip');
+      expect((await store.loadAll()).slots[8]).toBe('rgb-light-strip');
+      for (const wrongSlot of [1, 6, 11] as const) {
+        await expect(store.setSlot(wrongSlot, 'rgb-light-strip')).rejects.toMatchObject({
+          code: 'wrong_placement',
+        });
+      }
+      const slots = (await store.loadAll()).slots;
+      expect(slots[11]).toBe('disco-ball');
+      expect(slots[8]).toBe('rgb-light-strip');
+    });
+
+    it('sells the three JG awards as 60-token wall items that hang only on walls', async () => {
+      const { store } = await makeHarness();
+      const catalog = (await store.loadAll()).catalog;
+      for (const id of ['award-bptw', 'award-inc5000', 'award-top-workplaces']) {
+        expect(catalog.find((item) => item.id === id)).toMatchObject({
+          price: 60,
+          placement: 'wall',
+          artKey: id,
+        });
+      }
+
+      const { balance } = await store.purchase('award-bptw');
+      expect(balance).toBe(40);
+      await store.setSlot(8, 'award-bptw');
+      expect((await store.loadAll()).slots[8]).toBe('award-bptw');
+      for (const wrongSlot of [1, 3, 6, 11] as const) {
+        await expect(store.setSlot(wrongSlot, 'award-bptw')).rejects.toMatchObject({
+          code: 'wrong_placement',
+        });
+      }
     });
 
     it('reflects the look, Tokens, Badges, bests, owned Furniture and Igloo slots in loadAll', async () => {
@@ -395,7 +497,7 @@ export function describeProgressStoreContract(
       expect(snapshot.badges).toEqual(['exterminator']);
       expect(snapshot.bests).toEqual({ 'bug-squash': 520 });
       expect(snapshot.ownedItems).toEqual(['beanbag']);
-      expect(snapshot.slots).toEqual({ 1: 'beanbag', 2: null, 3: null, 4: null, 5: null, 6: null });
+      expect(snapshot.slots).toEqual({ ...emptySlots(), 1: 'beanbag' });
     });
 
     // Table-driven cases below use literal values from the #27 payout table
