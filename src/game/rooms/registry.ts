@@ -9,6 +9,7 @@ import { teamRoom2 } from './definitions/team-room-2';
 import { teamRoom3 } from './definitions/team-room-3';
 import { teamRoom4 } from './definitions/team-room-4';
 import { theIcebox } from './definitions/the-icebox';
+import { theMullet } from './definitions/the-mullet';
 import { theMelt } from './definitions/the-melt';
 import { townCenter } from './definitions/town-center';
 import type { RoomDefinition } from './room-definition';
@@ -28,6 +29,7 @@ export const ROOM_DEFINITIONS: readonly RoomDefinition[] = [
   teamRoom3,
   teamRoom4,
   bathroom,
+  theMullet,
 ];
 
 // Fails fast on a broken RoomDefinition in dev (`npm run dev`) and test

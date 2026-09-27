@@ -8,6 +8,7 @@ import { teamRoom2 } from '../src/game/rooms/definitions/team-room-2';
 import { teamRoom3 } from '../src/game/rooms/definitions/team-room-3';
 import { teamRoom4 } from '../src/game/rooms/definitions/team-room-4';
 import { theIcebox } from '../src/game/rooms/definitions/the-icebox';
+import { theMullet } from '../src/game/rooms/definitions/the-mullet';
 import { townCenter } from '../src/game/rooms/definitions/town-center';
 import type { RoomDefinition, RoomDoor } from '../src/game/rooms/room-definition';
 import { GAME_HEIGHT, GAME_WIDTH } from '../src/game/stage-size';
@@ -208,6 +209,28 @@ test("The Bathroom: its HALLWAY door lands on the Hallway's spawn tile", async (
   expect(errors).toEqual([]);
 });
 
+// #51 slice 3: the Mullet's two doors lead out only (no Room draws a door
+// in, D5), so each test starts in the Mullet and walks out through one.
+for (const { label, target } of [
+  { label: 'HALLWAY', target: 'office-hallway' },
+  { label: 'DEV PIT', target: 'dev-pit' },
+] as const) {
+  test(`The Mullet: its ${label} door lands on ${target}'s spawn tile`, async ({ page }) => {
+    test.setTimeout(90_000);
+    const errors = collectErrors(page);
+
+    await page.goto('/?asPlayer');
+    await waitForBoot(page);
+    await changeRoom(page, 'the-mullet');
+    await page.screenshot({ path: 'test-results/room-the-mullet/arrived.png' });
+
+    await walkThrough(page, door(theMullet, label), target);
+    await page.screenshot({ path: `test-results/room-the-mullet/to-${target}.png` });
+
+    expect(errors).toEqual([]);
+  });
+}
+
 // Each new Map tile loads its Room on the Room's own spawn tile.
 const MAP_TILES: readonly { number: string; room: RoomDefinition }[] = [
   { number: '07', room: teamRoom4 },
@@ -216,6 +239,7 @@ const MAP_TILES: readonly { number: string; room: RoomDefinition }[] = [
   { number: '10', room: teamRoom3 },
   { number: '11', room: officeHallway },
   { number: '13', room: bathroom },
+  { number: '15', room: theMullet },
 ];
 
 for (const { number, room } of MAP_TILES) {

@@ -37,6 +37,8 @@ export const ROOM_FLOORS: Record<RoomId, FloorId | null> = {
   'team-room-3': '5',
   'team-room-4': '5',
   bathroom: '5',
+  // #51 slice 3: THE MULLET is the JG HQ floor's mezzanine.
+  'the-mullet': '5',
 };
 
 /** Whether `a` and `b` are both real (non-null) floors and differ -- the Elevator's own show condition (#52 D3). */
