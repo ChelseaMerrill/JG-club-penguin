@@ -4,3 +4,4 @@ export * from './look-hash';
 export * from './player-penguin-scale';
 export * from './texture';
 export * from './penguin-sprite';
+export * from './motion';

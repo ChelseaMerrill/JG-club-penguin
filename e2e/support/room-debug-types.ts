@@ -27,6 +27,10 @@ export interface LocalPenguinDebugInfo {
   lookName: string;
   lookBody: HexColor;
   playerId: string;
+  spriteAngle?: number;
+  spriteX?: number;
+  spriteY?: number;
+  bodyTweenCount?: number;
 }
 
 /** One remote Penguin's movement state (#43). */

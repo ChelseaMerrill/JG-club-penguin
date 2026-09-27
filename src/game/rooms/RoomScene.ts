@@ -692,6 +692,10 @@ export class RoomScene extends Scene {
             lookName: this.currentLook.name,
             lookBody: this.currentLook.body,
             playerId: controller.state.playerId,
+            spriteAngle: this.penguinSprite()?.angle,
+            spriteX: this.penguinSprite()?.x,
+            spriteY: this.penguinSprite()?.y,
+            bodyTweenCount: this.penguin?.bodyMotionTweenCount(),
           }
         : undefined,
       textureListenerCount: countActiveTextureListeners(this),

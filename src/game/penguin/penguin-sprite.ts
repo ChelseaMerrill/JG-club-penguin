@@ -1,10 +1,11 @@
 import { GameObjects, Textures, type Scene, type Time } from 'phaser';
 import { DEFAULT_FACING, type Facing, type PenguinLook } from '../../contracts';
 import { penguinLookHash } from './look-hash';
+import { createBodyMotion, penguinMotionFor, prefersReducedMotion } from './motion';
 import { PLAYER_PENGUIN_SCALE } from './player-penguin-scale';
 import { PENGUIN_FRAME_MS, PENGUIN_FRAMES, type PenguinAnim } from './poses';
 import { PENGUIN_FRAME_PADDING_Y, PENGUIN_ORIGIN, penguinFeetOrigin } from './render-svg';
-import { ensurePenguinTextures, penguinTextureKey } from './texture';
+import { ensurePenguinTextures, penguinTextureKey, usesNeutralBody } from './texture';
 
 export { PLAYER_PENGUIN_SCALE } from './player-penguin-scale';
 
@@ -100,6 +101,12 @@ export interface Penguin {
   setSnowHat(on: boolean): void;
   /** Whether the snow hat is drawn right now (the hat child's `visible`). */
   hasSnowHat(): boolean;
+  /**
+   * Test support (#68 D3): how many tweens are running on this Penguin's
+   * body motion. 1 while an anim with a body motion plays, 0 otherwise (and
+   * always 0 under reduced motion); anything more is a leaked tween.
+   */
+  bodyMotionTweenCount(): number;
   destroy(): void;
 }
 
@@ -156,8 +163,14 @@ export function createPenguin(
   // listener instead of leaving it registered.
   let pendingKey: string | null = null;
   let pendingListener: (() => void) | null = null;
+  // #68 D5: read once, when the Penguin is built. With reduced motion the
+  // Penguin keeps today's baked two-frame swap exactly: no tween, no
+  // `:neutral` textures, no sway. An OS change applies to the next Penguin
+  // built, e.g. on the next Room entry.
+  const bodyMotion = !prefersReducedMotion();
+  const textureOptions = { bodyMotion };
 
-  ensurePenguinTextures(scene, look, facing);
+  ensurePenguinTextures(scene, look, facing, textureOptions);
 
   const sprite = new GameObjects.Sprite(scene, 0, 0, PLACEHOLDER_TEXTURE_KEY);
   sprite.setOrigin(origin.x, origin.y);
@@ -211,6 +224,12 @@ export function createPenguin(
   snowHat.fillCircle(0, SNOW_HAT_Y - SNOW_HAT_LUMP_CENTER_Y, SNOW_HAT_LUMP_CENTER_R);
   snowHat.setVisible(false);
 
+  // #68 D3: the figure's tilt, lift and (WADDLE's) sideways sway, tweened on
+  // the sprite and the snow hat only -- never the container (so the
+  // Penguin's position and Tile never move), the name tag or the bubble.
+  const motionProxy = { phase: 0, blend: 0 };
+  const motion = createBodyMotion(scene.tweens, [sprite, snowHat], motionProxy);
+
   const container = scene.add.container(x, y, [
     sprite,
     snowHat,
@@ -240,6 +259,7 @@ export function createPenguin(
     destroyed = true;
     clearPendingListener();
     stopFrameTimer();
+    motion.stop(false);
   });
 
   function redrawNameTag(): void {
@@ -280,7 +300,13 @@ export function createPenguin(
   }
 
   function applyFrame(): void {
-    const key = penguinTextureKey(currentHash, currentAnim, currentFrame, facing);
+    const key = penguinTextureKey(
+      currentHash,
+      currentAnim,
+      currentFrame,
+      facing,
+      usesNeutralBody(currentAnim, bodyMotion),
+    );
     // Captured now, alongside `key`, rather than read from the outer
     // `facing` closure variable inside the (possibly-async) callback below
     // (#147): a later `setFacing`/`applyFrame` call can advance `facing`
@@ -292,6 +318,8 @@ export function createPenguin(
     if (scene.textures.exists(key)) {
       sprite.setTexture(key);
       sprite.setFlipX(flipped);
+      // #68: mirror the body motion with the texture that's on screen.
+      motion.setFlipped(flipped);
       return;
     }
     // The texture hasn't decoded yet (`addBase64` is async); pick it up once
@@ -307,6 +335,7 @@ export function createPenguin(
       if (!destroyed) {
         sprite.setTexture(key);
         sprite.setFlipX(flipped);
+        motion.setFlipped(flipped);
       }
     };
     pendingKey = key;
@@ -316,19 +345,24 @@ export function createPenguin(
 
   function play(anim: PenguinAnim): void {
     stopFrameTimer();
+    motion.stop();
     currentAnim = anim;
     currentFrame = 0;
     applyFrame();
     const frameCount = PENGUIN_FRAMES[anim];
-    if (frameCount <= 1) return;
-    frameTimer = scene.time.addEvent({
-      delay: PENGUIN_FRAME_MS[anim],
-      loop: true,
-      callback: () => {
-        currentFrame = (currentFrame + 1) % frameCount;
-        applyFrame();
-      },
-    });
+    if (frameCount > 1) {
+      frameTimer = scene.time.addEvent({
+        delay: PENGUIN_FRAME_MS[anim],
+        loop: true,
+        callback: () => {
+          currentFrame = (currentFrame + 1) % frameCount;
+          applyFrame();
+        },
+      });
+    }
+    // Started alongside the frame timer, so a two-pose motion reaches its
+    // second keyframe as the timer swaps to frame 1 (#68 D3).
+    if (bodyMotion) motion.start(penguinMotionFor(anim));
   }
 
   play(currentAnim);
@@ -339,6 +373,10 @@ export function createPenguin(
       play(currentLook.emote);
     },
     walk() {
+      // #68 D4a: `RoomScene.advanceStep` calls this on every Tile step. While
+      // WALK is already playing, restarting it would reset the frame timer
+      // (so a long walk never reached frame 1) and the body tween.
+      if (currentAnim === 'WALK') return;
       play('WALK');
     },
     play(anim: PenguinAnim) {
@@ -360,14 +398,14 @@ export function createPenguin(
       // in use.
       if (next === facing) return;
       facing = next;
-      ensurePenguinTextures(scene, currentLook, facing);
+      ensurePenguinTextures(scene, currentLook, facing, textureOptions);
       applyFrame();
     },
     setLook(next: PenguinLook) {
       const wasWalking = currentAnim === 'WALK';
       currentLook = next;
       currentHash = penguinLookHash(next);
-      ensurePenguinTextures(scene, next, facing);
+      ensurePenguinTextures(scene, next, facing, textureOptions);
       redrawNameTag();
       play(wasWalking ? 'WALK' : next.emote);
     },
@@ -380,10 +418,20 @@ export function createPenguin(
     hasSnowHat() {
       return !destroyed && snowHat.visible;
     },
+    bodyMotionTweenCount() {
+      // A removed tween stays in Phaser's list, already stopped, until the
+      // manager's next update; only a tween still running counts, so a
+      // tween that was never removed (a leak) shows up and a finished one
+      // doesn't.
+      return scene.tweens
+        .getTweensOf(motionProxy)
+        .filter((tween) => !tween.isPendingRemove() && !tween.isRemoved()).length;
+    },
     destroy() {
       destroyed = true;
       clearPendingListener();
       stopFrameTimer();
+      motion.stop(false);
       container.destroy();
     },
   };
