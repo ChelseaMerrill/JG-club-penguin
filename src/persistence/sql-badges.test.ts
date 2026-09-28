@@ -233,6 +233,87 @@ describe('badges migration (PGlite)', () => {
     expect(stored.rows[0].tokens).toBe(250);
   });
 
+  describe('each Badge survives a reload in a new store, with its +50 paid once', () => {
+    // Night Owl is pre-held (D16), so a run between 02:00 and 05:00 Eastern
+    // can't add it to a Session check here.
+    async function namedHarness(name: string) {
+      const harness = await createPgliteProgressStoreHarness();
+      await harness.holdBadge('night-owl');
+      await harness.store.saveLook({ ...DEFAULT_LOOK, name });
+      return harness;
+    }
+
+    it('First Waddle', async () => {
+      const harness = await namedHarness('Waddler');
+      const before = (await harness.store.loadAll()).tokens;
+
+      const first = await harness.store.checkBadges();
+      const second = await harness.store.checkBadges();
+
+      expect(first.badges).toContain('first-waddle');
+      expect(first.balance).toBe(before + 50);
+      expect(second.balance).toBe(first.balance);
+      const reloaded = await (await createPgliteProgressStoreFor(harness.playerId)).loadAll();
+      expect(reloaded.badges.filter((badgeId) => badgeId === 'first-waddle')).toEqual([
+        'first-waddle',
+      ]);
+      expect(reloaded.tokens).toBe(first.balance);
+    });
+
+    it('Interior Penguin', async () => {
+      const harness = await namedHarness('Decorator');
+      await harness.grantTokens(1000);
+      for (const itemId of SIX_ITEMS) {
+        await harness.store.purchase(itemId);
+      }
+      const before = (await harness.store.loadAll()).tokens;
+
+      for (const [index, itemId] of SIX_ITEMS.entries()) {
+        await harness.store.setSlot((index + 1) as 1 | 2 | 3 | 4 | 5 | 6, itemId);
+      }
+      const afterSixth = (await harness.store.loadAll()).tokens;
+      // Re-placing a slot fires the trigger again, and pays nothing.
+      await harness.store.setSlot(6, null);
+      await harness.store.setSlot(6, SIX_ITEMS[5]);
+
+      expect(afterSixth).toBe(before + 50);
+      const reloaded = await (await createPgliteProgressStoreFor(harness.playerId)).loadAll();
+      expect(reloaded.badges).toContain('interior-penguin');
+      expect(reloaded.tokens).toBe(afterSixth);
+    });
+
+    it('Ship It', async () => {
+      const harness = await namedHarness('Shipper');
+      await harness.store.markDevPitVisited();
+      await harness.store.recordRound('bug-squash', 0, {
+        score: 0,
+        squashed: 0,
+        bestCombo: 0,
+        escaped: 0,
+      });
+      await harness.store.recordRound('pancake-flip', 0, {
+        golden: 0,
+        flipNow: 0,
+        raw: 0,
+        burnt: 0,
+        stacked: 0,
+        bestStreak: 0,
+      });
+      await harness.store.purchase('beanbag');
+      const before = (await harness.store.loadAll()).tokens;
+
+      const first = await harness.store.completeQuest('main');
+      const second = await harness.store.completeQuest('main');
+
+      expect(first.badgesEarned).toEqual(['ship-it']);
+      expect(first.balance).toBe(before + 150 + 50);
+      expect(second).toMatchObject({ alreadyCompleted: true, badgesEarned: [] });
+      const reloaded = await (await createPgliteProgressStoreFor(harness.playerId)).loadAll();
+      expect(reloaded.badges).toContain('ship-it');
+      expect(reloaded.tokens).toBe(first.balance);
+    });
+  });
+
   it('backfills First Waddle, Ship It and Interior Penguin exactly once, with +50 each', async () => {
     const db = await ownDb({ through: 'quests' });
     const named = await addPlayer(db, { named: true });
@@ -273,6 +354,61 @@ describe('badges migration (PGlite)', () => {
       fiveSlots: [await badgesOf(db, fiveSlots), await tokensOf(db, fiveSlots)],
     };
     expect(afterRerun).toEqual(afterFirst);
+  });
+
+  it("README's H1 one-paste block passes, and runs again on the same connection", async () => {
+    const readme = readRepoFile('supabase', 'tests', 'README.md').replace(/\r\n/g, '\n');
+    const fenced = /```sql\n( {6}drop table if exists h1_before;[\s\S]*?)\n {6}```/.exec(readme);
+    expect(fenced).not.toBeNull();
+    const migration = migrationSql('badges');
+    const h1Sql = fenced![1]
+      .split('\n')
+      .map((line) => line.replace(/^ {6}/, ''))
+      .join('\n')
+      .replace(/^-- <paste 20260927000000_badges\.sql here[^\n]*$/gm, () => migration);
+    expect(h1Sql).not.toContain('<paste');
+
+    const db = await ownDb({ through: 'quests' });
+    await addPlayer(db, { named: true });
+    await addPlayer(db);
+    const completer = await addPlayer(db, { named: true, tokens: 1000 });
+    await db.query(
+      "insert into public.player_quest_completions (player_id, quest_id, tokens_awarded) values ($1, 'main', 150)",
+      [completer],
+    );
+    // A Minigame Badge held before the migration: counted, and paid nothing.
+    await db.query(
+      "insert into public.player_badges (player_id, badge_id) values ($1, 'exterminator')",
+      [completer],
+    );
+    const decorator = await addPlayer(db, { tokens: 1000 });
+    await placeItems(db, decorator, SIX_ITEMS);
+    await placeItems(db, await addPlayer(db, { tokens: 1000 }), SIX_ITEMS.slice(0, 5));
+
+    const run = async () => {
+      const results = await db.exec(h1Sql);
+      return results.at(-1)!.rows[0] as Record<string, unknown>;
+    };
+    const expectedChecks = {
+      apply_paid_50_per_badge: true,
+      badges_unchanged_by_rerun: true,
+      tokens_unchanged_by_rerun: true,
+      named_players_without_first_waddle: 0,
+      main_quest_completers_without_ship_it: 0,
+      six_item_igloos_without_interior_penguin: 0,
+    };
+
+    const first = await run();
+    expect(first).toMatchObject({ ...expectedChecks, badge_rows_added_by_apply: 4 });
+    expect(first.badges_after_apply).toEqual([
+      { badge_id: 'exterminator', n: 1 },
+      { badge_id: 'first-waddle', n: 2 },
+      { badge_id: 'interior-penguin', n: 1 },
+      { badge_id: 'ship-it', n: 1 },
+    ]);
+
+    const again = await run();
+    expect(again).toMatchObject({ ...expectedChecks, badge_rows_added_by_apply: 0 });
   });
 
   it('never resets a Badge a later migration turned on, when rerun', async () => {

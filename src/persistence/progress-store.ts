@@ -185,6 +185,10 @@ export const PROGRESS_ERROR_CODES = [
   // main-Quest step is met.
   'unknown_quest',
   'quest_incomplete',
+  // #138: a response that doesn't have the shape the client expects (the
+  // Session Badge check's malformed `check_session_badges` result). Raised
+  // client-side only, never by the database.
+  'invalid_response',
 ] as const;
 
 export type ProgressErrorCode = (typeof PROGRESS_ERROR_CODES)[number];

@@ -287,6 +287,7 @@ const TOAST_MESSAGES: Record<ProgressErrorCode, string> = {
   invalid_slot: "That slot doesn't exist",
   unknown_quest: "That quest doesn't exist",
   quest_incomplete: "That quest isn't finished yet",
+  invalid_response: "Couldn't read the server's reply",
 };
 
 /** Anything that isn't a typed `ProgressStoreError`: network failures, unrecognized errors. */
@@ -621,11 +622,14 @@ export function createSupabaseProgressStore(
     if (error) {
       throw toProgressError(error);
     }
+    // A malformed reply rejects rather than reading as a balance of 0, which
+    // the wrapper would otherwise write into the snapshot and the HUD. The
+    // Session timer swallows the rejection.
     const result = (data ?? {}) as Partial<BadgeCheckResult>;
-    return {
-      badges: Array.isArray(result.badges) ? result.badges : [],
-      balance: typeof result.balance === 'number' ? result.balance : 0,
-    };
+    if (!Array.isArray(result.badges) || typeof result.balance !== 'number') {
+      throw new ProgressStoreError('invalid_response');
+    }
+    return { badges: result.badges, balance: result.balance };
   }
 
   return {

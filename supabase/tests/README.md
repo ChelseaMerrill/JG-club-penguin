@@ -133,21 +133,35 @@ on the new schema.
    1. Review the migration (30 minutes, time-boxed): schema, RLS, Tokens,
       the security-definer trigger, the internal-only grants and the rerun
       chain in its header.
-   2. Apply it, then prove the rerun changes nothing, **in one paste** so no
-      live play lands in between (or do it in a quiet window with nobody
-      online). Paste this whole block into the SQL editor, with the migration
-      file's contents where marked, and run it once:
+   2. Apply it, then prove the apply paid exactly +50 per Badge it granted,
+      that the backfill missed nobody, and that the rerun changes nothing,
+      **in one paste** so no live play lands in between (or do it in a quiet
+      window with nobody online). Paste this whole block into the SQL editor,
+      with the migration file's contents where marked, and run it once. It
+      reads counts only, so it's safe on live data. The temp tables are
+      dropped first, so the block can be run again on the same connection:
 
       ```sql
+      drop table if exists h1_before;
+      create temp table h1_before as
+        select (select count(*) from public.player_badges) as badge_rows,
+               (select coalesce(sum(tokens), 0) from public.players) as token_total;
       -- <paste 20260927000000_badges.sql here: the apply and backfill>
+      drop table if exists h1_badges;
       create temp table h1_badges as
         select badge_id, count(*) as n from public.player_badges group by 1;
+      drop table if exists h1_players;
       create temp table h1_players as
-        select count(*) as player_count, sum(tokens) as token_total from public.players;
+        select count(*) as player_count, coalesce(sum(tokens), 0) as token_total,
+               (select count(*) from public.player_badges) as badge_rows
+        from public.players;
       -- <paste 20260927000000_badges.sql here a second time: the rerun>
       select
         (select json_agg(b order by b.badge_id) from h1_badges b) as badges_after_apply,
-        (select row_to_json(p) from h1_players p) as players_after_apply,
+        (select h.badge_rows - b.badge_rows from h1_players h, h1_before b)
+          as badge_rows_added_by_apply,
+        (select h.token_total - b.token_total = 50 * (h.badge_rows - b.badge_rows)
+         from h1_players h, h1_before b) as apply_paid_50_per_badge,
         not exists (
           (select badge_id, count(*) from public.player_badges group by 1
            except select badge_id, n from h1_badges)
@@ -155,14 +169,43 @@ on the new schema.
           (select badge_id, n from h1_badges
            except select badge_id, count(*) from public.player_badges group by 1)
         ) as badges_unchanged_by_rerun,
-        (select count(*) = h.player_count and sum(pl.tokens) = h.token_total
-         from public.players pl, h1_players h group by h.player_count, h.token_total)
-          as tokens_unchanged_by_rerun;
+        (select (select count(*) from public.players) = h.player_count
+            and (select coalesce(sum(tokens), 0) from public.players) = h.token_total
+         from h1_players h) as tokens_unchanged_by_rerun,
+        (select count(*) from public.players p
+         where p.profile_created_at is not null and p.penguin_name <> ''
+           and not exists (select 1 from public.player_badges pb
+                           where pb.player_id = p.id and pb.badge_id = 'first-waddle'))
+          as named_players_without_first_waddle,
+        (select count(*) from public.player_quest_completions c
+         where c.quest_id = 'main'
+           and not exists (select 1 from public.player_badges pb
+                           where pb.player_id = c.player_id and pb.badge_id = 'ship-it'))
+          as main_quest_completers_without_ship_it,
+        (select count(*) from (select s.player_id from public.igloo_slots s
+                               group by 1 having count(*) >= 6) s
+         where not exists (select 1 from public.player_badges pb
+                           where pb.player_id = s.player_id and pb.badge_id = 'interior-penguin'))
+          as six_item_igloos_without_interior_penguin;
       ```
 
-      Expected: `badges_unchanged_by_rerun` and `tokens_unchanged_by_rerun`
-      are both `true`. `badges_after_apply` shows how many Players the
-      backfill granted each Badge (counts only).
+      Expected, in the one result row:
+
+      | Column | Expected |
+      |---|---|
+      | `badges_after_apply` | how many Players hold each Badge after the backfill (counts only) |
+      | `badge_rows_added_by_apply` | how many Badges the backfill granted (0 or more) |
+      | `apply_paid_50_per_badge` | `true` (the Token total rose by exactly 50 per granted Badge) |
+      | `badges_unchanged_by_rerun` | `true` |
+      | `tokens_unchanged_by_rerun` | `true` |
+      | `named_players_without_first_waddle` | `0` |
+      | `main_quest_completers_without_ship_it` | `0` |
+      | `six_item_igloos_without_interior_penguin` | `0` |
+
+      `apply_paid_50_per_badge` holds only if no Tokens moved for another
+      reason during the paste. A `false` means live play overlapped it:
+      report it on #138 rather than rerunning, since a second run starts from
+      the applied state and can't re-prove the apply.
    3. Open `138_badges_proof.sql`, replace every occurrence of
       `00000000-0000-0000-0000-00000000f1f0` with the real #9 H1 fixture
       Player's id, and run it. Expect every row's `pass` column to read

@@ -780,6 +780,29 @@ describe('createSupabaseProgressStore', () => {
       expect(events).toEqual([]);
     });
 
+    it.each([
+      ['no data', null],
+      ['no balance', { badges: ['first-waddle'] }],
+      ['a non-number balance', { badges: [], balance: '150' }],
+      ['no badges array', { badges: 'first-waddle', balance: 150 }],
+    ])(
+      'checkBadges rejects with invalid_response, not a balance of 0, on a malformed reply (%s)',
+      async (_label, data) => {
+        const { client } = makeFakeClient({ checkSessionBadges: { data, error: null } });
+        const events: string[] = [];
+        const emitter = createEmitter<GameEventMap>();
+        emitter.on('tokens:changed', () => events.push('tokens'));
+        emitter.on('ui:toast', () => events.push('toast'));
+        const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID, emitter });
+
+        await expect(store.checkBadges()).rejects.toMatchObject({
+          name: 'ProgressStoreError',
+          code: 'invalid_response',
+        });
+        expect(events).toEqual([]);
+      },
+    );
+
     it('checkBadges rejects without a toast on a failure', async () => {
       const { client } = makeFakeClient({
         checkSessionBadges: { data: null, error: { message: 'not_authenticated', code: '42501' } },

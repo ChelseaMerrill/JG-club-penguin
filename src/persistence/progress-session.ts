@@ -60,6 +60,15 @@ export interface ProgressSession {
   start(player: Player, store: ProgressStore): Promise<ProgressSnapshot | null>;
   /** Removes both registry keys and invalidates any in-flight `start()`. */
   stop(): void;
+  /**
+   * #138: the emitter to build each signed-in Player's store with. It
+   * forwards every event to the session's emitter, except that a
+   * `badge:earned` for a Badge already announced this session is dropped, so
+   * a Badge is announced at most once whichever path (the store's direct
+   * award, or the wrapper's `checkBadges` diff) sees it first. The announced
+   * set resets on every `start()` and `stop()`.
+   */
+  readonly storeEmitter: TypedEmitter<GameEventMap>;
 }
 
 /**
@@ -83,9 +92,26 @@ function wrapStore(
   initialPlayer: Player,
   isCurrent: () => boolean,
   emitter: TypedEmitter<GameEventMap>,
+  announceBadge: (badgeId: BadgeId) => void,
 ): { wrapper: ProgressStore; loadInitial(): Promise<ProgressSnapshot> } {
   let currentPlayer = initialPlayer;
   let pendingLoad: Promise<ProgressSnapshot> | null = null;
+  // #138: the Token-changing writes (recordRound, purchase, completeQuest)
+  // in flight, and how many have started. `checkBadges` uses them to skip its
+  // balance when a write overlapped it, so an older balance never overwrites
+  // a newer one.
+  let tokenWritesInFlight = 0;
+  let tokenWritesStarted = 0;
+
+  async function tokenWrite<T>(call: () => Promise<T>): Promise<T> {
+    tokenWritesInFlight += 1;
+    tokenWritesStarted += 1;
+    try {
+      return await call();
+    } finally {
+      tokenWritesInFlight -= 1;
+    }
+  }
 
   /** Puts a fresh snapshot in the registry, rebinds `player.look` and updates the HUD. */
   function applySnapshot(snapshot: ProgressSnapshot): void {
@@ -143,7 +169,7 @@ function wrapStore(
     score: number,
     stats: MinigameStatsMap[K],
   ): Promise<RoundResult> {
-    const result = await store.recordRound(minigameId, score, stats);
+    const result = await tokenWrite(() => store.recordRound(minigameId, score, stats));
     if (!isCurrent()) return result;
     const previous = currentSnapshot();
     if (previous) {
@@ -163,7 +189,7 @@ function wrapStore(
   }
 
   async function purchase(itemId: string): Promise<PurchaseResult> {
-    const result = await store.purchase(itemId);
+    const result = await tokenWrite(() => store.purchase(itemId));
     if (!isCurrent()) return result;
     const previous = currentSnapshot();
     if (previous) {
@@ -217,7 +243,7 @@ function wrapStore(
   // holds, so they pass straight through; `completeQuest` keeps the
   // snapshot's balance equal to the server's.
   async function completeQuest(questId: string): Promise<CompleteQuestResult> {
-    const result = await store.completeQuest(questId);
+    const result = await tokenWrite(() => store.completeQuest(questId));
     if (!isCurrent()) return result;
     const previous = currentSnapshot();
     if (previous) {
@@ -238,22 +264,34 @@ function wrapStore(
    * here, once each: every id the snapshot doesn't hold yet gets one
    * `badge:earned`. The snapshot only ever gains ids. With no snapshot loaded
    * yet, nothing is announced; the next `loadAll` picks the Badges up.
+   *
+   * The check can resolve before a concurrent `completeQuest`/`recordRound`
+   * that awarded the same Badge; `announceBadge` drops whichever
+   * announcement comes second. When a Token-changing write overlapped the
+   * check, its balance may be older than the write's, so the check leaves the
+   * snapshot's balance (and the HUD) to the write and the next check.
    */
   async function checkBadges(): Promise<BadgeCheckResult> {
+    const writesBusyAtStart = tokenWritesInFlight > 0;
+    const writesStartedAtStart = tokenWritesStarted;
     const result = await store.checkBadges();
     if (!isCurrent()) return result;
     const previous = currentSnapshot();
     if (!previous) return result;
+    const balanceMayBeStale =
+      writesBusyAtStart || tokenWritesInFlight > 0 || tokenWritesStarted !== writesStartedAtStart;
     const newBadges = result.badges.filter((badgeId) => !previous.badges.includes(badgeId));
     setSnapshot({
       ...previous,
-      tokens: result.balance,
+      tokens: balanceMayBeStale ? previous.tokens : result.balance,
       badges: unionBadges(previous.badges, result.badges),
     });
     for (const badgeId of newBadges) {
-      emitter.emit('badge:earned', { badgeId });
+      announceBadge(badgeId);
     }
-    emitter.emit('tokens:changed', { balance: result.balance });
+    if (!balanceMayBeStale) {
+      emitter.emit('tokens:changed', { balance: result.balance });
+    }
     return result;
   }
 
@@ -290,13 +328,45 @@ function unionBadges(existing: readonly BadgeId[], added: readonly BadgeId[]): B
 export function createProgressSession(options: CreateProgressSessionOptions): ProgressSession {
   const { registry, emitter } = options;
   let generation = 0;
+  // #138: the Badges announced this session, whichever path announced them.
+  let announced = new Set<BadgeId>();
+
+  function announceBadge(badgeId: BadgeId): void {
+    if (announced.has(badgeId)) return;
+    announced.add(badgeId);
+    emitter.emit('badge:earned', { badgeId });
+  }
+
+  const storeEmitter: TypedEmitter<GameEventMap> = {
+    on: (type, handler) => emitter.on(type, handler),
+    off: (type, handler) => emitter.off(type, handler),
+    once: (type, handler) => emitter.once(type, handler),
+    emit<K extends keyof GameEventMap>(
+      type: K,
+      ...args: GameEventMap[K] extends void ? [] : [GameEventMap[K]]
+    ): void {
+      if (type === 'badge:earned') {
+        announceBadge((args[0] as GameEventMap['badge:earned']).badgeId);
+        return;
+      }
+      emitter.emit(type, ...args);
+    },
+  };
 
   async function start(player: Player, store: ProgressStore): Promise<ProgressSnapshot | null> {
     generation += 1;
+    announced = new Set();
     const myGeneration = generation;
     const isCurrent = () => generation === myGeneration;
 
-    const { wrapper, loadInitial } = wrapStore(store, registry, player, isCurrent, emitter);
+    const { wrapper, loadInitial } = wrapStore(
+      store,
+      registry,
+      player,
+      isCurrent,
+      emitter,
+      announceBadge,
+    );
     registry.set(PROGRESS_STORE_KEY, wrapper);
 
     try {
@@ -313,6 +383,7 @@ export function createProgressSession(options: CreateProgressSessionOptions): Pr
 
   function stop(): void {
     generation += 1;
+    announced = new Set();
     registry.remove(PROGRESS_KEY);
     registry.remove(PROGRESS_STORE_KEY);
     // So the HUD never keeps showing a signed-out or previous account's
@@ -320,7 +391,7 @@ export function createProgressSession(options: CreateProgressSessionOptions): Pr
     emitter.emit('tokens:changed', { balance: 0 });
   }
 
-  return { start, stop };
+  return { start, stop, storeEmitter };
 }
 
 /**

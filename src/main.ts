@@ -1045,7 +1045,8 @@ const auth = startAuth({
       createSupabaseProgressStore({
         client: toProgressClient(client),
         playerId: player.id,
-        emitter: gameEvents,
+        // #138: announces each Badge at most once per session.
+        emitter: progress.storeEmitter,
       }),
     );
     if (devHookActive) {
