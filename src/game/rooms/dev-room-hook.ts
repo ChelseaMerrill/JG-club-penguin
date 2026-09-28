@@ -95,6 +95,8 @@ export interface LocalPenguinDebugInfo {
   nameTagY?: number;
   /** The name tag and chat bubble overlay's depth: `NPC_BUBBLE_LAYER` + the body's, above the ceiling item (#161 review). */
   nameTagDepth?: number;
+  /** Whether the own Penguin is drawn: false from boot until the Player's Session starts (#162). */
+  visible: boolean;
 }
 
 /** One `room:leave`/`room:enter` #15's navigator has emitted, in emission order. */
@@ -163,6 +165,12 @@ export interface RoomDebugInfo {
    * reaching into `RoomScene` internals.
    */
   setRegisteredPlayer?: (player: RegisteredPlayer) => void;
+  /**
+   * Test-only: sets the own Penguin's visibility flag (#162), which also
+   * gates Stage clicks, so an e2e spec can put a no-Session page into the
+   * hidden state.
+   */
+  setLocalPenguinVisible?: (visible: boolean) => void;
   /**
    * Test-only: spawns an extra, static Penguin at `tile` with `look`, for
    * the WAVE/DANCE evidence screenshot (review fix 8). It's never cleaned up

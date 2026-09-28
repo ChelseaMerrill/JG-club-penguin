@@ -68,6 +68,12 @@ import type {
   RoomNpcSlot,
 } from './room-definition';
 import { RoomPenguinView, type PlacePenguin } from './room-penguin-view';
+import {
+  LOCAL_PENGUIN_VISIBLE_KEY,
+  isLocalPenguinVisible,
+  setLocalPenguinVisible,
+  stageAcceptsInput,
+} from './local-penguin-visibility';
 import type { SnowballView } from '../../snowball/snowball-controller';
 import { arcPoint, clampTileToGrid, type ScreenPoint } from '../../snowball/snowball-rules';
 import type { IglooSlot, ShopItem } from '../../persistence/progress-store';
@@ -415,6 +421,12 @@ export class RoomScene extends Scene {
    */
   private readonly handleRegistrySetData = (_parent: unknown, key: string): void => {
     if (key === PLAYER_REGISTRY_KEY) this.applyRegisteredPlayer();
+    if (key === LOCAL_PENGUIN_VISIBLE_KEY) this.applyLocalPenguinVisibility();
+  };
+
+  /** Fired on every later change to the own Penguin's visibility flag (#162). */
+  private readonly handleLocalPenguinVisibilityChanged = (): void => {
+    this.applyLocalPenguinVisibility();
   };
 
   /** Fired on every later `player` update, once the key already exists (review fix 1). */
@@ -432,6 +444,10 @@ export class RoomScene extends Scene {
     this.registry.events.off(
       Data.Events.CHANGE_DATA_KEY + PLAYER_REGISTRY_KEY,
       this.handleRegistryPlayerChanged,
+    );
+    this.registry.events.off(
+      Data.Events.CHANGE_DATA_KEY + LOCAL_PENGUIN_VISIBLE_KEY,
+      this.handleLocalPenguinVisibilityChanged,
     );
     if (this.activeTween) {
       this.activeTween.stop();
@@ -684,6 +700,10 @@ export class RoomScene extends Scene {
       Data.Events.CHANGE_DATA_KEY + PLAYER_REGISTRY_KEY,
       this.handleRegistryPlayerChanged,
     );
+    this.registry.events.on(
+      Data.Events.CHANGE_DATA_KEY + LOCAL_PENGUIN_VISIBLE_KEY,
+      this.handleLocalPenguinVisibilityChanged,
+    );
     // `cleanup` destroys only #14's own Penguins (local and debug).
     this.events.once(Scenes.Events.SHUTDOWN, this.cleanup);
 
@@ -740,6 +760,7 @@ export class RoomScene extends Scene {
               (child): child is GameObjects.Text => child instanceof GameObjects.Text,
             )?.y,
             nameTagDepth: this.penguin?.overlay.depth,
+            visible: this.penguin?.container.visible ?? false,
           }
         : undefined,
       textureListenerCount: countActiveTextureListeners(this),
@@ -756,6 +777,7 @@ export class RoomScene extends Scene {
       remotePenguinCount: this.countPenguinContainers((name) => name === REMOTE_PENGUIN_NAME),
       remotePenguins: this.penguins.debugRemotePenguins(),
       setRegisteredPlayer: (player) => this.registry.set(PLAYER_REGISTRY_KEY, player),
+      setLocalPenguinVisible: (visible) => setLocalPenguinVisible(this.registry, visible),
       spawnDebugPenguin: (tile, look) => this.spawnDebugPenguin(tile, look),
       furniture: this.debugFurniture(),
       npcs: this.npcMotions?.debug(),
@@ -1030,6 +1052,16 @@ export class RoomScene extends Scene {
     this.currentAnim = look.emote;
     this.penguin = createPenguin(this, spawnPoint.x, spawnPoint.y, look);
     this.penguin.container.setDepth(depthForTile(spawnTile));
+    // #162: hidden until the Player's Session starts. Every Room restart
+    // respawns here with the registry's current value.
+    this.applyLocalPenguinVisibility();
+  }
+
+  /** Shows or hides the own Penguin, its name tag and bubble with it, per the registry flag (#162). */
+  private applyLocalPenguinVisibility(): void {
+    const visible = isLocalPenguinVisible(this.registry);
+    this.penguin?.container.setVisible(visible);
+    this.penguin?.overlay.setVisible(visible);
   }
 
   /** Re-applies the registered Player's look/id to the already-spawned Penguin (#14 review fixes 1 and 4). */
@@ -1047,6 +1079,10 @@ export class RoomScene extends Scene {
   }
 
   private onPointerDown(pointer: Input.Pointer, currentlyOver: GameObjects.GameObject[]): void {
+    // #162 H1: while the own Penguin is hidden (before the Session starts),
+    // the Stage ignores every click: moves, NPCs, doors, hotspots, Furniture
+    // slots and Snowball throws. DOM overlays take their own clicks.
+    if (!stageAcceptsInput(this.registry)) return;
     const room = this.room;
     if (!room) return;
 
