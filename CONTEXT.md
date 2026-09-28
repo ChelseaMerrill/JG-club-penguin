@@ -116,7 +116,10 @@ The display in the Igloo where a Player's Trophies are shown.
 A place in a Room where an NPC sells items for Tokens, opening the Market panel. The prototype has one: the Igloo Gear stall at the Roof Deck Market, which sells Furniture.
 
 **Furniture**
-Items bought at the Igloo Gear stall and placed into the Igloo's furniture slots (six in the prototype). A Player owns each Furniture item they buy, and a slot can hold only Furniture its owner owns.
+Items bought at the Igloo Gear stall and placed into the Igloo's furniture slots. The Igloo has 11: six on the floor, four on the walls and one on the ceiling. A Player owns each Furniture item they buy, and a slot can hold only Furniture its owner owns and whose Placement matches the slot.
+
+**Placement**
+Where a Furniture item goes: floor, wall or ceiling. Every Igloo Gear item has exactly one Placement and fits only Igloo slots of that Placement (for example, the Disco Ball hangs only from the ceiling).
 
 ### Out of scope
 
