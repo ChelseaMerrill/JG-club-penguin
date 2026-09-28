@@ -79,6 +79,20 @@ export interface LocalPenguinDebugInfo {
   lookBody: HexColor;
   /** `PenguinState.playerId`; review fix 4. */
   playerId: string;
+  /** The figure sprite's `angle` in degrees: the #68 body tilt (0 under reduced motion). */
+  spriteAngle?: number;
+  /** The figure sprite's `x` in container px: WADDLE's #68 sideways sway (0 for WALK and under reduced motion). */
+  spriteX?: number;
+  /** The figure sprite's `y` in container px: the #68 body lift. */
+  spriteY?: number;
+  /** `Penguin.bodyMotionTweenCount()`: 1 while a body motion plays, 0 without one, more only on a leak (#68). */
+  bodyTweenCount?: number;
+  /** The Penguin container's `x`: its world position, which the #68 body motion never moves. */
+  containerX?: number;
+  /** The Penguin container's `y`: its world position, which the #68 body motion never moves. */
+  containerY?: number;
+  /** The name tag's `y` in container px: the #68 body motion never moves it. */
+  nameTagY?: number;
 }
 
 /** One `room:leave`/`room:enter` #15's navigator has emitted, in emission order. */

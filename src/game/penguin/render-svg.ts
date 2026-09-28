@@ -531,19 +531,30 @@ function renderHat(
  * `penguin-sprite.ts` flips the whole sprite for a left-facing Penguin. Every
  * other shape (body, arms, cap, props) is unaffected by `facing` here -- the
  * sprite flip alone mirrors them.
+ *
+ * `options.neutralBody` (#68 D2) renders the body group upright and unlifted
+ * (`rotate(0 …) translate(0 0)`) for every anim, so `penguin-sprite.ts` can
+ * tween the tilt and lift on the sprite instead. Arms, foot lifts, eyes,
+ * HA HA, the seat, props and the #147 lettering stay per frame. The clip id
+ * gains a `-neutral` suffix. Off by default, which keeps every existing
+ * render byte-identical.
  */
 export function renderPenguinSvgWithColors(
   look: PenguinLook,
   pose: PenguinPose = { anim: look.emote, frame: 0 },
-  options: { idPrefix?: string } = {},
+  options: PenguinSvgOptions = {},
   colors: ResolvedPenguinColors = resolvePenguinColors(look),
   facing: Facing = 'right',
 ): string {
-  const framePose = resolvePenguinFramePose(pose);
+  const bakedPose = resolvePenguinFramePose(pose);
+  const framePose = options.neutralBody
+    ? { ...bakedPose, bodyRotateDeg: 0, bodyTranslateY: 0 }
+    : bakedPose;
   const resolved = colors;
-  const clipId = options.idPrefix
+  const clipBase = options.idPrefix
     ? `penguin-belly-${options.idPrefix}`
     : `penguin-belly-${penguinLookHash(look)}-${pose.anim}-${pose.frame}`;
+  const clipId = options.neutralBody ? `${clipBase}-neutral` : clipBase;
 
   const bodyTransform = `rotate(${framePose.bodyRotateDeg} ${BODY_ROTATE_ORIGIN.x} ${BODY_ROTATE_ORIGIN.y}) translate(0 ${framePose.bodyTranslateY})`;
   const leftFootAttr = framePose.leftFootLift
@@ -593,6 +604,14 @@ export function renderPenguinSvgWithColors(
   return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${minX} ${minY} ${PENGUIN_FRAME_WIDTH} ${PENGUIN_FRAME_HEIGHT}" width="${PENGUIN_FRAME_WIDTH}" height="${PENGUIN_FRAME_HEIGHT}">${figure}</svg>`;
 }
 
+/** Rendering options for `renderPenguinSvg` / `renderPenguinSvgWithColors`. */
+export interface PenguinSvgOptions {
+  /** Replaces the hash+pose suffix in the belly `clipPath` id (#31 review fix 7). */
+  idPrefix?: string;
+  /** Renders the body group upright and unlifted, for the #68 body-motion tween. */
+  neutralBody?: boolean;
+}
+
 /**
  * Renders `look` at `pose` as a standalone SVG string, resolving its
  * colours with `resolvePenguinColors` (#79 D2). See
@@ -603,7 +622,7 @@ export function renderPenguinSvgWithColors(
 export function renderPenguinSvg(
   look: PenguinLook,
   pose: PenguinPose = { anim: look.emote, frame: 0 },
-  options: { idPrefix?: string } = {},
+  options: PenguinSvgOptions = {},
   facing: Facing = 'right',
 ): string {
   return renderPenguinSvgWithColors(look, pose, options, resolvePenguinColors(look), facing);

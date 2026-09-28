@@ -758,3 +758,58 @@ describe('renderPenguinSvgWithColors one-field markers (#79 review round 1 nit 2
     },
   );
 });
+
+// #68 D2: a `neutralBody` frame keeps the body upright and unlifted so
+// `penguin-sprite.ts` can tween the tilt and lift instead; every other
+// per-frame detail stays baked.
+describe('renderPenguinSvg neutralBody (#68)', () => {
+  const NEUTRAL_BODY = 'rotate(0 60 130) translate(0 0)';
+
+  it.each([
+    ['WADDLE', 1],
+    ['DANCE', 1],
+    ['LAUGH', 1],
+    ['WALK', 1],
+  ] as const)('renders %s frame %i with the body upright and unlifted', (anim, frame) => {
+    const svg = renderPenguinSvg(DEFAULT_LOOK, { anim, frame }, { neutralBody: true });
+    expect(svg).toContain(`<g transform="${NEUTRAL_BODY}">`);
+  });
+
+  it('keeps the arms, foot lifts, sleepy eyes and HA HA per frame', () => {
+    const dance = renderPenguinSvg(
+      DEFAULT_LOOK,
+      { anim: 'DANCE', frame: 1 },
+      { neutralBody: true },
+    );
+    expect(dance).toContain('rotate(-40 26 62)');
+    const walk = renderPenguinSvg(DEFAULT_LOOK, { anim: 'WALK', frame: 1 }, { neutralBody: true });
+    expect(walk).toContain('transform="translate(0 -4)"');
+    const laugh = renderPenguinSvg(
+      DEFAULT_LOOK,
+      { anim: 'LAUGH', frame: 1 },
+      { neutralBody: true },
+    );
+    const bakedLaugh = renderPenguinSvg(DEFAULT_LOOK, { anim: 'LAUGH', frame: 1 });
+    // Only the body transform and the clip id differ from the baked frame.
+    const strip = (svg: string) =>
+      svg.replace(/<g transform="rotate\([^"]*\)">/, '').replace(/penguin-belly-[^")]*/g, '');
+    expect(strip(laugh)).toBe(strip(bakedLaugh));
+  });
+
+  it('suffixes the belly clip id with -neutral', () => {
+    const svg = renderPenguinSvg(
+      DEFAULT_LOOK,
+      { anim: 'WADDLE', frame: 0 },
+      { idPrefix: 'x', neutralBody: true },
+    );
+    expect(svg).toContain('id="penguin-belly-x-neutral"');
+  });
+
+  it('leaves the default render byte-identical', () => {
+    const pose = { anim: 'WADDLE', frame: 1 } as const;
+    expect(renderPenguinSvg(DEFAULT_LOOK, pose, { neutralBody: false })).toBe(
+      renderPenguinSvg(DEFAULT_LOOK, pose),
+    );
+    expect(renderPenguinSvg(DEFAULT_LOOK, pose)).toContain('rotate(4 60 130)');
+  });
+});

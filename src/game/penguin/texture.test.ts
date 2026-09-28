@@ -180,3 +180,40 @@ describe('penguinTextureKey (#147)', () => {
     expect(penguinTextureKey(hash, 'WADDLE', 0, 'left')).toBe(`penguin:${hash}:WADDLE:0:left`);
   });
 });
+
+describe('neutral-body textures (#68 D2)', () => {
+  const MOTION_ANIMS = new Set(['WADDLE', 'DANCE', 'LAUGH', 'WALK']);
+
+  it('puts :neutral after any :left, leaving the default keys unchanged', () => {
+    const hash = penguinLookHash(DEFAULT_LOOK);
+    expect(penguinTextureKey(hash, 'WADDLE', 0, 'right', true)).toBe(
+      `penguin:${hash}:WADDLE:0:neutral`,
+    );
+    expect(penguinTextureKey(hash, 'WADDLE', 0, 'left', true)).toBe(
+      `penguin:${hash}:WADDLE:0:left:neutral`,
+    );
+    expect(penguinTextureKey(hash, 'WADDLE', 0, 'right', false)).toBe(`penguin:${hash}:WADDLE:0`);
+  });
+
+  it('registers :neutral keys only for the anims with a body motion, still one set per facing', () => {
+    for (const facing of ['right', 'left'] as const) {
+      const manager = createFakeTextureManager();
+      ensurePenguinTextures({ textures: manager }, DEFAULT_LOOK, facing, { bodyMotion: true });
+
+      expect(manager.addedKeys).toHaveLength(TOTAL_FRAMES_PER_LOOK);
+      for (const key of manager.addedKeys) {
+        const anim = key.split(':')[2];
+        expect(key.endsWith(':neutral'), key).toBe(MOTION_ANIMS.has(anim));
+      }
+    }
+  });
+
+  it('registers exactly the baked keys when body motion is off (reduced motion)', () => {
+    const baked = createFakeTextureManager();
+    const off = createFakeTextureManager();
+    ensurePenguinTextures({ textures: baked }, DEFAULT_LOOK);
+    ensurePenguinTextures({ textures: off }, DEFAULT_LOOK, 'right', { bodyMotion: false });
+    expect(off.addedKeys).toEqual(baked.addedKeys);
+    for (const key of off.addedKeys) expect(key.endsWith(':neutral')).toBe(false);
+  });
+});

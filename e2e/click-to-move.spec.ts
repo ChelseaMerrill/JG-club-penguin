@@ -217,10 +217,11 @@ test('click-to-move', async ({ page }) => {
   expect((await debugInfo(page))?.localPenguin?.flipX).toBe(true);
   // #147 review fix: the actually-displayed texture key (not just the
   // requested `facing`/`flipX`) ends up on the left-facing (counter-mirrored
-  // lettering) texture set too, once it's decoded.
+  // lettering) texture set too, once it's decoded. With body motion on
+  // (#68), a WALK or WADDLE frame's key carries `:neutral` after `:left`.
   await expect
     .poll(async () => (await debugInfo(page))?.localPenguin?.textureKey)
-    .toMatch(/:left$/);
+    .toMatch(/:left(:neutral)?$/);
   await expect
     .poll(async () => (await debugInfo(page))?.localPenguin?.moving, { timeout: LONG_WALK_TIMEOUT })
     .toBe(false);
