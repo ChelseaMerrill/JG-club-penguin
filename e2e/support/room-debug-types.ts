@@ -35,6 +35,8 @@ export interface LocalPenguinDebugInfo {
   containerY?: number;
   nameTagY?: number;
   nameTagDepth?: number;
+  /** #162: optional here so a spec can also run against code from before #162 (V4a). */
+  visible?: boolean;
 }
 
 /** One remote Penguin's movement state (#43). */
@@ -68,6 +70,7 @@ export interface RoomDebugInfo {
   remotePenguinCount?: number;
   remotePenguins?: RemotePenguinDebugInfo[];
   setRegisteredPlayer?: (player: RegisteredPlayer) => void;
+  setLocalPenguinVisible?: (visible: boolean) => void;
   spawnDebugPenguin?: (tile: Tile, look: PenguinLook) => void;
   comingSoonHint?: string | null;
   changeRoom?: (roomId: RoomId) => void;

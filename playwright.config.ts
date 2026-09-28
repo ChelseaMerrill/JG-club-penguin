@@ -10,6 +10,7 @@ const SHARED_TEST_USER_SPECS = [
   '**/movement-sync.spec.ts',
   '**/snowball-hit.spec.ts',
   '**/penguin-load-retry.spec.ts',
+  '**/own-penguin-sign-in.spec.ts',
 ];
 
 export default defineConfig({
