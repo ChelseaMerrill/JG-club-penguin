@@ -684,8 +684,9 @@ describe('createSupabaseProgressStore', () => {
         questProgress: {
           data: {
             devPitVisited: true,
-            roundsFinished: ['bug-squash'],
+            roundsFinished: ['bug-squash', 'beystadium'],
             completedQuests: [],
+            matchWins: { beystadium: 2 },
           },
           error: null,
         },
@@ -694,8 +695,9 @@ describe('createSupabaseProgressStore', () => {
 
       await expect(store.questProgress()).resolves.toEqual({
         devPitVisited: true,
-        roundsFinished: ['bug-squash'],
+        roundsFinished: ['bug-squash', 'beystadium'],
         completedQuests: [],
+        matchWins: { beystadium: 2 },
       });
       expect(calls).toContainEqual(['rpc.quest_progress', {}]);
     });

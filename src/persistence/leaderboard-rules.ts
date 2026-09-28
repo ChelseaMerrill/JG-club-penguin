@@ -68,6 +68,11 @@ export const LEADERBOARD_SCORE_CEILINGS: Readonly<Record<MinigameId, number | nu
   // easy to tighten once #46's stretch engines exist.
   'coffee-rush': null,
   'snow-cone-stand': null,
+  // Beystadium's `best_score` is strikes landed in one match. Strikes are
+  // not hard-bounded by the engine (every SPACE press inside the 450 ms
+  // ring zone lands one), so, like Coffee Rush and Snow Cone Stand, this
+  // excludes nothing rather than guess a number that could hide a real best.
+  beystadium: null,
 };
 
 /**

@@ -146,6 +146,7 @@ export function createQuestController(deps: QuestControllerDeps): QuestControlle
         devPitVisited: progress.devPitVisited,
         roundsFinished: progress.roundsFinished,
         completedQuests: progress.completedQuests,
+        matchWins: progress.matchWins,
       });
     } catch {
       return;

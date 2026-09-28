@@ -82,6 +82,17 @@ test('opens from the Igloo hotspot showing the current Badge count, and Escape c
   await expect(exterminator).not.toHaveClass(/trophy-case__badge--earned/);
   await expect(exterminator.locator('.trophy-case__badge-hint')).toHaveText('500 · BUG SQUASH');
 
+  // Beystadium's Let It Rip in the design's 7th slot; Barista in the 12th.
+  const tiles = page.locator('.trophy-case__badge');
+  await expect(tiles.nth(6)).toHaveAttribute('data-badge-id', 'let-it-rip');
+  await expect(tiles.nth(6).locator('.trophy-case__badge-name')).toHaveText('Let It Rip');
+  await expect(tiles.nth(6).locator('.trophy-case__badge-hint')).toHaveText('WIN 3 BEY MATCHES');
+  await expect(tiles.nth(11)).toHaveAttribute('data-badge-id', 'barista');
+  await expect(tiles.nth(11).locator('.trophy-case__badge-name')).toHaveText('Barista');
+  await expect(tiles.nth(11).locator('.trophy-case__badge-hint')).toHaveText(
+    '15 CUPS · COFFEE RUSH',
+  );
+
   // TROPHIES and JG AWARDS are static tab content.
   await page.locator('[data-tab="trophies"]').click();
   await expect(page.locator('.trophy-case__trophy-name').first()).toHaveText('Team Pod · Ship It');

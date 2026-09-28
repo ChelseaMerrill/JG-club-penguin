@@ -21,6 +21,25 @@ export interface MinigameContext<K extends MinigameId = MinigameId> {
 }
 
 /**
+ * A Minigame's own done-screen headings, for a design whose done screen
+ * differs from the shell's generic one (Beystadium's "MATCH OVER"). The
+ * shell still owns the rest: SAVING, the server's Tokens and personal
+ * best, the Badge row, the leaderboard and QUIT.
+ */
+export interface MinigameDoneSummary {
+  /** Replaces "ROUND COMPLETE". */
+  kicker: string;
+  /** Replaces the Minigame's title. */
+  title: string;
+  /** Replaces the SCORE row's label. */
+  scoreLabel?: string;
+  /** Extra stat rows, shown before the score row, in order. */
+  rows: ReadonlyArray<{ key: string; label: string; value: string }>;
+  /** One line under the Badge row (e.g. an NPC's result line); `null` for none. */
+  quote: string | null;
+}
+
+/**
  * One Minigame, launched by `createMinigameLauncher` and driven by
  * `createMinigameShell`. The shell owns the round's timer, pause state and
  * phase transitions (how-to-play -> play -> done); a `Minigame` only knows
@@ -40,6 +59,9 @@ export interface Minigame<K extends MinigameId = MinigameId> {
   readonly durationSec: number;
   /** Lines shown on the how-to-play screen before the round starts. */
   readonly howToPlay: readonly string[];
+  /** Replaces the how-to-play screen's "<TITLE> · N SECONDS" line, for a
+   *  Minigame whose round isn't really timed (Beystadium's best of 3). */
+  readonly howToSubtitle?: string;
   /** Display label for each `MinigameStatsMap[K]` key the shell should show
    *  as a header counter, in the order they're shown. A key without an
    *  entry here is tracked (and still sent to `recordRound`) but not shown. */
@@ -56,6 +78,9 @@ export interface Minigame<K extends MinigameId = MinigameId> {
    *  the game called `context.finish()`, or the Player quit). Must return
    *  synchronously; a quit discards this return value without recording it. */
   end(): { score: number; stats: MinigameStatsMap[K] };
+  /** Optional: the done screen's own headings (see `MinigameDoneSummary`).
+   *  Called once, right after a finished round's `end()`; never on quit. */
+  doneSummary?(): MinigameDoneSummary;
 }
 
 /** Builds a fresh `Minigame` instance for one round. A factory is called
