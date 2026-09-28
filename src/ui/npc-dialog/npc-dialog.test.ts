@@ -172,6 +172,29 @@ describe('createNpcDialog', () => {
     expect(panel(root).hidden).toBe(true);
   });
 
+  it("Michael's buttons: LET IT RIP launches beystadium; BACK AWAY SLOWLY just closes (#121)", () => {
+    const { root, launchMinigame } = setup();
+    gameEvents.emit('npc:arrived', { npcId: 'michael' });
+
+    expect(root.querySelector('.npc-dialog__subtitle')?.textContent).toBe(
+      'THE POD · IT ASSOCIATE · BEYSTADIUM CHAMP',
+    );
+    const buttonNamed = (label: string) =>
+      Array.from(root.querySelectorAll('button')).find(
+        (button) => button.textContent === label,
+      ) as HTMLButtonElement;
+
+    buttonNamed('BACK AWAY SLOWLY').click();
+    expect(panel(root).hidden).toBe(true);
+    expect(launchMinigame).not.toHaveBeenCalled();
+
+    gameEvents.emit('npc:arrived', { npcId: 'michael' });
+    buttonNamed('LET IT RIP').click();
+
+    expect(launchMinigame).toHaveBeenCalledWith('beystadium');
+    expect(panel(root).hidden).toBe(true);
+  });
+
   it('Casey calls openStall("igloo-gear") and closes', () => {
     const { root, openStall } = setup();
     gameEvents.emit('npc:arrived', { npcId: 'casey' });

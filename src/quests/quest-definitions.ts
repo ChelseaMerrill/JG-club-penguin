@@ -1,7 +1,7 @@
 import type { MinigameId, RoomId } from '../contracts';
 import { getRoomDefinition } from '../game/rooms/registry';
 import type { MinigameRegistry } from '../minigames/minigame';
-import { MINIGAME_RULES } from '../persistence/minigame-rules';
+import { MINIGAME_RULES, type MinigameRule } from '../persistence/minigame-rules';
 
 /**
  * Quest definitions as data (#46). The build has one main Quest (five steps,
@@ -50,11 +50,18 @@ export interface MinigameQuestDefinition {
   minigameId: MinigameId;
   title: string;
   location: string;
-  /** The Minigame's Badge threshold, compared against its personal best. */
+  /** What counts as progress, following the Minigame's Badge rule: its
+   *  personal best (`'best'`) or its recorded match wins (`'match-wins'`,
+   *  `QuestProgress.matchWins`; Beystadium). */
+  goalKind: 'best' | 'match-wins';
+  /** The Minigame's Badge threshold (a best) or match-win count. */
   goal: number;
   /** The HUD widget's next-step text. */
   hint: string;
-  roomId: RoomId;
+  /** Where the Minigame is played; `null` while its Room isn't in the build. */
+  roomId: RoomId | null;
+  /** The HUD widget's next-step location. */
+  hintLocation: string;
 }
 
 export type QuestDefinition = StepsQuestDefinition | MinigameQuestDefinition;
@@ -62,6 +69,14 @@ export type QuestDefinition = StepsQuestDefinition | MinigameQuestDefinition;
 /** The Room's own display title (e.g. `the-melt` shows as THE KITCHEN). */
 export function roomTitle(roomId: RoomId | null): string {
   return roomId === null ? 'ANY ROOM' : getRoomDefinition(roomId).title;
+}
+
+/** The goal a Minigame Quest tracks, straight from the Minigame's Badge rule. */
+function badgeGoal(minigameId: MinigameId): Pick<MinigameQuestDefinition, 'goalKind' | 'goal'> {
+  const rule: MinigameRule = MINIGAME_RULES[minigameId];
+  return rule.badgeKind === 'match-wins'
+    ? { goalKind: 'match-wins', goal: rule.badgeMatchWins }
+    : { goalKind: 'best', goal: rule.badgeThreshold };
 }
 
 function minigameQuest(
@@ -78,9 +93,10 @@ function minigameQuest(
     minigameId,
     title,
     location: npcLine ? `${room} · ${npcLine}` : room,
-    goal: MINIGAME_RULES[minigameId].badgeThreshold,
+    ...badgeGoal(minigameId),
     hint,
     roomId,
+    hintLocation: room,
   };
 }
 
@@ -141,6 +157,15 @@ export const QUEST_DEFINITIONS: readonly QuestDefinition[] = [
     'Earn 200 tokens in one round',
   ),
   minigameQuest('coffee-rush', 'Coffee Rush', 'the-melt', null, 'Serve 15 cups in one round'),
+  // The design's "QUEST · LET IT RIP · WIN 3 MATCHES" as its title; located
+  // from Team Room 4's own definition, where Michael launches it (#121).
+  minigameQuest(
+    'beystadium',
+    'LET IT RIP · WIN 3 MATCHES',
+    'team-room-4',
+    'TALK TO MICHAEL',
+    'Win 3 Beystadium matches',
+  ),
 ];
 
 /**

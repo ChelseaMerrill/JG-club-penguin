@@ -89,7 +89,8 @@ export type NpcId =
  * (`design/Minigame Bug Squash.dc.html`), Chelsea/Pancake Flip
  * (`design/Minigame Pancake Flip.dc.html`), Josh/Snow Cone Stand
  * (`design/Minigame Snow Cone Stand.dc.html`) and Tom/Coffee Rush
- * (`design/Minigame Coffee Rush.dc.html`) (#36 round-2 review item 1).
+ * (`design/Minigame Coffee Rush.dc.html`) (#36 round-2 review item 1), and
+ * Michael/Beystadium (`design/Minigame Beystadium.dc.html`, #121).
  */
 export interface NpcMinigameDialog {
   kind: 'minigame';
@@ -303,6 +304,22 @@ const COFFEE_RUSH_DIALOG: NpcMinigameDialog = {
   triggerLine:
     'Fresh pot is on and the line is out the door. You pour, I supervise. Fifteen good cups before the pot runs dry and the Barista badge is yours.',
   subtitle: 'THE MELT · COFFEE RUSH',
+};
+
+/**
+ * Michael's Beystadium trigger dialog (#121), verbatim from
+ * `design/Minigame Beystadium.dc.html`'s trigger phase: his "THE POD · IT
+ * ASSOCIATE · BEYSTADIUM CHAMP" badge, his challenge and its LET IT RIP /
+ * BACK AWAY SLOWLY buttons.
+ */
+const BEYSTADIUM_DIALOG: NpcMinigameDialog = {
+  kind: 'minigame',
+  minigameId: 'beystadium',
+  actionLabel: 'LET IT RIP',
+  declineLabel: 'BACK AWAY SLOWLY',
+  triggerLine:
+    "You walked into the Pod. That's a challenge. Pick a Bey, rip the launcher, and knock mine out of the stadium. Best of three. I'm 3-0 against the whole office. 3-0 against you next.",
+  subtitle: 'THE POD · IT ASSOCIATE · BEYSTADIUM CHAMP',
 };
 
 const IGLOO_GEAR_STALL_DIALOG: NpcStallDialog = { kind: 'stall', stallId: 'igloo-gear' };
@@ -1379,7 +1396,8 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     idleLines: staticLine('I challenge you to a Beyblade battle!'),
     // Team Room 4's design draws its NPCs without any idle bob.
     still: true,
-    dialog: LINE_DIALOG,
+    // #121: LET IT RIP launches Beystadium.
+    dialog: BEYSTADIUM_DIALOG,
     figure: {
       style: 'shortDark',
       hair: 'dark',

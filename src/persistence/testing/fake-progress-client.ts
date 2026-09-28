@@ -138,7 +138,13 @@ export function makeFakeClient(responses: FakeResponses = {}): {
   const recordRound =
     responses.recordRound ??
     ({
-      data: { tokensAwarded: 0, balance: 100, newBest: false, badgeEarned: false },
+      data: {
+        tokensAwarded: 0,
+        balance: 100,
+        newBest: false,
+        badgeEarned: false,
+        badgesEarned: [],
+      },
       error: null,
     } satisfies FakeResult<unknown>);
   const purchaseItem =
@@ -149,7 +155,7 @@ export function makeFakeClient(responses: FakeResponses = {}): {
   const questProgress =
     responses.questProgress ??
     ({
-      data: { devPitVisited: false, roundsFinished: [], completedQuests: [] },
+      data: { devPitVisited: false, roundsFinished: [], completedQuests: [], matchWins: {} },
       error: null,
     } satisfies FakeResult<unknown>);
   const markDevPitVisited =

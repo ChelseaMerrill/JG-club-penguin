@@ -232,6 +232,27 @@ export interface LeaderboardRpcRow {
 }
 
 /**
+ * `quest_progress().matchWins`, keeping only known Minigame ids with a
+ * whole, non-negative count; anything else (missing, malformed) reads as no
+ * wins rather than trusting an unexpected shape into Quest progress.
+ */
+function toMatchWins(value: unknown): Partial<Record<MinigameId, number>> {
+  const wins: Partial<Record<MinigameId, number>> = {};
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return wins;
+  for (const [id, count] of Object.entries(value as Record<string, unknown>)) {
+    if (
+      id in MINIGAME_RULES &&
+      typeof count === 'number' &&
+      Number.isInteger(count) &&
+      count >= 0
+    ) {
+      wins[id as MinigameId] = count;
+    }
+  }
+  return wins;
+}
+
+/**
  * Column -> `PenguinLook` field mapping, exactly `pglite-progress-store.ts`'s
  * `toLook`: `penguin_color` is the body colour, `idle_emote` is the emote,
  * `penguin_name` is the name.
@@ -493,10 +514,21 @@ export function createSupabaseProgressStore(
       if (error) {
         throw toProgressError(error);
       }
-      const result = data as RoundResult;
+      const raw = data as Omit<RoundResult, 'badgesEarned'> & { badgesEarned?: unknown };
+      // #121 (B8): the server names the Badges this round awarded. A schema
+      // before 20260928000000_beystadium.sql has only badgeEarned, which
+      // means the Minigame's own Badge.
+      const result: RoundResult = {
+        ...raw,
+        badgesEarned: Array.isArray(raw.badgesEarned)
+          ? (raw.badgesEarned as BadgeId[])
+          : raw.badgeEarned
+            ? [MINIGAME_RULES[minigameId].badgeId]
+            : [],
+      };
       emitter?.emit('tokens:changed', { balance: result.balance });
-      if (result.badgeEarned) {
-        emitter?.emit('badge:earned', { badgeId: MINIGAME_RULES[minigameId].badgeId });
+      for (const badgeId of result.badgesEarned) {
+        emitter?.emit('badge:earned', { badgeId });
       }
       return result;
     });
@@ -615,6 +647,7 @@ export function createSupabaseProgressStore(
       devPitVisited: result.devPitVisited === true,
       roundsFinished: Array.isArray(result.roundsFinished) ? result.roundsFinished : [],
       completedQuests: Array.isArray(result.completedQuests) ? result.completedQuests : [],
+      matchWins: toMatchWins(result.matchWins),
     };
   }
 

@@ -82,6 +82,12 @@ test('opens from the Igloo hotspot showing the current Badge count, and Escape c
   await expect(exterminator).not.toHaveClass(/trophy-case__badge--earned/);
   await expect(exterminator.locator('.trophy-case__badge-hint')).toHaveText('500 · BUG SQUASH');
 
+  // #121: Beystadium's Let It Rip is earnable now: locked, not coming soon.
+  const letItRip = page.locator('[data-badge-id="let-it-rip"]');
+  await expect(letItRip.locator('.trophy-case__badge-name')).toHaveText('Let It Rip');
+  await expect(letItRip.locator('.trophy-case__badge-hint')).toHaveText('WIN 3 BEY MATCHES');
+  await expect(letItRip).not.toHaveClass(/trophy-case__badge--coming-soon/);
+
   // TROPHIES and JG AWARDS are static tab content.
   await page.locator('[data-tab="trophies"]').click();
   await expect(page.locator('.trophy-case__trophy-name').first()).toHaveText('Team Pod · Ship It');

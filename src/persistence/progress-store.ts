@@ -87,6 +87,12 @@ export interface RoundResult {
   balance: number;
   newBest: boolean;
   badgeEarned: boolean;
+  /**
+   * The Badge ids this round newly awarded (#121, following #138's
+   * `complete_quest` contract): the Minigame's own Badge on the round that
+   * first earns it (Let It Rip on the third Beystadium win), else empty.
+   */
+  badgesEarned: BadgeId[];
 }
 
 /** The result of a validated Furniture purchase. Producer: #27 (`purchase_item`). Consumer: #40. */
@@ -122,6 +128,11 @@ export interface QuestProgress {
   roundsFinished: MinigameId[];
   /** Ordered by Quest id. */
   completedQuests: string[];
+  /** Match wins per Minigame with a match-win Badge (only Beystadium): how
+   *  many recorded rounds have `stats.won = 1`. A Minigame with no win has
+   *  no entry. Producer: the Beystadium migration's `quest_progress`.
+   *  Consumer: the Beystadium Quest's "x / 3" progress. */
+  matchWins: Partial<Record<MinigameId, number>>;
 }
 
 /**

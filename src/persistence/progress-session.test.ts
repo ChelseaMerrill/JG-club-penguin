@@ -248,7 +248,13 @@ describe('createProgressSession', () => {
         saveLook: () => Promise.reject(new Error('unused in this test')),
         recordRound: () => {
           balance += 10;
-          return Promise.resolve({ tokensAwarded: 10, balance, newBest: false, badgeEarned: true });
+          return Promise.resolve({
+            tokensAwarded: 10,
+            balance,
+            newBest: false,
+            badgeEarned: true,
+            badgesEarned: ['exterminator'],
+          });
         },
         purchase: () => Promise.reject(new Error('unused in this test')),
         setSlot: () => Promise.reject(new Error('unused in this test')),
@@ -319,6 +325,7 @@ describe('createProgressSession', () => {
         devPitVisited: true,
         roundsFinished: ['bug-squash', 'pancake-flip'],
         completedQuests: [],
+        matchWins: {},
       });
       const result = await wrapped.completeQuest('main');
 
@@ -569,7 +576,13 @@ describe('createProgressSession', () => {
               await round.promise;
               session.storeEmitter.emit('tokens:changed', { balance: 275 });
               session.storeEmitter.emit('badge:earned', { badgeId: 'exterminator' });
-              return { tokensAwarded: 25, balance: 275, newBest: true, badgeEarned: true };
+              return {
+                tokensAwarded: 25,
+                balance: 275,
+                newBest: true,
+                badgeEarned: true,
+                badgesEarned: ['exterminator'],
+              };
             },
             checkBadges: () => {
               const check = gate<BadgeCheckResult>();

@@ -1290,6 +1290,17 @@ body {
   color: var(--fg-muted);
 }
 
+/* A game's own result line (`MinigameDoneSummary.quote`, e.g. Beystadium's
+   Michael line), styled as `design/Minigame Beystadium.dc.html`'s. */
+.minigame__done-quote {
+  font: 700 15px var(--font-body);
+  color: var(--fg-muted);
+}
+
+.minigame__done-quote[hidden] {
+  display: none;
+}
+
 .minigame__done-error {
   font: 700 14px var(--font-body);
   color: var(--fg-primary);

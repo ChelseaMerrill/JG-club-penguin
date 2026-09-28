@@ -16,6 +16,7 @@ import {
   STATS_MAX_KEY_LENGTH,
   MIN_ROUND_INTERVAL_SECONDS,
   STATS_MAX_KEYS,
+  type MinigameRule,
 } from './minigame-rules';
 import {
   clampLeaderboardRows,
@@ -61,6 +62,9 @@ interface PlayerState {
    *  `minigame_bests.updated_at`. */
   bestReachedAtMs: Partial<Record<MinigameId, number>>;
   lastRoundFinishedAtMs: Partial<Record<MinigameId, number>>;
+  /** Recorded match wins per `'match-wins'`-Badge Minigame (Beystadium):
+   *  the fake's count of `minigame_rounds` rows with `stats.won = 1`. */
+  matchWins: Partial<Record<MinigameId, number>>;
   /** Item id to the time (ms) it was acquired, for `loadAll`'s ordering. */
   ownedItems: Map<string, number>;
   slots: Record<IglooSlot, string | null>;
@@ -135,6 +139,7 @@ export function createInMemoryProgressStoreWithControls(
     bests: {},
     bestReachedAtMs: {},
     lastRoundFinishedAtMs: {},
+    matchWins: {},
     ownedItems: new Map(),
     slots: emptySlots(),
     devPitVisited: false,
@@ -220,9 +225,13 @@ export function createInMemoryProgressStoreWithControls(
       }
     }
 
-    const rule = MINIGAME_RULES[minigameId];
+    const rule: MinigameRule | undefined = MINIGAME_RULES[minigameId];
     if (!rule) {
       throw new ProgressStoreError('unknown_minigame');
+    }
+    const numericStats = statsRecord as Record<string, number>;
+    if (rule.validStats && !rule.validStats(numericStats)) {
+      throw new ProgressStoreError('invalid_stats');
     }
 
     const nowMs = now();
@@ -233,7 +242,6 @@ export function createInMemoryProgressStoreWithControls(
       throw new ProgressStoreError('round_too_soon');
     }
 
-    const numericStats = statsRecord as Record<string, number>;
     const rawPayout = rule.rawPayout(score, numericStats);
     let payout = Math.min(Math.max(rawPayout, 0), rule.cap);
     if (elapsedSeconds !== undefined) {
@@ -249,9 +257,21 @@ export function createInMemoryProgressStoreWithControls(
       state.bestReachedAtMs[minigameId] = nowMs;
     }
 
+    // A 'match-wins' Badge counts this round's win too (the SQL counts the
+    // earlier rows, then adds this one before inserting it).
+    const isMatchWin = rule.badgeKind === 'match-wins' && rule.isMatchWin(numericStats);
+    const matchWins = (state.matchWins[minigameId] ?? 0) + (isMatchWin ? 1 : 0);
+    const badgeMet =
+      rule.badgeKind === 'match-wins'
+        ? isMatchWin && matchWins >= rule.badgeMatchWins
+        : rawBest >= rule.badgeThreshold;
+    if (isMatchWin) {
+      state.matchWins[minigameId] = matchWins;
+    }
+
     let badgeEarned = false;
     let bonus = 0;
-    if (!state.badges.has(rule.badgeId) && rawBest >= rule.badgeThreshold) {
+    if (!state.badges.has(rule.badgeId) && badgeMet) {
       state.badges.set(rule.badgeId, nowMs);
       badgeEarned = true;
       bonus = BADGE_BONUS;
@@ -265,7 +285,13 @@ export function createInMemoryProgressStoreWithControls(
       emitter?.emit('badge:earned', { badgeId: rule.badgeId });
     }
 
-    return { tokensAwarded: payout, balance: state.tokens, newBest, badgeEarned };
+    return {
+      tokensAwarded: payout,
+      balance: state.tokens,
+      newBest,
+      badgeEarned,
+      badgesEarned: badgeEarned ? [rule.badgeId] : [],
+    };
   }
 
   async function purchase(itemId: string): Promise<PurchaseResult> {
@@ -397,6 +423,7 @@ export function createInMemoryProgressStoreWithControls(
       devPitVisited: state.devPitVisited,
       roundsFinished: (Object.keys(state.lastRoundFinishedAtMs) as MinigameId[]).sort(),
       completedQuests: [...state.completedQuests].sort(),
+      matchWins: { ...state.matchWins },
     };
   }
 

@@ -105,6 +105,9 @@ It also checks `security definer`/`search_path = ''`/one overload each and the
 3. Save the result table to `test-results/46-quests-proof-supabase/output.txt`,
    and paste the same table on #46.
 
+   #121's `20260928000000_beystadium.sql` adds `matchWins` to `quest_progress()`,
+   so once it is applied this proof expects `matchWins: {}` in that row.
+
 ## #138 Badges (gate H1)
 
 `20260927000000_badges.sql` turns Badges into data (`public.badges`, all 15),
@@ -279,6 +282,45 @@ and the guard trigger's presence and security shape.
    `test-results/135-igloo-placement-proof-supabase/output.txt`, paste them on
    #135, then merge the PR straight away: the new client needs this schema,
    and old tabs run degraded against it until the new build loads.
+
+## #121 Beystadium (reviewer gate)
+
+`80_beystadium_proof.sql` proves `20260928000000_beystadium.sql` (decisions
+B1-B10 in its header) against the same #9 H1 fixture Player. As postgres it
+checks that Let It Rip is `available` in `public.badges` and that #138's
+foreign key is still the only Badge constraint (no check constraint). As the
+fixture signed in: an impossible match result is `invalid_stats` and pays
+nothing, a won match pays 60 with the best set to strikes landed, a second
+round inside 10 s is `round_too_soon`, a win half the 45 s window later is
+clamped to 30, a loss pays 15 and never counts; with Let It Rip switched off,
+the third win fails with `award_badge`'s own `badge_unavailable` (so the
+award goes through `public.award_badge`); switched back on, the third win
+earns it, pays +50 once and returns `badgesEarned: ["let-it-rip"]`, every
+other call returns `badgesEarned: []`, and the fourth win earns nothing more;
+`quest_progress()` reports `matchWins`, `leaderboard('beystadium')` is
+accepted, and the fixture can't call `award_badge`. As anon `record_round`,
+`quest_progress`, `leaderboard` and `award_badge` are denied (`42501`). It
+also checks `security definer`/`search_path = ''`/one overload each and the
+`authenticated`-only grants.
+
+**Apply it before the #121 PR merges or deploys** (#138's deploy-order
+rule), after #138's `20260927000000_badges.sql` and #135's
+`20260927010000_igloo_wall_slots.sql`. It sorts before the feedback branch's
+`20260928010000`.
+
+1. Local: covered automatically by `sql-beystadium.test.ts`'s PGlite run in
+   `npm test` (not by `run-local.sh`), which migrates every file in
+   timestamp order and also proves the rerun chain.
+2. Real Postgres/Supabase: apply `20260928000000_beystadium.sql` in the SQL
+   editor (after every earlier migration), then open
+   `80_beystadium_proof.sql`, replace every occurrence of
+   `00000000-0000-0000-0000-00000000f1f0` with the real #9 H1 fixture
+   Player's id, and run it. Expect every row's `pass` column to read `true`,
+   including the final `ALL` row. It changes nothing (everything is rolled
+   back) and prints only booleans, counts and Token amounts. Then rerun
+   `138_badges_proof.sql` and `46_quests_proof.sql` the same way: both
+   still pass on the new schema.
+3. Save the result tables to `test-results/80-beystadium-proof-supabase/output.txt`.
 
 ## In-game feedback
 

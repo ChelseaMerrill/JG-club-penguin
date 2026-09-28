@@ -82,11 +82,12 @@ describe('orderBadgeTiles', () => {
       'brain-freeze',
       'barista',
       'interior-penguin',
+      // #121: Let It Rip is earnable now, so it sorts with the locked ones.
+      'let-it-rip',
       'snowmageddon',
       'rail-rider',
       'hexle-parent',
       'mullet-mania',
-      'let-it-rip',
       'stair-master',
       'phish-fry',
     ]);
@@ -195,7 +196,7 @@ describe('createTrophyCase', () => {
     expect(q('[aria-label="Page 1"]').getAttribute('aria-current')).toBe('page');
 
     next.click();
-    expect(tileIds()).toEqual(['let-it-rip', 'stair-master', 'phish-fry']);
+    expect(tileIds()).toEqual(['mullet-mania', 'stair-master', 'phish-fry']);
     expect(q<HTMLButtonElement>('[aria-label="Next page"]').disabled).toBe(true);
     expect(q('[aria-label="Page 2"]').getAttribute('aria-current')).toBe('page');
 

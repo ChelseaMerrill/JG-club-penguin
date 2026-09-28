@@ -92,7 +92,7 @@ export const BADGE_CATALOG: readonly (BadgeDefinition & { id: BadgeId })[] = [
     name: 'Let It Rip',
     howToEarn: 'WIN 3 BEY MATCHES',
     sortOrder: 13,
-    available: false,
+    available: true,
   },
   {
     id: 'stair-master',
@@ -117,7 +117,10 @@ export const BADGE_CATALOG: readonly (BadgeDefinition & { id: BadgeId })[] = [
  * the matching `BADGE_CATALOG` entry's `available` to true, so the catalog
  * test keeps matching both migrations.
  */
-export const BADGE_AVAILABILITY_OVERRIDES: ReadonlySet<BadgeId> = new Set<BadgeId>();
+export const BADGE_AVAILABILITY_OVERRIDES: ReadonlySet<BadgeId> = new Set<BadgeId>([
+  // #121: 20260928000000_beystadium.sql turns Let It Rip on.
+  'let-it-rip',
+]);
 
 /** The catalog row for `badgeId`, if there is one. */
 export function badgeDefinition(badgeId: string): BadgeDefinition | undefined {

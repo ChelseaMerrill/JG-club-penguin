@@ -654,6 +654,24 @@ describe('NPCS', () => {
     });
   });
 
+  it("includes Michael Prete in Team Room 4 with a Beystadium dialog and the trigger design's own quote/subtitle (#121)", () => {
+    const michael = NPCS.michael;
+    expect(michael.name).toBe('Michael Prete');
+    expect(michael.roomId).toBe('team-room-4');
+    expect(michael.idleLines).toEqual([
+      expect.objectContaining({ text: 'I challenge you to a Beyblade battle!' }),
+    ]);
+    expect(michael.dialog).toEqual({
+      kind: 'minigame',
+      minigameId: 'beystadium',
+      actionLabel: 'LET IT RIP',
+      declineLabel: 'BACK AWAY SLOWLY',
+      triggerLine:
+        "You walked into the Pod. That's a challenge. Pick a Bey, rip the launcher, and knock mine out of the stadium. Best of three. I'm 3-0 against the whole office. 3-0 against you next.",
+      subtitle: 'THE POD · IT ASSOCIATE · BEYSTADIUM CHAMP',
+    });
+  });
+
   it('includes Casey in Roof Deck with an Igloo Gear stall dialog', () => {
     const casey = NPCS.casey;
     expect(casey.name).toBe('Casey Snow');
@@ -662,7 +680,15 @@ describe('NPCS', () => {
   });
 
   it('every other NPC has a plain line dialog', () => {
-    const talkers: NpcId[] = ['ian', 'ian-team-room-2', 'chelsea', 'casey', 'josh', 'tom'];
+    const talkers: NpcId[] = [
+      'ian',
+      'ian-team-room-2',
+      'chelsea',
+      'casey',
+      'josh',
+      'tom',
+      'michael',
+    ];
     for (const npc of Object.values(NPCS)) {
       if (talkers.includes(npc.id)) continue;
       expect(npc.dialog).toMatchObject({ kind: 'line' });
