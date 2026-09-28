@@ -41,3 +41,75 @@ export function initDevCreatorHook(
   }
   return true;
 }
+
+type EditorStore = Pick<ProgressStore, 'loadAll' | 'saveLook'>;
+
+export interface LoadFailureCounts {
+  loadAll: number;
+  saveLook: number;
+}
+
+/**
+ * Test-only (#164): wraps `inner` so its first `failures` `loadAll` calls
+ * reject with an injected error, then pass through. `counts` tallies only the
+ * calls made through this wrapper, so a direct `inner` call (the dev hook's
+ * seed `saveLook`, Quest loads) never shows up in them.
+ */
+export function createLoadFailureStore(
+  inner: EditorStore,
+  failures: number,
+): { store: EditorStore; counts: LoadFailureCounts } {
+  const counts: LoadFailureCounts = { loadAll: 0, saveLook: 0 };
+  let remaining = failures;
+  const store: EditorStore = {
+    loadAll() {
+      counts.loadAll += 1;
+      if (remaining > 0) {
+        remaining -= 1;
+        return Promise.reject(new Error('Injected load failure (test)'));
+      }
+      return inner.loadAll();
+    },
+    saveLook(look) {
+      counts.saveLook += 1;
+      return inner.saveLook(look);
+    },
+  };
+  return { store, counts };
+}
+
+/**
+ * Test-only (#164): with `?creator` and `failLoads=<n>` in the URL, and hooks
+ * enabled (the same direct `import.meta.env.*` checks as
+ * `initDevCreatorHook`, so Vite strips this from a production build), wraps
+ * the Penguin editor's store so its first `n` loads fail, and exposes the
+ * editor's own call counts as `window.__creatorDebug`. Applied only to the
+ * store passed to `createPenguinEditor` (#164 RT B1): Quest loads and the
+ * `?creator=returning` seed go through the unwrapped store, so they neither
+ * consume an injected failure nor show in the counts. Otherwise returns
+ * `inner` unchanged.
+ */
+export function withDevLoadFailures(inner: EditorStore): EditorStore {
+  const e2eHooksEnabled = import.meta.env.DEV || import.meta.env.VITE_E2E_HOOKS === 'true';
+  if (!e2eHooksEnabled) return inner;
+  const params = new URLSearchParams(window.location.search);
+  const failLoads = Number(params.get('failLoads'));
+  if (!params.has('creator') || !Number.isInteger(failLoads) || failLoads <= 0) return inner;
+  const { store, counts } = createLoadFailureStore(inner, failLoads);
+  window.__creatorDebug = {
+    get loadAllCalls() {
+      return counts.loadAll;
+    },
+    get saveLookCalls() {
+      return counts.saveLook;
+    },
+  };
+  return store;
+}
+
+declare global {
+  interface Window {
+    /** Test-only (#164): the Penguin editor's own store call counts. */
+    __creatorDebug?: { readonly loadAllCalls: number; readonly saveLookCalls: number };
+  }
+}

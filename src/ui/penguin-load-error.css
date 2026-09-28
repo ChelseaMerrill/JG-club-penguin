@@ -1,0 +1,105 @@
+/* The "Couldn't load your Penguin" state (#164). A full-Stage cover like
+   .penguin-creator, so the Stage can't be clicked behind it; every size is
+   Stage pixels (the #ui layer is already scaled to the window). No design
+   mock exists for this state, so it reuses the JG tokens the Creator and
+   the Landing page use. */
+
+.penguin-load-error {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--stage-bg);
+  color: var(--jg-light);
+  font-family: var(--font-body);
+}
+
+.penguin-load-error[hidden] {
+  display: none;
+}
+
+.penguin-load-error__card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  max-width: 640px;
+  padding: 48px 56px;
+  border: 2px solid var(--jg-secondary);
+  border-radius: 24px;
+  background: var(--jg-dark);
+  text-align: center;
+}
+
+.penguin-load-error__title {
+  margin: 0;
+  font: 400 40px var(--font-display);
+  letter-spacing: 0.06em;
+  color: var(--jg-primary);
+}
+
+.penguin-load-error__body {
+  margin: 0;
+  font: 700 20px var(--font-body);
+  line-height: 1.4;
+}
+
+.penguin-load-error__detail {
+  margin: 0;
+  font: 400 14px var(--font-body);
+  color: var(--jg-inactive);
+  overflow-wrap: anywhere;
+}
+
+.penguin-load-error__detail:empty {
+  display: none;
+}
+
+.penguin-load-error__actions {
+  display: flex;
+  gap: 16px;
+  margin-top: 8px;
+}
+
+.penguin-load-error button {
+  padding: 12px 28px;
+  border-radius: 999px;
+  font: 400 18px var(--font-display);
+  letter-spacing: 0.16em;
+  cursor: pointer;
+}
+
+.penguin-load-error button:focus-visible {
+  outline: 3px solid var(--jg-light);
+  outline-offset: 2px;
+}
+
+.penguin-load-error__retry {
+  border: 2px solid var(--jg-primary);
+  background: var(--jg-primary);
+  color: var(--jg-dark);
+}
+
+.penguin-load-error__retry:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.penguin-load-error__signout {
+  border: 2px solid var(--jg-secondary);
+  background: var(--jg-dark);
+  color: var(--jg-light);
+}
+
+/* The screen-reader-only "Trying again…" status line. */
+.penguin-load-error__status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

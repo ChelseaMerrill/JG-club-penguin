@@ -85,8 +85,9 @@ import { initDevMinigameHook } from './minigames/dev-minigame-hook';
 import { devLeaderboardSeed } from './minigames/dev-leaderboard-seed';
 import { MINIGAME_OVERLAY_ID } from './minigames/minigame-shell';
 import { createPenguinCreator } from './ui/penguin-creator';
+import { createPenguinLoadError } from './ui/penguin-load-error';
 import { createPenguinEditor } from './penguin/penguin-editor';
-import { initDevCreatorHook } from './penguin/dev-creator-hook';
+import { initDevCreatorHook, withDevLoadFailures } from './penguin/dev-creator-hook';
 import { createNpcDialog } from './ui/npc-dialog/npc-dialog';
 import { hasQuestStarter, startQuest } from './npcs/quest-giver';
 import { recordNpcTalked, recordOpenStall } from './game/rooms/dev-room-hook';
@@ -999,10 +1000,20 @@ const creator = createPenguinCreator(uiLayer, {
   },
 });
 
+// #164: a failed sign-in load shows this retryable state, never the Creator.
+// Sign out uses the same late-bound `auth` as `overlay` and `hud` above.
+const penguinLoadError = createPenguinLoadError(uiLayer, {
+  onRetry: () => void penguinEditor.retry(),
+  onSignOut: () => void auth.signOut(),
+});
+
 const penguinEditor = createPenguinEditor({
   creator,
-  store: progressStore,
+  // Only the editor's store is wrapped (#164 RT B1): Quest loads and the
+  // `?creator=returning` seed keep the unwrapped `progressStore`.
+  store: withDevLoadFailures(progressStore),
   overlays: hud.overlays,
+  loadError: penguinLoadError,
   onLookChanged: applyLocalLook,
   onReady: () => {
     hud.show();

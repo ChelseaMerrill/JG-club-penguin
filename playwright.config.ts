@@ -9,6 +9,7 @@ const SHARED_TEST_USER_SPECS = [
   '**/chat-two-browsers.spec.ts',
   '**/movement-sync.spec.ts',
   '**/snowball-hit.spec.ts',
+  '**/penguin-load-retry.spec.ts',
 ];
 
 export default defineConfig({
