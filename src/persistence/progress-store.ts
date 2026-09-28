@@ -29,6 +29,20 @@ export interface ShopItem {
 }
 
 /**
+ * One row of the Badge catalog (`public.badges`, #138). `id` is a plain
+ * string so a catalog row added by a later migration renders without a code
+ * change. `available` is false for a Badge that is defined but not yet
+ * earnable ("coming soon").
+ */
+export interface BadgeDefinition {
+  id: string;
+  name: string;
+  howToEarn: string;
+  sortOrder: number;
+  available: boolean;
+}
+
+/**
  * Everything a `ProgressStore` loads for one Player: the Penguin look,
  * Creator completion, Token balance, earned Badges, Minigame personal
  * bests, owned Furniture, the Igloo's slot layout and the Igloo Gear
@@ -47,6 +61,8 @@ export interface ProgressSnapshot {
   /** Every slot, `null` when empty. */
   slots: Record<IglooSlot, string | null>;
   catalog: ShopItem[];
+  /** Every Badge in the catalog (#138), ordered by `sortOrder` then id. */
+  badgeCatalog: BadgeDefinition[];
 }
 
 /**
@@ -107,6 +123,20 @@ export interface CompleteQuestResult {
   tokensAwarded: number;
   balance: number;
   alreadyCompleted: boolean;
+  /**
+   * The Badges this call awarded (#138): `['ship-it']` when the main Quest
+   * is first paid, `[]` otherwise. Each one's +50 is already in `balance`.
+   */
+  badgesEarned: BadgeId[];
+}
+
+/**
+ * The result of the Session Badge check (#138's `check_session_badges`):
+ * every Badge the Player now holds and the server's balance after the check.
+ */
+export interface BadgeCheckResult {
+  badges: BadgeId[];
+  balance: number;
 }
 
 /** The Quest ids `completeQuest` accepts: only the main Quest is server-paid (#46). */
@@ -155,6 +185,10 @@ export const PROGRESS_ERROR_CODES = [
   // main-Quest step is met.
   'unknown_quest',
   'quest_incomplete',
+  // #138: a response that doesn't have the shape the client expects (the
+  // Session Badge check's malformed `check_session_badges` result). Raised
+  // client-side only, never by the database.
+  'invalid_response',
 ] as const;
 
 export type ProgressErrorCode = (typeof PROGRESS_ERROR_CODES)[number];
@@ -302,7 +336,17 @@ export interface ProgressStore {
    * main-Quest step against saved records and pays `MAIN_QUEST_REWARD` once;
    * a repeat call resolves `alreadyCompleted: true` and pays nothing.
    * Rejects with `unknown_quest` or `quest_incomplete`. Emits
-   * `tokens:changed` with the server's balance on success, as `purchase` does.
+   * `tokens:changed` with the server's balance on success, as `purchase` does,
+   * and `badge:earned` once for each id in `badgesEarned` (#138).
    */
   completeQuest(questId: string): Promise<CompleteQuestResult>;
+
+  /**
+   * The Session Badge check (#138): asks the server to award any Session
+   * Badge now due (First Waddle, Night Owl, and Interior Penguin as a safety
+   * net), by the server's own clock. Resolves every Badge the Player holds
+   * and the balance. Emits nothing itself: a Badge it awards is silent, and
+   * the session wrapper (`progress-session.ts`) announces what's new.
+   */
+  checkBadges(): Promise<BadgeCheckResult>;
 }

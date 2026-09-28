@@ -96,6 +96,8 @@ import { createElevatorScreen } from './ui/elevator-screen';
 import { createMarket, MARKET_OVERLAY_ID } from './ui/market';
 import { createIglooEditor, type IglooEditor } from './ui/igloo-editor';
 import { wireBadgeToast } from './ui/badge-toast';
+import { createBadgePopup } from './ui/badge-unlock-panel';
+import { startBadgeChecks } from './badges/badge-checks';
 import { createQuestController } from './quests/quest-controller';
 import { QUEST_DEFINITIONS, questsInBuild } from './quests/quest-definitions';
 import { createQuestsPanel, QUESTS_OVERLAY_ID, type QuestsTab } from './ui/quests-panel';
@@ -216,6 +218,8 @@ let roomScene: RoomScene | null = null;
 let penguins: RoomPenguinView | null = null;
 /** The Igloo's Furniture editor (#41): assigned once, after `hud`/`progressStore` exist below. */
 let iglooEditor: IglooEditor | null = null;
+/** Stops the running Session's Badge checks (#138 D11); null outside a Session. */
+let stopBadgeChecks: (() => void) | null = null;
 /**
  * The one producer of `room:leave`/`room:enter` (#15 A1, replacing #28's
  * `stub-rooms.ts` wholesale). Built once the Scene exists, since it restarts
@@ -507,6 +511,9 @@ function endSession(): RoomChannel | null {
   debugOverlay?.setSubscribed(false);
   // #46: Quest tracking lives and dies with the Session.
   quests.stop();
+  // #138: so do the Session Badge checks.
+  stopBadgeChecks?.();
+  stopBadgeChecks = null;
   questWidget.render(null);
   hud.overlays.close(QUESTS_OVERLAY_ID);
   return channel;
@@ -592,6 +599,10 @@ async function startSession(player: Player, previous: RoomChannel | null): Promi
   void roomNavigator?.enterSpawnRoom();
   // #46: loads Quest progress from saved data (steps already done aren't toasted).
   void quests.start();
+  // #138 D11: the Session Badge check, now and every 5 minutes (First Waddle,
+  // Night Owl), by the server's own clock.
+  stopBadgeChecks?.();
+  stopBadgeChecks = startBadgeChecks({ store: progressStore });
 }
 
 /**
@@ -874,6 +885,10 @@ const questWidget = createQuestWidget(hud.questSlot, {
   onOpen: (tab) => openQuestsPanel(tab),
 });
 const questBanner = createQuestBanner(uiLayer);
+// #138 D13: the Badge popup for every Badge earned outside a Minigame done
+// screen. It waits for the QUEST COMPLETE banner, which shows at the same
+// moment Ship It is earned, so the two never overlap.
+const badgePopup = createBadgePopup(uiLayer, { blockers: [questBanner] });
 
 function openQuestsPanel(tab: QuestsTab): void {
   hud.overlays.open(QUESTS_OVERLAY_ID, () => {
@@ -963,9 +978,10 @@ gameEvents.on('hotspot:click', ({ hotspotId }) => {
   tryOpenCoreValuesCard();
 });
 
-// A toast "wherever the Player is" for every earned Badge (#42), not just
-// while the Trophy Case happens to be open.
-wireBadgeToast();
+// A toast "wherever the Player is" for every earned Minigame Badge (#42),
+// not just while the Trophy Case happens to be open, and the Badge popup for
+// every other Badge (#138).
+wireBadgeToast({ popup: badgePopup });
 
 // Must run before `startAuth`: Supabase's `onAuthStateChange` always fires
 // asynchronously, so `devHudActive`/`devMinigameActive` need to be settled
@@ -1039,7 +1055,8 @@ const auth = startAuth({
       createSupabaseProgressStore({
         client: toProgressClient(client),
         playerId: player.id,
-        emitter: gameEvents,
+        // #138: announces each Badge at most once per session.
+        emitter: progress.storeEmitter,
       }),
     );
     if (devHookActive) {

@@ -638,23 +638,52 @@ describe('createSupabaseProgressStore', () => {
       expect(calls).toContainEqual(['rpc.mark_dev_pit_visited', {}]);
     });
 
-    it('completeQuest sends quest_id and emits tokens:changed with the server balance', async () => {
+    it('completeQuest sends quest_id, emits tokens:changed with the server balance and badge:earned per awarded Badge', async () => {
       const { client, calls } = makeFakeClient({
         completeQuest: {
-          data: { tokensAwarded: 150, balance: 201, alreadyCompleted: false },
+          data: {
+            tokensAwarded: 150,
+            balance: 251,
+            alreadyCompleted: false,
+            badgesEarned: ['ship-it'],
+          },
           error: null,
         },
       });
       const balances: number[] = [];
+      const announced: string[] = [];
       const emitter = createEmitter<GameEventMap>();
       emitter.on('tokens:changed', ({ balance }) => balances.push(balance));
+      emitter.on('badge:earned', ({ badgeId }) => announced.push(badgeId));
       const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID, emitter });
 
       const result = await store.completeQuest('main');
 
       expect(calls).toContainEqual(['rpc.complete_quest', { quest_id: 'main' }]);
-      expect(result).toEqual({ tokensAwarded: 150, balance: 201, alreadyCompleted: false });
-      expect(balances).toEqual([201]);
+      expect(result).toEqual({
+        tokensAwarded: 150,
+        balance: 251,
+        alreadyCompleted: false,
+        badgesEarned: ['ship-it'],
+      });
+      expect(balances).toEqual([251]);
+      expect(announced).toEqual(['ship-it']);
+    });
+
+    it('completeQuest treats a response without badgesEarned (an old schema) as no Badges', async () => {
+      const { client } = makeFakeClient({
+        completeQuest: {
+          data: { tokensAwarded: 150, balance: 201, alreadyCompleted: false },
+          error: null,
+        },
+      });
+      const announced: string[] = [];
+      const emitter = createEmitter<GameEventMap>();
+      emitter.on('badge:earned', ({ badgeId }) => announced.push(badgeId));
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID, emitter });
+
+      await expect(store.completeQuest('main')).resolves.toMatchObject({ badgesEarned: [] });
+      expect(announced).toEqual([]);
     });
 
     it.each(['quest_incomplete', 'unknown_quest'] as const)(
@@ -670,5 +699,121 @@ describe('createSupabaseProgressStore', () => {
         await expect(rejection).rejects.toMatchObject({ code });
       },
     );
+  });
+
+  describe('Badges (#138)', () => {
+    it('loadAll reads the badge catalog ordered by sort_order then id, and maps it', async () => {
+      const { client, calls } = makeFakeClient({
+        badgeCatalog: {
+          data: [
+            {
+              id: 'first-waddle',
+              name: 'First Waddle',
+              how_to_earn: 'LOG IN',
+              sort_order: 1,
+              available: true,
+            },
+            {
+              id: 'snowmageddon',
+              name: 'Snowmageddon',
+              how_to_earn: '5 SNOWBALL HITS / DAY',
+              sort_order: 2,
+              available: false,
+            },
+          ],
+          error: null,
+        },
+      });
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID });
+
+      const snapshot = await store.loadAll();
+
+      expect(calls).toContainEqual([
+        'badges.select',
+        'id, name, how_to_earn, sort_order, available',
+      ]);
+      expect(calls).toContainEqual(['badges.select.order', 'sort_order', { ascending: true }]);
+      expect(calls).toContainEqual(['badges.select.order', 'id', { ascending: true }]);
+      expect(snapshot.badgeCatalog).toEqual([
+        {
+          id: 'first-waddle',
+          name: 'First Waddle',
+          howToEarn: 'LOG IN',
+          sortOrder: 1,
+          available: true,
+        },
+        {
+          id: 'snowmageddon',
+          name: 'Snowmageddon',
+          howToEarn: '5 SNOWBALL HITS / DAY',
+          sortOrder: 2,
+          available: false,
+        },
+      ]);
+    });
+
+    it('loadAll rejects when the badges table is missing (a new client on the old schema)', async () => {
+      const { client } = makeFakeClient({
+        badgeCatalog: { data: [], error: { message: 'relation "public.badges" does not exist' } },
+      });
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID });
+
+      await expect(store.loadAll()).rejects.toThrow('relation "public.badges" does not exist');
+    });
+
+    it('checkBadges calls check_session_badges with no arguments and emits nothing', async () => {
+      const { client, calls } = makeFakeClient({
+        checkSessionBadges: { data: { badges: ['first-waddle'], balance: 150 }, error: null },
+      });
+      const events: string[] = [];
+      const emitter = createEmitter<GameEventMap>();
+      emitter.on('badge:earned', () => events.push('badge'));
+      emitter.on('tokens:changed', () => events.push('tokens'));
+      emitter.on('ui:toast', () => events.push('toast'));
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID, emitter });
+
+      await expect(store.checkBadges()).resolves.toEqual({
+        badges: ['first-waddle'],
+        balance: 150,
+      });
+      expect(calls).toContainEqual(['rpc.check_session_badges', {}]);
+      expect(events).toEqual([]);
+    });
+
+    it.each([
+      ['no data', null],
+      ['no balance', { badges: ['first-waddle'] }],
+      ['a non-number balance', { badges: [], balance: '150' }],
+      ['no badges array', { badges: 'first-waddle', balance: 150 }],
+    ])(
+      'checkBadges rejects with invalid_response, not a balance of 0, on a malformed reply (%s)',
+      async (_label, data) => {
+        const { client } = makeFakeClient({ checkSessionBadges: { data, error: null } });
+        const events: string[] = [];
+        const emitter = createEmitter<GameEventMap>();
+        emitter.on('tokens:changed', () => events.push('tokens'));
+        emitter.on('ui:toast', () => events.push('toast'));
+        const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID, emitter });
+
+        await expect(store.checkBadges()).rejects.toMatchObject({
+          name: 'ProgressStoreError',
+          code: 'invalid_response',
+        });
+        expect(events).toEqual([]);
+      },
+    );
+
+    it('checkBadges rejects without a toast on a failure', async () => {
+      const { client } = makeFakeClient({
+        checkSessionBadges: { data: null, error: { message: 'not_authenticated', code: '42501' } },
+      });
+      const toasts: string[] = [];
+      const emitter = createEmitter<GameEventMap>();
+      emitter.on('ui:toast', ({ message }) => toasts.push(message));
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID, emitter });
+
+      await expect(store.checkBadges()).rejects.toMatchObject({ code: 'not_authenticated' });
+      expect(toasts).toEqual([]);
+    });
   });
 });

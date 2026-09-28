@@ -7,9 +7,27 @@ import type { RoomEventMap, RoomId } from './rooms';
 export type MinigameId = 'bug-squash' | 'pancake-flip' | 'coffee-rush' | 'snow-cone-stand';
 
 /**
- * Producers: #37 (played), #27 `record_round`. Consumers: #27, #34, #42.
+ * Every Badge seeded in `public.badges` (#138's migration; mirrored by
+ * `BADGE_CATALOG` in `src/persistence/badge-catalog.ts`). The four Minigame
+ * Badges are awarded by `record_round` (#27); the rest by the server paths
+ * #138 and later issues add. Producers: #27, #138. Consumers: #34, #42, #138.
  */
-export type BadgeId = 'exterminator' | 'breakfast-club' | 'barista' | 'brain-freeze';
+export type BadgeId =
+  | 'exterminator'
+  | 'breakfast-club'
+  | 'barista'
+  | 'brain-freeze'
+  | 'first-waddle'
+  | 'snowmageddon'
+  | 'ship-it'
+  | 'rail-rider'
+  | 'hexle-parent'
+  | 'interior-penguin'
+  | 'night-owl'
+  | 'mullet-mania'
+  | 'let-it-rip'
+  | 'stair-master'
+  | 'phish-fry';
 
 /**
  * Per-minigame stats keys. Producer: #37. Consumers: #27 (SQL keys), #32,

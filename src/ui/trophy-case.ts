@@ -1,6 +1,6 @@
 import type { BadgeId } from '../contracts';
-import { badgeDisplayName } from '../minigames/badge-names';
-import type { ProgressStore } from '../persistence/progress-store';
+import { BADGE_CATALOG } from '../persistence/badge-catalog';
+import type { BadgeDefinition, ProgressStore } from '../persistence/progress-store';
 import './trophy-case.css';
 
 /** The id `main.ts` registers this overlay with on `hud.overlays`. */
@@ -8,52 +8,24 @@ export const TROPHY_CASE_OVERLAY_ID = 'trophy-case';
 
 type TabId = 'badges' | 'trophies' | 'awards';
 
-interface BadgeTile {
-  /**
-   * Exactly the design's tile title (`design/Trophy Case.dc.html`); equal to
-   * `badgeDisplayName(badgeId)` for the three tiles this build can actually
-   * earn.
-   */
-  title: string;
-  /**
-   * The design's own hint text, except "Breakfast Club": the design says
-   * "20 SERVED · COFFEE RUSH", but Breakfast Club is Pancake Flip's Badge
-   * (20 stacked, `minigame-rules.ts`), so its hint names Pancake Flip.
-   */
-  hint: string;
-  /**
-   * `null` for a design badge this build has no earning logic for yet (it
-   * always renders locked). A real `BadgeId` otherwise.
-   */
-  badgeId: BadgeId | null;
-}
+/** Tiles per BADGES page: the design's 4 x 3 grid (`design/Trophy Case.dc.html`). */
+export const TROPHY_CASE_PAGE_SIZE = 12;
 
 /**
- * The Trophy Case's 12 BADGES tiles, in the design's own order. Four carry
- * a real `BadgeId` that `ProgressStore.loadAll` can report earned: one per
- * Minigame (Breakfast Club/Pancake Flip, Brain Freeze/Snow Cone Stand,
- * Exterminator/Bug Squash, Barista/Coffee Rush). The design has no Barista
- * tile, so Barista takes the design's "Let It Rip · WIN 3 BEY MATCHES" slot,
- * which has no game behind it. The other eight have no earning logic in this
- * prototype and always render locked with their design hint.
+ * The BADGES tab's tile order (#138): earned Badges first, then locked ones
+ * (earnable, not yet earned), then coming-soon ones (defined, not yet
+ * earnable), each group by `sortOrder`, then id.
  */
-const BADGE_TILES: readonly BadgeTile[] = [
-  { title: 'First Waddle', hint: 'LOG IN', badgeId: null },
-  { title: 'Snowmageddon', hint: '5 SNOWBALL HITS / DAY', badgeId: null },
-  { title: 'Ship It', hint: 'FINISH THE MAIN QUEST', badgeId: null },
-  { title: 'Breakfast Club', hint: '20 STACKED · PANCAKE FLIP', badgeId: 'breakfast-club' },
-  { title: 'Brain Freeze', hint: '200 TOKENS · SNOW CONES', badgeId: 'brain-freeze' },
-  { title: 'Exterminator', hint: '500 · BUG SQUASH', badgeId: 'exterminator' },
-  { title: 'Barista', hint: '15 CUPS · COFFEE RUSH', badgeId: 'barista' },
-  { title: 'Rail Rider', hint: 'SLIDE THE STAIRWELL', badgeId: null },
-  { title: 'Hexle Parent', hint: 'ADOPT A HEXLE', badgeId: null },
-  { title: 'Interior Penguin', hint: '6 IGLOO ITEMS', badgeId: null },
-  { title: 'Night Owl', hint: 'ONLINE AFTER 2AM', badgeId: null },
-  { title: 'Mullet Mania', hint: 'HIGH SCORE · ARCADE', badgeId: null },
-];
-
-/** The design's "n / 12 BADGES" denominator. */
-export const TROPHY_CASE_BADGE_SLOTS = BADGE_TILES.length;
+export function orderBadgeTiles(
+  catalog: readonly BadgeDefinition[],
+  earned: readonly string[],
+): BadgeDefinition[] {
+  const group = (badge: BadgeDefinition) =>
+    earned.includes(badge.id) ? 0 : badge.available ? 1 : 2;
+  return [...catalog].sort(
+    (a, b) => group(a) - group(b) || a.sortOrder - b.sortOrder || a.id.localeCompare(b.id),
+  );
+}
 
 /** TROPHIES tab content (`design/Trophy Case.dc.html`'s "HACKATHON TROPHIES" panel): static, not read from any store. */
 const TROPHIES: readonly { rank: number; name: string; earned: boolean }[] = [
@@ -173,24 +145,81 @@ export function createTrophyCase(root: HTMLElement, options: TrophyCaseOptions):
   const body = el('div', 'trophy-case__body');
   body.append(panels.badges, panels.trophies, panels.awards);
 
-  // ---- BADGES tab: the 12-tile grid ----
+  // ---- BADGES tab: the catalog, 12 tiles per page (#138) ----
   const badgesGrid = el('div', 'trophy-case__badges');
-  panels.badges.append(badgesGrid);
+  const pager = el('div', 'trophy-case__pager');
+  const prevButton = button('trophy-case__page-arrow', '‹');
+  prevButton.setAttribute('aria-label', 'Previous page');
+  const dots = el('div', 'trophy-case__page-dots');
+  const nextButton = button('trophy-case__page-arrow', '›');
+  nextButton.setAttribute('aria-label', 'Next page');
+  pager.append(prevButton, dots, nextButton);
+  panels.badges.append(badgesGrid, pager);
 
-  const badgeTiles = BADGE_TILES.map((tile) => {
+  let catalog: readonly BadgeDefinition[] = BADGE_CATALOG;
+  let earned: readonly BadgeId[] = [];
+  let page = 0;
+
+  const pageCount = () => Math.max(1, Math.ceil(catalog.length / TROPHY_CASE_PAGE_SIZE));
+
+  function renderTile(badge: BadgeDefinition): HTMLElement {
+    const isEarned = earned.includes(badge.id as BadgeId);
+    const comingSoon = !isEarned && !badge.available;
     const tileEl = el('div', 'trophy-case__badge');
-    tileEl.dataset.badgeId = tile.badgeId ?? '';
-    const icon = el('div', 'trophy-case__badge-icon');
-    const name = el(
-      'div',
-      'trophy-case__badge-name',
-      tile.badgeId ? badgeDisplayName(tile.badgeId) : tile.title,
+    tileEl.dataset.badgeId = badge.id;
+    tileEl.classList.toggle('trophy-case__badge--earned', isEarned);
+    tileEl.classList.toggle('trophy-case__badge--coming-soon', comingSoon);
+    tileEl.append(
+      el('div', 'trophy-case__badge-icon', isEarned ? '✓' : '?'),
+      el('div', 'trophy-case__badge-name', badge.name),
+      el('div', 'trophy-case__badge-hint', badge.howToEarn),
     );
-    const hint = el('div', 'trophy-case__badge-hint', tile.hint);
-    tileEl.append(icon, name, hint);
-    badgesGrid.append(tileEl);
-    return { tile, tileEl, icon };
-  });
+    if (comingSoon) tileEl.append(el('div', 'trophy-case__badge-tag', 'COMING SOON'));
+    return tileEl;
+  }
+
+  function goToPage(next: number): void {
+    page = Math.min(Math.max(next, 0), pageCount() - 1);
+    renderBadges();
+  }
+
+  function renderBadges(): void {
+    const tiles = orderBadgeTiles(catalog, earned);
+    const pages = pageCount();
+    page = Math.min(page, pages - 1);
+    badgesGrid.replaceChildren(
+      ...tiles
+        .slice(page * TROPHY_CASE_PAGE_SIZE, (page + 1) * TROPHY_CASE_PAGE_SIZE)
+        .map(renderTile),
+    );
+
+    pager.hidden = pages <= 1;
+    prevButton.disabled = page === 0;
+    nextButton.disabled = page === pages - 1;
+    dots.replaceChildren(
+      ...Array.from({ length: pages }, (_, index) => {
+        const dot = button('trophy-case__page-dot');
+        dot.setAttribute('aria-label', `Page ${index + 1}`);
+        if (index === page) dot.setAttribute('aria-current', 'page');
+        dot.addEventListener('click', () => goToPage(index));
+        return dot;
+      }),
+    );
+
+    const earnedCount = catalog.filter((badge) => earned.includes(badge.id as BadgeId)).length;
+    subtitle.textContent = `YOUR IGLOO · BADGES · ${earnedCount} / ${catalog.length}`;
+  }
+
+  prevButton.addEventListener('click', () => goToPage(page - 1));
+  nextButton.addEventListener('click', () => goToPage(page + 1));
+
+  // ArrowLeft / ArrowRight page while the BADGES tab is showing.
+  function onKeydown(event: KeyboardEvent): void {
+    if (overlay.hidden || panels.badges.hidden) return;
+    if (event.key === 'ArrowLeft') goToPage(page - 1);
+    else if (event.key === 'ArrowRight') goToPage(page + 1);
+  }
+  window.addEventListener('keydown', onKeydown);
 
   // ---- TROPHIES tab: static podium ----
   const trophiesPanel = el('div', 'trophy-case__trophies');
@@ -230,37 +259,28 @@ export function createTrophyCase(root: HTMLElement, options: TrophyCaseOptions):
 
   showTab('badges');
 
-  function renderCount(earnedCount: number): void {
-    subtitle.textContent = `YOUR IGLOO · ${earnedCount} / ${TROPHY_CASE_BADGE_SLOTS} BADGES`;
-  }
-
-  function applyBadges(earnedBadges: readonly BadgeId[]): void {
-    let earnedCount = 0;
-    for (const { tile, tileEl, icon } of badgeTiles) {
-      const earned = tile.badgeId !== null && earnedBadges.includes(tile.badgeId);
-      if (earned) earnedCount += 1;
-      tileEl.classList.toggle('trophy-case__badge--earned', earned);
-      icon.textContent = earned ? '✓' : '?';
-    }
-    renderCount(earnedCount);
-  }
-
   // Nothing earned yet, before the first `open()` resolves.
-  applyBadges([]);
+  renderBadges();
 
   return {
     async open() {
       overlay.hidden = false;
       showTab('badges');
+      page = 0;
+      renderBadges();
       const snapshot = await options.store.loadAll();
       if (overlay.hidden) return; // Closed again before `loadAll` resolved.
-      applyBadges(snapshot.badges);
+      // A store that returns no catalog (an older fake) keeps the built-in one.
+      if (snapshot.badgeCatalog?.length) catalog = snapshot.badgeCatalog;
+      earned = snapshot.badges;
+      renderBadges();
     },
     close() {
       overlay.hidden = true;
     },
     isOpen: () => !overlay.hidden,
     destroy() {
+      window.removeEventListener('keydown', onKeydown);
       overlay.remove();
     },
   };

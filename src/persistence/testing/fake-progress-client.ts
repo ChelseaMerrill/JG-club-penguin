@@ -59,6 +59,11 @@ export interface FakeResponses {
   catalog?: FakeResult<
     Array<{ id: string; stall: string; name: string; price: number; art_key: string }>
   >;
+  /** #138 */
+  badgeCatalog?: FakeResult<
+    Array<{ id: string; name: string; how_to_earn: string; sort_order: number; available: boolean }>
+  >;
+  checkSessionBadges?: FakeResult<unknown>;
   updateLook?: { error: FakeError | null };
   updateCreatedAt?: { error: FakeError | null };
   deleteBySlot?: { error: FakeError | null };
@@ -106,6 +111,10 @@ export function makeFakeClient(responses: FakeResponses = {}): {
   const items = responses.items ?? { data: [], error: null };
   const slots = responses.slots ?? { data: [], error: null };
   const catalog = responses.catalog ?? { data: [], error: null };
+  const badgeCatalog = responses.badgeCatalog ?? { data: [], error: null };
+  const checkSessionBadges =
+    responses.checkSessionBadges ??
+    ({ data: { badges: [], balance: 100 }, error: null } satisfies FakeResult<unknown>);
   const updateLook = responses.updateLook ?? { error: null };
   const updateCreatedAt = responses.updateCreatedAt ?? { error: null };
   const deleteBySlot = responses.deleteBySlot ?? { error: null };
@@ -133,7 +142,7 @@ export function makeFakeClient(responses: FakeResponses = {}): {
   const completeQuest =
     responses.completeQuest ??
     ({
-      data: { tokensAwarded: 0, balance: 100, alreadyCompleted: true },
+      data: { tokensAwarded: 0, balance: 100, alreadyCompleted: true, badgesEarned: [] },
       error: null,
     } satisfies FakeResult<unknown>);
 
@@ -252,6 +261,13 @@ export function makeFakeClient(responses: FakeResponses = {}): {
               return orderable(catalog, calls, 'shop_items.select');
             },
           } as never;
+        case 'badges':
+          return {
+            select: (columns: string) => {
+              log('badges.select', columns);
+              return orderable(badgeCatalog, calls, 'badges.select');
+            },
+          } as never;
         default:
           throw new Error(`unexpected table ${String(table)}`);
       }
@@ -275,6 +291,9 @@ export function makeFakeClient(responses: FakeResponses = {}): {
       }
       if (fn === 'complete_quest') {
         return Promise.resolve(completeQuest);
+      }
+      if (fn === 'check_session_badges') {
+        return Promise.resolve(checkSessionBadges);
       }
       throw new Error(`unexpected rpc ${fn}`);
     },

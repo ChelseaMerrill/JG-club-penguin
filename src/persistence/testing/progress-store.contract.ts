@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_LOOK, PENGUIN_NAME_MAX, type PenguinLook } from '../../contracts/penguin';
 import type { BadgeId, MinigameId, MinigameStatsMap } from '../../contracts/game-events';
+import { BADGE_CATALOG } from '../badge-catalog';
 import { IGLOO_GEAR_CATALOG } from '../minigame-rules';
 import type { IglooSlot, ProgressStore, ShopItem } from '../progress-store';
 
@@ -9,6 +10,14 @@ export interface ProgressStoreHarness {
   store: ProgressStore;
   /** Makes `seconds` seconds appear to have passed since every earlier round. */
   advanceSeconds(seconds: number): Promise<void>;
+  /** Adds Tokens directly, as the postgres role would (#138's Badge tests). */
+  grantTokens(tokens: number): Promise<void>;
+  /**
+   * Awards `badgeId` with its +50 directly, as the postgres role calling
+   * `award_badge` would. Used to pre-hold Night Owl so no test depends on
+   * whether it's currently 02:00-05:00 Eastern (#138 D16).
+   */
+  holdBadge(badgeId: BadgeId): Promise<void>;
 }
 
 function sortById(items: readonly ShopItem[]): ShopItem[] {
@@ -61,6 +70,7 @@ export function describeProgressStoreContract(
       expect(snapshot.ownedItems).toEqual([]);
       expect(snapshot.slots).toEqual({ 1: null, 2: null, 3: null, 4: null, 5: null, 6: null });
       expect(sortById(snapshot.catalog)).toEqual(sortById(IGLOO_GEAR_CATALOG));
+      expect(snapshot.badgeCatalog).toEqual(BADGE_CATALOG);
     });
 
     it('round-trips a saved look and keeps profileCreatedAt after a second save', async () => {
@@ -689,7 +699,7 @@ export function describeProgressStoreContract(
         },
       );
 
-      it('completeQuest("main") pays 150 Tokens once; a second call returns alreadyCompleted and pays nothing', async () => {
+      it('completeQuest("main") pays 150 Tokens once plus the Ship It bonus; a second call returns alreadyCompleted and pays nothing', async () => {
         const { store } = await makeHarness();
         await meetMainQuestSteps(store);
         // 100 start + 1 (Bug Squash 10 points) + 0 (neutral Pancake Flip) - 50 (Beanbag).
@@ -698,9 +708,21 @@ export function describeProgressStoreContract(
         const first = await store.completeQuest('main');
         const second = await store.completeQuest('main');
 
-        expect(first).toEqual({ tokensAwarded: 150, balance: 201, alreadyCompleted: false });
-        expect(second).toEqual({ tokensAwarded: 0, balance: 201, alreadyCompleted: true });
-        expect((await store.loadAll()).tokens).toBe(201);
+        // #138: the first call also awards Ship It, whose +50 is in the balance.
+        expect(first).toEqual({
+          tokensAwarded: 150,
+          balance: 251,
+          alreadyCompleted: false,
+          badgesEarned: ['ship-it'],
+        });
+        expect(second).toEqual({
+          tokensAwarded: 0,
+          balance: 251,
+          alreadyCompleted: true,
+          badgesEarned: [],
+        });
+        expect((await store.loadAll()).tokens).toBe(251);
+        expect((await store.loadAll()).badges).toEqual(['ship-it']);
         expect((await store.questProgress()).completedQuests).toEqual(['main']);
       });
 
@@ -716,6 +738,97 @@ export function describeProgressStoreContract(
           tokensAwarded: 150,
           alreadyCompleted: false,
         });
+      });
+    });
+
+    // #138: the Badge catalog and the server-earned Badges. Night Owl is
+    // pre-held before any `checkBadges()` so no assertion depends on
+    // whether it is currently 02:00-05:00 Eastern (D16).
+    describe('Badges (#138)', () => {
+      /** The five items that stay floor-only before and after #135. */
+      const FLOOR_ITEMS = ['beanbag', 'desk', 'speakers', 'dual-monitors', 'arcade-cabinet'];
+
+      /**
+       * The slot the RGB Light Strip fits: slot 6 while the catalog has no
+       * placement (before #135), slot 7 once #135 makes it a wall item.
+       */
+      function rgbLightStripSlot(catalog: readonly ShopItem[]): IglooSlot {
+        const rgb = catalog.find((item) => item.id === 'rgb-light-strip') as
+          (ShopItem & { placement?: string }) | undefined;
+        return (rgb?.placement === 'wall' ? 7 : 6) as IglooSlot;
+      }
+
+      it('checkBadges awards nothing before the Penguin is named, then First Waddle and its +50 exactly once, which survives a reload', async () => {
+        const harness = await makeHarness();
+        const { store } = harness;
+        await harness.holdBadge('night-owl');
+
+        const unnamed = await store.checkBadges();
+        expect(unnamed.badges).toEqual(['night-owl']);
+        expect(unnamed.balance).toBe(150);
+
+        await store.saveLook({ ...DEFAULT_LOOK, name: 'Waddler' });
+        const first = await store.checkBadges();
+        const second = await store.checkBadges();
+
+        // Both were earned at the fake's frozen clock, so compare as sets.
+        expect([...first.badges].sort()).toEqual(['first-waddle', 'night-owl']);
+        expect(first.balance).toBe(200);
+        expect(second).toEqual(first);
+        const reloaded = await store.loadAll();
+        expect([...reloaded.badges].sort()).toEqual(['first-waddle', 'night-owl']);
+        expect(reloaded.tokens).toBe(200);
+      });
+
+      it('placing the sixth Furniture item awards Interior Penguin and +50 once; re-placing pays nothing', async () => {
+        const harness = await makeHarness();
+        const { store } = harness;
+        await harness.grantTokens(700);
+        for (const itemId of [...FLOOR_ITEMS, 'rgb-light-strip']) {
+          await store.purchase(itemId);
+        }
+        const { catalog, tokens: afterPurchases } = await store.loadAll();
+        // 100 start + 700 granted - 660 for the six items.
+        expect(afterPurchases).toBe(140);
+
+        for (const [index, itemId] of FLOOR_ITEMS.entries()) {
+          await store.setSlot((index + 1) as IglooSlot, itemId);
+        }
+        const atFive = await store.loadAll();
+        expect(atFive.badges).not.toContain('interior-penguin');
+        expect(atFive.tokens).toBe(140);
+
+        await store.setSlot(rgbLightStripSlot(catalog), 'rgb-light-strip');
+        const atSix = await store.loadAll();
+        expect(atSix.badges).toContain('interior-penguin');
+        expect(atSix.tokens).toBe(190);
+
+        await store.setSlot(1, null);
+        await store.setSlot(1, 'beanbag');
+        const replaced = await store.loadAll();
+        expect(replaced.badges.filter((id) => id === 'interior-penguin')).toHaveLength(1);
+        expect(replaced.tokens).toBe(190);
+      });
+
+      it("Ship It's balance equals the stored balance", async () => {
+        const { store } = await makeHarness();
+        await store.saveLook({ ...DEFAULT_LOOK, name: 'Shipper' });
+        await store.markDevPitVisited();
+        await store.recordRound('bug-squash', 10, {
+          score: 10,
+          squashed: 1,
+          bestCombo: 1,
+          escaped: 0,
+        });
+        await store.recordRound('pancake-flip', 0, NEUTRAL_PANCAKE_STATS);
+        await store.purchase('beanbag');
+        const before = (await store.loadAll()).tokens;
+
+        const result = await store.completeQuest('main');
+
+        expect(result.badgesEarned).toEqual(['ship-it']);
+        expect(result.balance).toBe(before + 200);
+        expect((await store.loadAll()).tokens).toBe(result.balance);
       });
     });
   });

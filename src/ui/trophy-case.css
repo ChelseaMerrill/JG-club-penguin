@@ -282,3 +282,82 @@
   font: 700 11px var(--font-body);
   color: var(--jg-inactive);
 }
+
+/* ---- #138: coming-soon tiles and paging (styled from the design's own
+   type and colours; the design has no pager of its own) ---- */
+
+.trophy-case__badge--coming-soon {
+  opacity: 0.7;
+}
+
+.trophy-case__badge-tag {
+  padding: 2px 8px;
+  font: 400 9px var(--font-display);
+  letter-spacing: 0.16em;
+  color: var(--tc-dark);
+  background: var(--jg-inactive);
+}
+
+/* The pager sits at the bottom of the panel, so it doesn't move when the
+   last page has fewer tiles. */
+.trophy-case__panel[data-panel='badges']:not([hidden]) {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.trophy-case__pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: auto;
+  padding-top: 14px;
+}
+
+.trophy-case__pager[hidden] {
+  display: none;
+}
+
+.trophy-case__page-arrow {
+  width: 36px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  background: var(--tc-teal);
+  border: none;
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  font: 400 20px var(--font-display);
+  color: var(--tc-light);
+  cursor: pointer;
+}
+
+.trophy-case__page-arrow:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.trophy-case__page-dots {
+  display: flex;
+  gap: 8px;
+}
+
+.trophy-case__page-dot {
+  width: 12px;
+  height: 12px;
+  padding: 0;
+  border: 2px solid var(--tc-cyan);
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+}
+
+.trophy-case__page-dot[aria-current='page'] {
+  background: var(--tc-cyan);
+}
+
+.trophy-case__page-arrow:focus-visible,
+.trophy-case__page-dot:focus-visible {
+  outline: 3px solid var(--tc-light);
+  outline-offset: 2px;
+}
