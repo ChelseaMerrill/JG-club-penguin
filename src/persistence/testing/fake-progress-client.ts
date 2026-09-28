@@ -1,5 +1,7 @@
 import { DEFAULT_LOOK } from '../../contracts/penguin';
 import type { BadgeId, MinigameId } from '../../contracts/game-events';
+import { IGLOO_GEAR_CATALOG } from '../minigame-rules';
+import type { Placement } from '../progress-store';
 import type { ProgressClient } from '../supabase-progress-store';
 
 // A hand-written fake `ProgressClient`: no real network or database, but the
@@ -57,8 +59,26 @@ export interface FakeResponses {
   items?: FakeResult<Array<{ item_id: string }>>;
   slots?: FakeResult<Array<{ slot: number; item_id: string }>>;
   catalog?: FakeResult<
-    Array<{ id: string; stall: string; name: string; price: number; art_key: string }>
+    Array<{
+      id: string;
+      stall: string;
+      name: string;
+      price: number;
+      art_key: string;
+      placement: Placement;
+    }>
   >;
+  /** #138 */
+  badgeCatalog?: FakeResult<
+    Array<{ id: string; name: string; how_to_earn: string; sort_order: number; available: boolean }>
+  >;
+  checkSessionBadges?: FakeResult<unknown>;
+  /**
+   * #135: `shop_items.select('placement').eq('id', itemId).maybeSingle()`,
+   * `setSlot`'s placement pre-check. Defaults to the item's placement in
+   * `IGLOO_GEAR_CATALOG`, or `null` for an id not in it.
+   */
+  itemPlacement?: FakeResult<{ placement: Placement } | null>;
   updateLook?: { error: FakeError | null };
   updateCreatedAt?: { error: FakeError | null };
   deleteBySlot?: { error: FakeError | null };
@@ -106,6 +126,10 @@ export function makeFakeClient(responses: FakeResponses = {}): {
   const items = responses.items ?? { data: [], error: null };
   const slots = responses.slots ?? { data: [], error: null };
   const catalog = responses.catalog ?? { data: [], error: null };
+  const badgeCatalog = responses.badgeCatalog ?? { data: [], error: null };
+  const checkSessionBadges =
+    responses.checkSessionBadges ??
+    ({ data: { badges: [], balance: 100 }, error: null } satisfies FakeResult<unknown>);
   const updateLook = responses.updateLook ?? { error: null };
   const updateCreatedAt = responses.updateCreatedAt ?? { error: null };
   const deleteBySlot = responses.deleteBySlot ?? { error: null };
@@ -133,7 +157,7 @@ export function makeFakeClient(responses: FakeResponses = {}): {
   const completeQuest =
     responses.completeQuest ??
     ({
-      data: { tokensAwarded: 0, balance: 100, alreadyCompleted: true },
+      data: { tokensAwarded: 0, balance: 100, alreadyCompleted: true, badgesEarned: [] },
       error: null,
     } satisfies FakeResult<unknown>);
 
@@ -249,7 +273,28 @@ export function makeFakeClient(responses: FakeResponses = {}): {
           return {
             select: (columns: string) => {
               log('shop_items.select', columns);
-              return orderable(catalog, calls, 'shop_items.select');
+              const rows = orderable(catalog, calls, 'shop_items.select') as ReturnType<
+                typeof orderable<typeof catalog>
+              > & { eq: (column: string, value: string) => unknown };
+              rows.eq = (column: string, value: string) => {
+                log('shop_items.select.eq', column, value);
+                return {
+                  maybeSingle: async () => {
+                    log('shop_items.select.eq.maybeSingle');
+                    if (responses.itemPlacement) return responses.itemPlacement;
+                    const item = IGLOO_GEAR_CATALOG.find((entry) => entry.id === value);
+                    return { data: item ? { placement: item.placement } : null, error: null };
+                  },
+                };
+              };
+              return rows;
+            },
+          } as never;
+        case 'badges':
+          return {
+            select: (columns: string) => {
+              log('badges.select', columns);
+              return orderable(badgeCatalog, calls, 'badges.select');
             },
           } as never;
         default:
@@ -275,6 +320,9 @@ export function makeFakeClient(responses: FakeResponses = {}): {
       }
       if (fn === 'complete_quest') {
         return Promise.resolve(completeQuest);
+      }
+      if (fn === 'check_session_badges') {
+        return Promise.resolve(checkSessionBadges);
       }
       throw new Error(`unexpected rpc ${fn}`);
     },

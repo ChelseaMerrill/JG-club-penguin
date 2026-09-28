@@ -99,7 +99,7 @@ class Component extends DCLogic {
     else if(k==='p'||k==='P')this.togglePause();};
   componentWillUnmount(){clearInterval(this.t);}
   togglePause=()=>this.setState(s=>({paused:!s.paused}));
-  quit=()=>{clearInterval(this.t);this.setState({phase:'trigger'});};
+  quit=()=>{ window.location.href='Kitchen.dc.html';clearInterval(this.t);this.setState({phase:'trigger'});};
   renderVals(){const s=this.state;const lefts=[20,190,360,530];const info=[['RAW','#e8d3a8','#B3B6C9'],['FLIP NOW','#d9b47a','#F4F4F4'],['GOLDEN','#c9a266','#00BDFF'],['BURNING','#4a3220','#F4F4F4']];return {
     stateLabel:s.phase.toUpperCase(),isTrigger:s.phase==='trigger',isHowTo:s.phase==='howto',isPlaying:s.phase==='play',isDone:s.phase==='done',
     startHowTo:()=>this.setState({phase:'howto'}),backToTrigger:()=>this.setState({phase:'trigger'}),decline:()=>this.setState({chelsea:'Then you get the burnt ones.'}),startGame:this.start,quit:this.quit,togglePause:this.togglePause,onKey:this.onKey,flip:this.flip,

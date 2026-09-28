@@ -6,7 +6,13 @@ import {
   createSupabaseProgressStore,
   toProgressClient,
 } from '../src/persistence/supabase-progress-store';
-import { IGLOO_SLOTS, ProgressStoreError, type IglooSlot } from '../src/persistence/progress-store';
+import {
+  fitsSlot,
+  IGLOO_SLOTS,
+  ProgressStoreError,
+  type IglooSlot,
+  type ShopItem,
+} from '../src/persistence/progress-store';
 
 const DEPLOY_URL = process.env.DEPLOY_URL;
 const AUTH_STATE = process.env.AUTH_STATE;
@@ -42,8 +48,10 @@ function randomNameSuffix(length: number): string {
   ).join('');
 }
 
-function randomSlot(): IglooSlot {
-  return IGLOO_SLOTS[Math.floor(Math.random() * IGLOO_SLOTS.length)];
+/** #135: a random slot the item fits (its own placement), never a mismatched one. */
+function randomSlotFor(item: Pick<ShopItem, 'placement'>): IglooSlot {
+  const fitting = IGLOO_SLOTS.filter((slot) => fitsSlot(item, slot));
+  return fitting[Math.floor(Math.random() * fitting.length)];
 }
 
 test('deployed-progress-restore', async ({ page }, testInfo) => {
@@ -127,8 +135,9 @@ test('deployed-progress-restore', async ({ page }, testInfo) => {
     });
   }
 
-  const chosenSlot = randomSlot();
   const slotItemId = purchasedItemId ?? before.ownedItems[0] ?? null;
+  const slotItem = before.catalog.find((item) => item.id === slotItemId);
+  const chosenSlot = randomSlotFor(slotItem ?? { placement: 'floor' });
   if (slotItemId) {
     await store.setSlot(chosenSlot, slotItemId);
   } else {

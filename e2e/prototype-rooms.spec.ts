@@ -1,10 +1,17 @@
 import { expect, test, type Page } from '@playwright/test';
 import { computeDebugOverlay, type DebugOverlayMarker } from '../src/game/rooms/debug-overlay';
+import { bathroom } from '../src/game/rooms/definitions/bathroom';
 import { devPit } from '../src/game/rooms/definitions/dev-pit';
 import { igloo } from '../src/game/rooms/definitions/igloo';
+import { officeHallway } from '../src/game/rooms/definitions/office-hallway';
 import { roofDeck } from '../src/game/rooms/definitions/roof-deck';
+import { teamRoom1 } from '../src/game/rooms/definitions/team-room-1';
+import { teamRoom2 } from '../src/game/rooms/definitions/team-room-2';
+import { teamRoom3 } from '../src/game/rooms/definitions/team-room-3';
+import { teamRoom4 } from '../src/game/rooms/definitions/team-room-4';
 import { theIcebox } from '../src/game/rooms/definitions/the-icebox';
 import { theMelt } from '../src/game/rooms/definitions/the-melt';
+import { theMullet } from '../src/game/rooms/definitions/the-mullet';
 import { townCenter } from '../src/game/rooms/definitions/town-center';
 import type { RoomDefinition } from '../src/game/rooms/room-definition';
 import { ROOM_IDS, type RoomId } from '../src/contracts';
@@ -23,6 +30,13 @@ const ROOM_DEFINITIONS: Record<RoomId, RoomDefinition> = {
   'roof-deck': roofDeck,
   igloo,
   'the-icebox': theIcebox,
+  'office-hallway': officeHallway,
+  'team-room-1': teamRoom1,
+  'team-room-2': teamRoom2,
+  'team-room-3': teamRoom3,
+  'team-room-4': teamRoom4,
+  bathroom,
+  'the-mullet': theMullet,
 };
 
 /** Fails the test on any uncaught page error or console error. */

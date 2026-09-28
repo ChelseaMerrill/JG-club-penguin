@@ -47,7 +47,39 @@ export type NpcId =
   | 'nicole'
   | 'jason'
   | 'jethro'
-  | 'darrin-icebox';
+  | 'darrin-icebox'
+  // #51: the Hallway's, Team Rooms 1-4's and the Bathroom's NPCs, by the same
+  // rule. Emily and Michael Prete have no slot anywhere else, so they get
+  // bare ids; everyone else is a repeat appearance with a `-<room>` suffix.
+  // The design also draws Michael S., Samantha and Daniel in the Hallway and
+  // Jessie in the Bathroom, but only Players appear as Penguins in the World
+  // (owner decision 2026-09-25; PR #133), so none of those four gets an id.
+  | 'emily'
+  | 'anthony-hallway'
+  | 'jethro-team-room-1'
+  | 'dom-team-room-1'
+  | 'ian-team-room-2'
+  | 'millie-team-room-3'
+  | 'casey-team-room-3'
+  | 'sydney-team-room-3'
+  | 'michael'
+  | 'sam-team-room-4'
+  | 'ryan-team-room-4'
+  // #113: Town Center's Jory Hutchins, on the couch. Her first Room.
+  | 'jory'
+  // #51 slice 3: the Mullet's nine NPCs, by the same rule. Tony Mercadante has
+  // no slot anywhere else, so he gets his bare id; the other eight are repeat
+  // appearances with a `-mullet` suffix (Dom's bare `dom` stays defined but
+  // unplaced, as before).
+  | 'jason-mullet'
+  | 'nicole-mullet'
+  | 'ann-marie-mullet'
+  | 'jory-mullet'
+  | 'ashley-mullet'
+  | 'tony'
+  | 'jon-mullet'
+  | 'brandon-mullet'
+  | 'dom-mullet';
 
 /**
  * A minigame-launching NPC's trigger dialog (#36 D4; round-1 review item 4
@@ -89,20 +121,38 @@ export type NpcDialog = NpcMinigameDialog | NpcStallDialog | NpcLineDialog;
  * own `say`-style CSS animation (`design/Room 01 Town Center.dc.html` and
  * siblings) (#36 round-1 review item 2/3b): `periodS` is the animation's own
  * duration, and `delayS` is its CSS `animation-delay` (typically negative,
- * "already elapsed at load"), both normalized onto the shared 7%-26%-of-
- * period visible window Dev Pit's and Roof Deck's generic `@keyframes say`
- * use (Town Center's own per-NPC keyframes -- `sayDarrin`, `saySyd`, `sayJon`
- * -- are converted to an equivalent delay under that same window, so every
- * NPC's cycle uses one shared render-side timing model).
+ * "already elapsed at load"). `window` is the fraction of the period the line
+ * is fully shown, from the design's own keyframes; it defaults to the shared
+ * 7%-26% of the generic `@keyframes say` most Rooms use, and only Town
+ * Center's per-NPC keyframes (`sayDarrin`, `saySyd`, `sayJon`, `sayJory`) set
+ * their own (#113). `bubbleSchedule()` turns all three into show times.
  *
  * `periodS: 0` means the design shows this line statically, with no cycling
- * at all (Front Desk, and every The Melt NPC -- `design/Room 04
- * Kitchen.dc.html` has zero `animation:say` occurrences).
+ * at all (Front Desk, and the static bubbles in the #51 Rooms). The Kitchen
+ * cycles its lines with the generic `say` like the other Rooms (#91).
  */
 export interface NpcBubbleLine {
   text: string;
   periodS: number;
   delayS: number;
+  window?: readonly [start: number, end: number];
+}
+
+/**
+ * A quest giver's "Got any work for me?" hook (#144 D5). Adding a Quest or a
+ * line here is a data-only change; `quest-giver.ts` does the routing.
+ */
+export interface NpcQuestGiver {
+  /** The Quest this NPC gives, once its issue lands (#121 'beystadium', #140, #141, #142). */
+  questId?: string;
+  /**
+   * For a steps Quest whose "talk to <giver>" step starts it: the Quest counts
+   * as not started until that step is done. Without it, not started means
+   * progress 0.
+   */
+  startStepId?: string;
+  /** The in-character "nothing right now" reply while no Quest is connected. BA copy only. */
+  nothingRightNowLine?: string;
 }
 
 interface NpcDefinitionBase {
@@ -133,13 +183,25 @@ interface NpcDefinitionBase {
   /** The idle speech-bubble cycle, from the Room design's own `say` bubbles. */
   idleLines: NpcBubbleLine[];
   /**
-   * The line `npc-dialog.ts` shows for a `kind: 'line'` or `kind: 'stall'`
-   * NPC's dialog panel: the character sheet's own short quote (distinct from
-   * `idleLines` above, which is the Room design's separate in-World bubble
-   * cycle). A `kind: 'minigame'` NPC's dialog uses `dialog.triggerLine`
-   * instead.
+   * This NPC's own dialog lines (#144): element 0 is #36's single
+   * `dialogLine` (usually the character sheet's quote, otherwise the
+   * `humans.js` `line`), then any other lines the designs or the BA give the
+   * person (`humans.js`, the Mullet and HUD designs). The dialog shows
+   * `dialogLinePool()` of these plus this appearance's `idleLines`, one at
+   * random, never the same line twice in a row. A `kind: 'minigame'` NPC's
+   * dialog keeps its verbatim `dialog.triggerLine` instead (#144 Q15).
    */
-  dialogLine: string;
+  dialogLines: readonly [string, ...string[]];
+  /**
+   * `idleLines` texts left out of the dialog pool (#144 Q16): near-duplicates
+   * of a `dialogLines` entry. They still show as bubbles in the Room.
+   */
+  dialogOmit?: readonly string[];
+  /**
+   * Set on the one appearance of a QUEST GIVER (`design/Characters.dc.html`)
+   * that offers "Got any work for me?" (#144 D5): the Room its Quest names.
+   */
+  questGiver?: NpcQuestGiver;
   dialog: NpcDialog;
   /**
    * A per-NPC horizontal nudge, layered on top of the tile-derived bubble
@@ -147,24 +209,28 @@ interface NpcDefinitionBase {
    * (Kevin, Ann Marie, Josh, Casey) float their speech bubble left of their
    * own nameplate/figure centre by exactly -90px (#36 round-1 review item
    * 3c; traced directly from the Room design's own bubble-vs-nameplate x
-   * offset). Dev Pit's row-1/row-5 NPCs sat close enough after #92's D3
-   * round 2 resync (Ian/Dom one tile apart; Ryan/Steven/Sam two tiles apart
-   * each) that their bubbles visibly overlapped -- confirmed via an e2e
-   * screenshot -- so those are spread apart by a nudge instead (`ian`/`dom`
-   * and `ryan`/`sam`'s own doc comments).
+   * offset), and where the Room's tile grid stands two NPCs closer than
+   * their design does, a bubble shifts clear of a neighbour's nameplate
+   * (#113: Dev Pit's Sam, the Office Hallway's Anthony; see each entry).
+   * `npcs.test.ts`'s rest-slot overlap check guards it.
    */
   bubbleOffsetX?: number;
   /**
    * A per-NPC vertical nudge (more negative floats the bubble higher),
-   * layered on top of the shared head-top offset every NPC otherwise uses.
-   * Only set where deriving a screen position from `npcs.ts`'s own tile
-   * grid (rather than the design's exact, hand-placed pixel layout) pushed
-   * two NPCs' Room elements close enough to visually collide: e.g. Tristin's
-   * bubble and Millie's nameplate, confirmed via an e2e screenshot to
-   * overlap (#36 round-1 review item 3's overlap check) even though the
-   * source design's own pixel coordinates for the two don't.
+   * layered on top of the layout's bubble position just above the nameplate
+   * (`npc-layout.ts`). Only set where deriving a screen position from the
+   * Room's tile grid (rather than the design's exact, hand-placed pixel
+   * layout) puts two NPCs' bubbles on top of each other while both are
+   * shown: `npcs.test.ts`'s time-aware bubble check (#113) guards it.
    */
   bubbleOffsetY?: number;
+  /**
+   * `true` for an NPC its Room design draws without any idle bob (#113: the
+   * Kitchen's Chelsea, Dev Pit's Ashley, the Office Hallway's Emily and
+   * Anthony, and every NPC in Team Rooms 3 and 4). Every other NPC bobs,
+   * unless a designed motion (`npc-motions.ts`) replaces the bob.
+   */
+  still?: boolean;
 }
 
 /** A Human NPC (`design/build/humans.js`'s figures), rendered by `render-npc-svg.ts`. */
@@ -180,6 +246,22 @@ export interface PenguinNpcDefinition extends NpcDefinitionBase {
 }
 
 export type NpcDefinition = HumanNpcDefinition | PenguinNpcDefinition;
+
+/**
+ * Dev Pit's whiteboard markers (#113), verbatim from the design's raised-arm
+ * `scribble` markup: Ryan's and Sam's cyan, Steven's red, each with its own
+ * sleeve and hand colour as drawn.
+ */
+const DEV_PIT_CYAN_MARKER: HumanFigureSpec['marker'] = {
+  arm: '#1f2a4a',
+  hand: '#F3D3B8',
+  color: '#00BDFF',
+};
+const DEV_PIT_RED_MARKER: HumanFigureSpec['marker'] = {
+  arm: '#2B3557',
+  hand: '#E4B896',
+  color: '#D63C3C',
+};
 
 const BUG_SQUASH_DIALOG: NpcMinigameDialog = {
   kind: 'minigame',
@@ -278,6 +360,302 @@ const MILLIE_FIGURE: HumanFigureSpec = {
 };
 
 /**
+ * Ian Ballard's figure, shared by Dev Pit (`ian`) and Team Room 2
+ * (`ian-team-room-2`) (#51): the same person, the same `humans.js` spec, in
+ * one constant so the copies can't drift.
+ */
+const IAN_FIGURE: HumanFigureSpec = {
+  style: 'bald',
+  hair: 'brown',
+  skin: 'fair',
+  top: '#161719',
+  collar: 'polo',
+  // Both his Rooms' designs (Dev Pit, Team Room 2) draw light dotted stubble,
+  // not humans.js's full beard (#113).
+  beard: 'dotStubble',
+  teeth: true,
+  prop: 'laptop',
+};
+
+/**
+ * Dom Favata's figure, shared by Dev Pit (`dom`) and Team Room 1
+ * (`dom-team-room-1`) (#51): the same person, the same `humans.js` spec, in
+ * one constant so the copies can't drift.
+ */
+const DOM_FIGURE: HumanFigureSpec = {
+  style: 'short',
+  hair: 'brown',
+  skin: 'fair',
+  top: '#C9B48E',
+  collar: 'zip',
+  teeth: true,
+  prop: 'laptop',
+};
+
+/**
+ * Sydney Murauskas's figure, shared by Town Center (`sydney`) and Team Room 3
+ * (`sydney-team-room-3`) (#51): the same person, the same `humans.js` spec,
+ * in one constant so the copies can't drift.
+ */
+const SYDNEY_FIGURE: HumanFigureSpec = {
+  style: 'straightLong',
+  hair: 'caramel',
+  skin: 'med',
+  top: '#1f2a4a',
+  collar: 'crew',
+  necklace: true,
+  teeth: true,
+  prop: 'clipboard',
+};
+
+/**
+ * Casey Snow's figure, shared by Roof Deck (`casey`) and Team Room 3
+ * (`casey-team-room-3`) (#51): the same person, the same `humans.js` spec, in
+ * one constant so the copies can't drift.
+ */
+const CASEY_FIGURE: HumanFigureSpec = {
+  style: 'straightLong',
+  hair: 'sandy',
+  skin: 'fair',
+  top: '#2FB59A',
+  pattern: 'stripes',
+  pattern2: '#F4F4F4',
+  collar: 'crew',
+  necklace: true,
+  teeth: true,
+  hat: 'headphones',
+};
+
+/**
+ * Sam Schantz's figure, shared by Dev Pit (`sam`) and Team Room 4
+ * (`sam-team-room-4`) (#51): the same person, the same `humans.js` spec, in
+ * one constant so the copies can't drift.
+ */
+const SAM_FIGURE: HumanFigureSpec = {
+  style: 'spiky',
+  hair: 'dark',
+  skin: 'med',
+  top: '#00BDFF',
+  collar: 'crew',
+  glasses: 'thin',
+  teeth: true,
+  prop: 'coffee',
+};
+
+/**
+ * Ryan Shendler's figure, shared by Dev Pit (`ryan`) and Team Room 4
+ * (`ryan-team-room-4`) (#51): the same person, the same `humans.js` spec, in
+ * one constant so the copies can't drift.
+ */
+const RYAN_FIGURE: HumanFigureSpec = {
+  style: 'short',
+  hair: 'brown',
+  skin: 'fair',
+  top: '#0C4B5F',
+  collar: 'crew',
+  beard: 'stubble',
+  mouth: 'smirk',
+  prop: 'laptop',
+};
+
+/**
+ * Anthony Conway's figure, shared by Roof Deck (`anthony`) and the Hallway
+ * (`anthony-hallway`) (#51): the same person, the same `humans.js` spec, in
+ * one constant so the copies can't drift.
+ */
+const ANTHONY_FIGURE: HumanFigureSpec = {
+  style: 'shortDark',
+  hair: 'dark',
+  skin: 'light',
+  top: '#4a4f57',
+  collar: 'button',
+  beard: 'stubble',
+  teeth: true,
+  prop: 'laptop',
+};
+
+/**
+ * Jethro Breuer's figure, shared by the Icebox (`jethro`) and Team Room 1
+ * (`jethro-team-room-1`) (#51): the same person, the same `humans.js` spec,
+ * in one constant so the copies can't drift.
+ */
+const JETHRO_FIGURE: HumanFigureSpec = {
+  style: 'short',
+  hair: 'ash',
+  skin: 'fair',
+  top: '#4a4f57',
+  pattern: 'dots',
+  collar: 'button',
+  beard: 'full',
+  beardColor: '#A85A2A',
+  mouth: 'smirk',
+  prop: 'camera',
+};
+
+/**
+ * Jon Keller's figure, shared by Town Center (`jon`) and the Mullet
+ * (`jon-mullet`) (#51 slice 3): the same person, the same `humans.js` spec,
+ * in one constant so the copies can't drift. Town Center's playing cards are
+ * that entry's own override.
+ */
+const JON_FIGURE: HumanFigureSpec = {
+  style: 'spiky',
+  hair: 'dark',
+  skin: 'light',
+  top: '#BFD6EE',
+  jacket: '#1f2a4a',
+  collar: 'shirtLight',
+  glasses: 'sun',
+  mouth: 'smirk',
+  prop: 'scarf',
+};
+
+/**
+ * Jory Hutchins's figure, shared by Town Center (`jory`) and the Mullet
+ * (`jory-mullet`) (#51 slice 3), from `humans.js`'s `hutchins`.
+ */
+const JORY_FIGURE: HumanFigureSpec = {
+  style: 'short',
+  hair: 'brown',
+  skin: 'fair',
+  top: '#1f6b4a',
+  collar: 'crew',
+  glasses: 'rect',
+  beard: 'stubble',
+  teeth: true,
+  hat: 'survivor',
+  tee: 'survivor',
+};
+
+/**
+ * Ashley Schuliger's figure, shared by the Dev Pit (`ashley`) and the Mullet
+ * (`ashley-mullet`) (#51 slice 3), from `humans.js`'s `schuliger`.
+ */
+const ASHLEY_FIGURE: HumanFigureSpec = {
+  style: 'wavyLong',
+  hair: 'brown',
+  skin: 'fair',
+  top: '#161719',
+  collar: 'crew',
+  teeth: true,
+  prop: 'chicken',
+};
+
+/**
+ * Ann Marie Berdar's figure, shared by the Roof Deck (`ann-marie`) and the
+ * Mullet (`ann-marie-mullet`) (#51 slice 3), from `humans.js`'s `berdar`.
+ */
+const ANN_MARIE_FIGURE: HumanFigureSpec = {
+  style: 'wavyLong',
+  hair: 'lblond',
+  skin: 'med',
+  top: '#F2C12E',
+  jacket: '#7A2A8C',
+  collar: 'crew',
+  necklace: true,
+  teeth: true,
+};
+
+/**
+ * Brandon Badgett's figure, shared by the Roof Deck (`brandon`) and the
+ * Mullet (`brandon-mullet`) (#51 slice 3), from `humans.js`'s spec.
+ */
+const BRANDON_FIGURE: HumanFigureSpec = {
+  style: 'sideSwept',
+  hair: 'dark',
+  skin: 'fair',
+  top: '#1f2a4a',
+  pattern: 'stripes',
+  pattern2: '#D63C3C',
+  collar: 'crew',
+  beard: 'stubble',
+  mouth: 'smirk',
+  prop: 'hobbyhorse',
+};
+
+/**
+ * Nicole Roberts's figure, shared by the Icebox (`nicole`) and the Mullet
+ * (`nicole-mullet`) (#51 slice 3), from `humans.js`'s spec. The Icebox's
+ * laptop-on-lap pose is that entry's own override.
+ */
+const NICOLE_FIGURE: HumanFigureSpec = {
+  style: 'wavyLong',
+  hair: 'lblond',
+  skin: 'fair',
+  top: '#161719',
+  sleeveless: true,
+  necklace: true,
+  teeth: true,
+};
+
+/**
+ * Jason Jahnel's figure, shared by the Icebox (`jason`) and the Mullet
+ * (`jason-mullet`) (#51 slice 3), from `humans.js`'s spec.
+ */
+const JASON_FIGURE: HumanFigureSpec = {
+  style: 'buzz',
+  hair: 'brown',
+  skin: 'fair',
+  top: '#F4F4F4',
+  pattern: 'plaid',
+  pattern2: '#8FB5D8',
+  collar: 'button',
+  glasses: 'thin',
+  teeth: true,
+};
+
+/**
+ * Person-wide dialog lines (#144 D2), shared by every appearance of the same
+ * person like the `*_FIGURE` constants above, so the copies can't drift.
+ * Element 0 is #36's single `dialogLine` (usually the character sheet's
+ * quote, otherwise the `humans.js` `line`). Sources are the character sheet
+ * (`design/Characters.dc.html`), `design/build/humans.js`'s `line`, the
+ * Mullet design (`design/The Mullet.dc.html`) and the BA (#144). A line tied
+ * to one Room reaches that appearance only through its own `idleLines`.
+ */
+const DARRIN_LINES = ['Show me energy.'] as const;
+const SYDNEY_LINES = ['Welcome to JG HQ!'] as const;
+/** "Living the dream!" is the BA's (#144); "Clucknelius coming at you!" is the Mullet design's. */
+const ASHLEY_LINES = [
+  'The chicken stays. Non-negotiable.',
+  'Living the dream!',
+  'Clucknelius coming at you!',
+] as const;
+const IAN_LINES = ['Who broke CI? Be honest.'] as const;
+/** humans.js's line, the sheet's quote and the Mullet design's line. */
+const DOM_LINES = [
+  'p95 is spicy today.',
+  'Another day, another trophy.',
+  'Undefeated. I always win.',
+] as const;
+/** humans.js's line, then the sheet's quote. */
+const RYAN_LINES = ['LGTM. One nit.', 'Hold on, dropping the bass.'] as const;
+/** humans.js's line, then the sheet's quote. */
+const SAM_LINES = [
+  'Have you tried turning it off?',
+  "Mic check. This one's about merge conflicts.",
+] as const;
+/** humans.js's line, then the sheet's quote. */
+const MILLIE_LINES = [
+  'Quick question before you go in.',
+  "So what I'm hearing you say is...",
+] as const;
+const ANTHONY_LINES = ['Would you click this link? Wrong.'] as const;
+const CASEY_LINES = ['Snow by name. Snowcones by trade.'] as const;
+/** The sheet's quote, plus his two Icebox bubbles, reused in Team Room 1 (#144 H4). */
+const JETHRO_LINES = [
+  "Act natural. Camera's rolling.",
+  'One more for the recap.',
+  'Say hackathon!',
+] as const;
+const JON_LINES = ['Welcome to JG. Sunglasses stay on.'] as const;
+const JORY_LINES = ['The tribe has spoken.'] as const;
+const ANN_MARIE_LINES = ['That cap? Totally your color.', 'OK great :) now do it now'] as const;
+const BRANDON_LINES = ["Giddy up. Arcade's this way."] as const;
+const NICOLE_LINES = ["The client loved it. Next one's at 2."] as const;
+const JASON_LINES = ['Answer three and you may pass.'] as const;
+
+/**
  * `NPCS`: every prototype Room's NPC, keyed by `NpcId` (#36 D1). Names come
  * from `design/Characters.dc.html`'s character sheet (D1/A3); titles come
  * from the same sheet, with `null` for every "TITLE TBD" card its footnote
@@ -286,8 +664,9 @@ const MILLIE_FIGURE: HumanFigureSpec = {
  * `design/build/humans.js`'s figure `spec`s are used for the Human NPCs'
  * rendered figures only, never for name/title. `idleLines` come from each
  * Room design's own `say`-cycling (or static) speech bubbles (round-1 item
- * 2), and `dialogLine` is the sheet's own short quote, shown in the dialog
- * panel instead.
+ * 2), and `dialogLines` starts with #36's single `dialogLine` (usually the
+ * sheet's own short quote, otherwise the `humans.js` `line`), shown in the
+ * dialog panel (#144).
  *
  * The 5 Penguin-kind background NPCs (Front Desk, Kevin, Tristin, Tonya,
  * Jesse) are named, drawn characters in their own Room's
@@ -302,11 +681,15 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'town-center',
     kind: 'human',
     tagName: 'Darrin Jahnel',
-    dialogLine: 'Show me energy.',
+    dialogLines: DARRIN_LINES,
+    // `sayDarrin` (9%-28%) and `sayDarrin2` (55%-76%), 11 s, no delay.
     idleLines: [
-      { text: "LET'S GO! Who's shipping today?!", periodS: 11, delayS: -0.22 },
-      { text: 'YOU. ARE. CRUSHING IT.', periodS: 11, delayS: -5.28 },
+      { text: "LET'S GO! Who's shipping today?!", periodS: 11, delayS: 0, window: [0.09, 0.28] },
+      { text: 'YOU. ARE. CRUSHING IT.', periodS: 11, delayS: 0, window: [0.55, 0.76] },
     ],
+    // His tile sits one screen row above Sydney's and Jory's, so his bubble
+    // would overlap the top 5 px of theirs: lifted 8 px to clear them.
+    bubbleOffsetY: -8,
     dialog: LINE_DIALOG,
     figure: DARRIN_FIGURE,
   },
@@ -317,20 +700,17 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'town-center',
     kind: 'human',
     tagName: 'Jon Keller',
-    dialogLine: 'Welcome to JG. Sunglasses stay on.',
-    idleLines: [{ text: 'Wanna see a magic trick?', periodS: 14, delayS: -1.68 }],
+    dialogLines: JON_LINES,
+    questGiver: { nothingRightNowLine: 'Just enjoy the tour. Sunglasses stay on.' },
+    // `sayJon` shows the same line twice per 14 s cycle: 19%-32% and 61%-74%.
+    idleLines: [
+      { text: 'Wanna see a magic trick?', periodS: 14, delayS: 0, window: [0.19, 0.32] },
+      { text: 'Wanna see a magic trick?', periodS: 14, delayS: 0, window: [0.61, 0.74] },
+    ],
     dialog: LINE_DIALOG,
-    figure: {
-      style: 'spiky',
-      hair: 'dark',
-      skin: 'light',
-      top: '#BFD6EE',
-      jacket: '#1f2a4a',
-      collar: 'shirtLight',
-      glasses: 'sun',
-      mouth: 'smirk',
-      prop: 'scarf',
-    },
+    // Town Center's design puts three playing cards in his hand (`trick`);
+    // the Mullet's doesn't, so it's this entry's own override.
+    figure: { ...JON_FIGURE, cards: true },
   },
   sydney: {
     id: 'sydney',
@@ -339,22 +719,34 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'town-center',
     kind: 'human',
     tagName: 'Sydney Murauskas',
-    dialogLine: 'Welcome to JG HQ!',
+    // `design/Club JenGuin HUD Menus.dc.html`'s Town Center scene gives her
+    // one more line; it's this appearance's own, not Team Room 3's.
+    dialogLines: [...SYDNEY_LINES, 'lobby snowball fight?'],
+    questGiver: {},
+    // `saySyd` (21%-33%) and `saySyd2` (60%-84%), 24 s, no delay.
     idleLines: [
-      { text: 'Look what we won!', periodS: 24, delayS: -3.36 },
-      { text: 'Serve. Grind. Grow. Inspire.', periodS: 24, delayS: -12.72 },
+      { text: 'Look what we won!', periodS: 24, delayS: 0, window: [0.21, 0.33] },
+      { text: 'Serve. Grind. Grow. Inspire.', periodS: 24, delayS: 0, window: [0.6, 0.84] },
     ],
     dialog: LINE_DIALOG,
-    figure: {
-      style: 'straightLong',
-      hair: 'caramel',
-      skin: 'med',
-      top: '#1f2a4a',
-      collar: 'crew',
-      necklace: true,
-      teeth: true,
-      prop: 'clipboard',
-    },
+    figure: SYDNEY_FIGURE,
+  },
+  // #113: Town Center's design draws Jory Hutchins on the couch with her own
+  // nameplate and `sayJory` bubble. Name, title and dialog line from her
+  // design/Characters.dc.html card; figure from humans.js's `hutchins`.
+  jory: {
+    id: 'jory',
+    name: 'Jory Hutchins',
+    title: 'Director of Career Development',
+    roomId: 'town-center',
+    kind: 'human',
+    tagName: 'Jory Hutchins',
+    dialogLines: JORY_LINES,
+    questGiver: {},
+    // `sayJory` (63%-88%), 9 s, no delay.
+    idleLines: [{ text: 'COUCH. IS. LAVA.', periodS: 9, delayS: 0, window: [0.63, 0.88] }],
+    dialog: LINE_DIALOG,
+    figure: JORY_FIGURE,
   },
   'front-desk': {
     id: 'front-desk',
@@ -363,7 +755,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'town-center',
     kind: 'penguin',
     tagName: 'Front Desk',
-    dialogLine: 'Welcome to JG HQ!',
+    dialogLines: ['Welcome to JG HQ!'],
     idleLines: staticLine('Welcome to JG HQ!'),
     dialog: LINE_DIALOG,
     look: MARKET_PENGUIN_LOOK,
@@ -375,22 +767,17 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'dev-pit',
     kind: 'human',
     tagName: 'Ashley',
-    dialogLine: 'The chicken stays. Non-negotiable.',
+    dialogLines: ASHLEY_LINES,
+    questGiver: {},
+    // The Dev Pit design gives her group no `animation:` at all.
+    still: true,
     idleLines: [
       { text: 'Incoming!', periodS: 9, delayS: -4.2 },
       { text: 'Most spirited. Deal with it.', periodS: 14, delayS: -5 },
       { text: 'Catch!', periodS: 14, delayS: -9.5 },
     ],
     dialog: LINE_DIALOG,
-    figure: {
-      style: 'wavyLong',
-      hair: 'brown',
-      skin: 'fair',
-      top: '#161719',
-      collar: 'crew',
-      teeth: true,
-      prop: 'chicken',
-    },
+    figure: ASHLEY_FIGURE,
   },
   ian: {
     id: 'ian',
@@ -399,30 +786,18 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'dev-pit',
     kind: 'human',
     tagName: 'Ian',
-    dialogLine: 'Who broke CI? Be honest.',
+    dialogLines: IAN_LINES,
+    questGiver: {},
     idleLines: [
       { text: 'Who broke CI? Be honest.', periodS: 22, delayS: -1 },
       { text: 'Grab the hammer. CI is red.', periodS: 22, delayS: -10 },
     ],
-    // #92 D3 round 2 moved Ian to (1,5) and Dom to (2,5), one tile apart
-    // (confirmed via an e2e screenshot to overlap at their derived screen
-    // position): nudged apart horizontally, opposite Dom's own +80 below.
-    // 80, not 70 (#36 round-2 review item 4): the minimum that clears their
-    // bubble rects at the shared bubble-width ceiling (`npc-sprite.ts`'s own
-    // `MAX_BUBBLE_WIDTH`) while still spanning Ian's own tile x, confirmed by
-    // `npcs.test.ts`'s geometric bubble-rect check.
-    bubbleOffsetX: -80,
+    // No `still` and no nudge: the Dev Pit design draws him without the
+    // shared idle bob, but he now walks a loop (owner request, 2026-09-25;
+    // `motions/dev-pit.ts`), and Dom, whose bubble his used to clear, is no
+    // longer in this Room.
     dialog: BUG_SQUASH_DIALOG,
-    figure: {
-      style: 'bald',
-      hair: 'brown',
-      skin: 'fair',
-      top: '#161719',
-      collar: 'polo',
-      beard: 'full',
-      teeth: true,
-      prop: 'laptop',
-    },
+    figure: IAN_FIGURE,
   },
   steven: {
     id: 'steven',
@@ -431,7 +806,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'dev-pit',
     kind: 'human',
     tagName: 'Steven',
-    dialogLine: 'Architecture question. Ready?',
+    dialogLines: ['Architecture question. Ready?'],
     idleLines: [
       { text: 'Boxes and arrows. Mostly arrows.', periodS: 14, delayS: -2 },
       { text: 'This diagram scales. Trust me.', periodS: 14, delayS: -9 },
@@ -448,6 +823,8 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       beard: 'full',
       mouth: 'smirk',
       greys: true,
+      // Dev Pit's design raises a red whiteboard marker (`scribble`).
+      marker: DEV_PIT_RED_MARKER,
     },
   },
   dom: {
@@ -457,24 +834,14 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'dev-pit',
     kind: 'human',
     tagName: 'Dom',
-    dialogLine: 'p95 is spicy today.',
+    dialogLines: DOM_LINES,
     idleLines: [
       { text: 'Parkour!', periodS: 18, delayS: -1 },
       { text: 'Dashboards are lava.', periodS: 18, delayS: -7 },
       { text: 'Do not tell facilities.', periodS: 18, delayS: -13 },
     ],
-    // See Ian's own bubbleOffsetX note above -- the two are one tile apart.
-    bubbleOffsetX: 80,
     dialog: LINE_DIALOG,
-    figure: {
-      style: 'short',
-      hair: 'brown',
-      skin: 'fair',
-      top: '#C9B48E',
-      collar: 'zip',
-      teeth: true,
-      prop: 'laptop',
-    },
+    figure: DOM_FIGURE,
   },
   ryan: {
     id: 'ryan',
@@ -483,32 +850,19 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'dev-pit',
     kind: 'human',
     tagName: 'Ryan',
-    dialogLine: 'LGTM. One nit.',
+    dialogLines: RYAN_LINES,
     idleLines: [
       { text: 'LGTM. One nit.', periodS: 20, delayS: -2 },
       { text: 'This diagram is load-bearing.', periodS: 20, delayS: -8 },
       { text: 'Whiteboard is the real repo.', periodS: 20, delayS: -14 },
     ],
-    // #92 D3 round 2's row-1 trio (Ryan, Steven, Sam) sit only 2 tiles apart
-    // each (confirmed via an e2e screenshot to overlap): Ryan and Sam nudged
-    // apart from Steven in the middle, opposite Sam's own +100 below.
-    // 100, not 110 (#36 round-2 review item 4): 110 pushed the bubble rect
-    // (at `npc-sprite.ts`'s own `MAX_BUBBLE_WIDTH` ceiling) fully past Ryan's
-    // own tile x, so its rect no longer spanned him; 100 is the exact value
-    // both constraints allow here, confirmed by `npcs.test.ts`'s geometric
-    // bubble-rect check.
-    bubbleOffsetX: -100,
+    // No nudge (#113): the row-1 trio (Ryan, Steven, Sam) sit two tiles
+    // apart on a diagonal, one screen row (50 px) apart each, so their
+    // one-line, design-height bubbles no longer overlap.
     dialog: LINE_DIALOG,
-    figure: {
-      style: 'short',
-      hair: 'brown',
-      skin: 'fair',
-      top: '#0C4B5F',
-      collar: 'crew',
-      beard: 'stubble',
-      mouth: 'smirk',
-      prop: 'laptop',
-    },
+    // Dev Pit's design raises a cyan whiteboard marker (`scribble`); Team
+    // Room 4's doesn't, so it's this entry's own override.
+    figure: { ...RYAN_FIGURE, marker: DEV_PIT_CYAN_MARKER },
   },
   sam: {
     id: 'sam',
@@ -517,25 +871,20 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'dev-pit',
     kind: 'human',
     tagName: 'Sam',
-    dialogLine: 'Have you tried turning it off?',
+    dialogLines: SAM_LINES,
     idleLines: [
       { text: 'Have you tried turning it off?', periodS: 20, delayS: -4 },
       { text: 'Drawing the architecture. Again.', periodS: 20, delayS: -11 },
       { text: 'Ship it Friday. What could go wrong.', periodS: 20, delayS: -17 },
     ],
-    // See Ryan's own bubbleOffsetX note above -- the row-1 trio sit close together.
-    bubbleOffsetX: 100,
+    // Shifted right just past Steven's nameplate (#113): the grid stands
+    // him 50 px below Steven, and his wrapped "Ship it Friday..." pill (one
+    // line in the design) would otherwise cover Steven's whole nameplate.
+    // The design's own one-line pills already overlap its bottom 4 px.
+    bubbleOffsetX: 72,
     dialog: LINE_DIALOG,
-    figure: {
-      style: 'spiky',
-      hair: 'dark',
-      skin: 'med',
-      top: '#00BDFF',
-      collar: 'crew',
-      glasses: 'thin',
-      teeth: true,
-      prop: 'coffee',
-    },
+    // As Ryan's: the marker is Dev Pit's only.
+    figure: { ...SAM_FIGURE, marker: DEV_PIT_CYAN_MARKER },
   },
   kevin: {
     id: 'kevin',
@@ -544,7 +893,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'roof-deck',
     kind: 'penguin',
     tagName: 'Kevin',
-    dialogLine: 'Hexles bounce. 800 tokens.',
+    dialogLines: ['Hexles bounce. 800 tokens.'],
     idleLines: [
       { text: 'Hexles bounce. 800 tokens.', periodS: 13, delayS: -2 },
       { text: 'They bite. Gently.', periodS: 13, delayS: -9 },
@@ -560,20 +909,17 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'roof-deck',
     kind: 'human',
     tagName: 'Ann Marie',
-    dialogLine: 'That cap? Totally your color.',
-    idleLines: [{ text: 'Try it on!', periodS: 12, delayS: -6 }],
+    dialogLines: ANN_MARIE_LINES,
+    idleLines: [
+      { text: 'Cyan cap? 120 tokens.', periodS: 12, delayS: 0 },
+      { text: 'Try it on!', periodS: 12, delayS: -6 },
+    ],
     bubbleOffsetX: -90,
+    // Her stall's tile sits one screen row above Millie's, so her bubble
+    // would overlap the top 5 px of Millie's: lifted 8 px to clear it.
+    bubbleOffsetY: -8,
     dialog: LINE_DIALOG,
-    figure: {
-      style: 'wavyLong',
-      hair: 'lblond',
-      skin: 'med',
-      top: '#F2C12E',
-      jacket: '#7A2A8C',
-      collar: 'crew',
-      necklace: true,
-      teeth: true,
-    },
+    figure: ANN_MARIE_FIGURE,
   },
   millie: {
     id: 'millie',
@@ -582,7 +928,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'roof-deck',
     kind: 'human',
     tagName: 'Millie',
-    dialogLine: 'Quick question before you go in.',
+    dialogLines: MILLIE_LINES,
     idleLines: [{ text: 'Team lead perk: free cone.', periodS: 20, delayS: -7 }],
     dialog: LINE_DIALOG,
     figure: MILLIE_FIGURE,
@@ -594,7 +940,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'roof-deck',
     kind: 'human',
     tagName: 'Josh',
-    dialogLine: 'Pumpkin spice is a lifestyle.',
+    dialogLines: ['Pumpkin spice is a lifestyle.'],
     idleLines: [
       { text: 'Snowcones are 15!', periodS: 11, delayS: -3 },
       { text: 'Pumpkin spice, obviously.', periodS: 11, delayS: -8.5 },
@@ -620,25 +966,14 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'roof-deck',
     kind: 'human',
     tagName: 'Brandon',
-    dialogLine: "Giddy up. Arcade's this way.",
+    dialogLines: BRANDON_LINES,
     idleLines: [
       { text: 'Giddy up!', periodS: 26, delayS: -2 },
       { text: 'Does it come in horse?', periodS: 26, delayS: -10 },
       { text: 'Yeehaw. Hexle time.', periodS: 26, delayS: -18 },
     ],
     dialog: LINE_DIALOG,
-    figure: {
-      style: 'sideSwept',
-      hair: 'dark',
-      skin: 'fair',
-      top: '#1f2a4a',
-      pattern: 'stripes',
-      pattern2: '#D63C3C',
-      collar: 'crew',
-      beard: 'stubble',
-      mouth: 'smirk',
-      prop: 'hobbyhorse',
-    },
+    figure: BRANDON_FIGURE,
   },
   anthony: {
     id: 'anthony',
@@ -647,23 +982,16 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'roof-deck',
     kind: 'human',
     tagName: 'Anthony',
-    dialogLine: 'Would you click this link? Wrong.',
+    dialogLines: ANTHONY_LINES,
     idleLines: [
       { text: 'Catch of the day: your password.', periodS: 28, delayS: -2 },
       { text: 'Never click the bait!', periodS: 28, delayS: -11 },
       { text: 'Reel talk: check the sender.', periodS: 28, delayS: -20 },
     ],
     dialog: LINE_DIALOG,
-    figure: {
-      style: 'shortDark',
-      hair: 'dark',
-      skin: 'light',
-      top: '#4a4f57',
-      collar: 'button',
-      beard: 'stubble',
-      teeth: true,
-      prop: 'laptop',
-    },
+    // Roof Deck's design gives him a fishing rod baited with a "FREE $$$"
+    // envelope instead of his laptop; the Hallway's keeps the laptop.
+    figure: { ...ANTHONY_FIGURE, prop: 'fishingRod' },
   },
   tristin: {
     id: 'tristin',
@@ -672,17 +1000,11 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'roof-deck',
     kind: 'penguin',
     tagName: 'Tristin',
-    dialogLine: "It's 12° out here.",
+    dialogLines: ["It's 12° out here."],
     idleLines: [
       { text: "It's 12° out here.", periodS: 24, delayS: -1 },
       { text: 'Worth it for snacks.', periodS: 24, delayS: -13 },
     ],
-    // Confirmed via an e2e screenshot: at his own tile's derived screen
-    // position, Tristin's bubble overlapped Millie's nameplate (they sit far
-    // apart on the design's own hand-placed canvas, but close together once
-    // both are projected from `roofDeck.npcSlots`' tile grid). Nudged up to
-    // clear it.
-    bubbleOffsetY: -60,
     dialog: LINE_DIALOG,
     look: TRISTIN_LOOK,
   },
@@ -693,25 +1015,14 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'roof-deck',
     kind: 'human',
     tagName: 'Casey',
-    dialogLine: 'Snow by name. Snowcones by trade.',
+    dialogLines: CASEY_LINES,
     idleLines: [
       { text: 'Roof igloo: BYO fish.', periodS: 12, delayS: -4 },
       { text: 'New gear drops Friday.', periodS: 12, delayS: -10 },
     ],
     bubbleOffsetX: -90,
     dialog: IGLOO_GEAR_STALL_DIALOG,
-    figure: {
-      style: 'straightLong',
-      hair: 'sandy',
-      skin: 'fair',
-      top: '#2FB59A',
-      pattern: 'stripes',
-      pattern2: '#F4F4F4',
-      collar: 'crew',
-      necklace: true,
-      teeth: true,
-      hat: 'headphones',
-    },
+    figure: CASEY_FIGURE,
   },
   tom: {
     id: 'tom',
@@ -723,7 +1034,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'the-melt',
     kind: 'human',
     tagName: 'Tom',
-    dialogLine: 'Fresh pot. Do not touch.',
+    dialogLines: ['Fresh pot. Do not touch.'],
     idleLines: [
       { text: 'Fresh pot. Do not touch.', periodS: 16, delayS: -1 },
       { text: 'Coffee run?', periodS: 16, delayS: -6 },
@@ -737,6 +1048,8 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       top: '#6E86A8',
       pattern: 'stripes',
       pattern2: '#9FB3CC',
+      // The Kitchen design's green apron over the shirt.
+      apron: true,
       collar: 'button',
       glasses: 'rect',
       teeth: true,
@@ -750,15 +1063,19 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'the-melt',
     kind: 'human',
     tagName: 'Chelsea',
-    dialogLine: 'Flip it NOW.',
+    dialogLines: ['Flip it NOW.'],
     idleLines: [
       { text: 'Flip it NOW.', periodS: 13, delayS: 0 },
       { text: 'GOLDEN. Not before.', periodS: 13, delayS: -4.5 },
       { text: 'Tom, stop eating the burnt ones.', periodS: 13, delayS: -9 },
     ],
+    // The Kitchen design draws her without the shared idle bob.
+    still: true,
     dialog: PANCAKE_FLIP_DIALOG,
     figure: {
-      style: 'curlyLong',
+      // The Kitchen design's textured hair and pleated toque, not humans.js's
+      // curls and puffy chef's hat.
+      style: 'texturedLong',
       hair: 'blond',
       skin: 'fair',
       top: '#161719',
@@ -768,7 +1085,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       earrings: '#F06A5A',
       teeth: true,
       prop: 'spatula',
-      hat: 'chef',
+      hat: 'toque',
     },
   },
   tonya: {
@@ -778,7 +1095,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'the-melt',
     kind: 'penguin',
     tagName: 'Tonya',
-    dialogLine: 'Clean your mug.',
+    dialogLines: ['Clean your mug.'],
     idleLines: [
       { text: 'Clean your mug.', periodS: 15, delayS: -5 },
       { text: 'I made the sign. I mean it.', periodS: 15, delayS: -12 },
@@ -786,6 +1103,9 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     dialog: LINE_DIALOG,
     look: MARKET_PENGUIN_LOOK,
   },
+  // Spelled "Jesse" here, unlike the Bathroom's "Jessie" (see that entry's
+  // own comment) -- a deliberate human decision to keep them as two separate
+  // characters, not a typo to reconcile (#51).
   jesse: {
     id: 'jesse',
     name: 'Jesse',
@@ -793,7 +1113,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'the-melt',
     kind: 'penguin',
     tagName: 'Jesse',
-    dialogLine: 'Is this decaf? Be honest.',
+    dialogLines: ['Is this decaf? Be honest.'],
     idleLines: [
       { text: 'Is this decaf? Be honest.', periodS: 15, delayS: -2 },
       { text: 'Snack drawer is a lie.', periodS: 15, delayS: -9 },
@@ -814,7 +1134,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'the-icebox',
     kind: 'human',
     tagName: 'Millie',
-    dialogLine: 'Quick question before you go in.',
+    dialogLines: MILLIE_LINES,
     idleLines: [
       { text: 'Team lead question: who owns this?', periodS: 26, delayS: -3 },
       { text: 'Standup was 4 minutes. Record.', periodS: 26, delayS: -12 },
@@ -832,24 +1152,18 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'the-icebox',
     kind: 'human',
     tagName: 'Nicole',
-    dialogLine: "The client loved it. Next one's at 2.",
+    dialogLines: NICOLE_LINES,
+    questGiver: {},
     idleLines: [
       { text: 'Client call in 5. Shh.', periodS: 15, delayS: -2 },
       { text: 'Account manager mode: on.', periodS: 15, delayS: -7 },
       { text: 'Nope, that is billable.', periodS: 15, delayS: -12 },
     ],
     dialog: LINE_DIALOG,
-    // humans.js's spec. The Room design also seats her on a stool with a
-    // laptop on her lap, a scene-only pose the renderer doesn't draw.
-    figure: {
-      style: 'wavyLong',
-      hair: 'lblond',
-      skin: 'fair',
-      top: '#161719',
-      sleeveless: true,
-      necklace: true,
-      teeth: true,
-    },
+    // humans.js's spec, seated with a laptop on her lap as the Room design
+    // draws her (#113). The Mullet's design seats her on the couch without
+    // one, a pose the renderer doesn't draw, so that entry stands.
+    figure: { ...NICOLE_FIGURE, seated: 'laptop' },
   },
   jason: {
     id: 'jason',
@@ -858,24 +1172,16 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'the-icebox',
     kind: 'human',
     tagName: 'Jason',
-    dialogLine: 'Answer three and you may pass.',
+    dialogLines: JASON_LINES,
+    // A near-duplicate of his dialog line; it stays a bubble in the Room.
+    dialogOmit: ['Three questions and you may pass.'],
     idleLines: [
       { text: 'Stairs challenge. You are behind.', periodS: 26, delayS: -1 },
       { text: 'Three questions and you may pass.', periodS: 26, delayS: -10 },
       { text: 'Kickoff in 4:32. Sit.', periodS: 26, delayS: -18 },
     ],
     dialog: LINE_DIALOG,
-    figure: {
-      style: 'buzz',
-      hair: 'brown',
-      skin: 'fair',
-      top: '#F4F4F4',
-      pattern: 'plaid',
-      pattern2: '#8FB5D8',
-      collar: 'button',
-      glasses: 'thin',
-      teeth: true,
-    },
+    figure: JASON_FIGURE,
   },
   jethro: {
     id: 'jethro',
@@ -884,32 +1190,18 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'the-icebox',
     kind: 'human',
     tagName: 'Jethro',
-    dialogLine: "Act natural. Camera's rolling.",
+    dialogLines: JETHRO_LINES,
+    // A near-duplicate of his dialog line; it stays a bubble in the Room.
+    dialogOmit: ['Act natural. Camera is rolling.'],
     idleLines: [
       { text: 'Act natural. Camera is rolling.', periodS: 21, delayS: -2 },
       { text: 'One more for the recap.', periodS: 21, delayS: -9 },
       { text: 'Say hackathon!', periodS: 21, delayS: -16 },
     ],
-    // Confirmed via an e2e screenshot (#113): at their own tiles' derived
-    // screen positions, Jethro's bubble (his row+col puts his feet, and so
-    // his head-top, far enough down-screen that HEAD_TOP_OFFSET_Y alone
-    // isn't enough clearance) crowded right up against Nicole's nameplate
-    // just above and to his left. Nudged up to clear it, the same fix
-    // Roof Deck's Tristin got against Millie's nameplate.
-    bubbleOffsetY: -60,
     dialog: LINE_DIALOG,
-    figure: {
-      style: 'short',
-      hair: 'ash',
-      skin: 'fair',
-      top: '#4a4f57',
-      pattern: 'dots',
-      collar: 'button',
-      beard: 'full',
-      beardColor: '#A85A2A',
-      mouth: 'smirk',
-      prop: 'camera',
-    },
+    // The Icebox design straps a camera rig to his chest; Team Room 1's
+    // doesn't, so it's this entry's own override.
+    figure: { ...JETHRO_FIGURE, cameraRig: true },
   },
   'darrin-icebox': {
     id: 'darrin-icebox',
@@ -918,7 +1210,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'the-icebox',
     kind: 'human',
     tagName: 'Darrin',
-    dialogLine: 'Show me energy.',
+    dialogLines: DARRIN_LINES,
     idleLines: [
       { text: 'Show me energy.', periodS: 15, delayS: -1 },
       { text: 'Serve. Grind. Grow. Inspire.', periodS: 15, delayS: -6 },
@@ -929,6 +1221,376 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     // via the `DARRIN_FIGURE` constant so the two can't drift.
     figure: DARRIN_FIGURE,
   },
+  // #51: the Hallway's, Team Rooms 1-4's and the Bathroom's NPCs. Names and
+  // titles from design/Characters.dc.html (Emily, Dom, Millie, Casey, Ryan and
+  // Sam are on its TITLE TBD list), figures from design/build/humans.js, and
+  // tags/`idleLines` from each Room design's own nameplates and bubbles,
+  // verbatim. A repeat appearance shares its person's figure constant and
+  // dialog line. Static bubbles are `periodS: 0`; Team Room 1's and Team
+  // Room 3's custom keyframes are re-expressed under the shared 7% show
+  // window (see each entry). Only Ian's Team Room 2 slot shows a Minigame
+  // trigger ("TALK · BUG SQUASH"); Team Room 4's Beystadium is not a
+  // Minigame in this build.
+  // Michael S., Samantha and Daniel: the design draws all three as Penguins
+  // in the Hallway, but only Players appear as Penguins in the World (owner
+  // decision 2026-09-25, superseding an earlier addition; see PR #133) --
+  // dropped here and from the Hallway's own npcSlots.
+  emily: {
+    id: 'emily',
+    name: 'Emily Smith',
+    title: null,
+    roomId: 'office-hallway',
+    kind: 'human',
+    tagName: 'Emily Smith',
+    dialogLines: ['Ever thought about joining JG?'],
+    // A near-duplicate of her dialog line; it stays a bubble in the Room.
+    dialogOmit: ['Joining JG?'],
+    idleLines: staticLine('Joining JG?'),
+    // The Hallway design draws her without any idle bob.
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: {
+      style: 'wavyLong',
+      hair: 'blond',
+      skin: 'fair',
+      top: '#D63C8A',
+      sleeveless: true,
+      mouth: 'smirk',
+      necklace: true,
+    },
+  },
+  'anthony-hallway': {
+    id: 'anthony-hallway',
+    name: 'Anthony Conway',
+    title: 'Director of IT',
+    roomId: 'office-hallway',
+    kind: 'human',
+    tagName: 'Anthony Conway',
+    dialogLines: ANTHONY_LINES,
+    idleLines: staticLine('Is this link safe?'),
+    // The design stands him 140 px right of Emily; the grid stands him one
+    // tile (50 px) away, where his always-shown bubble would cover her
+    // nameplate. Shifted right until it clears it (#113).
+    bubbleOffsetX: 90,
+    // The Hallway design draws him without any idle bob.
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: ANTHONY_FIGURE,
+  },
+  'jethro-team-room-1': {
+    id: 'jethro-team-room-1',
+    name: 'Jethro Breuer',
+    title: 'Director of Digital Media',
+    roomId: 'team-room-1',
+    kind: 'human',
+    tagName: 'Jethro',
+    dialogLines: JETHRO_LINES,
+    // `jtalk 4s`, shown from 38%: (0.38 - 0.07) * 4 = 1.24s, i.e. -2.76s.
+    idleLines: [{ text: "Act natural. Camera's rolling.", periodS: 4, delayS: -2.76 }],
+    dialog: LINE_DIALOG,
+    figure: JETHRO_FIGURE,
+  },
+  'dom-team-room-1': {
+    id: 'dom-team-room-1',
+    name: 'Dom Favata',
+    title: null,
+    roomId: 'team-room-1',
+    kind: 'human',
+    tagName: 'Dom',
+    dialogLines: DOM_LINES,
+    questGiver: {},
+    // `domtalk 6s`, shown from 39%: (0.39 - 0.07) * 6 = 1.92s, i.e. -4.08s.
+    idleLines: [{ text: 'you gotta be faster than that', periodS: 6, delayS: -4.08 }],
+    dialog: LINE_DIALOG,
+    // humans.js's spec; the Room design dresses him in running gear for his
+    // lap of the room, a scene-only costume the renderer doesn't draw.
+    figure: DOM_FIGURE,
+  },
+  'ian-team-room-2': {
+    id: 'ian-team-room-2',
+    name: 'Ian Ballard',
+    title: 'VP of Engineering',
+    roomId: 'team-room-2',
+    kind: 'human',
+    tagName: 'Ian',
+    dialogLines: IAN_LINES,
+    idleLines: staticLine('have you installed the atlas plugin yet?'),
+    // Team Room 2's own name badge, not Dev Pit's "DEV PIT · VP OF
+    // ENGINEERING" (#51 review fix 2): the trigger line and action/decline
+    // labels are still Ian's own Bug Squash copy, shared via
+    // `BUG_SQUASH_DIALOG`.
+    dialog: { ...BUG_SQUASH_DIALOG, subtitle: 'TEAM ROOM 2 · VP OF ENGINEERING' },
+    figure: IAN_FIGURE,
+  },
+  'millie-team-room-3': {
+    id: 'millie-team-room-3',
+    name: 'Millie Elliott',
+    title: null,
+    roomId: 'team-room-3',
+    kind: 'human',
+    tagName: 'Millie',
+    dialogLines: MILLIE_LINES,
+    // The design gives her no bubble here.
+    idleLines: [],
+    // Team Room 3's design draws its NPCs without any idle bob.
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: MILLIE_FIGURE,
+  },
+  'casey-team-room-3': {
+    id: 'casey-team-room-3',
+    name: 'Casey Snow',
+    title: null,
+    roomId: 'team-room-3',
+    kind: 'human',
+    tagName: 'Casey',
+    dialogLines: CASEY_LINES,
+    // `rats 10s`, shown from 80%: (0.80 - 0.07) * 10 = 7.3s, i.e. -2.7s.
+    idleLines: [{ text: 'RATS', periodS: 10, delayS: -2.7 }],
+    // The Igloo Gear stall is the Roof Deck's; here she is just gaming.
+    // Team Room 3's design draws its NPCs without any idle bob.
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: CASEY_FIGURE,
+  },
+  'sydney-team-room-3': {
+    id: 'sydney-team-room-3',
+    name: 'Sydney Murauskas',
+    title: 'Technical Recruiter',
+    roomId: 'team-room-3',
+    kind: 'human',
+    tagName: 'Sydney',
+    dialogLines: SYDNEY_LINES,
+    idleLines: staticLine('So, open to new roles?'),
+    // Team Room 3's design draws its NPCs without any idle bob.
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: SYDNEY_FIGURE,
+  },
+  michael: {
+    id: 'michael',
+    name: 'Michael Prete',
+    title: 'IT Associate',
+    roomId: 'team-room-4',
+    kind: 'human',
+    tagName: 'Michael',
+    dialogLines: ['3-0. Again.'],
+    questGiver: {},
+    idleLines: staticLine('I challenge you to a Beyblade battle!'),
+    // Team Room 4's design draws its NPCs without any idle bob.
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: {
+      style: 'shortDark',
+      hair: 'dark',
+      skin: 'light',
+      top: '#161719',
+      jacket: '#D9534F',
+      collar: 'crew',
+      glasses: 'rect',
+      beard: 'full',
+      teeth: true,
+      prop: 'beyblade',
+    },
+  },
+  'sam-team-room-4': {
+    id: 'sam-team-room-4',
+    name: 'Sam Schantz',
+    title: null,
+    roomId: 'team-room-4',
+    kind: 'human',
+    tagName: 'Sam',
+    dialogLines: SAM_LINES,
+    // The design gives him music notes, not a bubble.
+    idleLines: [],
+    // Team Room 4's design draws its NPCs without any idle bob.
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: SAM_FIGURE,
+  },
+  'ryan-team-room-4': {
+    id: 'ryan-team-room-4',
+    name: 'Ryan Shendler',
+    title: null,
+    roomId: 'team-room-4',
+    kind: 'human',
+    tagName: 'Ryan',
+    dialogLines: RYAN_LINES,
+    // The design gives him no bubble here.
+    idleLines: [],
+    // Team Room 4's design draws its NPCs without any idle bob.
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: RYAN_FIGURE,
+  },
+  // #51 slice 3: the Mullet's nine NPCs. Names and titles from
+  // design/Characters.dc.html (Dom and Ashley are on its TITLE TBD list), tags
+  // and `idleLines` from design/The Mullet.dc.html's own nameplates and
+  // bubbles, verbatim. A repeat appearance shares its person's figure and
+  // dialog-lines constants. The design animates several of them with SMIL (Dom's lap,
+  // Tony's walk round the pool table, Jory's walk, Jon's and Brandon's
+  // ping-pong sway, Ashley's pacing); none of that is ported here: each stands
+  // at its rest slot, and only a figure the design gives a plain up-down bob
+  // keeps the shared idle bob (#149 follow-up).
+  'jason-mullet': {
+    id: 'jason-mullet',
+    name: 'Jason Jahnel',
+    title: 'COO',
+    roomId: 'the-mullet',
+    kind: 'human',
+    tagName: 'Jason',
+    dialogLines: JASON_LINES,
+    // At the Ms. Pac-Man, with no bubble.
+    idleLines: [],
+    // The design jiggles him at the joystick rather than bobbing him.
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: JASON_FIGURE,
+  },
+  'nicole-mullet': {
+    id: 'nicole-mullet',
+    name: 'Nicole Roberts',
+    title: 'Account Manager',
+    roomId: 'the-mullet',
+    kind: 'human',
+    tagName: 'Nicole',
+    dialogLines: NICOLE_LINES,
+    // The design floats a laugh ("hehe") off her on a 3 s cycle; ported as a
+    // static line (#149 follow-up).
+    idleLines: staticLine('hehe'),
+    dialog: LINE_DIALOG,
+    figure: NICOLE_FIGURE,
+  },
+  'ann-marie-mullet': {
+    id: 'ann-marie-mullet',
+    name: 'Ann Marie Berdar',
+    title: 'SUBSCRIPTION AI',
+    roomId: 'the-mullet',
+    kind: 'human',
+    tagName: 'Ann Marie',
+    dialogLines: ANN_MARIE_LINES,
+    // As Nicole's: the design's floating "haha", ported as a static line.
+    idleLines: staticLine('haha'),
+    dialog: LINE_DIALOG,
+    figure: ANN_MARIE_FIGURE,
+  },
+  'jory-mullet': {
+    id: 'jory-mullet',
+    name: 'Jory Hutchins',
+    title: 'Director of Career Development',
+    roomId: 'the-mullet',
+    kind: 'human',
+    tagName: 'Jory',
+    dialogLines: JORY_LINES,
+    idleLines: staticLine('Tribe has spoken.'),
+    // The grid stands her two tiles (100 px) right of Brandon, where her
+    // always-shown bubble would cover the end of his nameplate (the design
+    // already has them touching). Shifted right until it clears it (#113).
+    bubbleOffsetX: 20,
+    // The design walks her a loop of the room rather than bobbing her.
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: JORY_FIGURE,
+  },
+  'ashley-mullet': {
+    id: 'ashley-mullet',
+    name: 'Ashley Schuliger',
+    title: null,
+    roomId: 'the-mullet',
+    kind: 'human',
+    tagName: 'Ashley',
+    dialogLines: ASHLEY_LINES,
+    // One bubble the design shows three times per 18 s cycle (a discrete SMIL
+    // opacity: shown 4.4%-16.7%, 41.1%-53.3% and 70.6%-82.8%), each time
+    // Clucknelius is thrown.
+    idleLines: [
+      { text: 'Clucknelius coming at you!', periodS: 18, delayS: 0, window: [0.0444, 0.1667] },
+      { text: 'Clucknelius coming at you!', periodS: 18, delayS: 0, window: [0.4111, 0.5333] },
+      { text: 'Clucknelius coming at you!', periodS: 18, delayS: 0, window: [0.7056, 0.8278] },
+    ],
+    dialog: LINE_DIALOG,
+    figure: ASHLEY_FIGURE,
+  },
+  tony: {
+    id: 'tony',
+    name: 'Tony Mercadante',
+    title: 'Project Manager',
+    roomId: 'the-mullet',
+    kind: 'human',
+    tagName: 'Tony Mercadante',
+    dialogLines: ['Eight ball, corner pocket.'],
+    idleLines: staticLine('corner pocket'),
+    // The design walks him round the pool table with his cue rather than
+    // bobbing him.
+    still: true,
+    dialog: LINE_DIALOG,
+    // humans.js's `mercadante` spec has `slick` hair and a `henley` collar,
+    // neither of which the renderer draws; the nearest it does are the short
+    // dark cut and a crew neck (#149 follow-up).
+    figure: {
+      style: 'shortDark',
+      hair: 'dark',
+      skin: 'light',
+      top: '#6B2237',
+      collar: 'crew',
+      beard: 'stubble',
+      teeth: true,
+    },
+  },
+  'jon-mullet': {
+    id: 'jon-mullet',
+    name: 'Jon Keller',
+    title: 'President',
+    roomId: 'the-mullet',
+    kind: 'human',
+    tagName: 'Jon',
+    dialogLines: JON_LINES,
+    // At the ping-pong table, with no bubble.
+    idleLines: [],
+    // The design sways him side to side with the rally rather than bobbing.
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: JON_FIGURE,
+  },
+  'brandon-mullet': {
+    id: 'brandon-mullet',
+    name: 'Brandon Badgett',
+    title: 'Senior Vice President',
+    roomId: 'the-mullet',
+    kind: 'human',
+    tagName: 'Brandon',
+    dialogLines: BRANDON_LINES,
+    // Jon's ping-pong opponent, also with no bubble. The arcade is out of
+    // scope, so his Interaction is Dialogue.
+    idleLines: [],
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: BRANDON_FIGURE,
+  },
+  'dom-mullet': {
+    id: 'dom-mullet',
+    name: 'Dom Favata',
+    title: null,
+    roomId: 'the-mullet',
+    kind: 'human',
+    tagName: 'Dom',
+    dialogLines: DOM_LINES,
+    // A discrete SMIL opacity on a 9.4 s cycle shows it from 86% of one cycle
+    // to 12% of the next: two windows either side of the cycle's start.
+    idleLines: [
+      { text: 'Undefeated. I always win.', periodS: 9.4, delayS: 0, window: [0, 0.12] },
+      { text: 'Undefeated. I always win.', periodS: 9.4, delayS: 0, window: [0.86, 1] },
+    ],
+    dialog: LINE_DIALOG,
+    // humans.js's spec; the Room design dresses him in running gear for his
+    // lap of the room, a scene-only costume the renderer doesn't draw.
+    figure: DOM_FIGURE,
+  },
+  // Jessie: the design draws her as a Penguin in the Bathroom, but only
+  // Players appear as Penguins in the World (owner decision 2026-09-25; see
+  // PR #133) -- dropped here and from the Bathroom's own npcSlots. Spelled
+  // "Jessie" there, unlike The Melt's "Jesse" (see that entry's own
+  // comment), which remains.
 };
 
 const NPC_IDS = Object.keys(NPCS) as NpcId[];

@@ -2,9 +2,9 @@ import { isIglooSlot, type IglooSlot } from '../../persistence/progress-store';
 
 /**
  * The only shape `igloo.ts`'s `furnitureSlots` ever uses for a
- * `RoomFurnitureSlot.id` (#41): `"slot-1"` through `"slot-6"`.
+ * `RoomFurnitureSlot.id` (#41): `"slot-1"` through `"slot-11"` (#135).
  */
-const SLOT_ID_PATTERN = /^slot-([1-6])$/;
+const SLOT_ID_PATTERN = /^slot-([1-9]\d?)$/;
 
 /**
  * Maps a Room's `RoomFurnitureSlot.id` (e.g. `"slot-3"`) to the matching

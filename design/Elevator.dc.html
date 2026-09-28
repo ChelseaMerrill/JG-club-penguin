@@ -24,6 +24,8 @@
     @keyframes popin { 0% { opacity:0; transform:translateY(12px);} 3%,13% { opacity:1; transform:translateY(0);} 16%,100% { opacity:0; transform:translateY(-8px);} }
     @keyframes blink { 50% { opacity: .35; } }
   </style>
+  <script src="door-nav.js"></script>
+  <script>(function(){var to=new URLSearchParams(location.search).get('to');var dest={roof:'Room 05 Roof Deck.dc.html',town:'Room 01 Town Center.dc.html'}[to];if(dest)setTimeout(function(){location.href=dest;},4500);})();</script>
 </helmet>
 <section style="display:flex; flex-direction:column; gap:14px; padding:40px; align-items:flex-start;">
   <div style="display:flex; align-items:center; gap:18px; font: 400 14px 'Anton', sans-serif; letter-spacing:.24em; color:#B3B6C9;"><a href="Club JenGuin Map.dc.html" style="color:#00BDFF; text-decoration:none;">← MAP</a><span>14 · ELEVATOR (LOADING SCREEN)</span></div>

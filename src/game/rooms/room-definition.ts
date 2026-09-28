@@ -1,4 +1,5 @@
 import type { HexColor, RoomId, Tile } from '../../contracts';
+import type { Placement } from '../../persistence/progress-store';
 
 /**
  * A Room's art. `procedural` is drawn by `RoomScene` from `walkable` in the
@@ -51,15 +52,40 @@ export interface RoomNpcSlot {
   tile: Tile;
 }
 
-/**
- * A placeholder slot for interactive Furniture. Reserved for the Igloo (#16):
- * Furniture is CONTEXT.md's term for items a Player buys at the Igloo Gear
- * stall and places in their own Igloo, so no other Room populates this.
- */
-export interface RoomFurnitureSlot {
-  id: string;
-  tile: Tile;
+/** A point in Stage pixels (1600x900), for things that aren't on a floor Tile. */
+export interface StagePoint {
+  x: number;
+  y: number;
 }
+
+/**
+ * A slot for interactive Furniture. Reserved for the Igloo (#16): Furniture
+ * is CONTEXT.md's term for items a Player buys at the Igloo Gear stall and
+ * places in their own Igloo, so no other Room populates this.
+ *
+ * #135: each slot has a `placement` that must match `IGLOO_SLOT_PLACEMENT`
+ * for its number (`validate.ts` checks it). A floor slot sits on a Tile. A
+ * wall slot is a Stage point on the left or right back wall, whose art is
+ * drawn sheared into that wall plane. The ceiling slot hangs its item on a
+ * cord from `cordTopY` down to `anchor`, with a shadow on the floor at
+ * `shadow`. Wall and ceiling fixtures aren't Tile positions, so they use
+ * Stage pixels (CONTEXT.md reserves Tiles for Penguins, doors, spawn and NPCs).
+ */
+export type RoomFurnitureSlot =
+  | { id: string; placement: Extract<Placement, 'floor'>; tile: Tile }
+  | {
+      id: string;
+      placement: Extract<Placement, 'wall'>;
+      wall: 'left' | 'right';
+      anchor: StagePoint;
+    }
+  | {
+      id: string;
+      placement: Extract<Placement, 'ceiling'>;
+      anchor: StagePoint;
+      cordTopY: number;
+      shadow: StagePoint;
+    };
 
 /**
  * A non-interactive decorative prop position (e.g. Town Center's planter,

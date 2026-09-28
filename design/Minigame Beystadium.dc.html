@@ -125,7 +125,7 @@ class Component extends DCLogic {
   dodge=()=>{const s=this.state;if(s.phase!=='battle'||s.sub!=='fight'||s.paused||s.dodge>0)return;this.setState({dodge:1.2,mySpin:s.mySpin-1,clash:'DODGE READY'});this.clashTimer();};
   onKey=(e)=>{const k=e.key;if(k===' '){e.preventDefault();if(!e.repeat)this.action();}else if(k==='x'||k==='X'){e.preventDefault();this.dodge();}else if(k==='p'||k==='P')this.togglePause();};
   togglePause=()=>this.setState(s=>({paused:!s.paused}));
-  quit=()=>{clearInterval(this.iv);this.setState({phase:'trigger',paused:false});};
+  quit=()=>{ window.location.href='Team Room 4.dc.html';clearInterval(this.iv);this.setState({phase:'trigger',paused:false});};
   componentWillUnmount(){clearInterval(this.iv);}
   renderVals(){const s=this.state;const b=this.BEYS[s.bey];const zone=this.ringZone();const ringScale=s.ring<1.5?(0.6+s.ring/1.5*0.6).toFixed(2):(1.2-(s.ring-1.5)/0.7*0.4).toFixed(2);
     // bey positions: orbit around center; converge on clashes

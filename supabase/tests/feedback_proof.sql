@@ -1,4 +1,4 @@
--- Feedback proof for 20260925020000_feedback.sql, against the #9 H1 fixture
+-- Feedback proof for 20260928010000_feedback.sql, against the #9 H1 fixture
 -- Player, in 46_quests_proof.sql's style.
 --
 -- What this proves, as the fixture signed in (role authenticated):

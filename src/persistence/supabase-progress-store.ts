@@ -13,13 +13,16 @@ import {
   clampLeaderboardRows,
   ProgressStoreError,
   emptySlots,
+  fitsSlot,
   isIglooSlot,
   isProgressErrorCode,
   validateLook,
+  type BadgeCheckResult,
   type CompleteQuestResult,
   type QuestProgress,
   type IglooSlot,
   type LeaderboardEntry,
+  type Placement,
   type ProgressErrorCode,
   type ProgressSnapshot,
   type ProgressStore,
@@ -110,6 +113,24 @@ interface ShopItemRow {
   name: string;
   price: number;
   art_key: string;
+  placement: Placement;
+}
+
+/** `shop_items.select('placement').eq('id', itemId)`: the one-item read `setSlot`'s placement pre-check makes (#135). */
+interface ShopItemsSelect extends OrderableRows<ShopItemRow> {
+  eq(
+    column: 'id',
+    value: string,
+  ): { maybeSingle(): PromiseLike<SelectResult<{ placement: Placement }>> };
+}
+
+/** A `public.badges` row (#138). */
+interface BadgeCatalogRow {
+  id: string;
+  name: string;
+  how_to_earn: string;
+  sort_order: number;
+  available: boolean;
 }
 
 export interface PlayersTable {
@@ -154,7 +175,11 @@ export interface IglooSlotsTable {
 }
 
 export interface ShopItemsTable {
-  select(columns: string): OrderableRows<ShopItemRow>;
+  select(columns: string): ShopItemsSelect;
+}
+
+export interface BadgesTable {
+  select(columns: string): OrderableRows<BadgeCatalogRow>;
 }
 
 export type ProgressTable =
@@ -163,10 +188,17 @@ export type ProgressTable =
   | MinigameBestsTable
   | PlayerItemsTable
   | IglooSlotsTable
-  | ShopItemsTable;
+  | ShopItemsTable
+  | BadgesTable;
 
 export type ProgressTableName =
-  'players' | 'player_badges' | 'minigame_bests' | 'player_items' | 'igloo_slots' | 'shop_items';
+  | 'players'
+  | 'player_badges'
+  | 'minigame_bests'
+  | 'player_items'
+  | 'igloo_slots'
+  | 'shop_items'
+  | 'badges';
 
 /**
  * The narrow slice of a Supabase client `createSupabaseProgressStore` needs:
@@ -185,7 +217,8 @@ export interface ProgressClient {
       | 'leaderboard'
       | 'quest_progress'
       | 'mark_dev_pit_visited'
-      | 'complete_quest',
+      | 'complete_quest'
+      | 'check_session_badges',
     args: Record<string, unknown>,
   ): PromiseLike<RpcResult>;
 }
@@ -263,8 +296,10 @@ const TOAST_MESSAGES: Record<ProgressErrorCode, string> = {
   invalid_look: "That Penguin look can't be saved",
   not_owned: "You don't own that item",
   invalid_slot: "That slot doesn't exist",
+  wrong_placement: "That item doesn't go there",
   unknown_quest: "That quest doesn't exist",
   quest_incomplete: "That quest isn't finished yet",
+  invalid_response: "Couldn't read the server's reply",
 };
 
 /** Anything that isn't a typed `ProgressStoreError`: network failures, unrecognized errors. */
@@ -321,28 +356,42 @@ export function createSupabaseProgressStore(
       const playerItemsTable = client.from('player_items') as PlayerItemsTable;
       const iglooSlotsTable = client.from('igloo_slots') as IglooSlotsTable;
       const shopItemsTable = client.from('shop_items') as ShopItemsTable;
+      const badgesTable = client.from('badges') as BadgesTable;
 
-      const [playerRes, badgesRes, bestsRes, itemsRes, slotsRes, catalogRes] = await Promise.all([
-        playersTable.select(SELECT_PLAYER_COLUMNS).eq('id', playerId).maybeSingle(),
-        playerBadgesTable
-          .select('badge_id')
-          .eq('player_id', playerId)
-          .order('earned_at', { ascending: true })
-          .order('badge_id', { ascending: true }),
-        minigameBestsTable.select('minigame_id, best_score').eq('player_id', playerId),
-        playerItemsTable
-          .select('item_id')
-          .eq('player_id', playerId)
-          .order('acquired_at', { ascending: true })
-          .order('item_id', { ascending: true }),
-        iglooSlotsTable.select('slot, item_id').eq('player_id', playerId),
-        shopItemsTable
-          .select('id, stall, name, price, art_key')
-          .order('price', { ascending: true })
-          .order('id', { ascending: true }),
-      ]);
+      const [playerRes, badgesRes, bestsRes, itemsRes, slotsRes, catalogRes, badgeCatalogRes] =
+        await Promise.all([
+          playersTable.select(SELECT_PLAYER_COLUMNS).eq('id', playerId).maybeSingle(),
+          playerBadgesTable
+            .select('badge_id')
+            .eq('player_id', playerId)
+            .order('earned_at', { ascending: true })
+            .order('badge_id', { ascending: true }),
+          minigameBestsTable.select('minigame_id, best_score').eq('player_id', playerId),
+          playerItemsTable
+            .select('item_id')
+            .eq('player_id', playerId)
+            .order('acquired_at', { ascending: true })
+            .order('item_id', { ascending: true }),
+          iglooSlotsTable.select('slot, item_id').eq('player_id', playerId),
+          shopItemsTable
+            .select('id, stall, name, price, art_key, placement')
+            .order('price', { ascending: true })
+            .order('id', { ascending: true }),
+          badgesTable
+            .select('id, name, how_to_earn, sort_order, available')
+            .order('sort_order', { ascending: true })
+            .order('id', { ascending: true }),
+        ]);
 
-      for (const res of [playerRes, badgesRes, bestsRes, itemsRes, slotsRes, catalogRes]) {
+      for (const res of [
+        playerRes,
+        badgesRes,
+        bestsRes,
+        itemsRes,
+        slotsRes,
+        catalogRes,
+        badgeCatalogRes,
+      ]) {
         if (res.error) {
           throw toProgressError(res.error);
         }
@@ -376,6 +425,14 @@ export function createSupabaseProgressStore(
           name: row.name,
           price: row.price,
           artKey: row.art_key,
+          placement: row.placement,
+        })),
+        badgeCatalog: (badgeCatalogRes.data ?? []).map((row) => ({
+          id: row.id,
+          name: row.name,
+          howToEarn: row.how_to_earn,
+          sortOrder: row.sort_order,
+          available: row.available,
         })),
       };
     });
@@ -476,6 +533,26 @@ export function createSupabaseProgressStore(
         return;
       }
 
+      // #135: check the item's placement against the slot's *before* the
+      // delete. The delete and upsert are two requests, so a move the
+      // database's placement guard rejects at the upsert would otherwise
+      // have already emptied the item's old slot. The trigger stays the
+      // authority; this only avoids the half-move.
+      const shopItemsTable = client.from('shop_items') as ShopItemsTable;
+      const { data: itemRow, error: itemError } = await shopItemsTable
+        .select('placement')
+        .eq('id', itemId)
+        .maybeSingle();
+      if (itemError) {
+        throw toProgressError(itemError);
+      }
+      if (!itemRow) {
+        throw new ProgressStoreError('not_owned');
+      }
+      if (!fitsSlot(itemRow, slot)) {
+        throw new ProgressStoreError('wrong_placement');
+      }
+
       // Moving an owned item: drop it from wherever it currently sits, then
       // place it in the requested slot, mirroring the pglite/SQL harness.
       const { error: deleteError } = await iglooSlotsTable
@@ -556,10 +633,36 @@ export function createSupabaseProgressStore(
       if (error) {
         throw toProgressError(error);
       }
-      const result = data as CompleteQuestResult;
+      const raw = data as Omit<CompleteQuestResult, 'badgesEarned'> & { badgesEarned?: unknown };
+      const result: CompleteQuestResult = {
+        ...raw,
+        badgesEarned: Array.isArray(raw.badgesEarned) ? (raw.badgesEarned as BadgeId[]) : [],
+      };
       emitter?.emit('tokens:changed', { balance: result.balance });
+      // #138: one announcement per Badge the call awarded (Ship It today).
+      for (const badgeId of result.badgesEarned) {
+        emitter?.emit('badge:earned', { badgeId });
+      }
       return result;
     });
+  }
+
+  // #138: a background check (the Session timer), so no `guarded()` toast,
+  // like `questProgress`. It emits nothing: the session wrapper announces
+  // any Badge the check awarded.
+  async function checkBadges(): Promise<BadgeCheckResult> {
+    const { data, error } = await client.rpc('check_session_badges', {});
+    if (error) {
+      throw toProgressError(error);
+    }
+    // A malformed reply rejects rather than reading as a balance of 0, which
+    // the wrapper would otherwise write into the snapshot and the HUD. The
+    // Session timer swallows the rejection.
+    const result = (data ?? {}) as Partial<BadgeCheckResult>;
+    if (!Array.isArray(result.badges) || typeof result.balance !== 'number') {
+      throw new ProgressStoreError('invalid_response');
+    }
+    return { badges: result.badges, balance: result.balance };
   }
 
   return {
@@ -572,6 +675,7 @@ export function createSupabaseProgressStore(
     questProgress,
     markDevPitVisited,
     completeQuest,
+    checkBadges,
   };
 }
 
@@ -666,7 +770,16 @@ export function toProgressClient(client: SupabaseClient): ProgressClient {
 
   function shopItemsTable(): ShopItemsTable {
     const table = client.from('shop_items');
-    return { select: (columns) => table.select(columns) };
+    // A cast, as for the other tables: PostgREST's own builder types are far
+    // deeper than `ShopItemsSelect` and trip TypeScript's instantiation limit.
+    return { select: (columns) => table.select(columns) as unknown as ShopItemsSelect };
+  }
+
+  function badgesTable(): BadgesTable {
+    const table = client.from('badges');
+    return {
+      select: (columns) => table.select(columns) as unknown as OrderableRows<BadgeCatalogRow>,
+    };
   }
 
   return {
@@ -684,6 +797,8 @@ export function toProgressClient(client: SupabaseClient): ProgressClient {
           return iglooSlotsTable();
         case 'shop_items':
           return shopItemsTable();
+        case 'badges':
+          return badgesTable();
         default: {
           const exhaustiveCheck: never = table;
           throw new Error(`Unknown ProgressClient table: ${String(exhaustiveCheck)}`);

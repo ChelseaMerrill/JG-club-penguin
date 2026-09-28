@@ -18,7 +18,7 @@ You need the Supabase CLI (`npx supabase ...` works), logged in and linked to
 the project: `supabase login`, then `supabase link --project-ref <project-ref>`.
 
 1. **Apply the migration.** Paste
-   `supabase/migrations/20260925020000_feedback.sql` into the Supabase SQL
+   `supabase/migrations/20260928010000_feedback.sql` into the Supabase SQL
    editor and run it (safe to rerun). Optionally prove it: paste
    `supabase/tests/feedback_proof.sql`, replace the fixture id as its header
    says, and check every row (including `ALL`) shows `pass = true`.

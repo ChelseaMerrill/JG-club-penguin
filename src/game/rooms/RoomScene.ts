@@ -22,10 +22,17 @@ import {
 import { doorApproachTile, npcInteractionTile } from '../movement/targets';
 import { getNpcMotion } from '../../npcs/npc-motions';
 import { getNpcDefinition } from '../../npcs/npcs';
+import { npcLayout } from '../npcs/npc-layout';
 import { NpcClickPause } from '../npcs/npc-motion';
 import { createNpcSprite, type NpcSprite } from '../npcs/npc-sprite';
 import { RoomNpcMotions } from '../npcs/room-npc-motions';
-import { createPenguin, type Penguin, type PenguinAnim } from '../penguin';
+import {
+  createPenguin,
+  PENGUIN_OVERLAY_NAME,
+  PLAYER_PENGUIN_SCALE,
+  type Penguin,
+  type PenguinAnim,
+} from '../penguin';
 import { GAME_HEIGHT, GAME_WIDTH } from '../stage-size';
 import { planBackgroundDraw } from './background';
 import {
@@ -34,10 +41,17 @@ import {
   HOOKS_ENABLED,
   resolveRoomIdFromLocation,
 } from './dev-room-hook';
-import { drawFurnitureArt } from './furniture-art';
+import {
+  AWARD_LOGO_LOAD_SIZE,
+  drawCeilingShadow,
+  drawFurnitureArt,
+  FURNITURE_IMAGE_ART,
+} from './furniture-art';
 import { iglooSlotForSlotId } from './furniture-slots';
 import {
+  CEILING_FURNITURE_DEPTH,
   depthForTile,
+  NPC_BUBBLE_LAYER,
   screenToTile,
   SNOWBALL_LAYER,
   tileCornerToScreen,
@@ -54,6 +68,12 @@ import type {
   RoomNpcSlot,
 } from './room-definition';
 import { RoomPenguinView, type PlacePenguin } from './room-penguin-view';
+import {
+  LOCAL_PENGUIN_VISIBLE_KEY,
+  isLocalPenguinVisible,
+  setLocalPenguinVisible,
+  stageAcceptsInput,
+} from './local-penguin-visibility';
 import type { SnowballView } from '../../snowball/snowball-controller';
 import { arcPoint, clampTileToGrid, type ScreenPoint } from '../../snowball/snowball-rules';
 import type { IglooSlot, ShopItem } from '../../persistence/progress-store';
@@ -159,21 +179,6 @@ const HOTSPOT_LABEL_FONT_SIZE = '14px';
 const LABEL_FONT_FAMILY = 'sans-serif';
 const LABEL_TEXT_COLOR = '#F4F4F4';
 const DOOR_LABEL_FONT_SIZE = '14px';
-/**
- * The invisible click zone over each NPC sprite (#36 D3/A4, sized per #36
- * round-1 review item 6): centred above the sprite's feet-anchor point,
- * covering roughly feet-105 to feet+5 -- the figure's own body/head, not just
- * its feet -- not an alpha-0 shape, which Phaser drops from input
- * hit-testing the same way `drawDoors`'s own image-background `Zone` avoids
- * that trap. Confirmed against Town Center's actual NPC/click tile geometry
- * (`e2e/click-to-move.spec.ts` clicks tiles as close as one column/two rows
- * from an NPC slot) to still exclude every one of that spec's own click
- * points.
- */
-const NPC_HIT_ZONE_WIDTH = 64;
-const NPC_HIT_ZONE_HEIGHT = 110;
-const NPC_HIT_ZONE_OFFSET_Y = -50;
-
 // #15 D3/A4: a disabled door's (`targetRoomId: null`) "COMING SOON" hint, in
 // the Stage's own display font (`--font-game-display`, `style.css`).
 const DOOR_HINT_FONT_FAMILY = "'Bumbastika', sans-serif";
@@ -194,8 +199,13 @@ const SNOWBALL_DEPTH = SNOWBALL_LAYER;
 const SNOWBALL_CYAN = 0x00bdff;
 const SNOWBALL_WHITE = 0xf4f4f4;
 const SNOWBALL_OUTLINE = 0x0c4b5f;
-/** Arcs start at chest height, this far above the feet point every `SnowballView` point is. */
-const SNOWBALL_CHEST_OFFSET_Y = 60;
+/**
+ * Arcs start at chest height, this far above the feet point every
+ * `SnowballView` point is. Scaled by `PLAYER_PENGUIN_SCALE` (#131): chest
+ * height is measured off the Penguin sprite's own size, so it shrinks with
+ * the sprite (≈ 60 × 0.58).
+ */
+const SNOWBALL_CHEST_OFFSET_Y = 60 * PLAYER_PENGUIN_SCALE;
 const SNOWBALL_PREVIEW_SEGMENTS = 28;
 /** How long a splat stays up before it has faded out (#53 D2: ~400 ms). */
 const SNOWBALL_SPLAT_MS = 400;
@@ -206,6 +216,18 @@ const SNOWBALL_HINT_OFFSET_Y = 56;
 // over any Furniture already placed there, in the door/hotspot's own
 // cyan-outline vocabulary.
 const FURNITURE_SLOT_HIGHLIGHT_COLOR = 0x00bdff;
+// #135: wall art sits flat on the back walls, above the Room art and floor
+// but below every Tile depth, so Penguins always walk in front of it. The
+// ceiling item (`iso.ts`'s `CEILING_FURNITURE_DEPTH`) hangs above floor
+// content, below NPC speech bubbles and Player name tags and chat bubbles;
+// its shadow lies on the floor. Edit-mode markers for wall and ceiling slots
+// sit just under the bubble layer so they win clicks over the door hotspot.
+const WALL_FURNITURE_DEPTH = -0.5;
+const CEILING_SHADOW_DEPTH = -0.4;
+const HANGING_SLOT_MARKER_DEPTH = NPC_BUBBLE_LAYER - 10;
+/** A wall slot's edit-mode outline and hit area (the wall art box, before shear). */
+const WALL_SLOT_BOX = 38;
+const CEILING_SLOT_RADIUS = 20;
 const FURNITURE_SLOT_HIGHLIGHT_WIDTH = 3;
 const FURNITURE_SLOT_LABEL_FONT_SIZE = '16px';
 const FURNITURE_SLOT_LABEL_BG = 'rgba(10,11,13,0.75)';
@@ -399,6 +421,12 @@ export class RoomScene extends Scene {
    */
   private readonly handleRegistrySetData = (_parent: unknown, key: string): void => {
     if (key === PLAYER_REGISTRY_KEY) this.applyRegisteredPlayer();
+    if (key === LOCAL_PENGUIN_VISIBLE_KEY) this.applyLocalPenguinVisibility();
+  };
+
+  /** Fired on every later change to the own Penguin's visibility flag (#162). */
+  private readonly handleLocalPenguinVisibilityChanged = (): void => {
+    this.applyLocalPenguinVisibility();
   };
 
   /** Fired on every later `player` update, once the key already exists (review fix 1). */
@@ -416,6 +444,10 @@ export class RoomScene extends Scene {
     this.registry.events.off(
       Data.Events.CHANGE_DATA_KEY + PLAYER_REGISTRY_KEY,
       this.handleRegistryPlayerChanged,
+    );
+    this.registry.events.off(
+      Data.Events.CHANGE_DATA_KEY + LOCAL_PENGUIN_VISIBLE_KEY,
+      this.handleLocalPenguinVisibilityChanged,
     );
     if (this.activeTween) {
       this.activeTween.stop();
@@ -605,6 +637,18 @@ export class RoomScene extends Scene {
     if (room.background.kind === 'image') {
       this.load.image(room.background.key, room.background.url);
     }
+    // #135 D7: the JG award logos, for award Furniture hung on the Igloo's
+    // walls. Only a Room with Furniture slots can show them.
+    if (room.furnitureSlots?.length) {
+      for (const { textureKey, url } of Object.values(FURNITURE_IMAGE_ART)) {
+        if (!this.textures.exists(textureKey)) {
+          this.load.svg(textureKey, url, {
+            width: AWARD_LOGO_LOAD_SIZE,
+            height: AWARD_LOGO_LOAD_SIZE,
+          });
+        }
+      }
+    }
   }
 
   create(): void {
@@ -656,6 +700,10 @@ export class RoomScene extends Scene {
       Data.Events.CHANGE_DATA_KEY + PLAYER_REGISTRY_KEY,
       this.handleRegistryPlayerChanged,
     );
+    this.registry.events.on(
+      Data.Events.CHANGE_DATA_KEY + LOCAL_PENGUIN_VISIBLE_KEY,
+      this.handleLocalPenguinVisibilityChanged,
+    );
     // `cleanup` destroys only #14's own Penguins (local and debug).
     this.events.once(Scenes.Events.SHUTDOWN, this.cleanup);
 
@@ -697,9 +745,22 @@ export class RoomScene extends Scene {
             facing: controller.state.facing,
             moving: controller.isMoving(),
             flipX: this.penguinSprite()?.flipX ?? false,
+            textureKey: this.penguinSprite()?.texture.key,
             lookName: this.currentLook.name,
             lookBody: this.currentLook.body,
             playerId: controller.state.playerId,
+            spriteAngle: this.penguinSprite()?.angle,
+            spriteX: this.penguinSprite()?.x,
+            spriteY: this.penguinSprite()?.y,
+            bodyTweenCount: this.penguin?.bodyMotionTweenCount(),
+            containerX: this.penguin?.container.x,
+            containerY: this.penguin?.container.y,
+            // The name tag is the overlay's first `Text`; the chat bubble's comes after it.
+            nameTagY: this.penguin?.overlay.list.find(
+              (child): child is GameObjects.Text => child instanceof GameObjects.Text,
+            )?.y,
+            nameTagDepth: this.penguin?.overlay.depth,
+            visible: this.penguin?.container.visible ?? false,
           }
         : undefined,
       textureListenerCount: countActiveTextureListeners(this),
@@ -716,6 +777,7 @@ export class RoomScene extends Scene {
       remotePenguinCount: this.countPenguinContainers((name) => name === REMOTE_PENGUIN_NAME),
       remotePenguins: this.penguins.debugRemotePenguins(),
       setRegisteredPlayer: (player) => this.registry.set(PLAYER_REGISTRY_KEY, player),
+      setLocalPenguinVisible: (visible) => setLocalPenguinVisible(this.registry, visible),
       spawnDebugPenguin: (tile, look) => this.spawnDebugPenguin(tile, look),
       furniture: this.debugFurniture(),
       npcs: this.npcMotions?.debug(),
@@ -750,7 +812,10 @@ export class RoomScene extends Scene {
    */
   private countPenguinContainers(matches: (name: string) => boolean): number {
     return this.children.list.filter(
-      (child) => child instanceof GameObjects.Container && matches(child.name),
+      (child) =>
+        child instanceof GameObjects.Container &&
+        child.name !== PENGUIN_OVERLAY_NAME &&
+        matches(child.name),
     ).length;
   }
 
@@ -873,7 +938,10 @@ export class RoomScene extends Scene {
       graphics.lineBetween(a.x, a.y, b.x, b.y);
     }
     graphics.fillStyle(SNOWBALL_WHITE, 1);
-    graphics.fillCircle(from.x, from.y, 6);
+    // Scaled by PLAYER_PENGUIN_SCALE (#131 review fix): this dot sits at the
+    // thrower's chest, so it shrinks with the smaller figure; the reticle
+    // ellipse/ticks below stay tile-sized and unscaled.
+    graphics.fillCircle(from.x, from.y, 6 * PLAYER_PENGUIN_SCALE);
     // Reticle: outer ring, soft inner fill, four ticks.
     graphics.lineStyle(3, SNOWBALL_CYAN, 1);
     graphics.strokeEllipse(at.x, at.y, 92, 46);
@@ -902,8 +970,11 @@ export class RoomScene extends Scene {
     if (!this.live) return;
     this.stopSnowballArc(throwId);
     const start = { x: from.x, y: from.y - SNOWBALL_CHEST_OFFSET_Y };
+    // Radius scaled by PLAYER_PENGUIN_SCALE (#131 review fix): a snowball
+    // thrown by a smaller Penguin is itself smaller; the landing splat stays
+    // tile-sized and unscaled.
     const ball = this.add
-      .circle(start.x, start.y, 9, SNOWBALL_WHITE)
+      .circle(start.x, start.y, 9 * PLAYER_PENGUIN_SCALE, SNOWBALL_WHITE)
       .setStrokeStyle(2, SNOWBALL_OUTLINE)
       .setDepth(SNOWBALL_DEPTH);
     const tween = this.tweens.addCounter({
@@ -981,6 +1052,16 @@ export class RoomScene extends Scene {
     this.currentAnim = look.emote;
     this.penguin = createPenguin(this, spawnPoint.x, spawnPoint.y, look);
     this.penguin.container.setDepth(depthForTile(spawnTile));
+    // #162: hidden until the Player's Session starts. Every Room restart
+    // respawns here with the registry's current value.
+    this.applyLocalPenguinVisibility();
+  }
+
+  /** Shows or hides the own Penguin, its name tag and bubble with it, per the registry flag (#162). */
+  private applyLocalPenguinVisibility(): void {
+    const visible = isLocalPenguinVisible(this.registry);
+    this.penguin?.container.setVisible(visible);
+    this.penguin?.overlay.setVisible(visible);
   }
 
   /** Re-applies the registered Player's look/id to the already-spawned Penguin (#14 review fixes 1 and 4). */
@@ -998,6 +1079,10 @@ export class RoomScene extends Scene {
   }
 
   private onPointerDown(pointer: Input.Pointer, currentlyOver: GameObjects.GameObject[]): void {
+    // #162 H1: while the own Penguin is hidden (before the Session starts),
+    // the Stage ignores every click: moves, NPCs, doors, hotspots, Furniture
+    // slots and Snowball throws. DOM overlays take their own clicks.
+    if (!stageAcceptsInput(this.registry)) return;
     const room = this.room;
     if (!room) return;
 
@@ -1440,13 +1525,43 @@ export class RoomScene extends Scene {
     for (const slot of room.furnitureSlots ?? []) {
       const iglooSlot = iglooSlotForSlotId(slot.id);
       const itemId = iglooSlot !== null ? (this.furnitureSlots?.[iglooSlot] ?? null) : null;
+      const artKey = itemId
+        ? (this.furnitureCatalog.find((entry) => entry.id === itemId)?.artKey ?? itemId)
+        : null;
+
+      if (slot.placement !== 'floor') {
+        // #135: wall and ceiling slots hang at a Stage point, not a Tile.
+        if (artKey) {
+          if (slot.placement === 'wall') {
+            this.furnitureObjects.push(
+              drawFurnitureArt(this, artKey, slot.anchor, {
+                placement: 'wall',
+                wall: slot.wall,
+              }).setDepth(WALL_FURNITURE_DEPTH),
+            );
+          } else {
+            this.furnitureObjects.push(
+              drawCeilingShadow(this, slot.shadow).setDepth(CEILING_SHADOW_DEPTH),
+              drawFurnitureArt(this, artKey, slot.anchor, {
+                placement: 'ceiling',
+                cordTopY: slot.cordTopY,
+              }).setDepth(CEILING_FURNITURE_DEPTH),
+            );
+          }
+        }
+        if (this.furnitureEditMode) {
+          this.furnitureObjects.push(
+            ...this.drawHangingSlotMarker(slot, iglooSlot, artKey === null),
+          );
+        }
+        continue;
+      }
+
       const point = tileToScreen(slot.tile, room.grid.origin);
       const depth = depthForTile(slot.tile);
 
-      if (itemId) {
-        const item = this.furnitureCatalog.find((entry) => entry.id === itemId);
-        const art = drawFurnitureArt(this, item?.artKey ?? itemId, point).setDepth(depth);
-        this.furnitureObjects.push(art);
+      if (artKey) {
+        this.furnitureObjects.push(drawFurnitureArt(this, artKey, point).setDepth(depth));
       }
 
       if (this.furnitureEditMode) {
@@ -1455,7 +1570,68 @@ export class RoomScene extends Scene {
     }
   }
 
-  /** One edit-mode slot marker (#41): an outlined isometric tile diamond, a numbered label, and -- when `iglooSlot` resolves -- a clickable `Zone`. */
+  /**
+   * One edit-mode marker for a wall or ceiling slot (#135 D8): a subtle
+   * outline only while the slot is empty (a sheared square on the wall, a
+   * circle and cord for the ceiling), plus the slot number and a clickable
+   * `Zone` whether or not it's filled.
+   */
+  private drawHangingSlotMarker(
+    slot: Exclude<RoomFurnitureSlot, { placement: 'floor' }>,
+    iglooSlot: IglooSlot | null,
+    empty: boolean,
+  ): GameObjects.GameObject[] {
+    const objects: GameObjects.GameObject[] = [];
+    const { x, y } = slot.anchor;
+
+    if (empty) {
+      const outline = this.add.graphics().setDepth(HANGING_SLOT_MARKER_DEPTH);
+      outline.lineStyle(FURNITURE_SLOT_HIGHLIGHT_WIDTH - 1, FURNITURE_SLOT_HIGHLIGHT_COLOR, 0.7);
+      if (slot.placement === 'wall') {
+        const half = WALL_SLOT_BOX / 2;
+        const shear = slot.wall === 'left' ? -0.5 : 0.5;
+        outline.strokePoints(
+          [
+            { x: x - half, y: y - half - shear * half },
+            { x: x + half, y: y - half + shear * half },
+            { x: x + half, y: y + half + shear * half },
+            { x: x - half, y: y + half - shear * half },
+          ],
+          true,
+        );
+      } else {
+        outline.strokeCircle(x, y, CEILING_SLOT_RADIUS);
+        outline.lineBetween(x, slot.cordTopY, x, y - CEILING_SLOT_RADIUS);
+      }
+      objects.push(outline);
+    }
+
+    const label = this.add
+      .text(x, y, iglooSlot !== null ? String(iglooSlot) : '?', {
+        fontFamily: LABEL_FONT_FAMILY,
+        fontSize: FURNITURE_SLOT_LABEL_FONT_SIZE,
+        color: LABEL_TEXT_COLOR,
+        backgroundColor: FURNITURE_SLOT_LABEL_BG,
+        padding: { x: 6, y: 2 },
+      })
+      .setOrigin(0.5)
+      .setDepth(HANGING_SLOT_MARKER_DEPTH + 1);
+    objects.push(label);
+
+    if (iglooSlot !== null) {
+      const size = slot.placement === 'wall' ? WALL_SLOT_BOX : CEILING_SLOT_RADIUS * 2;
+      const zone = this.add
+        .zone(x, y, size, size)
+        .setDepth(HANGING_SLOT_MARKER_DEPTH + 1)
+        .setInteractive({ useHandCursor: true });
+      this.furnitureSlotHitAreas.push({ object: zone, data: slot });
+      objects.push(zone);
+    }
+
+    return objects;
+  }
+
+  /** One edit-mode floor slot marker (#41): an outlined isometric tile diamond, a numbered label, and -- when `iglooSlot` resolves -- a clickable `Zone`. */
   private drawFurnitureSlotMarker(
     slot: RoomFurnitureSlot,
     point: ScreenPoint,
@@ -1513,7 +1689,10 @@ export class RoomScene extends Scene {
    * The click target stays a separate invisible `Zone` (#14's own
    * `npcHitAreas`/`handleNpcClick` path is unchanged): an alpha-0 shape is
    * excluded from Phaser's input hit-testing, the same trap #16 already
-   * worked around for a door drawn over image art.
+   * worked around for a door drawn over image art. Its rect comes from
+   * `npc-layout.ts` (#113): about 48 px wide, from the top of the nameplate
+   * (now above the head) down to just below the feet, so it follows the
+   * NPC's design scale.
    */
   private drawNpcs(room: RoomDefinition): void {
     for (const slot of room.npcSlots) {
@@ -1528,18 +1707,20 @@ export class RoomScene extends Scene {
       npcSprite.container.setName(NPC_CONTAINER_NAME);
       this.npcSprites.push(npcSprite);
 
+      const { hitArea } = npcLayout(npc);
       const zone = this.add
-        .zone(point.x, point.y + NPC_HIT_ZONE_OFFSET_Y, NPC_HIT_ZONE_WIDTH, NPC_HIT_ZONE_HEIGHT)
+        .zone(point.x + hitArea.centerX, point.y + hitArea.centerY, hitArea.width, hitArea.height)
         .setDepth(depth)
         .setInteractive({ useHandCursor: true });
       this.npcHitAreas.push({ object: zone, data: slot });
-      // #113: its designed motion (if any) moves the sprite and this zone together.
+      // #113: its designed motion (if any) moves the sprite and this zone
+      // together, keeping the zone's `npc-layout.ts` rect over the feet.
       this.npcMotions?.add(
         {
           npcId: slot.npcId,
           sprite: npcSprite,
           zone,
-          zoneOffsetY: NPC_HIT_ZONE_OFFSET_Y,
+          zoneOffsetY: hitArea.centerY,
           rest: point,
         },
         motion,

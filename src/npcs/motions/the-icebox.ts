@@ -11,7 +11,8 @@ import type { NpcMotionSpec } from './types';
  * plays on a wrapper directly around the figure `<svg>` the whole time they
  * roam -- ported as `figure` too, since a designed `path` alone would
  * otherwise drop #36's default bob entirely and lose that motion the design
- * clearly intends.
+ * clearly intends. Its distance is rescaled to figure units (see
+ * `ICEBOX_IDLE_BOB`).
  *
  * Left out, because they don't belong to an NPC: `say` (#36's bubbles),
  * `blink` (a HUD button elsewhere in the Room), `fadeIn`/`fadeOut` (the photo
@@ -23,9 +24,15 @@ import type { NpcMotionSpec } from './types';
  * never referenced by any element's `animation:` anywhere in the file (dead
  * CSS in the design itself) -- there's nothing to port for them.
  */
+/**
+ * The design's `idle` (`translateY(-3px)`) sits on a `<g>` outside the
+ * figure's scaled `<svg>`, so it moves 3 Stage px. A `figure` track plays
+ * inside `npc-sprite.ts`'s 0.62 scaled wrapper, in figure units, so the
+ * distance is 3 / 0.62 = 4.84 figure px here to move the same 3 Stage px.
+ */
 const ICEBOX_IDLE_BOB = {
   keyframes:
-    '@keyframes idle { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }',
+    '@keyframes idle { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-4.84px); } }',
   animation: 'idle 1.1s ease-in-out infinite',
 };
 

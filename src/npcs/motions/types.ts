@@ -28,17 +28,30 @@ export interface NpcPropLayer {
  *   spin, hop, dance, sip...), in figure viewBox units, with the design's
  *   `transform-origin` (e.g. `60px 120px`, the feet). The name tag doesn't
  *   take part, as in the designs.
+ * - `stage`: a design animation on a Stage-level group that holds the
+ *   figure *and* its name tag (#150, e.g. Jory's couch `jump`). It is
+ *   sampled in Stage coordinates: its `translate()`s are Stage pixels and
+ *   its `transformOrigin` is a Stage point, defaulting to `0 0` (the Stage's
+ *   top-left corner), exactly as the browser applies it to a `<g>` in the
+ *   design's 1600x900 root `<svg>`. It is never scaled by the NPC's draw
+ *   scale, and like `figure` it keeps playing while the NPC's dialog is
+ *   open. The speech bubble doesn't take part, as in the designs.
  * - `props`: extra moving parts drawn in front of the figure.
  * - `replaceFigureProp`: draw the figure without its `npcs.ts` `prop`, for
  *   when a `props` layer is the design's version of what that hand holds.
+ * - `replaceFigureRestPose`: draw the figure without the static resting pose
+ *   of a designed prop (`cards`, `marker`, from issue #137), for when a
+ *   `props` layer animates that same prop, so it isn't drawn twice.
  *
- * Any NPC with a `path` or `figure` drops #36's idle bob: the designed
+ * Any NPC with a `path`, `figure` or `stage` drops #36's idle bob: the designed
  * motion replaces it. Under `prefers-reduced-motion` none of this runs and
  * the NPC looks exactly as it did before #113.
  */
 export interface NpcMotionSpec {
   path?: CssAnimationSource;
   figure?: CssAnimationSource;
+  stage?: CssAnimationSource;
   props?: readonly NpcPropLayer[];
   replaceFigureProp?: boolean;
+  replaceFigureRestPose?: boolean;
 }

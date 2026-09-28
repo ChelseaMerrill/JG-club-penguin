@@ -244,21 +244,15 @@ export const townCenter: RoomDefinition = {
     { npcId: 'darrin', tile: { col: 3, row: 4 } },
     { npcId: 'sydney', tile: { col: 6, row: 2 } },
     { npcId: 'jon', tile: { col: 6, row: 6 } },
-    // The Front Desk receptionist is a Penguin in the design, so she isn't
-    // placed.
-    // Penguin-kind NPCs are left out of every Room: only Players appear as
-    // Penguins (owner decision, 2026-09-25). Their `NpcDefinition`s stay in
-    // `src/npcs/npcs.ts`.
-    // Jory Hutchins has her own nameplate and speech bubble (`sayJory`), like
-    // Darrin/Sydney/Jon, but her `jump` bounce animation and "SURVIVOR" badge
-    // are nested *inside* Sydney's own `walkSyd` group in the design markup,
-    // not a standalone figure with its own fixed position -- she rides along
-    // with wherever Sydney's walk cycle currently places her, so there's no
-    // single tile that's "hers" to place an NPC slot on the way Darrin's,
-    // Sydney's and Jon's own patrol-start tiles are approximated. #16 fix 5
-    // decision: no NPC slot for Jory, for a different reason than Matt's
-    // exclusion in Dev Pit (Matt is a Penguin/Player, never a static NPC
-    // slot at all; Jory is a designed NPC, just one without an independent
-    // position in this design). Reviewable if #36 finds otherwise.
+    // Penguin-kind NPCs (the Front Desk receptionist among them) are left out
+    // of every Room: only Players appear as Penguins (owner decision,
+    // 2026-09-25; PR #133). Their `NpcDefinition`s stay in `src/npcs/npcs.ts`.
+    // Jory Hutchins (#113): her `jump` group is a sibling of Sydney's
+    // `walkSyd` group in the design markup, not nested in it, so she has a
+    // fixed position of her own, on the couch with her feet at about Stage
+    // (590, 462). (2, 6) is the tile whose centre is nearest that point; it
+    // sits on the unwalkable stairwell platform, like Sydney's tile sits on a
+    // fixture.
+    { npcId: 'jory', tile: { col: 2, row: 6 } },
   ],
 };

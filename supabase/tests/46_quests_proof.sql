@@ -5,7 +5,9 @@
 -- complete_quest('main') refuses with quest_incomplete while any step is
 -- unmet (paying nothing), refuses an unknown Quest id with unknown_quest,
 -- pays exactly 150 Tokens once all five steps are met in a non-listed
--- order, and a second call returns alreadyCompleted with nothing paid;
+-- order (plus Ship It's first-time +50 since #138, reported in
+-- badgesEarned), and a second call returns alreadyCompleted with nothing
+-- paid;
 -- mark_dev_pit_visited() sets the flag and keeps the first visit's time;
 -- quest_progress() reports the flag, finished rounds (a 0-score round,
 -- which sets no best, still counts) and paid Quests; the two new tables
@@ -69,6 +71,9 @@ begin
     delete from public.minigame_rounds where player_id = fixture;
     delete from public.igloo_slots where player_id = fixture;
     delete from public.player_items where player_id = fixture;
+    -- #138: completing the main Quest also awards Ship It (+50 once), so the
+    -- fixture starts without it.
+    delete from public.player_badges where player_id = fixture and badge_id = 'ship-it';
     update public.players
     set penguin_name = 'PROOF FIXTURE', profile_created_at = now(), tokens = 1000
     where id = fixture;
@@ -152,7 +157,10 @@ begin
     v_names := array_append(v_names, 'pays_150_once_all_steps_met');
     v_pass := array_append(
       v_pass,
-      v_result = jsonb_build_object('tokensAwarded', 150, 'balance', 1100, 'alreadyCompleted', false)
+      v_result = jsonb_build_object(
+        'tokensAwarded', 150, 'balance', 1150, 'alreadyCompleted', false,
+        'badgesEarned', jsonb_build_array('ship-it')
+      )
     );
     v_detail := array_append(v_detail, format('result=%s', v_result));
 
@@ -161,8 +169,11 @@ begin
     v_names := array_append(v_names, 'second_call_already_completed_pays_nothing');
     v_pass := array_append(
       v_pass,
-      v_second = jsonb_build_object('tokensAwarded', 0, 'balance', 1100, 'alreadyCompleted', true)
-        and v_tokens = 1100
+      v_second = jsonb_build_object(
+        'tokensAwarded', 0, 'balance', 1150, 'alreadyCompleted', true,
+        'badgesEarned', '[]'::jsonb
+      )
+        and v_tokens = 1150
     );
     v_detail := array_append(v_detail, format('result=%s tokens=%s', v_second, v_tokens));
 

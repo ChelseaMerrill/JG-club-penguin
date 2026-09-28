@@ -33,6 +33,11 @@ export interface NpcMotionDebugInfo {
   y: number;
   moving: boolean;
   paused: boolean;
+  /**
+   * The live transform of the NPC's `body` (figure plus name tag, #150),
+   * relative to its feet: identity unless it has a `stage` motion.
+   */
+  body: { x: number; y: number; scaleX: number; scaleY: number; rotation: number };
 }
 
 interface PropView {
@@ -66,7 +71,8 @@ function applyProps(views: PropView[], poses: NpcPropPose[]): void {
  * Plays a Room's NPC motions (#113) on the Phaser objects `RoomScene`
  * built: each frame it advances every NPC's `NpcMotion` and moves its
  * sprite (figure, name tag, speech bubble), click target and depth to the
- * sampled pose, and transforms the figure and any prop layers in place.
+ * sampled pose, and transforms the figure, its Stage-level `body` (figure
+ * plus name tag, #150) and any prop layers in place.
  * NPCs without a designed motion, and every NPC under reduced motion, are
  * only tracked (for `debug()`), never moved. Client-side only: nothing
  * here touches Presence.
@@ -126,11 +132,19 @@ export class RoomNpcMotions implements NpcPauseTarget {
     for (const [npcId, entry] of this.entries) {
       const pose = entry.motion?.pose();
       const point = pose?.point ?? entry.actor.rest;
+      const body = entry.actor.sprite.body;
       result[npcId] = {
         x: point.x,
         y: point.y,
         moving: pose?.moving ?? false,
         paused: entry.motion?.paused ?? false,
+        body: {
+          x: body.x,
+          y: body.y,
+          scaleX: body.scaleX,
+          scaleY: body.scaleY,
+          rotation: body.rotation,
+        },
       };
     }
     return result;
@@ -149,6 +163,10 @@ export class RoomNpcMotions implements NpcPauseTarget {
     actor.zone.setPosition(pose.point.x, pose.point.y + actor.zoneOffsetY);
     actor.zone.setDepth(pose.depth);
     if (pose.figure) applyAffine(actor.sprite.figure, pose.figure);
+    // A Stage-level motion (#150) moves the figure and name tag together but
+    // leaves the click zone at the slot, as `figure` motions do: its lift
+    // stays inside the zone, so clicking the NPC keeps landing on it.
+    if (pose.stage) applyAffine(actor.sprite.body, pose.stage);
     applyProps(entry.props, pose.props);
   }
 

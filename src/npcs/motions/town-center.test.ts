@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createNpcMotion } from '../../game/npcs/npc-motion';
 import { transformPoint } from '../../game/npcs/css-keyframes';
+import { npcLayout } from '../../game/npcs/npc-layout';
 import { getNpcMotion } from '../npc-motions';
 import { NPCS, type NpcId } from '../npcs';
 import { TOWN_CENTER_MOTIONS } from './town-center';
@@ -18,8 +19,8 @@ function motionFor(id: NpcId) {
 }
 
 describe("Town Center's NPC motions (#113)", () => {
-  it('registers exactly the NPCs with a designed motion (Darrin, Jon, Sydney)', () => {
-    expect(Object.keys(TOWN_CENTER_MOTIONS).sort()).toEqual(['darrin', 'jon', 'sydney']);
+  it('registers exactly the NPCs with a designed motion (Darrin, Jon, Jory, Sydney)', () => {
+    expect(Object.keys(TOWN_CENTER_MOTIONS).sort()).toEqual(['darrin', 'jon', 'jory', 'sydney']);
     for (const id of Object.keys(TOWN_CENTER_MOTIONS) as NpcId[]) {
       expect(NPCS[id].roomId).toBe('town-center');
     }
@@ -80,6 +81,37 @@ describe("Town Center's NPC motions (#113)", () => {
     const localOrigin = transformPoint(trick.matrix, FEET);
     expect(localOrigin.x).toBeCloseTo(36);
     expect(localOrigin.y).toBeCloseTo(-36);
+  });
+
+  it("bounces Jory's figure and nameplate as the design renders jump (#150, Stage origin)", () => {
+    // Her design feet, and the Stage y of her feet and nameplate top sampled
+    // from Chromium's own render of the design's `jump` group (#150 plan E1).
+    const designFeet = { x: 590, y: 461.9 };
+    const motion = createNpcMotion(getNpcMotion('jory'), designFeet, ORIGIN, {
+      reducedMotion: false,
+    });
+    if (!motion) throw new Error('expected jory to have a motion');
+    const nameplateTop = { x: 0, y: npcLayout(NPCS.jory).nameplateTopY };
+    const samples = [
+      { ms: 0, feet: 461.9, nameplate: 362.5 },
+      { ms: 135, feet: 460.45, nameplate: 358.56 },
+      { ms: 270, feet: 458.99, nameplate: 354.62 },
+      { ms: 405, feet: 446.59, nameplate: 347.69 },
+      { ms: 540, feet: 434.19, nameplate: 340.75 },
+      { ms: 720, feet: 448.04, nameplate: 351.63 },
+    ];
+    let elapsed = 0;
+    for (const sample of samples) {
+      motion.advance(sample.ms - elapsed);
+      elapsed = sample.ms;
+      const pose = motion.pose();
+      expect(pose.point).toEqual(designFeet); // she stays on her couch slot
+      const feet = transformPoint(pose.stage!, { x: 0, y: 0 });
+      const plate = transformPoint(pose.stage!, nameplateTop);
+      expect(feet.x).toBeCloseTo(0, 5);
+      expect(Math.abs(designFeet.y + feet.y - sample.feet)).toBeLessThan(0.05);
+      expect(Math.abs(designFeet.y + plate.y - sample.nameplate)).toBeLessThan(0.05);
+    }
   });
 
   it("follows walkSyd's own path (exact at its 19% stop, 4.56s into 24s)", () => {

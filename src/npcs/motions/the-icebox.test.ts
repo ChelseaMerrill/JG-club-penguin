@@ -5,6 +5,7 @@ import {
   transformPoint,
 } from '../../game/npcs/css-keyframes';
 import { createNpcMotion } from '../../game/npcs/npc-motion';
+import { HUMAN_NPC_SCALE } from '../../game/npcs/npc-layout';
 import type { NpcId } from '../npcs';
 import { THE_ICEBOX_MOTIONS } from './the-icebox';
 
@@ -42,12 +43,15 @@ describe('The Icebox NPC motions (#113)', () => {
     expect(point.y).toBeCloseTo(100);
   });
 
-  it('samples the shared roam-idle bob at its 50% stop, .55s into the 1.1s loop, for every NPC', () => {
+  it("bobs every NPC 3 Stage px at the shared roam-idle's 50% stop, .55s into the 1.1s loop", () => {
+    // The design's `idle` (translateY(-3px)) wraps the figure's scaled `<svg>`
+    // from outside, so it moves 3 Stage px; a `figure` track runs inside the
+    // 0.62 scaled wrapper instead.
     for (const spec of Object.values(THE_ICEBOX_MOTIONS)) {
       const compiled = compileCssAnimation(spec!.figure!);
       const point = transformPoint(sampleCssAnimation(compiled, 550), { x: 0, y: 0 });
       expect(point.x).toBeCloseTo(0);
-      expect(point.y).toBeCloseTo(-3);
+      expect(point.y * HUMAN_NPC_SCALE).toBeCloseTo(-3);
     }
   });
 });

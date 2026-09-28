@@ -65,12 +65,38 @@ export interface LocalPenguinDebugInfo {
   moving: boolean;
   /** The sprite's Phaser `flipX` (true exactly when `facing === 'left'`); review fix 8. */
   flipX: boolean;
+  /**
+   * The sprite's currently-displayed Phaser texture key (`penguinTextureKey`,
+   * e.g. `...:left`) -- distinct from `facing`/`flipX`, which are the
+   * *requested* facing's state and can briefly lead the texture that's
+   * actually decoded and on screen (#147 review fix: the bug this guards
+   * against). Absent until the local Penguin's sprite exists.
+   */
+  textureKey?: string;
   /** `PenguinLook.name` as of this snapshot; review fix 1 (a sign-in look change, without a Room restart). */
   lookName: string;
   /** `PenguinLook.body`, same reasoning as `lookName`. */
   lookBody: HexColor;
   /** `PenguinState.playerId`; review fix 4. */
   playerId: string;
+  /** The figure sprite's `angle` in degrees: the #68 body tilt (0 under reduced motion). */
+  spriteAngle?: number;
+  /** The figure sprite's `x` in container px: WADDLE's #68 sideways sway (0 for WALK and under reduced motion). */
+  spriteX?: number;
+  /** The figure sprite's `y` in container px: the #68 body lift. */
+  spriteY?: number;
+  /** `Penguin.bodyMotionTweenCount()`: 1 while a body motion plays, 0 without one, more only on a leak (#68). */
+  bodyTweenCount?: number;
+  /** The Penguin container's `x`: its world position, which the #68 body motion never moves. */
+  containerX?: number;
+  /** The Penguin container's `y`: its world position, which the #68 body motion never moves. */
+  containerY?: number;
+  /** The name tag's `y` in container px: the #68 body motion never moves it. */
+  nameTagY?: number;
+  /** The name tag and chat bubble overlay's depth: `NPC_BUBBLE_LAYER` + the body's, above the ceiling item (#161 review). */
+  nameTagDepth?: number;
+  /** Whether the own Penguin is drawn: false from boot until the Player's Session starts (#162). */
+  visible: boolean;
 }
 
 /** One `room:leave`/`room:enter` #15's navigator has emitted, in emission order. */
@@ -139,6 +165,12 @@ export interface RoomDebugInfo {
    * reaching into `RoomScene` internals.
    */
   setRegisteredPlayer?: (player: RegisteredPlayer) => void;
+  /**
+   * Test-only: sets the own Penguin's visibility flag (#162), which also
+   * gates Stage clicks, so an e2e spec can put a no-Session page into the
+   * hidden state.
+   */
+  setLocalPenguinVisible?: (visible: boolean) => void;
   /**
    * Test-only: spawns an extra, static Penguin at `tile` with `look`, for
    * the WAVE/DANCE evidence screenshot (review fix 8). It's never cleaned up

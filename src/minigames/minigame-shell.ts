@@ -7,6 +7,7 @@ import {
 } from '../contracts';
 import { MINIGAME_RULES } from '../persistence/minigame-rules';
 import { ProgressStoreError, type ProgressStore } from '../persistence/progress-store';
+import { renderBadgeUnlock } from '../ui/badge-unlock-panel';
 import type { OverlayManager } from '../ui/hud/overlay-manager';
 import { badgeDisplayName } from './badge-names';
 import { setMinigameOpen } from './is-minigame-open';
@@ -252,15 +253,10 @@ export function createMinigameShell<K extends MinigameId>(deps: MinigameShellDep
   doneSavingEl.textContent = 'SAVING…';
   doneSavingEl.hidden = true;
 
-  const doneBadge = document.createElement('div');
-  doneBadge.className = 'minigame__done-badge';
+  // The shared "Badge unlocked" panel (#138 reuses it for its Badge popup).
+  const doneBadge = renderBadgeUnlock('');
   doneBadge.hidden = true;
-  const doneBadgeName = document.createElement('div');
-  doneBadgeName.className = 'minigame__done-badge-name';
-  const doneBadgeCaption = document.createElement('div');
-  doneBadgeCaption.className = 'minigame__done-badge-caption';
-  doneBadgeCaption.textContent = 'ADDED TO YOUR TROPHY CASE';
-  doneBadge.append(doneBadgeName, doneBadgeCaption);
+  const doneBadgeName = doneBadge.querySelector<HTMLElement>('.minigame__done-badge-name')!;
 
   const doneError = document.createElement('div');
   doneError.className = 'minigame__done-error';

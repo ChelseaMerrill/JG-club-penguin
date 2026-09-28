@@ -2,20 +2,37 @@ import { describe, expect, it } from 'vitest';
 import { createEmitter } from '../contracts/emitter';
 import { DEFAULT_LOOK } from '../contracts/penguin';
 import type { BadgeId, GameEventMap } from '../contracts/game-events';
-import { createInMemoryProgressStore } from './in-memory-progress-store';
+import {
+  createInMemoryProgressStore,
+  createInMemoryProgressStoreWithControls,
+} from './in-memory-progress-store';
 import {
   describeProgressStoreContract,
   type ProgressStoreHarness,
 } from './testing/progress-store.contract';
 
-/** A controllable clock: `advanceSeconds` moves it forward without a real wait. */
+/**
+ * A controllable clock: `advanceSeconds` moves it forward without a real
+ * wait. It starts at midday Eastern, well outside Night Owl's 02:00-05:00
+ * window (#138 D16).
+ */
 function makeHarness(): Promise<ProgressStoreHarness> {
-  let currentMs = Date.parse('2026-09-24T00:00:00.000Z');
-  const store = createInMemoryProgressStore({ now: () => currentMs });
+  let currentMs = Date.parse('2026-09-24T16:00:00.000Z');
+  const { store, grantTokens, holdBadge } = createInMemoryProgressStoreWithControls({
+    now: () => currentMs,
+  });
   return Promise.resolve({
     store,
     advanceSeconds(seconds: number): Promise<void> {
       currentMs += seconds * 1000;
+      return Promise.resolve();
+    },
+    grantTokens(tokens: number): Promise<void> {
+      grantTokens(tokens);
+      return Promise.resolve();
+    },
+    holdBadge(badgeId: BadgeId): Promise<void> {
+      holdBadge(badgeId);
       return Promise.resolve();
     },
   });

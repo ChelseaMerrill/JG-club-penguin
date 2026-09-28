@@ -12,13 +12,6 @@ import type { NpcMotionSpec } from './types';
  *   in the design's markup (confirmed by grepping the design file for each
  *   name) -- dead CSS left over from an earlier design pass, animating
  *   nothing.
- * - `jump` (and its `sayJory` bubble, and the "SURVIVOR" clip-path text):
- *   Jory Hutchins's bounce and nameplate. `town-center.ts` (the Room
- *   definition)'s own `npcSlots` comment already documents why she has no
- *   `NpcId`/slot: her `jump` figure and badge are nested *inside* Sydney's
- *   `walkSyd` group, riding along wherever Sydney's walk cycle currently
- *   places her, so there's no independent position -- and no `NpcId` -- to
- *   hang this motion spec on.
  * - `trophyReach`, `trophyShow`: Sydney reaching for, then holding up, a
  *   trophy. Every stop in both `@keyframes` rules sets only `opacity`, never
  *   `transform` -- exactly the case `css-keyframes.ts`'s own docs call out
@@ -66,6 +59,20 @@ export const TOWN_CENTER_MOTIONS: Partial<Record<NpcId, NpcMotionSpec>> = {
       },
     ],
   },
+  // Jory bounces on the couch (`jump`, #150). In the design the animation
+  // sits on a Stage-level group holding her figure and her nameplate (her
+  // `sayJory` bubble is a sibling outside it, so it stays still), so it's a
+  // `stage` track. The design sets no `transform-origin` on that group, so
+  // the browser scales about the Stage's top-left corner, and this port
+  // leaves the field unset to match (#150 H1): she stretches slightly at
+  // 30%, is about 28 px up and squashed at 60%, then falls back.
+  jory: {
+    stage: {
+      keyframes:
+        '@keyframes jump { 0%,100% { transform: translateY(0) scaleY(1);} 30% { transform: translateY(-26px) scaleY(1.05);} 60% { transform: translateY(0) scaleY(.94);} }',
+      animation: 'jump .9s ease-in-out infinite',
+    },
+  },
   sydney: {
     path: {
       keyframes:
@@ -83,6 +90,8 @@ export const TOWN_CENTER_MOTIONS: Partial<Record<NpcId, NpcMotionSpec>> = {
         '@keyframes walkJon { 0% { transform: translate(0,0);} 18%,32% { transform: translate(150px, 75px);} 45% { transform: translate(80px, 110px);} 60%,74% { transform: translate(-70px, 35px);} 100% { transform: translate(0,0);} }',
       animation: 'walkJon 14s linear infinite',
     },
+    // The spinning fan is the moving version of his `npcs.ts` `cards`.
+    replaceFigureRestPose: true,
     props: [
       {
         svg: '<rect x="0" y="0" width="16" height="22" rx="2" fill="#F4F4F4" stroke="#0C4B5F" stroke-width="1.5"/><rect x="3" y="-3" width="16" height="22" rx="2" fill="#F4F4F4" stroke="#0C4B5F" stroke-width="1.5"/><rect x="6" y="-6" width="16" height="22" rx="2" fill="#F4F4F4" stroke="#0C4B5F" stroke-width="1.5"/><path d="M14 -1 l2 3 l-2 3 l-2 -3 z" fill="#00BDFF"/>',

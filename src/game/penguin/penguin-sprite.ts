@@ -1,9 +1,14 @@
-import { GameObjects, Textures, type Scene, type Time } from 'phaser';
+import { GameObjects, Scenes, Textures, type Scene, type Time } from 'phaser';
 import { DEFAULT_FACING, type Facing, type PenguinLook } from '../../contracts';
+import { NPC_BUBBLE_LAYER } from '../rooms/iso';
 import { penguinLookHash } from './look-hash';
+import { createBodyMotion, penguinMotionFor, prefersReducedMotion } from './motion';
+import { PLAYER_PENGUIN_SCALE } from './player-penguin-scale';
 import { PENGUIN_FRAME_MS, PENGUIN_FRAMES, type PenguinAnim } from './poses';
 import { PENGUIN_FRAME_PADDING_Y, PENGUIN_ORIGIN, penguinFeetOrigin } from './render-svg';
-import { ensurePenguinTextures, penguinTextureKey } from './texture';
+import { ensurePenguinTextures, penguinTextureKey, usesNeutralBody } from './texture';
+
+export { PLAYER_PENGUIN_SCALE } from './player-penguin-scale';
 
 const NAME_TAG_BG = 0x00bdff;
 const NAME_TAG_TEXT_COLOR = '#161719';
@@ -36,26 +41,73 @@ const BUBBLE_FONT_SIZE = '13px';
 const BUBBLE_PADDING_X = 14;
 const BUBBLE_PADDING_Y = 8;
 const BUBBLE_MAX_WIDTH = 260;
-// Gap above the sprite's own top edge (the sprite's top edge sits at
-// `-(PENGUIN_ORIGIN.y + PENGUIN_FRAME_PADDING_Y)` in container space,
-// regardless of frame size, since that's exactly what the feet-anchor
-// origin fraction cancels out to).
+// Gap above the sprite's own top edge, a fixed screen-pixel gap that must
+// not shrink with the sprite (#131 review fix): only the top-edge term
+// (measured off the sprite's own unscaled frame size) scales.
 const BUBBLE_GAP = 10;
-const BUBBLE_ANCHOR_Y = -(PENGUIN_ORIGIN.y + PENGUIN_FRAME_PADDING_Y) - BUBBLE_GAP;
+// The sprite's top edge sits at `-(PENGUIN_ORIGIN.y + PENGUIN_FRAME_PADDING_Y)`
+// in container space, regardless of frame size, since that's exactly what the
+// feet-anchor origin fraction cancels out to. Scaled by PLAYER_PENGUIN_SCALE
+// (#131) so it shrinks with the smaller figure; BUBBLE_GAP is added
+// afterwards, unscaled, so the visual gap above the head stays constant.
+// Exported (unlike the other module-private tuning constants above) so
+// `penguin-sprite.test.ts` can assert the scale is applied to the right term
+// without booting a Phaser scene (#131 review fix).
+export const BUBBLE_ANCHOR_Y =
+  -(PENGUIN_ORIGIN.y + PENGUIN_FRAME_PADDING_Y) * PLAYER_PENGUIN_SCALE - BUBBLE_GAP;
 
 // Snow hat (#53 D4): a transient 10 s effect on a hit Penguin, never a `Hat`
 // of the Penguin look. Drawn as the design's HUD-SNOWBALL splat mound (a
 // wide ellipse topped by three lumps, `#F4F4F4`), sat on the head: the
 // frame's unpadded top edge, `PENGUIN_ORIGIN.y` above the feet anchor.
+// These geometry constants are all in the sprite's own unscaled frame
+// units; the `snowHat` Graphics object below is scaled (and its position
+// scaled) by `PLAYER_PENGUIN_SCALE` as a whole (#131 review fix) so the
+// outline stroke scales with it too, rather than each constant being
+// hand-scaled (which left the 2px stroke full-size on a shrunk mound).
 const SNOW_HAT_COLOR = 0xf4f4f4;
 const SNOW_HAT_OUTLINE = 0x0c4b5f;
 const SNOW_HAT_Y = -PENGUIN_ORIGIN.y + 14;
+const SNOW_HAT_WIDTH = 60;
+const SNOW_HAT_HEIGHT = 24;
+const SNOW_HAT_LUMP_LEFT_X = -20;
+const SNOW_HAT_LUMP_LEFT_Y = 8;
+const SNOW_HAT_LUMP_LEFT_R = 6;
+const SNOW_HAT_LUMP_RIGHT_X = 18;
+const SNOW_HAT_LUMP_RIGHT_Y = 9;
+const SNOW_HAT_LUMP_RIGHT_R = 7;
+const SNOW_HAT_LUMP_CENTER_Y = 14;
+const SNOW_HAT_LUMP_CENTER_R = 5;
 
 /** Phaser's always-present built-in placeholder texture. */
 const PLACEHOLDER_TEXTURE_KEY = '__DEFAULT';
 
+/**
+ * The name of every Penguin's overlay container (its name tag and chat
+ * bubble), so `RoomScene`'s Penguin-container counts can skip it.
+ */
+export const PENGUIN_OVERLAY_NAME = 'penguin-overlay';
+
+/**
+ * The depth a Penguin's name tag and chat bubble draw at, for a body at
+ * `bodyDepth` (#135, #161 review, milliehime): the NPC bubbles' own top
+ * layer, `NPC_BUBBLE_LAYER + depth`, so a tag or bubble is never drawn under
+ * the ceiling item (`iso.ts`'s `CEILING_FURNITURE_DEPTH`) or any Room object,
+ * while tags and bubbles still sort nearer-over-farther among themselves.
+ */
+export function penguinOverlayDepth(bodyDepth: number): number {
+  return NPC_BUBBLE_LAYER + bodyDepth;
+}
+
 export interface Penguin {
+  /** The body (sprite and snow hat): callers position and depth-sort this. */
   readonly container: GameObjects.Container;
+  /**
+   * The name tag and chat bubble, a separate top-layer container (like an
+   * NPC's bubble) that follows `container`'s position, visibility and depth
+   * every frame, at `penguinOverlayDepth(container.depth)`.
+   */
+  readonly overlay: GameObjects.Container;
   idle(): void;
   walk(): void;
   /**
@@ -74,6 +126,13 @@ export interface Penguin {
   setSnowHat(on: boolean): void;
   /** Whether the snow hat is drawn right now (the hat child's `visible`). */
   hasSnowHat(): boolean;
+  /**
+   * Test support (#68 D3): how many tweens are running on this Penguin's
+   * body motion. 1 while an anim with a body motion plays (or while the body
+   * eases back to neutral after one), 0 otherwise (and always 0 under
+   * reduced motion); anything more is a leaked tween.
+   */
+  bodyMotionTweenCount(): number;
   destroy(): void;
 }
 
@@ -130,12 +189,21 @@ export function createPenguin(
   // listener instead of leaving it registered.
   let pendingKey: string | null = null;
   let pendingListener: (() => void) | null = null;
+  // #68 D5: read once, when the Penguin is built. With reduced motion the
+  // Penguin keeps today's baked two-frame swap exactly: no tween, no
+  // `:neutral` textures, no sway. An OS change applies to the next Penguin
+  // built, e.g. on the next Room entry.
+  const bodyMotion = !prefersReducedMotion();
+  const textureOptions = { bodyMotion };
 
-  ensurePenguinTextures(scene, look);
+  ensurePenguinTextures(scene, look, facing, textureOptions);
 
   const sprite = new GameObjects.Sprite(scene, 0, 0, PLACEHOLDER_TEXTURE_KEY);
   sprite.setOrigin(origin.x, origin.y);
-  sprite.setFlipX(facing === 'left');
+  // #131: shrinks the sprite to the design's own scale, around its
+  // feet-anchor origin above -- Phaser scales a GameObject's display size
+  // around its fractional origin, so the feet stay pinned at (x, y).
+  sprite.setScale(PLAYER_PENGUIN_SCALE);
 
   const pill = new GameObjects.Graphics(scene);
   const nameText = new GameObjects.Text(scene, 0, NAME_TAG_GAP + NAME_TAG_PADDING_Y, '', {
@@ -166,23 +234,45 @@ export function createPenguin(
   bubbleText.setVisible(false);
 
   const snowHat = new GameObjects.Graphics(scene);
+  // Scale the whole Graphics object (#131 review fix), not each hand-scaled
+  // constant above, so the 2px outline stroke shrinks with the mound too.
+  snowHat.setScale(PLAYER_PENGUIN_SCALE);
   snowHat.lineStyle(2, SNOW_HAT_OUTLINE, 1);
   snowHat.fillStyle(SNOW_HAT_COLOR, 1);
-  snowHat.fillEllipse(0, SNOW_HAT_Y, 60, 24);
-  snowHat.strokeEllipse(0, SNOW_HAT_Y, 60, 24);
-  snowHat.fillCircle(-20, SNOW_HAT_Y - 8, 6);
-  snowHat.fillCircle(18, SNOW_HAT_Y - 9, 7);
-  snowHat.fillCircle(0, SNOW_HAT_Y - 14, 5);
+  snowHat.fillEllipse(0, SNOW_HAT_Y, SNOW_HAT_WIDTH, SNOW_HAT_HEIGHT);
+  snowHat.strokeEllipse(0, SNOW_HAT_Y, SNOW_HAT_WIDTH, SNOW_HAT_HEIGHT);
+  snowHat.fillCircle(SNOW_HAT_LUMP_LEFT_X, SNOW_HAT_Y - SNOW_HAT_LUMP_LEFT_Y, SNOW_HAT_LUMP_LEFT_R);
+  snowHat.fillCircle(
+    SNOW_HAT_LUMP_RIGHT_X,
+    SNOW_HAT_Y - SNOW_HAT_LUMP_RIGHT_Y,
+    SNOW_HAT_LUMP_RIGHT_R,
+  );
+  snowHat.fillCircle(0, SNOW_HAT_Y - SNOW_HAT_LUMP_CENTER_Y, SNOW_HAT_LUMP_CENTER_R);
   snowHat.setVisible(false);
 
-  const container = scene.add.container(x, y, [
-    sprite,
-    snowHat,
-    pill,
-    nameText,
-    bubblePill,
-    bubbleText,
-  ]);
+  // #68 D3: the figure's tilt, lift and (WADDLE's) sideways sway, tweened on
+  // the sprite and the snow hat only -- never the container (so the
+  // Penguin's position and Tile never move), the name tag or the bubble.
+  const motionProxy = { phase: 0, blend: 0 };
+  const motion = createBodyMotion(scene.tweens, [sprite, snowHat], motionProxy);
+
+  const container = scene.add.container(x, y, [sprite, snowHat]);
+  // #161 review (milliehime): the name tag and chat bubble live in their own
+  // top-layer container, not the body's, so the ceiling item (which hangs
+  // above every Tile depth) never draws over them. The body keeps its own
+  // Tile depth ordering; the overlay copies its position, visibility and
+  // depth on POST_UPDATE (#135 review fix), after `scene.update` and tweens
+  // have run but before `Systems.render` sorts the display list by depth, so
+  // the overlay's depth takes effect the same frame instead of one frame late.
+  const overlay = scene.add.container(x, y, [pill, nameText, bubblePill, bubbleText]);
+  overlay.setName(PENGUIN_OVERLAY_NAME);
+  function syncOverlay(): void {
+    overlay.setPosition(container.x, container.y);
+    overlay.setVisible(container.visible);
+    overlay.setDepth(penguinOverlayDepth(container.depth));
+  }
+  syncOverlay();
+  scene.events.on(Scenes.Events.POST_UPDATE, syncOverlay);
 
   function clearPendingListener(): void {
     if (pendingKey !== null && pendingListener !== null) {
@@ -204,6 +294,9 @@ export function createPenguin(
     destroyed = true;
     clearPendingListener();
     stopFrameTimer();
+    motion.stop(false);
+    scene.events.off(Scenes.Events.POST_UPDATE, syncOverlay);
+    overlay.destroy();
   });
 
   function redrawNameTag(): void {
@@ -244,20 +337,43 @@ export function createPenguin(
   }
 
   function applyFrame(): void {
-    const key = penguinTextureKey(currentHash, currentAnim, currentFrame);
+    const key = penguinTextureKey(
+      currentHash,
+      currentAnim,
+      currentFrame,
+      facing,
+      usesNeutralBody(currentAnim, bodyMotion),
+    );
+    // Captured now, alongside `key`, rather than read from the outer
+    // `facing` closure variable inside the (possibly-async) callback below
+    // (#147): a later `setFacing`/`applyFrame` call can advance `facing`
+    // again before this key's texture decodes, and the flip must always
+    // match the facing baked into whichever texture is actually on screen,
+    // not whatever `facing` happens to hold when the callback fires.
+    const flipped = facing === 'left';
     clearPendingListener();
     if (scene.textures.exists(key)) {
       sprite.setTexture(key);
+      sprite.setFlipX(flipped);
+      // #68: mirror the body motion with the texture that's on screen.
+      motion.setFlipped(flipped);
       return;
     }
     // The texture hasn't decoded yet (`addBase64` is async); pick it up once
-    // it has.
+    // it has. The flip is applied together with the texture swap so the
+    // previous facing's frame never shows flipped for the new facing (#147
+    // review fix): its own lettering was baked for the old facing, and
+    // flipping it early mirrors it backwards until the new texture lands.
     const listener = (): void => {
       if (pendingKey === key) {
         pendingKey = null;
         pendingListener = null;
       }
-      if (!destroyed) sprite.setTexture(key);
+      if (!destroyed) {
+        sprite.setTexture(key);
+        sprite.setFlipX(flipped);
+        motion.setFlipped(flipped);
+      }
     };
     pendingKey = key;
     pendingListener = listener;
@@ -266,43 +382,71 @@ export function createPenguin(
 
   function play(anim: PenguinAnim): void {
     stopFrameTimer();
+    // No `motion.stop()` here: resetting the pose to neutral would snap the
+    // body mid-sway. `motion.start` below replaces the tween and blends from
+    // wherever the body is now into the next anim (or back to neutral).
     currentAnim = anim;
     currentFrame = 0;
     applyFrame();
     const frameCount = PENGUIN_FRAMES[anim];
-    if (frameCount <= 1) return;
-    frameTimer = scene.time.addEvent({
-      delay: PENGUIN_FRAME_MS[anim],
-      loop: true,
-      callback: () => {
-        currentFrame = (currentFrame + 1) % frameCount;
-        applyFrame();
-      },
-    });
+    if (frameCount > 1) {
+      frameTimer = scene.time.addEvent({
+        delay: PENGUIN_FRAME_MS[anim],
+        loop: true,
+        callback: () => {
+          currentFrame = (currentFrame + 1) % frameCount;
+          applyFrame();
+        },
+      });
+    }
+    // Started alongside the frame timer, so a two-pose motion reaches its
+    // second keyframe as the timer swaps to frame 1 (#68 D3). Under reduced
+    // motion nothing ever moves the body, so it stays at neutral.
+    if (bodyMotion) motion.start(penguinMotionFor(anim));
   }
 
   play(currentAnim);
 
   return {
     container,
+    overlay,
     idle() {
       play(currentLook.emote);
     },
     walk() {
+      // #68 D4a: `RoomScene.advanceStep` calls this on every Tile step. While
+      // WALK is already playing, restarting it would reset the frame timer
+      // (so a long walk never reached frame 1) and the body tween.
+      if (currentAnim === 'WALK') return;
       play('WALK');
     },
     play(anim: PenguinAnim) {
       play(anim);
     },
     setFacing(next: Facing) {
+      // #147: a left-facing frame's texture bakes counter-mirrored lettering
+      // (`render-svg.ts`'s `renderLettering`), so switching facing must swap
+      // the sprite's *texture* (via `applyFrame`), not just flip it -- the
+      // flip alone would mirror the already-corrected lettering right back
+      // into reading backwards. The flip itself is applied inside
+      // `applyFrame`, together with whichever texture actually lands.
+      //
+      // Early-return when the facing hasn't changed (#147 review fix):
+      // `RoomScene.advanceStep` calls `setFacing` on every walk step, even
+      // while walking straight in one direction across several tiles, so
+      // without this guard every step re-hashes `currentLook` and re-runs 16
+      // `exists` checks (`ensurePenguinTextures`) for a texture set already
+      // in use.
+      if (next === facing) return;
       facing = next;
-      sprite.setFlipX(facing === 'left');
+      ensurePenguinTextures(scene, currentLook, facing, textureOptions);
+      applyFrame();
     },
     setLook(next: PenguinLook) {
       const wasWalking = currentAnim === 'WALK';
       currentLook = next;
       currentHash = penguinLookHash(next);
-      ensurePenguinTextures(scene, next);
+      ensurePenguinTextures(scene, next, facing, textureOptions);
       redrawNameTag();
       play(wasWalking ? 'WALK' : next.emote);
     },
@@ -315,10 +459,20 @@ export function createPenguin(
     hasSnowHat() {
       return !destroyed && snowHat.visible;
     },
+    bodyMotionTweenCount() {
+      // A removed tween stays in Phaser's list, already stopped, until the
+      // manager's next update; only a tween still running counts, so a
+      // tween that was never removed (a leak) shows up and a finished one
+      // doesn't.
+      return scene.tweens
+        .getTweensOf(motionProxy)
+        .filter((tween) => !tween.isPendingRemove() && !tween.isRemoved()).length;
+    },
     destroy() {
       destroyed = true;
       clearPendingListener();
       stopFrameTimer();
+      motion.stop(false);
       container.destroy();
     },
   };

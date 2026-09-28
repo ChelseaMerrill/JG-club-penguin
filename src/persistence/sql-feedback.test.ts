@@ -7,7 +7,7 @@ import { PGlite } from '@electric-sql/pglite';
 import { afterAll, describe, expect, it } from 'vitest';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const FEEDBACK_MIGRATION = ['supabase', 'migrations', '20260925020000_feedback.sql'];
+const FEEDBACK_MIGRATION = ['supabase', 'migrations', '20260928010000_feedback.sql'];
 
 function readRepoFile(...segments: string[]): string {
   return readFileSync(path.join(REPO_ROOT, ...segments), 'utf8');

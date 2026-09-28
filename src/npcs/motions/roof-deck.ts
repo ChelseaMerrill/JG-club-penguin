@@ -1,5 +1,9 @@
+import { NPC_TEXT_PATHS } from '../../game/npcs/text-paths';
 import type { NpcId } from '../npcs';
 import type { NpcMotionSpec } from './types';
+
+/** The bait's "FREE $$$" as outlined paths, as the static rod draws it (#137). */
+const FREE_BAIT = NPC_TEXT_PATHS.freeBait;
 
 /**
  * The Roof Deck's NPC motions (#113), copied verbatim from `design/Room 05
@@ -9,7 +13,9 @@ import type { NpcMotionSpec } from './types';
  * bouncing on Kevin's counter, and the Hexle pet following the design's
  * sample "You" Penguin), `mkYou` (that sample Player Penguin), `idle` (the
  * vendors' bob, which #36's own idle bob already covers), `say` (#36's
- * bubbles) and `blink` (the HUD/door arrow).
+ * bubbles) and `blink` (the HUD/door arrow). Also left out: `mkTristin`,
+ * since Tristin is a Penguin in the design and so isn't placed (#133: only
+ * Players appear as Penguins).
  */
 export const ROOF_DECK_MOTIONS: Partial<Record<NpcId, NpcMotionSpec>> = {
   // Brandon gallops a loop around the deck on his hobby horse. The horse is
@@ -29,8 +35,11 @@ export const ROOF_DECK_MOTIONS: Partial<Record<NpcId, NpcMotionSpec>> = {
     },
   },
   // Anthony strolls with a phishing rod: the design draws him casting a rod
-  // ("FREE $$$" bait on the line) where his character-sheet figure holds a
-  // laptop, so the rod replaces that prop while he moves.
+  // ("FREE $$$" bait on the line). His Roof Deck figure's own `prop` is that
+  // rod at rest (`fishingRod`, #137, shown under reduced motion), so this
+  // casting rod replaces it while he moves: one rod either way. The bait's
+  // text is the same outlined paths the static rod uses (an SVG texture
+  // can't load the design's Anton font), not the design's `<text>`.
   anthony: {
     path: {
       keyframes:
@@ -49,7 +58,7 @@ export const ROOF_DECK_MOTIONS: Partial<Record<NpcId, NpcMotionSpec>> = {
         },
         children: [
           {
-            svg: '<path d="M118 10 L118 70" stroke="#F4F4F4" stroke-width="1.2"/><path d="M118 70 q0 8 -6 6" stroke="#B3B6C9" stroke-width="1.5" fill="none"/><rect x="108" y="72" width="20" height="14" rx="2" fill="#F4F4F4" stroke="#0C4B5F" stroke-width="1.5"/><path d="M108 72 L118 80 L128 72" stroke="#0C4B5F" stroke-width="1.5" fill="none"/><text x="118" y="98" text-anchor="middle" font-family="Anton, Impact, sans-serif" font-size="7" fill="#00BDFF">FREE $$$</text>',
+            svg: `<path d="M118 10 L118 70" stroke="#F4F4F4" stroke-width="1.2"/><path d="M118 70 q0 8 -6 6" stroke="#B3B6C9" stroke-width="1.5" fill="none"/><rect x="108" y="72" width="20" height="14" rx="2" fill="#F4F4F4" stroke="#0C4B5F" stroke-width="1.5"/><path d="M108 72 L118 80 L128 72" stroke="#0C4B5F" stroke-width="1.5" fill="none"/><path d="${FREE_BAIT.d}" fill="${FREE_BAIT.fill}"/>`,
             motion: {
               keyframes:
                 '@keyframes line { 0%,100% { transform: rotate(20deg);} 40% { transform: rotate(-30deg);} 60% { transform: rotate(-24deg);} }',
@@ -66,13 +75,6 @@ export const ROOF_DECK_MOTIONS: Partial<Record<NpcId, NpcMotionSpec>> = {
       keyframes:
         '@keyframes mkMillie { 0% { transform: translate(0,0);} 44.0%,56.0% { transform: translate(25.00000000000002px, 67.5px);} 100% { transform: translate(0,0);} }',
       animation: 'mkMillie 20s ease-in-out infinite',
-    },
-  },
-  tristin: {
-    path: {
-      keyframes:
-        '@keyframes mkTristin { 0% { transform: translate(0,0);} 28.3%,38.3% { transform: translate(470px, -19.99999999999997px);} 62.7%,70.7% { transform: translate(305px, -102.49999999999999px);} 100% { transform: translate(0,0);} }',
-      animation: 'mkTristin 24s ease-in-out infinite',
     },
   },
 };
