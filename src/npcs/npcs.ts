@@ -66,7 +66,20 @@ export type NpcId =
   | 'sam-team-room-4'
   | 'ryan-team-room-4'
   // #113: Town Center's Jory Hutchins, on the couch. Her first Room.
-  | 'jory';
+  | 'jory'
+  // #51 slice 3: the Mullet's nine NPCs, by the same rule. Tony Mercadante has
+  // no slot anywhere else, so he gets his bare id; the other eight are repeat
+  // appearances with a `-mullet` suffix (Dom's bare `dom` stays defined but
+  // unplaced, as before).
+  | 'jason-mullet'
+  | 'nicole-mullet'
+  | 'ann-marie-mullet'
+  | 'jory-mullet'
+  | 'ashley-mullet'
+  | 'tony'
+  | 'jon-mullet'
+  | 'brandon-mullet'
+  | 'dom-mullet';
 
 /**
  * A minigame-launching NPC's trigger dialog (#36 D4; round-1 review item 4
@@ -480,6 +493,118 @@ const JETHRO_FIGURE: HumanFigureSpec = {
 };
 
 /**
+ * Jon Keller's figure, shared by Town Center (`jon`) and the Mullet
+ * (`jon-mullet`) (#51 slice 3): the same person, the same `humans.js` spec,
+ * in one constant so the copies can't drift. Town Center's playing cards are
+ * that entry's own override.
+ */
+const JON_FIGURE: HumanFigureSpec = {
+  style: 'spiky',
+  hair: 'dark',
+  skin: 'light',
+  top: '#BFD6EE',
+  jacket: '#1f2a4a',
+  collar: 'shirtLight',
+  glasses: 'sun',
+  mouth: 'smirk',
+  prop: 'scarf',
+};
+
+/**
+ * Jory Hutchins's figure, shared by Town Center (`jory`) and the Mullet
+ * (`jory-mullet`) (#51 slice 3), from `humans.js`'s `hutchins`.
+ */
+const JORY_FIGURE: HumanFigureSpec = {
+  style: 'short',
+  hair: 'brown',
+  skin: 'fair',
+  top: '#1f6b4a',
+  collar: 'crew',
+  glasses: 'rect',
+  beard: 'stubble',
+  teeth: true,
+  hat: 'survivor',
+  tee: 'survivor',
+};
+
+/**
+ * Ashley Schuliger's figure, shared by the Dev Pit (`ashley`) and the Mullet
+ * (`ashley-mullet`) (#51 slice 3), from `humans.js`'s `schuliger`.
+ */
+const ASHLEY_FIGURE: HumanFigureSpec = {
+  style: 'wavyLong',
+  hair: 'brown',
+  skin: 'fair',
+  top: '#161719',
+  collar: 'crew',
+  teeth: true,
+  prop: 'chicken',
+};
+
+/**
+ * Ann Marie Berdar's figure, shared by the Roof Deck (`ann-marie`) and the
+ * Mullet (`ann-marie-mullet`) (#51 slice 3), from `humans.js`'s `berdar`.
+ */
+const ANN_MARIE_FIGURE: HumanFigureSpec = {
+  style: 'wavyLong',
+  hair: 'lblond',
+  skin: 'med',
+  top: '#F2C12E',
+  jacket: '#7A2A8C',
+  collar: 'crew',
+  necklace: true,
+  teeth: true,
+};
+
+/**
+ * Brandon Badgett's figure, shared by the Roof Deck (`brandon`) and the
+ * Mullet (`brandon-mullet`) (#51 slice 3), from `humans.js`'s spec.
+ */
+const BRANDON_FIGURE: HumanFigureSpec = {
+  style: 'sideSwept',
+  hair: 'dark',
+  skin: 'fair',
+  top: '#1f2a4a',
+  pattern: 'stripes',
+  pattern2: '#D63C3C',
+  collar: 'crew',
+  beard: 'stubble',
+  mouth: 'smirk',
+  prop: 'hobbyhorse',
+};
+
+/**
+ * Nicole Roberts's figure, shared by the Icebox (`nicole`) and the Mullet
+ * (`nicole-mullet`) (#51 slice 3), from `humans.js`'s spec. The Icebox's
+ * laptop-on-lap pose is that entry's own override.
+ */
+const NICOLE_FIGURE: HumanFigureSpec = {
+  style: 'wavyLong',
+  hair: 'lblond',
+  skin: 'fair',
+  top: '#161719',
+  sleeveless: true,
+  necklace: true,
+  teeth: true,
+};
+
+/**
+ * Jason Jahnel's figure, shared by the Icebox (`jason`) and the Mullet
+ * (`jason-mullet`) (#51 slice 3), from `humans.js`'s spec.
+ */
+const JASON_FIGURE: HumanFigureSpec = {
+  style: 'buzz',
+  hair: 'brown',
+  skin: 'fair',
+  top: '#F4F4F4',
+  pattern: 'plaid',
+  pattern2: '#8FB5D8',
+  collar: 'button',
+  glasses: 'thin',
+  teeth: true,
+};
+
+/**
  * Person-wide dialog lines (#144 D2), shared by every appearance of the same
  * person like the `*_FIGURE` constants above, so the copies can't drift.
  * Element 0 is #36's single `dialogLine` (usually the character sheet's
@@ -523,6 +648,12 @@ const JETHRO_LINES = [
   'One more for the recap.',
   'Say hackathon!',
 ] as const;
+const JON_LINES = ['Welcome to JG. Sunglasses stay on.'] as const;
+const JORY_LINES = ['The tribe has spoken.'] as const;
+const ANN_MARIE_LINES = ['That cap? Totally your color.', 'OK great :) now do it now'] as const;
+const BRANDON_LINES = ["Giddy up. Arcade's this way."] as const;
+const NICOLE_LINES = ["The client loved it. Next one's at 2."] as const;
+const JASON_LINES = ['Answer three and you may pass.'] as const;
 
 /**
  * `NPCS`: every prototype Room's NPC, keyed by `NpcId` (#36 D1). Names come
@@ -569,7 +700,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'town-center',
     kind: 'human',
     tagName: 'Jon Keller',
-    dialogLines: ['Welcome to JG. Sunglasses stay on.'],
+    dialogLines: JON_LINES,
     questGiver: { nothingRightNowLine: 'Just enjoy the tour. Sunglasses stay on.' },
     // `sayJon` shows the same line twice per 14 s cycle: 19%-32% and 61%-74%.
     idleLines: [
@@ -577,19 +708,9 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: 'Wanna see a magic trick?', periodS: 14, delayS: 0, window: [0.61, 0.74] },
     ],
     dialog: LINE_DIALOG,
-    figure: {
-      style: 'spiky',
-      hair: 'dark',
-      skin: 'light',
-      top: '#BFD6EE',
-      jacket: '#1f2a4a',
-      collar: 'shirtLight',
-      glasses: 'sun',
-      mouth: 'smirk',
-      prop: 'scarf',
-      // Town Center's design puts three playing cards in his hand (`trick`).
-      cards: true,
-    },
+    // Town Center's design puts three playing cards in his hand (`trick`);
+    // the Mullet's doesn't, so it's this entry's own override.
+    figure: { ...JON_FIGURE, cards: true },
   },
   sydney: {
     id: 'sydney',
@@ -620,23 +741,12 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'town-center',
     kind: 'human',
     tagName: 'Jory Hutchins',
-    dialogLines: ['The tribe has spoken.'],
+    dialogLines: JORY_LINES,
     questGiver: {},
     // `sayJory` (63%-88%), 9 s, no delay.
     idleLines: [{ text: 'COUCH. IS. LAVA.', periodS: 9, delayS: 0, window: [0.63, 0.88] }],
     dialog: LINE_DIALOG,
-    figure: {
-      style: 'short',
-      hair: 'brown',
-      skin: 'fair',
-      top: '#1f6b4a',
-      collar: 'crew',
-      glasses: 'rect',
-      beard: 'stubble',
-      teeth: true,
-      hat: 'survivor',
-      tee: 'survivor',
-    },
+    figure: JORY_FIGURE,
   },
   'front-desk': {
     id: 'front-desk',
@@ -667,15 +777,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: 'Catch!', periodS: 14, delayS: -9.5 },
     ],
     dialog: LINE_DIALOG,
-    figure: {
-      style: 'wavyLong',
-      hair: 'brown',
-      skin: 'fair',
-      top: '#161719',
-      collar: 'crew',
-      teeth: true,
-      prop: 'chicken',
-    },
+    figure: ASHLEY_FIGURE,
   },
   ian: {
     id: 'ian',
@@ -807,7 +909,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'roof-deck',
     kind: 'human',
     tagName: 'Ann Marie',
-    dialogLines: ['That cap? Totally your color.', 'OK great :) now do it now'],
+    dialogLines: ANN_MARIE_LINES,
     idleLines: [
       { text: 'Cyan cap? 120 tokens.', periodS: 12, delayS: 0 },
       { text: 'Try it on!', periodS: 12, delayS: -6 },
@@ -817,16 +919,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     // would overlap the top 5 px of Millie's: lifted 8 px to clear it.
     bubbleOffsetY: -8,
     dialog: LINE_DIALOG,
-    figure: {
-      style: 'wavyLong',
-      hair: 'lblond',
-      skin: 'med',
-      top: '#F2C12E',
-      jacket: '#7A2A8C',
-      collar: 'crew',
-      necklace: true,
-      teeth: true,
-    },
+    figure: ANN_MARIE_FIGURE,
   },
   millie: {
     id: 'millie',
@@ -873,25 +966,14 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'roof-deck',
     kind: 'human',
     tagName: 'Brandon',
-    dialogLines: ["Giddy up. Arcade's this way."],
+    dialogLines: BRANDON_LINES,
     idleLines: [
       { text: 'Giddy up!', periodS: 26, delayS: -2 },
       { text: 'Does it come in horse?', periodS: 26, delayS: -10 },
       { text: 'Yeehaw. Hexle time.', periodS: 26, delayS: -18 },
     ],
     dialog: LINE_DIALOG,
-    figure: {
-      style: 'sideSwept',
-      hair: 'dark',
-      skin: 'fair',
-      top: '#1f2a4a',
-      pattern: 'stripes',
-      pattern2: '#D63C3C',
-      collar: 'crew',
-      beard: 'stubble',
-      mouth: 'smirk',
-      prop: 'hobbyhorse',
-    },
+    figure: BRANDON_FIGURE,
   },
   anthony: {
     id: 'anthony',
@@ -1070,7 +1152,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'the-icebox',
     kind: 'human',
     tagName: 'Nicole',
-    dialogLines: ["The client loved it. Next one's at 2."],
+    dialogLines: NICOLE_LINES,
     questGiver: {},
     idleLines: [
       { text: 'Client call in 5. Shh.', periodS: 15, delayS: -2 },
@@ -1079,17 +1161,9 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     ],
     dialog: LINE_DIALOG,
     // humans.js's spec, seated with a laptop on her lap as the Room design
-    // draws her (#113).
-    figure: {
-      style: 'wavyLong',
-      hair: 'lblond',
-      skin: 'fair',
-      top: '#161719',
-      sleeveless: true,
-      necklace: true,
-      teeth: true,
-      seated: 'laptop',
-    },
+    // draws her (#113). The Mullet's design seats her on the couch without
+    // one, a pose the renderer doesn't draw, so that entry stands.
+    figure: { ...NICOLE_FIGURE, seated: 'laptop' },
   },
   jason: {
     id: 'jason',
@@ -1098,7 +1172,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'the-icebox',
     kind: 'human',
     tagName: 'Jason',
-    dialogLines: ['Answer three and you may pass.'],
+    dialogLines: JASON_LINES,
     // A near-duplicate of his dialog line; it stays a bubble in the Room.
     dialogOmit: ['Three questions and you may pass.'],
     idleLines: [
@@ -1107,17 +1181,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: 'Kickoff in 4:32. Sit.', periodS: 26, delayS: -18 },
     ],
     dialog: LINE_DIALOG,
-    figure: {
-      style: 'buzz',
-      hair: 'brown',
-      skin: 'fair',
-      top: '#F4F4F4',
-      pattern: 'plaid',
-      pattern2: '#8FB5D8',
-      collar: 'button',
-      glasses: 'thin',
-      teeth: true,
-    },
+    figure: JASON_FIGURE,
   },
   jethro: {
     id: 'jethro',
@@ -1358,6 +1422,169 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     still: true,
     dialog: LINE_DIALOG,
     figure: RYAN_FIGURE,
+  },
+  // #51 slice 3: the Mullet's nine NPCs. Names and titles from
+  // design/Characters.dc.html (Dom and Ashley are on its TITLE TBD list), tags
+  // and `idleLines` from design/The Mullet.dc.html's own nameplates and
+  // bubbles, verbatim. A repeat appearance shares its person's figure and
+  // dialog-lines constants. The design animates several of them with SMIL (Dom's lap,
+  // Tony's walk round the pool table, Jory's walk, Jon's and Brandon's
+  // ping-pong sway, Ashley's pacing); none of that is ported here: each stands
+  // at its rest slot, and only a figure the design gives a plain up-down bob
+  // keeps the shared idle bob (#149 follow-up).
+  'jason-mullet': {
+    id: 'jason-mullet',
+    name: 'Jason Jahnel',
+    title: 'COO',
+    roomId: 'the-mullet',
+    kind: 'human',
+    tagName: 'Jason',
+    dialogLines: JASON_LINES,
+    // At the Ms. Pac-Man, with no bubble.
+    idleLines: [],
+    // The design jiggles him at the joystick rather than bobbing him.
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: JASON_FIGURE,
+  },
+  'nicole-mullet': {
+    id: 'nicole-mullet',
+    name: 'Nicole Roberts',
+    title: 'Account Manager',
+    roomId: 'the-mullet',
+    kind: 'human',
+    tagName: 'Nicole',
+    dialogLines: NICOLE_LINES,
+    // The design floats a laugh ("hehe") off her on a 3 s cycle; ported as a
+    // static line (#149 follow-up).
+    idleLines: staticLine('hehe'),
+    dialog: LINE_DIALOG,
+    figure: NICOLE_FIGURE,
+  },
+  'ann-marie-mullet': {
+    id: 'ann-marie-mullet',
+    name: 'Ann Marie Berdar',
+    title: 'SUBSCRIPTION AI',
+    roomId: 'the-mullet',
+    kind: 'human',
+    tagName: 'Ann Marie',
+    dialogLines: ANN_MARIE_LINES,
+    // As Nicole's: the design's floating "haha", ported as a static line.
+    idleLines: staticLine('haha'),
+    dialog: LINE_DIALOG,
+    figure: ANN_MARIE_FIGURE,
+  },
+  'jory-mullet': {
+    id: 'jory-mullet',
+    name: 'Jory Hutchins',
+    title: 'Director of Career Development',
+    roomId: 'the-mullet',
+    kind: 'human',
+    tagName: 'Jory',
+    dialogLines: JORY_LINES,
+    idleLines: staticLine('Tribe has spoken.'),
+    // The grid stands her two tiles (100 px) right of Brandon, where her
+    // always-shown bubble would cover the end of his nameplate (the design
+    // already has them touching). Shifted right until it clears it (#113).
+    bubbleOffsetX: 20,
+    // The design walks her a loop of the room rather than bobbing her.
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: JORY_FIGURE,
+  },
+  'ashley-mullet': {
+    id: 'ashley-mullet',
+    name: 'Ashley Schuliger',
+    title: null,
+    roomId: 'the-mullet',
+    kind: 'human',
+    tagName: 'Ashley',
+    dialogLines: ASHLEY_LINES,
+    // One bubble the design shows three times per 18 s cycle (a discrete SMIL
+    // opacity: shown 4.4%-16.7%, 41.1%-53.3% and 70.6%-82.8%), each time
+    // Clucknelius is thrown.
+    idleLines: [
+      { text: 'Clucknelius coming at you!', periodS: 18, delayS: 0, window: [0.0444, 0.1667] },
+      { text: 'Clucknelius coming at you!', periodS: 18, delayS: 0, window: [0.4111, 0.5333] },
+      { text: 'Clucknelius coming at you!', periodS: 18, delayS: 0, window: [0.7056, 0.8278] },
+    ],
+    dialog: LINE_DIALOG,
+    figure: ASHLEY_FIGURE,
+  },
+  tony: {
+    id: 'tony',
+    name: 'Tony Mercadante',
+    title: 'Project Manager',
+    roomId: 'the-mullet',
+    kind: 'human',
+    tagName: 'Tony Mercadante',
+    dialogLines: ['Eight ball, corner pocket.'],
+    idleLines: staticLine('corner pocket'),
+    // The design walks him round the pool table with his cue rather than
+    // bobbing him.
+    still: true,
+    dialog: LINE_DIALOG,
+    // humans.js's `mercadante` spec has `slick` hair and a `henley` collar,
+    // neither of which the renderer draws; the nearest it does are the short
+    // dark cut and a crew neck (#149 follow-up).
+    figure: {
+      style: 'shortDark',
+      hair: 'dark',
+      skin: 'light',
+      top: '#6B2237',
+      collar: 'crew',
+      beard: 'stubble',
+      teeth: true,
+    },
+  },
+  'jon-mullet': {
+    id: 'jon-mullet',
+    name: 'Jon Keller',
+    title: 'President',
+    roomId: 'the-mullet',
+    kind: 'human',
+    tagName: 'Jon',
+    dialogLines: JON_LINES,
+    // At the ping-pong table, with no bubble.
+    idleLines: [],
+    // The design sways him side to side with the rally rather than bobbing.
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: JON_FIGURE,
+  },
+  'brandon-mullet': {
+    id: 'brandon-mullet',
+    name: 'Brandon Badgett',
+    title: 'Senior Vice President',
+    roomId: 'the-mullet',
+    kind: 'human',
+    tagName: 'Brandon',
+    dialogLines: BRANDON_LINES,
+    // Jon's ping-pong opponent, also with no bubble. The arcade is out of
+    // scope, so his Interaction is Dialogue.
+    idleLines: [],
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: BRANDON_FIGURE,
+  },
+  'dom-mullet': {
+    id: 'dom-mullet',
+    name: 'Dom Favata',
+    title: null,
+    roomId: 'the-mullet',
+    kind: 'human',
+    tagName: 'Dom',
+    dialogLines: DOM_LINES,
+    // A discrete SMIL opacity on a 9.4 s cycle shows it from 86% of one cycle
+    // to 12% of the next: two windows either side of the cycle's start.
+    idleLines: [
+      { text: 'Undefeated. I always win.', periodS: 9.4, delayS: 0, window: [0, 0.12] },
+      { text: 'Undefeated. I always win.', periodS: 9.4, delayS: 0, window: [0.86, 1] },
+    ],
+    dialog: LINE_DIALOG,
+    // humans.js's spec; the Room design dresses him in running gear for his
+    // lap of the room, a scene-only costume the renderer doesn't draw.
+    figure: DOM_FIGURE,
   },
   // Jessie: the design draws her as a Penguin in the Bathroom, but only
   // Players appear as Penguins in the World (owner decision 2026-09-25; see

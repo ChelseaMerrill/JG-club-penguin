@@ -69,7 +69,8 @@ type RoomId =
   | 'team-room-2'
   | 'team-room-3'
   | 'team-room-4'
-  | 'bathroom';
+  | 'bathroom'
+  | 'the-mullet';
 
 // Per-Room overrides of STAGE_SELECTOR (#51 D3), for a design file whose
 // first `data-screen-label` element isn't the Stage this Room exports (e.g.
@@ -96,6 +97,7 @@ const ROOM_FILES: Record<RoomId, string> = {
   'team-room-3': 'Team Room 3.dc.html',
   'team-room-4': 'Team Room 4.dc.html',
   bathroom: 'Room 13 Bathroom.dc.html', // #51 D1: the design calls it THE THAW ROOM.
+  'the-mullet': 'The Mullet.dc.html', // #51 slice 3: THE MULLET (MEZZANINE).
 };
 
 // A hide rule targets one of three shapes the design markup uses for a live
@@ -932,6 +934,100 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
       anchor: 'MENU',
       companions: ['1,250', '12 ONLINE', 'MENU', 'QUEST'],
       comment: 'Top-right token/presence/menu/quest HUD cluster.',
+    },
+    {
+      kind: 'cluster',
+      anchor: 'EMOTE',
+      companions: ['EMOTE', 'SNOWBALL', 'QUESTS'],
+      comment: 'Bottom chat/action toolbar (HUD).',
+    },
+  ],
+  'the-mullet': [
+    {
+      kind: 'labels',
+      texts: ['You', 'Jason', 'Nicole', 'Ann Marie'],
+      comment:
+        "The local player's figure and nameplate, and the nameplates of Jason (at the Ms. Pac-Man) and of Nicole and Ann Marie (on the couch).",
+    },
+    {
+      kind: 'selector',
+      selectors: [
+        'ellipse[cx="570"][cy="543"]',
+        'ellipse[cx="782"][cy="310"]',
+        'svg[x="752"][y="246"]',
+        'svg[x="962"][y="416"]',
+        'svg[x="1047"][y="459"]',
+        'circle[cx="0"][cy="0"][r="3.5"]',
+        'svg[x="535.2"][y="471.66"]',
+        'g:has(> ellipse[cx="1250"][cy="643"])',
+        'g:has(> ellipse[cx="880"][cy="738"])',
+        'g:has(> ellipse[cx="500"][cy="518"])',
+      ],
+      comment:
+        "The local player's shadow and figure; Jason's shadow and his jiggling figure; Nicole's and Ann Marie's bouncing couch figures, none of which sits next to its nameplate; the moving ping-pong ball; and the moving groups of Jory (her walk), Ashley (her pacing, with Clucknelius and her bubble) and Tony (his walk round the pool table, with his cue and bubble), each pinned by its own ground-shadow ellipse. The design's runtime lifts those three nameplates into a separate label layer, so the `label-group` rule below only reaches the nameplates. The Ms. Pac-Man's own wobbling joystick is the cabinet prop and stays.",
+    },
+    {
+      kind: 'label-group',
+      texts: [
+        'hehe',
+        'haha',
+        'Jory',
+        'Tribe has spoken.',
+        'Ashley',
+        'Tony Mercadante',
+        'corner pocket',
+        'Jon',
+        'Brandon',
+        'Dom',
+      ],
+      comment:
+        "Nicole's and Ann Marie's floating laughs; Jon's, Brandon's and Dom's whole <g> of shadow, figure, nameplate and bubble (their ping-pong sway and Dom's lap); and the nameplates and bubbles of Jory, Ashley and Tony, which the design's runtime lifts into their own label-layer <g>s.",
+    },
+    {
+      kind: 'selector',
+      selectors: [
+        'polygon[points="345,490.5 280,523 345,555.5 370,543 335,525.5 395,525.5 395,505.5 350,518"]',
+      ],
+      comment:
+        "Non-working floor arrow decal (#132): this Room's working exits are its HALLWAY and DEV PIT doors, not this floor paint.",
+    },
+    {
+      kind: 'animation',
+      names: ['blink', 'confetti'],
+      comment:
+        "Blinking '↙ HALLWAY' and 'DEV PIT ↘' room-exit nav pills (HUD), and the after-party confetti layer.",
+    },
+    {
+      kind: 'cluster',
+      anchor: '← MAP',
+      companions: ['← MAP', '15 · THE MULLET (MEZZANINE)'],
+      comment: 'Top-left breadcrumb nav (HUD).',
+    },
+    {
+      kind: 'cluster',
+      anchor: 'MEZZANINE · MS. PAC-MAN · TV LOUNGE · POOL · PING PONG · END OF THE GAME',
+      companions: [
+        'THE MULLET',
+        'MEZZANINE · MS. PAC-MAN · TV LOUNGE · POOL · PING PONG · END OF THE GAME',
+      ],
+      comment:
+        "Room title/subtitle banner (HUD). Anchored on the subtitle: the wall sign also says 'THE MULLET'.",
+    },
+    {
+      kind: 'cluster',
+      anchor: 'MENU',
+      companions: ['1,250', '12 ONLINE', 'MENU'],
+      comment: 'Top-right token/presence/menu HUD cluster.',
+    },
+    {
+      kind: 'cluster',
+      anchor: 'No quests. Arcade unlocked. Tokens still spend at the Market.',
+      companions: [
+        'No quests. Arcade unlocked. Tokens still spend at the Market.',
+        '5 / 5 QUESTS DONE · 3 BADGES',
+      ],
+      comment:
+        "The AFTER-PARTY quest card (HUD). Anchored on its body: the TV on the wall also says 'AFTER-PARTY'.",
     },
     {
       kind: 'cluster',

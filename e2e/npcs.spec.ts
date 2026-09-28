@@ -76,6 +76,7 @@ for (const roomId of [
   'team-room-3',
   'team-room-4',
   'bathroom',
+  'the-mullet',
 ] as const) {
   test(`npcs-${roomId}: NPCs show at their designed positions`, async ({ page }) => {
     const errors = await bootRoom(page, roomId);
@@ -86,6 +87,27 @@ for (const roomId of [
     expect(errors).toEqual([]);
   });
 }
+
+test('The Mullet: clicking Tony arrives and opens his line dialog (#51 slice 3)', async ({
+  page,
+}) => {
+  const errors = await bootRoom(page, 'the-mullet');
+
+  const tony = await npc(page, 'tony');
+  await clickStagePoint(page, { x: tony.x, y: tony.y });
+
+  await expect
+    .poll(async () => (await debugInfo(page))?.npcArrivedLog, { timeout: LONG_WALK_TIMEOUT })
+    .toContain('tony');
+
+  const dialog = page.locator('.npc-dialog');
+  await expect(dialog).toBeVisible();
+  await expect(dialog.locator('.npc-dialog__name')).toHaveText('Tony Mercadante');
+  await expect(dialog).toContainText('Eight ball, corner pocket.');
+  await page.screenshot({ path: 'test-results/npcs-the-mullet/tony-dialog.png' });
+
+  expect(errors).toEqual([]);
+});
 
 test('Dev Pit: clicking Ian arrives, opens his dialog, and GRAB THE HAMMER opens Bug Squash', async ({
   page,

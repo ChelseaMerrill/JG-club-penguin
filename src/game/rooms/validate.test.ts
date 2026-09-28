@@ -458,6 +458,8 @@ describe('ROOM_DEFINITIONS registry', () => {
       'team-room-3': ['office-hallway'],
       'team-room-4': ['office-hallway'],
       bathroom: ['office-hallway'],
+      // #51 slice 3: one-way doors out; nothing draws a door in (D5).
+      'the-mullet': ['dev-pit', 'office-hallway'],
     });
   });
 
@@ -524,6 +526,11 @@ describe('ROOM_DEFINITIONS registry', () => {
     expect(getRoomDefinition('bathroom')).toMatchObject({
       title: 'THE THAW ROOM',
       subtitle: 'BATHROOM · FLOOR 5',
+    });
+    // #51 slice 3: the banner's own subtitle, which carries no live figure.
+    expect(getRoomDefinition('the-mullet')).toMatchObject({
+      title: 'THE MULLET',
+      subtitle: 'MEZZANINE · MS. PAC-MAN · TV LOUNGE · POOL · PING PONG · END OF THE GAME',
     });
   });
 });

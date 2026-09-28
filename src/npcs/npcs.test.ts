@@ -448,6 +448,77 @@ describe('NPCS', () => {
     });
   });
 
+  it("gives the Mullet's nine NPCs the sheet's names/titles and the design's own nameplates and lines (#51 slice 3)", () => {
+    // Names/titles from design/Characters.dc.html (Dom and Ashley are on its
+    // TITLE TBD list); tags and idle lines verbatim from design/The
+    // Mullet.dc.html. Its discrete SMIL bubbles keep their own windows:
+    // Ashley's on an 18 s cycle, Dom's either side of a 9.4 s cycle's start.
+    // Tony has no slot anywhere else, so he gets a bare id; the other eight
+    // are repeat appearances with a `-mullet` suffix.
+    const expected: Partial<Record<NpcId, Record<string, unknown>>> = {
+      'jason-mullet': { name: 'Jason Jahnel', title: 'COO', tagName: 'Jason', idleLines: [] },
+      'nicole-mullet': {
+        name: 'Nicole Roberts',
+        title: 'Account Manager',
+        tagName: 'Nicole',
+        idleLines: [{ text: 'hehe', periodS: 0, delayS: 0 }],
+      },
+      'ann-marie-mullet': {
+        name: 'Ann Marie Berdar',
+        title: 'SUBSCRIPTION AI',
+        tagName: 'Ann Marie',
+        idleLines: [{ text: 'haha', periodS: 0, delayS: 0 }],
+      },
+      'jory-mullet': {
+        name: 'Jory Hutchins',
+        title: 'Director of Career Development',
+        tagName: 'Jory',
+        idleLines: [{ text: 'Tribe has spoken.', periodS: 0, delayS: 0 }],
+      },
+      'ashley-mullet': {
+        name: 'Ashley Schuliger',
+        title: null,
+        tagName: 'Ashley',
+        idleLines: [
+          { text: 'Clucknelius coming at you!', periodS: 18, window: [0.0444, 0.1667] },
+          { text: 'Clucknelius coming at you!', periodS: 18, window: [0.4111, 0.5333] },
+          { text: 'Clucknelius coming at you!', periodS: 18, window: [0.7056, 0.8278] },
+        ],
+      },
+      tony: {
+        name: 'Tony Mercadante',
+        title: 'Project Manager',
+        tagName: 'Tony Mercadante',
+        dialogLines: ['Eight ball, corner pocket.'],
+        idleLines: [{ text: 'corner pocket', periodS: 0, delayS: 0 }],
+      },
+      'jon-mullet': { name: 'Jon Keller', title: 'President', tagName: 'Jon', idleLines: [] },
+      'brandon-mullet': {
+        name: 'Brandon Badgett',
+        title: 'Senior Vice President',
+        tagName: 'Brandon',
+        idleLines: [],
+      },
+      'dom-mullet': {
+        name: 'Dom Favata',
+        title: null,
+        tagName: 'Dom',
+        idleLines: [
+          { text: 'Undefeated. I always win.', periodS: 9.4, window: [0, 0.12] },
+          { text: 'Undefeated. I always win.', periodS: 9.4, window: [0.86, 1] },
+        ],
+      },
+    };
+    for (const [id, fields] of Object.entries(expected)) {
+      expect(NPCS[id as NpcId], id).toMatchObject({
+        kind: 'human',
+        roomId: 'the-mullet',
+        dialog: { kind: 'line' },
+        ...fields,
+      });
+    }
+  });
+
   it("draws each repeat appearance with the same figure and dialog line as the person's first Room (#51)", () => {
     const repeats: [NpcId, NpcId][] = [
       ['dom-team-room-1', 'dom'],
@@ -455,6 +526,13 @@ describe('NPCS', () => {
       ['millie-team-room-3', 'millie'],
       ['casey-team-room-3', 'casey'],
       ['sydney-team-room-3', 'sydney'],
+      // #51 slice 3: the Mullet.
+      ['jason-mullet', 'jason'],
+      ['ann-marie-mullet', 'ann-marie'],
+      ['jory-mullet', 'jory'],
+      ['ashley-mullet', 'ashley'],
+      ['brandon-mullet', 'brandon'],
+      ['dom-mullet', 'dom'],
     ];
     for (const [repeat, first] of repeats) {
       const again = NPCS[repeat];
@@ -476,6 +554,10 @@ describe('NPCS', () => {
       ['jethro', 'jethro-team-room-1', { cameraRig: true }],
       ['ryan', 'ryan-team-room-4', { marker: expect.anything() }],
       ['sam', 'sam-team-room-4', { marker: expect.anything() }],
+      // Town Center's Jon holds playing cards and the Icebox's Nicole has a
+      // laptop on her lap; the Mullet's design draws neither (#51 slice 3).
+      ['jon', 'jon-mullet', { cards: true }],
+      ['nicole', 'nicole-mullet', { seated: 'laptop' }],
     ];
     for (const [roomOwn, other, added] of overrides) {
       const withOverride = NPCS[roomOwn];

@@ -78,7 +78,7 @@ export const MAP_ROOMS: readonly MapRoomTile[] = [
     number: '15',
     label: '15 · THE MULLET',
     subtitle: 'MEZZANINE · AFTER-PARTY',
-    roomId: null,
+    roomId: 'the-mullet',
   },
 ] as const;
 

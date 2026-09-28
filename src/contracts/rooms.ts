@@ -14,6 +14,7 @@ export const ROOM_IDS = [
   'team-room-3',
   'team-room-4',
   'bathroom',
+  'the-mullet',
 ] as const;
 
 /**

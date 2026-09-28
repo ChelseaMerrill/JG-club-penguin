@@ -6,8 +6,15 @@ import { getNpcDefinition, NPCS, type NpcDefinition } from './npcs';
 /**
  * Placed NPCs still one line short, waiting on BA copy (#144). Remove an id
  * when its line lands; the test below fails if the set drifts either way.
+ * The three Mullet ids (#51 slice 3) are the BA request at
+ * https://github.com/ChelseaMerrill/JG-club-penguin/issues/144#issuecomment-5861116456.
  */
-const AWAITING_BA_LINE: readonly string[] = ['emily'];
+const AWAITING_BA_LINE: readonly string[] = [
+  'emily',
+  'jason-mullet',
+  'jon-mullet',
+  'brandon-mullet',
+];
 
 /**
  * Every speech-bubble line in `design/Stairwell.dc.html`. #144 leaves them
