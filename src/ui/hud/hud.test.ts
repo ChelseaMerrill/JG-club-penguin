@@ -94,6 +94,32 @@ describe('createHud', () => {
     unsubscribe();
   });
 
+  it('MAP is disabled while the Map is locked for Security Training, with a hint, and back after (#146)', () => {
+    const { root, hud } = setup();
+    const map = root.querySelector('.hud__button--map') as HTMLButtonElement;
+    const opened = vi.fn();
+    const toasts = vi.fn();
+    const unsubscribeOpen = gameEvents.on('ui:open-map', opened);
+    const unsubscribeToast = gameEvents.on('ui:toast', toasts);
+
+    hud.setMapLocked(true);
+    expect(map.getAttribute('aria-disabled')).toBe('true');
+    expect(map.title).toBe('Security Training is Required! Answer 3 of Anthony’s questions.');
+    map.click();
+    expect(opened).not.toHaveBeenCalled();
+    expect(toasts).toHaveBeenCalledWith({
+      message: 'Security Training is Required! Answer 3 of Anthony’s questions.',
+    });
+
+    hud.setMapLocked(false);
+    expect(map.hasAttribute('aria-disabled')).toBe(false);
+    expect(map.title).toBe('');
+    map.click();
+    expect(opened).toHaveBeenCalledTimes(1);
+    unsubscribeOpen();
+    unsubscribeToast();
+  });
+
   it('PENGUIN closes an open MENU before emitting ui:open-creator', () => {
     const { root } = setup();
     const menuPanel = () => root.querySelector('.hud__menu-panel') as HTMLElement;

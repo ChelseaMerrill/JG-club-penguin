@@ -113,7 +113,8 @@ export const roofDeck: RoomDefinition = {
     { npcId: 'millie', tile: { col: 2, row: 5 } },
     { npcId: 'josh', tile: { col: 11, row: 2 } },
     { npcId: 'brandon', tile: { col: 4, row: 6 } },
-    { npcId: 'anthony', tile: { col: 7, row: 5 } },
+    // Anthony has no slot here any more (#146): he guards one door of a
+    // shared Room at a time, placed by the Phishing Quiz (`RoomScene.setGuard`).
     // Her ellipse inverts to col 12.2, one column past this Room's last
     // valid column (11); clamped to 11 — a judgment call reported on the
     // #16 execution plan.

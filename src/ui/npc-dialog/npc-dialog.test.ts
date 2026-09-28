@@ -195,6 +195,45 @@ describe('createNpcDialog', () => {
     expect(panel(root).hidden).toBe(true);
   });
 
+  it('Anthony, the door guard: his rule, TAKE THE QUIZ opens the quiz, WALK AROUND HIM closes (#146)', () => {
+    const root = document.createElement('div');
+    document.body.append(root);
+    overlays = createOverlayManager();
+    const startPhishingQuiz = vi.fn();
+    dialog = createNpcDialog(root, {
+      overlays,
+      actions: {
+        launchMinigame: vi.fn(),
+        openStall: vi.fn(),
+        startQuest: vi.fn(),
+        startPhishingQuiz,
+      },
+    });
+    const buttonNamed = (label: string) =>
+      Array.from(root.querySelectorAll('button')).find(
+        (button) => button.textContent === label,
+      ) as HTMLButtonElement;
+
+    gameEvents.emit('npc:arrived', { npcId: 'anthony' });
+    expect(root.querySelector('.npc-dialog__name')?.textContent).toBe('Anthony Conway');
+    expect(root.querySelector('.npc-dialog__subtitle')?.textContent).toBe(
+      'DOOR BOSS · PHISHING QUIZ',
+    );
+    expect(lineText(root)).toBe(
+      'Whoa there. You bumped into me, so you know the rule: one security question before you pass.',
+    );
+
+    buttonNamed('WALK AROUND HIM').click();
+    expect(panel(root).hidden).toBe(true);
+    expect(startPhishingQuiz).not.toHaveBeenCalled();
+
+    gameEvents.emit('npc:arrived', { npcId: 'anthony' });
+    buttonNamed('TAKE THE QUIZ').click();
+    expect(panel(root).hidden).toBe(true);
+    expect(overlays.current()).toBeNull();
+    expect(startPhishingQuiz).toHaveBeenCalledTimes(1);
+  });
+
   it('Casey calls openStall("igloo-gear") and closes', () => {
     const { root, openStall } = setup();
     gameEvents.emit('npc:arrived', { npcId: 'casey' });

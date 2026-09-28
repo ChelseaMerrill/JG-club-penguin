@@ -67,9 +67,14 @@ export interface Hud {
   questSlot: HTMLElement;
   /** Shows the QUESTS button as active while the Quests panel is open (#46). */
   setQuestsActive(on: boolean): void;
+  /** Disables MAP (with a hint) while the Player is locked out for Security Training (#146). */
+  setMapLocked(locked: boolean): void;
 }
 
 const MENU_OVERLAY_ID = 'menu';
+
+/** The MAP button's hint while the Map is locked for Security Training (#146). */
+const MAP_LOCKED_HINT = 'Security Training is Required! Answer 3 of Anthony’s questions.';
 
 /** How long a toast (`ui:toast`) stays up before it auto-hides. */
 const TOAST_DURATION_MS = 4000;
@@ -283,8 +288,26 @@ export function createHud(layer: HTMLElement, deps: HudDeps): Hud {
     // `overlays.open` when a Session is active, so this is what actually
     // closes MENU on the rare click before one has started.
     overlays.close(MENU_OVERLAY_ID);
+    // #146: locked for Security Training, the button only explains why.
+    if (mapLocked) {
+      gameEvents.emit('ui:toast', { message: MAP_LOCKED_HINT });
+      return;
+    }
     gameEvents.emit('ui:open-map');
   });
+
+  /** #146: the Map is locked for Security Training (`setMapLocked`). */
+  let mapLocked = false;
+
+  function setMapLocked(locked: boolean): void {
+    mapLocked = locked;
+    // Dimmed and `aria-disabled` like SNOWBALL's off-ammo state, not the
+    // native `disabled`, so the hint still shows on hover and click.
+    mapButton.classList.toggle('hud__button--disabled', locked);
+    if (locked) mapButton.setAttribute('aria-disabled', 'true');
+    else mapButton.removeAttribute('aria-disabled');
+    mapButton.title = locked ? MAP_LOCKED_HINT : '';
+  }
 
   const iglooButton = document.createElement('button');
   iglooButton.type = 'button';
@@ -419,6 +442,7 @@ export function createHud(layer: HTMLElement, deps: HudDeps): Hud {
     overlays,
     setSnowballMode,
     setSnowballAmmo,
+    setMapLocked,
     questSlot,
     setQuestsActive(on) {
       questsButton.classList.toggle('hud__button--active', on);

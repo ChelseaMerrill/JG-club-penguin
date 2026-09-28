@@ -83,6 +83,8 @@ export interface RoomDebugInfo {
   openStallLog?: string[];
   /** Every NPC in the Room by npcId: where its feet are now, and whether it is walking its designed path (#113). */
   npcs?: Record<string, NpcMotionDebugInfo>;
+  /** #146: the guard NPC (Anthony) in this Room, or `null` for none. */
+  guard?: { npcId: string; tile: Tile; doorLabel: string | null; blocking: boolean } | null;
 }
 
 /** One NPC's motion state (#113). */

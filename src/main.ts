@@ -110,6 +110,15 @@ import { createQuestWidget } from './ui/quest-widget';
 import { createQuestBanner } from './ui/quest-banner';
 import type { QuestsTestHandle } from './quests/quests-test-handle';
 import type { MinigameId } from './contracts';
+import { createFakePhishingClient } from './phishing/fake-phishing-client';
+import {
+  createSupabasePhishingClient,
+  toPhishingRpcClient,
+} from './phishing/supabase-phishing-client';
+import { createPhishingController } from './phishing/phishing-controller';
+import { createPhishingQuiz, PHISHING_QUIZ_OVERLAY_ID } from './phishing/phishing-quiz';
+import { createSecurityTrainingBanner } from './phishing/security-training-banner';
+import { exposePhishingTestHandle } from './phishing/dev-phishing-hook';
 
 // Fail fast on a missing or malformed .env before anything boots.
 loadEnv();
@@ -526,6 +535,8 @@ function endSession(): RoomChannel | null {
   // #138: so do the Session Badge checks.
   stopBadgeChecks?.();
   stopBadgeChecks = null;
+  // #146: Anthony, the Map lock and the training banner go with it.
+  phishing.stop();
   questWidget.render(null);
   hud.overlays.close(QUESTS_OVERLAY_ID);
   return channel;
@@ -579,6 +590,9 @@ async function startSession(player: Player, previous: RoomChannel | null): Promi
   // Night Owl), by the server's own clock.
   stopBadgeChecks?.();
   stopBadgeChecks = startBadgeChecks({ store: progressStore });
+  // #146: where Anthony guards, and this Player's saved quiz state (the
+  // lockout survives reloads), from the server.
+  void phishing.start();
 }
 
 /**
@@ -682,6 +696,10 @@ function initDevAsPlayerHook(): boolean {
     // #109: the stub channel can't tell the controller about a Room change
     // itself, so leave the mode directly off `room:leave`.
     gameEvents.on('room:leave', () => setSnowballMode(false));
+    // #146: the Phishing Quiz, against the in-memory fake server, only with
+    // `?phishing`: otherwise Anthony would guard a door by the real clock
+    // and shut it in every other `?asPlayer` spec's walk.
+    if (new URLSearchParams(window.location.search).has('phishing')) void phishing.start();
   });
   return true;
 }
@@ -744,6 +762,9 @@ exposeSnowballDebug(() => ({
 createMapScreen(uiLayer, {
   overlays: hud.overlays,
   changeRoom: (roomId) => {
+    // #146: leaving by the Map may be a bypass of Anthony; the server decides.
+    const leaving = roomNavigator?.currentRoomId();
+    if (leaving) void phishing.mapUsed(leaving);
     void roomNavigator?.changeRoom(roomId);
   },
   currentRoomId: () => roomNavigator?.currentRoomId() ?? null,
@@ -788,6 +809,44 @@ if (e2eHooksEnabled) {
 // Built once at boot for the long-lived consumers below; every call forwards
 // to the signed-in Player's Supabase store (#34), or to the dev fallback.
 const progressStore = createActiveProgressStore(game.registry, () => devFallbackStore);
+
+// #146: the Phishing Quiz. The signed-in Player's calls go to the server's
+// RPCs; the dev/e2e hooks (no sign-in) use the in-memory fake server, on a
+// clock `__phishingTest.setNow` can freeze. Vite turns `e2eHooksEnabled`
+// into `false` in a production build, so the fake (and its question bank)
+// never ships.
+let devPhishingNow: number | null = null;
+const devPhishing = e2eHooksEnabled
+  ? createFakePhishingClient({ now: () => devPhishingNow ?? Date.now() })
+  : null;
+const supabasePhishing = createSupabasePhishingClient(toPhishingRpcClient(client));
+const phishing = createPhishingController({
+  client: () => (currentPlayer ? supabasePhishing : (devPhishing?.client ?? null)),
+  scene: { setGuard: (guard) => roomScene?.setGuard(guard) },
+  currentRoomId: () => roomNavigator?.currentRoomId() ?? null,
+  hud,
+  banner: createSecurityTrainingBanner(uiLayer),
+  emitter: progress.storeEmitter,
+});
+const phishingQuiz = createPhishingQuiz(uiLayer, {
+  overlays: hud.overlays,
+  start: () => phishing.startChallenge(),
+  answer: (challengeId, choice) => phishing.answer(challengeId, choice),
+});
+gameEvents.on('room:enter', () => phishing.roomEntered());
+if (devPhishing) {
+  exposePhishingTestHandle({
+    async setNow(ms) {
+      devPhishingNow = ms;
+      await phishing.refresh();
+    },
+    correctChoice() {
+      const open = devPhishing.controls.openChallengeId();
+      return open === null ? null : devPhishing.controls.correctChoiceFor(open);
+    },
+    state: () => phishing.state(),
+  });
+}
 
 /** `window.localStorage`, or `null` where reading it throws (private mode, sandboxed frames). */
 function safeLocalStorage(): Storage | null {
@@ -987,6 +1046,8 @@ createNpcDialog(getUiLayer(), {
     startQuest: (questId) => {
       startQuest(questId);
     },
+    // #146: Anthony's TAKE THE QUIZ.
+    startPhishingQuiz: () => phishingQuiz.open(),
   },
   // #144: quest givers read the Quests panel's own view; each Quest's issue
   // registers its starter in `src/npcs/quest-giver.ts`.
@@ -1164,6 +1225,7 @@ const auth = startAuth({
     hud.overlays.close(MARKET_OVERLAY_ID);
     hud.overlays.close(CORE_VALUES_OVERLAY_ID);
     hud.overlays.close(QUESTS_OVERLAY_ID);
+    hud.overlays.close(PHISHING_QUIZ_OVERLAY_ID);
     iglooEditor?.exitEditMode();
     iglooEditor?.setVisible(false);
     overlay.showSignedOut();

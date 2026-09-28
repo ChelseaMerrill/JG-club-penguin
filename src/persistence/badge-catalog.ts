@@ -106,7 +106,7 @@ export const BADGE_CATALOG: readonly (BadgeDefinition & { id: BadgeId })[] = [
     name: 'Phish Fry',
     howToEarn: '10 PHISHING ANSWERS IN A ROW',
     sortOrder: 15,
-    available: false,
+    available: true,
   },
 ];
 
@@ -120,6 +120,8 @@ export const BADGE_CATALOG: readonly (BadgeDefinition & { id: BadgeId })[] = [
 export const BADGE_AVAILABILITY_OVERRIDES: ReadonlySet<BadgeId> = new Set<BadgeId>([
   // #121: 20260928000000_beystadium.sql turns Let It Rip on.
   'let-it-rip',
+  // #146: 20260928020000_phishing_quiz.sql turns Phish Fry on.
+  'phish-fry',
 ]);
 
 /** The catalog row for `badgeId`, if there is one. */

@@ -77,6 +77,13 @@ import {
 import type { SnowballView } from '../../snowball/snowball-controller';
 import { arcPoint, clampTileToGrid, type ScreenPoint } from '../../snowball/snowball-rules';
 import type { IglooSlot, ShopItem } from '../../persistence/progress-store';
+import {
+  createBumpTracker,
+  guardTile,
+  isGuardedDoor,
+  isNextTo,
+  type RoomGuard,
+} from '../../phishing/guard-placement';
 
 export const ROOM_SCENE_KEY = 'RoomScene';
 
@@ -332,6 +339,16 @@ export class RoomScene extends Scene {
   /** The `onArrive` of the latest NPC click (#113), to tell whether that walk is still pending. */
   private npcArrival: (() => void) | null = null;
   private unsubscribeNpcDialog: (() => void)[] = [];
+  /** #146: where Anthony should stand (`setGuard`); kept across restarts, drawn only in its own Room. */
+  private guardSpec: RoomGuard | null = null;
+  /** #146: the guard as drawn in this Room, or `null`. Reset by `init()`/`cleanup()`. */
+  private guard: {
+    spec: RoomGuard;
+    slot: RoomNpcSlot;
+    sprite: NpcSprite;
+    zone: GameObjects.Zone;
+  } | null = null;
+  private readonly guardBumps = createBumpTracker();
   private hotspotHitAreas: HitArea<RoomHotspot>[] = [];
   /** Only populated while `furnitureEditMode` is on (#41). */
   private furnitureSlotHitAreas: HitArea<RoomFurnitureSlot>[] = [];
@@ -468,6 +485,8 @@ export class RoomScene extends Scene {
     this.npcMotions = null;
     this.npcClickPause = null;
     this.npcArrival = null;
+    this.guard?.sprite.destroy();
+    this.guard = null;
     this.clearComingSoonHint();
   };
 
@@ -505,6 +524,7 @@ export class RoomScene extends Scene {
     this.npcClickPause = null;
     this.npcArrival = null;
     this.unsubscribeNpcDialog = [];
+    this.guard = null;
     this.resetSnowballState();
   }
 
@@ -534,6 +554,20 @@ export class RoomScene extends Scene {
    */
   onDoorReached(handler: (door: RoomDoor) => void): void {
     this.events.on(DOOR_REACHED_EVENT, ({ door }: DoorReachedEvent) => handler(door));
+  }
+
+  /**
+   * Places (or with `null`, removes) a guard NPC (#146: Anthony, the Phishing
+   * Quiz door guard) in `spec.roomId`: on the approach tile of the door it
+   * names, or next to the local Penguin when it names none. While
+   * `spec.blocking`, using that door walks the Penguin to him instead (his
+   * dialog opens; no Room change), and finishing a walk next to him after
+   * being away "bumps" him, which opens it too. Kept across Room changes and
+   * drawn only while its Room is shown; calling it again redraws.
+   */
+  setGuard(spec: RoomGuard | null): void {
+    this.guardSpec = spec;
+    if (this.live) this.drawGuard();
   }
 
   /**
@@ -713,6 +747,7 @@ export class RoomScene extends Scene {
     this.events.once(Scenes.Events.SHUTDOWN, () => this.penguins.detach());
 
     this.live = true;
+    this.drawGuard();
     if (HOOKS_ENABLED) this.publishRoomDebug();
     this.resolveReady();
   }
@@ -781,6 +816,14 @@ export class RoomScene extends Scene {
       spawnDebugPenguin: (tile, look) => this.spawnDebugPenguin(tile, look),
       furniture: this.debugFurniture(),
       npcs: this.npcMotions?.debug(),
+      guard: this.guard
+        ? {
+            npcId: this.guard.spec.npcId,
+            tile: this.guard.slot.tile,
+            doorLabel: this.guard.spec.doorLabel,
+            blocking: this.guard.spec.blocking,
+          }
+        : null,
     });
   }
 
@@ -1161,6 +1204,11 @@ export class RoomScene extends Scene {
   }
 
   private handleDoorClick(door: RoomDoor, room: RoomDefinition): void {
+    // #146: a door Anthony is guarding for this Player takes them to him instead.
+    if (this.guard && isGuardedDoor(this.guard.spec, door)) {
+      this.handleNpcClick(this.guard.slot, room);
+      return;
+    }
     const target = doorApproachTile(room.walkable, door, room.grid.origin);
     this.startMoveTo(target, () => {
       this.doorReachedLog.push(door.label);
@@ -1246,6 +1294,7 @@ export class RoomScene extends Scene {
         const moveEvent: LocalPenguinMoveEvent = { target: tile };
         this.events.emit(LOCAL_PENGUIN_MOVE_EVENT, moveEvent);
         this.emitArrived(tile, facing);
+        this.checkGuardBump(tile, onArrive);
       }
       // Already standing on an NPC's interaction tile or a door's approach
       // tile: that still counts as arriving, so clicking an NPC you're next
@@ -1305,6 +1354,7 @@ export class RoomScene extends Scene {
       this.emitArrived(controller.state.tile, controller.state.facing);
       const arrive = this.pendingArrival;
       this.pendingArrival = null;
+      this.checkGuardBump(controller.state.tile, arrive);
       arrive?.();
       return;
     }
@@ -1694,6 +1744,59 @@ export class RoomScene extends Scene {
    * (now above the head) down to just below the feet, so it follows the
    * NPC's design scale.
    */
+  /**
+   * #146: draws `guardSpec` if it belongs to this Room, replacing any guard
+   * already drawn: the NPC's own sprite and click zone (the same as
+   * `drawNpcs`, standing still), on `guardTile`'s tile.
+   */
+  private drawGuard(): void {
+    if (this.guard) {
+      this.guard.sprite.destroy();
+      this.guard.zone.destroy();
+      const zone = this.guard.zone;
+      this.npcHitAreas = this.npcHitAreas.filter((hit) => hit.object !== zone);
+      this.guard = null;
+    }
+    const spec = this.guardSpec;
+    const room = this.room;
+    const controller = this.controller;
+    if (!spec || !room || !controller || spec.roomId !== room.id) return;
+    const npc = getNpcDefinition(spec.npcId);
+    const tile = guardTile(room, spec, controller.state.tile);
+    if (!npc || !tile) return;
+
+    const point = tileToScreen(tile, room.grid.origin);
+    const depth = depthForTile(tile);
+    const sprite = createNpcSprite(this, point.x, point.y, npc, depth);
+    sprite.container.setName(NPC_CONTAINER_NAME);
+    const { hitArea } = npcLayout(npc);
+    const zone = this.add
+      .zone(point.x + hitArea.centerX, point.y + hitArea.centerY, hitArea.width, hitArea.height)
+      .setDepth(depth)
+      .setInteractive({ useHandCursor: true });
+    const slot: RoomNpcSlot = { npcId: spec.npcId, tile };
+    // First, so a click where his zone overlaps a Room NPC's reaches him.
+    this.npcHitAreas.unshift({ object: zone, data: slot });
+    this.guard = { spec, slot, sprite, zone };
+    this.guardBumps.reset(isNextTo(controller.state.tile, tile));
+  }
+
+  /**
+   * #146: a walk that ends next to the guard, after being away from him,
+   * bumps him (opens his dialog), while he's shutting his door or waiting to
+   * train a locked-out Player. A click on an NPC already announces its own
+   * arrival, so that walk doesn't bump him as well.
+   */
+  private checkGuardBump(tile: Tile, arrive: (() => void) | null | undefined): void {
+    const guard = this.guard;
+    if (!guard) return;
+    const bumped = this.guardBumps.arrived(isNextTo(tile, guard.slot.tile));
+    if (!bumped || (arrive && arrive === this.npcArrival)) return;
+    if (!guard.spec.blocking && guard.spec.doorLabel !== null) return;
+    this.npcArrivedLog.push(guard.spec.npcId);
+    gameEvents.emit('npc:arrived', { npcId: guard.spec.npcId });
+  }
+
   private drawNpcs(room: RoomDefinition): void {
     for (const slot of room.npcSlots) {
       const npc = getNpcDefinition(slot.npcId);

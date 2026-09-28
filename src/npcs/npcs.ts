@@ -115,7 +115,20 @@ export interface NpcLineDialog {
   kind: 'line';
 }
 
-export type NpcDialog = NpcMinigameDialog | NpcStallDialog | NpcLineDialog;
+/**
+ * Anthony's Phishing Quiz trigger (#146, `design/Minigame Phishing Quiz.dc.html`,
+ * unbranded): laid out like a Minigame trigger (name badge, trigger line, two
+ * buttons), but its action opens the quiz, which isn't a Minigame round.
+ */
+export interface NpcPhishingQuizDialog {
+  kind: 'phishing-quiz';
+  actionLabel: string;
+  declineLabel: string;
+  triggerLine: string;
+  subtitle: string;
+}
+
+export type NpcDialog = NpcMinigameDialog | NpcStallDialog | NpcLineDialog | NpcPhishingQuizDialog;
 
 /**
  * One line of an NPC's idle speech-bubble cycle, ported from a Room design's
@@ -1005,7 +1018,16 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: 'Never click the bait!', periodS: 28, delayS: -11 },
       { text: 'Reel talk: check the sender.', periodS: 28, delayS: -20 },
     ],
-    dialog: LINE_DIALOG,
+    // #146: the door guard. He has no Room slot; the Phishing Quiz places him
+    // at the door he's guarding (`roomId` stays his home Room, the Roof Deck).
+    dialog: {
+      kind: 'phishing-quiz',
+      actionLabel: 'TAKE THE QUIZ',
+      declineLabel: 'WALK AROUND HIM',
+      triggerLine:
+        'Whoa there. You bumped into me, so you know the rule: one security question before you pass.',
+      subtitle: 'DOOR BOSS · PHISHING QUIZ',
+    },
     // Roof Deck's design gives him a fishing rod baited with a "FREE $$$"
     // envelope instead of his laptop; the Hallway's keeps the laptop.
     figure: { ...ANTHONY_FIGURE, prop: 'fishingRod' },

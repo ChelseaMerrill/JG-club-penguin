@@ -86,8 +86,34 @@ describe('NPC motion (#113)', () => {
     expect(transformPoint(figure, { x: 0, y: -100 }).x).toBeLessThan(-5);
   });
 
-  it("poses nested prop layers (Anthony's rod, and the line hanging off it)", () => {
-    const motion = createNpcMotion(getNpcMotion('anthony'), { x: 900, y: 575 }, ORIGIN, {
+  it('poses nested prop layers (a casting rod, and the line hanging off it)', () => {
+    // The Roof Deck design's casting rod, Anthony's until #146 stood him still
+    // at the door he guards; kept here as the one nested-layer example.
+    const castingRod: Parameters<typeof createNpcMotion>[0] = {
+      props: [
+        {
+          svg: '<path d="M92 96 L118 10" stroke="#C9A366" stroke-width="3.5"/>',
+          motion: {
+            keyframes:
+              '@keyframes cast { 0%,100% { transform: rotate(-35deg);} 40% { transform: rotate(25deg);} 60% { transform: rotate(20deg);} }',
+            animation: 'cast 3s ease-in-out infinite',
+            transformOrigin: '92px 96px',
+          },
+          children: [
+            {
+              svg: '<path d="M118 10 L118 70" stroke="#F4F4F4" stroke-width="1.2"/>',
+              motion: {
+                keyframes:
+                  '@keyframes line { 0%,100% { transform: rotate(20deg);} 40% { transform: rotate(-30deg);} 60% { transform: rotate(-24deg);} }',
+                animation: 'line 3s ease-in-out infinite',
+                transformOrigin: '118px 10px',
+              },
+            },
+          ],
+        },
+      ],
+    };
+    const motion = createNpcMotion(castingRod, { x: 900, y: 575 }, ORIGIN, {
       reducedMotion: false,
     })!;
     const [rod] = motion.pose().props;
@@ -113,7 +139,8 @@ describe('NPC motion (#113)', () => {
     const moving = (Object.keys(NPCS) as NpcId[]).filter(
       (id) => NPCS[id].roomId === 'roof-deck' && getNpcMotion(id),
     );
-    expect(moving.sort()).toEqual(['anthony', 'brandon', 'millie']);
+    // #146: Anthony stands still at the door he guards, so he has none.
+    expect(moving.sort()).toEqual(['brandon', 'millie']);
   });
 
   it('compiles every motion in the registry, and only for known NPCs', () => {
