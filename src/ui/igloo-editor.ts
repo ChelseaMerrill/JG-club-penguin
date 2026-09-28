@@ -2,8 +2,11 @@ import { iglooSlotForSlotId } from '../game/rooms/furniture-slots';
 import type { OverlayManager } from './hud/overlay-manager';
 import { buildIcon } from './market';
 import {
+  fitsSlot,
+  IGLOO_SLOT_PLACEMENT,
   ProgressStoreError,
   type IglooSlot,
+  type Placement,
   type ProgressStore,
   type ShopItem,
 } from '../persistence/progress-store';
@@ -15,13 +18,23 @@ export const IGLOO_SLOT_PICKER_OVERLAY_ID = 'igloo-slot-picker';
 /** #41 resolved decision 3's exact hint copy: the design has none of its own for an empty Igloo. */
 const NO_FURNITURE_HINT = 'Visit the Igloo Gear stall on the Roof Deck to buy Furniture.';
 
+/**
+ * #135 D9: the picker only lists owned items of the slot's placement. When
+ * none fits, it says what to buy instead.
+ */
+export const NO_FITTING_ITEM_HINT: Readonly<Record<Placement, string>> = {
+  floor: 'No floor Furniture yet. Buy some at the Igloo Gear stall.',
+  wall: 'Nothing to hang here yet. Buy wall items at the Igloo Gear stall.',
+  ceiling: 'Nothing to hang here yet. Buy the Disco Ball at the Igloo Gear stall.',
+};
+
 export interface IglooEditorOptions {
   store: Pick<ProgressStore, 'loadAll' | 'setSlot'>;
   /** The same `OverlayManager` the Trophy Case/Market register the picker with, so Escape closes it and only one overlay is open (#41 resolved decision 3). */
   overlays: OverlayManager;
   /**
    * Forwarded to `RoomScene.setFurnitureEditMode` whenever edit mode turns
-   * on or off, so the Scene highlights (or un-highlights) the six slots.
+   * on or off, so the Scene highlights (or un-highlights) the 11 slots.
    */
   onEditModeChange: (on: boolean) => void;
   /**
@@ -117,8 +130,10 @@ export function createIglooEditor(root: HTMLElement, options: IglooEditorOptions
   pickerError.setAttribute('role', 'alert');
 
   const pickerList = el('div', 'igloo-slot-picker__list');
+  const pickerHint = el('p', 'igloo-slot-picker__hint');
+  pickerHint.hidden = true;
 
-  pickerFrame.append(pickerHeader, pickerError, pickerList);
+  pickerFrame.append(pickerHeader, pickerError, pickerList, pickerHint);
   picker.append(pickerFrame);
   root.append(picker);
 
@@ -207,9 +222,13 @@ export function createIglooEditor(root: HTMLElement, options: IglooEditorOptions
       options.onSlotsChanged();
     } catch (error) {
       if (picker.hidden) return;
-      if (error instanceof ProgressStoreError && error.code === 'not_owned') {
+      if (
+        error instanceof ProgressStoreError &&
+        (error.code === 'not_owned' || error.code === 'wrong_placement')
+      ) {
         // Not reachable through this UI (the list is built from owned items
-        // only), but handled rather than left to crash (#41 test plan).
+        // of the slot's placement only), but handled rather than left to
+        // crash (#41 test plan, #135).
         setError("Couldn't place that item. Try again.");
       } else {
         setError('Something went wrong. Try again.');
@@ -222,9 +241,11 @@ export function createIglooEditor(root: HTMLElement, options: IglooEditorOptions
     const iglooSlot = iglooSlotForSlotId(slot.id);
     if (iglooSlot === null) return; // Defensive: RoomScene only ever emits a registered slot id.
 
-    pickerTitle.textContent = `SLOT ${iglooSlot}`;
+    const placement = IGLOO_SLOT_PLACEMENT[iglooSlot];
+    pickerTitle.textContent = `SLOT ${iglooSlot} · ${placement.toUpperCase()}`;
     setError('');
     pickerList.replaceChildren();
+    pickerHint.hidden = true;
     picker.hidden = false;
     options.overlays.open(IGLOO_SLOT_PICKER_OVERLAY_ID, closePicker);
 
@@ -235,12 +256,18 @@ export function createIglooEditor(root: HTMLElement, options: IglooEditorOptions
     const catalogById = new Map<string, ShopItem>(snapshot.catalog.map((item) => [item.id, item]));
     const entries: OptionEntry[] = [
       { itemId: null, label: 'Empty', artKey: null },
-      ...snapshot.ownedItems.map((itemId) => {
+      ...snapshot.ownedItems.flatMap((itemId) => {
         const item = catalogById.get(itemId);
-        return { itemId, label: item?.name ?? itemId, artKey: item?.artKey ?? itemId };
+        // #135: only items that fit this slot's placement.
+        if (!item || !fitsSlot(item, iglooSlot)) return [];
+        return [{ itemId, label: item.name, artKey: item.artKey }];
       }),
     ];
     renderOptions(entries, snapshot.slots[iglooSlot], iglooSlot);
+    if (entries.length === 1) {
+      pickerHint.textContent = NO_FITTING_ITEM_HINT[placement];
+      pickerHint.hidden = false;
+    }
   }
 
   return {

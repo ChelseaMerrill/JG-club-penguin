@@ -1,6 +1,12 @@
 import type { Tile } from '../../contracts';
 import { GAME_HEIGHT, GAME_WIDTH } from '../stage-size';
-import type { RoomDefinition } from './room-definition';
+import { IGLOO_SLOT_PLACEMENT } from '../../persistence/progress-store';
+import { iglooSlotForSlotId } from './furniture-slots';
+import type { RoomDefinition, StagePoint } from './room-definition';
+
+function isInStage(point: StagePoint): boolean {
+  return point.x >= 0 && point.x <= GAME_WIDTH && point.y >= 0 && point.y <= GAME_HEIGHT;
+}
 
 export interface RoomValidationError {
   roomId: RoomDefinition['id'];
@@ -46,10 +52,25 @@ function checkSlotsInBounds(room: RoomDefinition, errors: RoomValidationError[])
     }
   }
   for (const slot of room.furnitureSlots ?? []) {
-    if (!isInBounds(room, slot.tile)) {
+    if (slot.placement === 'floor') {
+      if (!isInBounds(room, slot.tile)) {
+        errors.push({
+          roomId: room.id,
+          message: `furniture slot "${slot.id}" tile { col: ${slot.tile.col}, row: ${slot.tile.row} } is out of bounds`,
+        });
+      }
+    } else if (!isInStage(slot.anchor)) {
       errors.push({
         roomId: room.id,
-        message: `furniture slot "${slot.id}" tile { col: ${slot.tile.col}, row: ${slot.tile.row} } is out of bounds`,
+        message: `furniture slot "${slot.id}" anchor { x: ${slot.anchor.x}, y: ${slot.anchor.y} } is outside the ${GAME_WIDTH}x${GAME_HEIGHT} Stage`,
+      });
+    }
+    // #135: the Room's placement for a slot must match the database's.
+    const iglooSlot = iglooSlotForSlotId(slot.id);
+    if (iglooSlot !== null && IGLOO_SLOT_PLACEMENT[iglooSlot] !== slot.placement) {
+      errors.push({
+        roomId: room.id,
+        message: `furniture slot "${slot.id}" is ${slot.placement}, but slot ${iglooSlot} is a ${IGLOO_SLOT_PLACEMENT[iglooSlot]} slot`,
       });
     }
   }

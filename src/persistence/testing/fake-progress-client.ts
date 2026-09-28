@@ -1,5 +1,7 @@
 import { DEFAULT_LOOK } from '../../contracts/penguin';
 import type { BadgeId, MinigameId } from '../../contracts/game-events';
+import { IGLOO_GEAR_CATALOG } from '../minigame-rules';
+import type { Placement } from '../progress-store';
 import type { ProgressClient } from '../supabase-progress-store';
 
 // A hand-written fake `ProgressClient`: no real network or database, but the
@@ -57,13 +59,26 @@ export interface FakeResponses {
   items?: FakeResult<Array<{ item_id: string }>>;
   slots?: FakeResult<Array<{ slot: number; item_id: string }>>;
   catalog?: FakeResult<
-    Array<{ id: string; stall: string; name: string; price: number; art_key: string }>
+    Array<{
+      id: string;
+      stall: string;
+      name: string;
+      price: number;
+      art_key: string;
+      placement: Placement;
+    }>
   >;
   /** #138 */
   badgeCatalog?: FakeResult<
     Array<{ id: string; name: string; how_to_earn: string; sort_order: number; available: boolean }>
   >;
   checkSessionBadges?: FakeResult<unknown>;
+  /**
+   * #135: `shop_items.select('placement').eq('id', itemId).maybeSingle()`,
+   * `setSlot`'s placement pre-check. Defaults to the item's placement in
+   * `IGLOO_GEAR_CATALOG`, or `null` for an id not in it.
+   */
+  itemPlacement?: FakeResult<{ placement: Placement } | null>;
   updateLook?: { error: FakeError | null };
   updateCreatedAt?: { error: FakeError | null };
   deleteBySlot?: { error: FakeError | null };
@@ -258,7 +273,21 @@ export function makeFakeClient(responses: FakeResponses = {}): {
           return {
             select: (columns: string) => {
               log('shop_items.select', columns);
-              return orderable(catalog, calls, 'shop_items.select');
+              const rows = orderable(catalog, calls, 'shop_items.select') as ReturnType<
+                typeof orderable<typeof catalog>
+              > & { eq: (column: string, value: string) => unknown };
+              rows.eq = (column: string, value: string) => {
+                log('shop_items.select.eq', column, value);
+                return {
+                  maybeSingle: async () => {
+                    log('shop_items.select.eq.maybeSingle');
+                    if (responses.itemPlacement) return responses.itemPlacement;
+                    const item = IGLOO_GEAR_CATALOG.find((entry) => entry.id === value);
+                    return { data: item ? { placement: item.placement } : null, error: null };
+                  },
+                };
+              };
+              return rows;
             },
           } as never;
         case 'badges':

@@ -13,6 +13,7 @@ import {
   clampLeaderboardRows,
   ProgressStoreError,
   emptySlots,
+  fitsSlot,
   isIglooSlot,
   isProgressErrorCode,
   validateLook,
@@ -21,6 +22,7 @@ import {
   type QuestProgress,
   type IglooSlot,
   type LeaderboardEntry,
+  type Placement,
   type ProgressErrorCode,
   type ProgressSnapshot,
   type ProgressStore,
@@ -111,6 +113,15 @@ interface ShopItemRow {
   name: string;
   price: number;
   art_key: string;
+  placement: Placement;
+}
+
+/** `shop_items.select('placement').eq('id', itemId)`: the one-item read `setSlot`'s placement pre-check makes (#135). */
+interface ShopItemsSelect extends OrderableRows<ShopItemRow> {
+  eq(
+    column: 'id',
+    value: string,
+  ): { maybeSingle(): PromiseLike<SelectResult<{ placement: Placement }>> };
 }
 
 /** A `public.badges` row (#138). */
@@ -164,7 +175,7 @@ export interface IglooSlotsTable {
 }
 
 export interface ShopItemsTable {
-  select(columns: string): OrderableRows<ShopItemRow>;
+  select(columns: string): ShopItemsSelect;
 }
 
 export interface BadgesTable {
@@ -285,6 +296,7 @@ const TOAST_MESSAGES: Record<ProgressErrorCode, string> = {
   invalid_look: "That Penguin look can't be saved",
   not_owned: "You don't own that item",
   invalid_slot: "That slot doesn't exist",
+  wrong_placement: "That item doesn't go there",
   unknown_quest: "That quest doesn't exist",
   quest_incomplete: "That quest isn't finished yet",
   invalid_response: "Couldn't read the server's reply",
@@ -362,7 +374,7 @@ export function createSupabaseProgressStore(
             .order('item_id', { ascending: true }),
           iglooSlotsTable.select('slot, item_id').eq('player_id', playerId),
           shopItemsTable
-            .select('id, stall, name, price, art_key')
+            .select('id, stall, name, price, art_key, placement')
             .order('price', { ascending: true })
             .order('id', { ascending: true }),
           badgesTable
@@ -413,6 +425,7 @@ export function createSupabaseProgressStore(
           name: row.name,
           price: row.price,
           artKey: row.art_key,
+          placement: row.placement,
         })),
         badgeCatalog: (badgeCatalogRes.data ?? []).map((row) => ({
           id: row.id,
@@ -518,6 +531,26 @@ export function createSupabaseProgressStore(
           throw toProgressError(error, { on23503: 'not_owned', on23514: 'invalid_slot' });
         }
         return;
+      }
+
+      // #135: check the item's placement against the slot's *before* the
+      // delete. The delete and upsert are two requests, so a move the
+      // database's placement guard rejects at the upsert would otherwise
+      // have already emptied the item's old slot. The trigger stays the
+      // authority; this only avoids the half-move.
+      const shopItemsTable = client.from('shop_items') as ShopItemsTable;
+      const { data: itemRow, error: itemError } = await shopItemsTable
+        .select('placement')
+        .eq('id', itemId)
+        .maybeSingle();
+      if (itemError) {
+        throw toProgressError(itemError);
+      }
+      if (!itemRow) {
+        throw new ProgressStoreError('not_owned');
+      }
+      if (!fitsSlot(itemRow, slot)) {
+        throw new ProgressStoreError('wrong_placement');
       }
 
       // Moving an owned item: drop it from wherever it currently sits, then
@@ -737,7 +770,9 @@ export function toProgressClient(client: SupabaseClient): ProgressClient {
 
   function shopItemsTable(): ShopItemsTable {
     const table = client.from('shop_items');
-    return { select: (columns) => table.select(columns) };
+    // A cast, as for the other tables: PostgREST's own builder types are far
+    // deeper than `ShopItemsSelect` and trip TypeScript's instantiation limit.
+    return { select: (columns) => table.select(columns) as unknown as ShopItemsSelect };
   }
 
   function badgesTable(): BadgesTable {

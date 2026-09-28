@@ -34,6 +34,7 @@ export interface LocalPenguinDebugInfo {
   containerX?: number;
   containerY?: number;
   nameTagY?: number;
+  nameTagDepth?: number;
 }
 
 /** One remote Penguin's movement state (#43). */

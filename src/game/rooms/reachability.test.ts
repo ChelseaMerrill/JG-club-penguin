@@ -111,8 +111,11 @@ describe('Room reachability (#16 D6)', () => {
         }
       });
 
-      it('reaches the nearest walkable neighbour of every furniture slot', () => {
+      it('reaches the nearest walkable neighbour of every floor furniture slot', () => {
+        // #135: wall and ceiling slots hang off the floor; only floor
+        // slots have a Tile to walk up to.
         for (const slot of room.furnitureSlots ?? []) {
+          if (slot.placement !== 'floor') continue;
           const neighbour = nearestWalkableTile(room, slot.tile, true);
           expect(reachable.has(tileKey(neighbour))).toBe(true);
         }

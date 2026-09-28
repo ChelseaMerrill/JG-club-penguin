@@ -10,11 +10,19 @@ import {
 } from '../contracts/penguin';
 
 /**
- * One of the Igloo's six Furniture slots (`igloo_slots.slot`, #27's
- * migration). Slot numbers are otherwise meaningless: the HUD lays them out,
- * this store only remembers which Furniture (if any) sits in each one.
+ * One of the Igloo's 11 Furniture slots (`igloo_slots.slot`, #27's
+ * migration, widened by #135): 1-6 floor, 7-10 wall, 11 ceiling (see
+ * `IGLOO_SLOT_PLACEMENT`). The Room definition lays them out; this store
+ * only remembers which Furniture (if any) sits in each one.
  */
-export type IglooSlot = 1 | 2 | 3 | 4 | 5 | 6;
+export type IglooSlot = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11;
+
+/**
+ * Where an Igloo Gear item goes (#135, `shop_items.placement`). An item
+ * fits only slots of its own placement; the database enforces it with the
+ * `igloo_slots_placement_guard` trigger.
+ */
+export type Placement = 'floor' | 'wall' | 'ceiling';
 
 /**
  * One entry in the Igloo Gear catalog (`public.shop_items`). Producer: #27
@@ -26,6 +34,8 @@ export interface ShopItem {
   name: string;
   price: number;
   artKey: string;
+  /** #135: which kind of Igloo slot the item fits. */
+  placement: Placement;
 }
 
 /**
@@ -181,6 +191,9 @@ export const PROGRESS_ERROR_CODES = [
   'invalid_look',
   'not_owned',
   'invalid_slot',
+  // #135: an item placed in a slot of another placement (a wall item in a
+  // floor slot, and so on). Raised by `igloo_slots_placement_guard`.
+  'wrong_placement',
   // #46: `complete_quest` with an id other than 'main', or before every
   // main-Quest step is met.
   'unknown_quest',
@@ -237,17 +250,53 @@ export function validateLook(look: PenguinLook): void {
   }
 }
 
-/** True when `value` is one of the Igloo's six slot numbers. */
+/** True when `value` is one of the Igloo's 11 slot numbers. */
 export function isIglooSlot(value: number): value is IglooSlot {
-  return Number.isInteger(value) && value >= 1 && value <= 6;
+  return Number.isInteger(value) && value >= 1 && value <= 11;
 }
 
 /** Every Igloo slot number, in order. */
-export const IGLOO_SLOTS: readonly IglooSlot[] = [1, 2, 3, 4, 5, 6];
+export const IGLOO_SLOTS: readonly IglooSlot[] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+
+/**
+ * Each slot's placement (#135). Mirrors `public.igloo_slot_placement` in
+ * `20260927010000_igloo_wall_slots.sql`; `sql-igloo-placement.test.ts`
+ * checks the two agree.
+ */
+export const IGLOO_SLOT_PLACEMENT: Readonly<Record<IglooSlot, Placement>> = {
+  1: 'floor',
+  2: 'floor',
+  3: 'floor',
+  4: 'floor',
+  5: 'floor',
+  6: 'floor',
+  7: 'wall',
+  8: 'wall',
+  9: 'wall',
+  10: 'wall',
+  11: 'ceiling',
+};
+
+/** True when `item` may sit in `slot` (their placements match). */
+export function fitsSlot(item: Pick<ShopItem, 'placement'>, slot: IglooSlot): boolean {
+  return IGLOO_SLOT_PLACEMENT[slot] === item.placement;
+}
 
 /** A fresh Igloo layout: every slot empty. */
 export function emptySlots(): Record<IglooSlot, string | null> {
-  return { 1: null, 2: null, 3: null, 4: null, 5: null, 6: null };
+  return {
+    1: null,
+    2: null,
+    3: null,
+    4: null,
+    5: null,
+    6: null,
+    7: null,
+    8: null,
+    9: null,
+    10: null,
+    11: null,
+  };
 }
 
 /**
@@ -304,7 +353,10 @@ export interface ProgressStore {
    * `setSlot(slot, null)` empties `slot`. Placing an item that already
    * occupies another slot moves it there, leaving that other slot empty.
    * Placing an item the Player does not own rejects with `not_owned`; an
-   * out-of-range slot (only 1-6 are valid) rejects with `invalid_slot`.
+   * out-of-range slot (only 1-11 are valid) rejects with `invalid_slot`;
+   * an item whose placement doesn't match the slot's (#135) rejects with
+   * `wrong_placement` before anything is written, so a rejected move leaves
+   * the item where it was.
    */
   setSlot(slot: IglooSlot, itemId: string | null): Promise<void>;
 

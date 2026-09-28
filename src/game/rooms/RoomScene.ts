@@ -26,7 +26,13 @@ import { npcLayout } from '../npcs/npc-layout';
 import { NpcClickPause } from '../npcs/npc-motion';
 import { createNpcSprite, type NpcSprite } from '../npcs/npc-sprite';
 import { RoomNpcMotions } from '../npcs/room-npc-motions';
-import { createPenguin, PLAYER_PENGUIN_SCALE, type Penguin, type PenguinAnim } from '../penguin';
+import {
+  createPenguin,
+  PENGUIN_OVERLAY_NAME,
+  PLAYER_PENGUIN_SCALE,
+  type Penguin,
+  type PenguinAnim,
+} from '../penguin';
 import { GAME_HEIGHT, GAME_WIDTH } from '../stage-size';
 import { planBackgroundDraw } from './background';
 import {
@@ -35,10 +41,17 @@ import {
   HOOKS_ENABLED,
   resolveRoomIdFromLocation,
 } from './dev-room-hook';
-import { drawFurnitureArt } from './furniture-art';
+import {
+  AWARD_LOGO_LOAD_SIZE,
+  drawCeilingShadow,
+  drawFurnitureArt,
+  FURNITURE_IMAGE_ART,
+} from './furniture-art';
 import { iglooSlotForSlotId } from './furniture-slots';
 import {
+  CEILING_FURNITURE_DEPTH,
   depthForTile,
+  NPC_BUBBLE_LAYER,
   screenToTile,
   SNOWBALL_LAYER,
   tileCornerToScreen,
@@ -197,6 +210,18 @@ const SNOWBALL_HINT_OFFSET_Y = 56;
 // over any Furniture already placed there, in the door/hotspot's own
 // cyan-outline vocabulary.
 const FURNITURE_SLOT_HIGHLIGHT_COLOR = 0x00bdff;
+// #135: wall art sits flat on the back walls, above the Room art and floor
+// but below every Tile depth, so Penguins always walk in front of it. The
+// ceiling item (`iso.ts`'s `CEILING_FURNITURE_DEPTH`) hangs above floor
+// content, below NPC speech bubbles and Player name tags and chat bubbles;
+// its shadow lies on the floor. Edit-mode markers for wall and ceiling slots
+// sit just under the bubble layer so they win clicks over the door hotspot.
+const WALL_FURNITURE_DEPTH = -0.5;
+const CEILING_SHADOW_DEPTH = -0.4;
+const HANGING_SLOT_MARKER_DEPTH = NPC_BUBBLE_LAYER - 10;
+/** A wall slot's edit-mode outline and hit area (the wall art box, before shear). */
+const WALL_SLOT_BOX = 38;
+const CEILING_SLOT_RADIUS = 20;
 const FURNITURE_SLOT_HIGHLIGHT_WIDTH = 3;
 const FURNITURE_SLOT_LABEL_FONT_SIZE = '16px';
 const FURNITURE_SLOT_LABEL_BG = 'rgba(10,11,13,0.75)';
@@ -596,6 +621,18 @@ export class RoomScene extends Scene {
     if (room.background.kind === 'image') {
       this.load.image(room.background.key, room.background.url);
     }
+    // #135 D7: the JG award logos, for award Furniture hung on the Igloo's
+    // walls. Only a Room with Furniture slots can show them.
+    if (room.furnitureSlots?.length) {
+      for (const { textureKey, url } of Object.values(FURNITURE_IMAGE_ART)) {
+        if (!this.textures.exists(textureKey)) {
+          this.load.svg(textureKey, url, {
+            width: AWARD_LOGO_LOAD_SIZE,
+            height: AWARD_LOGO_LOAD_SIZE,
+          });
+        }
+      }
+    }
   }
 
   create(): void {
@@ -698,10 +735,11 @@ export class RoomScene extends Scene {
             bodyTweenCount: this.penguin?.bodyMotionTweenCount(),
             containerX: this.penguin?.container.x,
             containerY: this.penguin?.container.y,
-            // The name tag is the container's first `Text`; the chat bubble's comes after it.
-            nameTagY: this.penguin?.container.list.find(
+            // The name tag is the overlay's first `Text`; the chat bubble's comes after it.
+            nameTagY: this.penguin?.overlay.list.find(
               (child): child is GameObjects.Text => child instanceof GameObjects.Text,
             )?.y,
+            nameTagDepth: this.penguin?.overlay.depth,
           }
         : undefined,
       textureListenerCount: countActiveTextureListeners(this),
@@ -752,7 +790,10 @@ export class RoomScene extends Scene {
    */
   private countPenguinContainers(matches: (name: string) => boolean): number {
     return this.children.list.filter(
-      (child) => child instanceof GameObjects.Container && matches(child.name),
+      (child) =>
+        child instanceof GameObjects.Container &&
+        child.name !== PENGUIN_OVERLAY_NAME &&
+        matches(child.name),
     ).length;
   }
 
@@ -1448,13 +1489,43 @@ export class RoomScene extends Scene {
     for (const slot of room.furnitureSlots ?? []) {
       const iglooSlot = iglooSlotForSlotId(slot.id);
       const itemId = iglooSlot !== null ? (this.furnitureSlots?.[iglooSlot] ?? null) : null;
+      const artKey = itemId
+        ? (this.furnitureCatalog.find((entry) => entry.id === itemId)?.artKey ?? itemId)
+        : null;
+
+      if (slot.placement !== 'floor') {
+        // #135: wall and ceiling slots hang at a Stage point, not a Tile.
+        if (artKey) {
+          if (slot.placement === 'wall') {
+            this.furnitureObjects.push(
+              drawFurnitureArt(this, artKey, slot.anchor, {
+                placement: 'wall',
+                wall: slot.wall,
+              }).setDepth(WALL_FURNITURE_DEPTH),
+            );
+          } else {
+            this.furnitureObjects.push(
+              drawCeilingShadow(this, slot.shadow).setDepth(CEILING_SHADOW_DEPTH),
+              drawFurnitureArt(this, artKey, slot.anchor, {
+                placement: 'ceiling',
+                cordTopY: slot.cordTopY,
+              }).setDepth(CEILING_FURNITURE_DEPTH),
+            );
+          }
+        }
+        if (this.furnitureEditMode) {
+          this.furnitureObjects.push(
+            ...this.drawHangingSlotMarker(slot, iglooSlot, artKey === null),
+          );
+        }
+        continue;
+      }
+
       const point = tileToScreen(slot.tile, room.grid.origin);
       const depth = depthForTile(slot.tile);
 
-      if (itemId) {
-        const item = this.furnitureCatalog.find((entry) => entry.id === itemId);
-        const art = drawFurnitureArt(this, item?.artKey ?? itemId, point).setDepth(depth);
-        this.furnitureObjects.push(art);
+      if (artKey) {
+        this.furnitureObjects.push(drawFurnitureArt(this, artKey, point).setDepth(depth));
       }
 
       if (this.furnitureEditMode) {
@@ -1463,7 +1534,68 @@ export class RoomScene extends Scene {
     }
   }
 
-  /** One edit-mode slot marker (#41): an outlined isometric tile diamond, a numbered label, and -- when `iglooSlot` resolves -- a clickable `Zone`. */
+  /**
+   * One edit-mode marker for a wall or ceiling slot (#135 D8): a subtle
+   * outline only while the slot is empty (a sheared square on the wall, a
+   * circle and cord for the ceiling), plus the slot number and a clickable
+   * `Zone` whether or not it's filled.
+   */
+  private drawHangingSlotMarker(
+    slot: Exclude<RoomFurnitureSlot, { placement: 'floor' }>,
+    iglooSlot: IglooSlot | null,
+    empty: boolean,
+  ): GameObjects.GameObject[] {
+    const objects: GameObjects.GameObject[] = [];
+    const { x, y } = slot.anchor;
+
+    if (empty) {
+      const outline = this.add.graphics().setDepth(HANGING_SLOT_MARKER_DEPTH);
+      outline.lineStyle(FURNITURE_SLOT_HIGHLIGHT_WIDTH - 1, FURNITURE_SLOT_HIGHLIGHT_COLOR, 0.7);
+      if (slot.placement === 'wall') {
+        const half = WALL_SLOT_BOX / 2;
+        const shear = slot.wall === 'left' ? -0.5 : 0.5;
+        outline.strokePoints(
+          [
+            { x: x - half, y: y - half - shear * half },
+            { x: x + half, y: y - half + shear * half },
+            { x: x + half, y: y + half + shear * half },
+            { x: x - half, y: y + half - shear * half },
+          ],
+          true,
+        );
+      } else {
+        outline.strokeCircle(x, y, CEILING_SLOT_RADIUS);
+        outline.lineBetween(x, slot.cordTopY, x, y - CEILING_SLOT_RADIUS);
+      }
+      objects.push(outline);
+    }
+
+    const label = this.add
+      .text(x, y, iglooSlot !== null ? String(iglooSlot) : '?', {
+        fontFamily: LABEL_FONT_FAMILY,
+        fontSize: FURNITURE_SLOT_LABEL_FONT_SIZE,
+        color: LABEL_TEXT_COLOR,
+        backgroundColor: FURNITURE_SLOT_LABEL_BG,
+        padding: { x: 6, y: 2 },
+      })
+      .setOrigin(0.5)
+      .setDepth(HANGING_SLOT_MARKER_DEPTH + 1);
+    objects.push(label);
+
+    if (iglooSlot !== null) {
+      const size = slot.placement === 'wall' ? WALL_SLOT_BOX : CEILING_SLOT_RADIUS * 2;
+      const zone = this.add
+        .zone(x, y, size, size)
+        .setDepth(HANGING_SLOT_MARKER_DEPTH + 1)
+        .setInteractive({ useHandCursor: true });
+      this.furnitureSlotHitAreas.push({ object: zone, data: slot });
+      objects.push(zone);
+    }
+
+    return objects;
+  }
+
+  /** One edit-mode floor slot marker (#41): an outlined isometric tile diamond, a numbered label, and -- when `iglooSlot` resolves -- a clickable `Zone`. */
   private drawFurnitureSlotMarker(
     slot: RoomFurnitureSlot,
     point: ScreenPoint,

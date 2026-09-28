@@ -87,7 +87,8 @@ export function computeDebugOverlay(room: RoomDefinition): DebugOverlayMarker[] 
   }
 
   for (const slot of room.furnitureSlots ?? []) {
-    const point = tileToScreen(slot.tile, room.grid.origin);
+    const point =
+      slot.placement === 'floor' ? tileToScreen(slot.tile, room.grid.origin) : slot.anchor;
     markers.push({ kind: 'furniture', x: point.x, y: point.y, label: slot.id });
   }
 

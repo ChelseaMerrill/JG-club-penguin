@@ -143,6 +143,13 @@
   display: none;
 }
 
+/* #135: shown instead of options when no owned item fits the slot. */
+.igloo-slot-picker__hint {
+  margin: 0;
+  font: 400 12px var(--font-body);
+  color: var(--isp-light);
+}
+
 .igloo-slot-picker__list {
   min-height: 0;
   display: flex;

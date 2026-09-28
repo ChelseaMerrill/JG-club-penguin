@@ -3,7 +3,7 @@ import { createEmitter } from '../contracts/emitter';
 import { DEFAULT_LOOK, type PenguinLook } from '../contracts/penguin';
 import type { BadgeId, GameEventMap } from '../contracts/game-events';
 import { MINIGAME_RULES } from './minigame-rules';
-import { ProgressStoreError } from './progress-store';
+import { ProgressStoreError, emptySlots } from './progress-store';
 import { createSupabaseProgressStore } from './supabase-progress-store';
 import { defaultPlayerRow, makeFakeClient } from './testing/fake-progress-client';
 
@@ -57,7 +57,10 @@ describe('createSupabaseProgressStore', () => {
       expect(calls).toContainEqual(['igloo_slots.select', 'slot, item_id']);
       expect(calls).toContainEqual(['igloo_slots.select.eq', 'player_id', PLAYER_ID]);
 
-      expect(calls).toContainEqual(['shop_items.select', 'id, stall, name, price, art_key']);
+      expect(calls).toContainEqual([
+        'shop_items.select',
+        'id, stall, name, price, art_key, placement',
+      ]);
       expect(calls).toContainEqual(['shop_items.select.order', 'price', { ascending: true }]);
       expect(calls).toContainEqual(['shop_items.select.order', 'id', { ascending: true }]);
     });
@@ -88,7 +91,16 @@ describe('createSupabaseProgressStore', () => {
         items: { data: [{ item_id: 'beanbag' }], error: null },
         slots: { data: [{ slot: 1, item_id: 'beanbag' }], error: null },
         catalog: {
-          data: [{ id: 'beanbag', stall: 'igloo', name: 'Beanbag', price: 50, art_key: 'beanbag' }],
+          data: [
+            {
+              id: 'beanbag',
+              stall: 'igloo',
+              name: 'Beanbag',
+              price: 50,
+              art_key: 'beanbag',
+              placement: 'floor',
+            },
+          ],
           error: null,
         },
       });
@@ -102,9 +114,16 @@ describe('createSupabaseProgressStore', () => {
       expect(snapshot.badges).toEqual(['exterminator']);
       expect(snapshot.bests).toEqual({ 'bug-squash': 520 });
       expect(snapshot.ownedItems).toEqual(['beanbag']);
-      expect(snapshot.slots).toEqual({ 1: 'beanbag', 2: null, 3: null, 4: null, 5: null, 6: null });
+      expect(snapshot.slots).toEqual({ ...emptySlots(), 1: 'beanbag' });
       expect(snapshot.catalog).toEqual([
-        { id: 'beanbag', stall: 'igloo', name: 'Beanbag', price: 50, artKey: 'beanbag' },
+        {
+          id: 'beanbag',
+          stall: 'igloo',
+          name: 'Beanbag',
+          price: 50,
+          artKey: 'beanbag',
+          placement: 'floor',
+        },
       ]);
     });
 
@@ -380,7 +399,7 @@ describe('createSupabaseProgressStore', () => {
       const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID });
 
       await expect(
-        store.setSlot(7 as Parameters<typeof store.setSlot>[0], 'beanbag'),
+        store.setSlot(12 as Parameters<typeof store.setSlot>[0], 'beanbag'),
       ).rejects.toMatchObject({ code: 'invalid_slot' });
       expect(calls).toEqual([]);
     });
@@ -405,6 +424,9 @@ describe('createSupabaseProgressStore', () => {
       await store.setSlot(3, 'beanbag');
 
       expect(calls).toEqual([
+        ['shop_items.select', 'placement'],
+        ['shop_items.select.eq', 'id', 'beanbag'],
+        ['shop_items.select.eq.maybeSingle'],
         ['igloo_slots.delete'],
         ['igloo_slots.delete.eq', 'player_id', PLAYER_ID],
         ['igloo_slots.delete.eq.eq', 'item_id', 'beanbag'],
@@ -414,6 +436,68 @@ describe('createSupabaseProgressStore', () => {
           { onConflict: 'player_id,slot' },
         ],
       ]);
+    });
+
+    // #135 (red-team W1): the placement pre-check runs before the delete, so
+    // a move the database would reject never empties the item's old slot.
+    // The fake client keeps no state; the call log is the proof.
+    it('rejects a wall item moved to a floor slot with wrong_placement, sending no delete or upsert', async () => {
+      const { client, calls } = makeFakeClient();
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID });
+
+      await expect(store.setSlot(1, 'jg-pennant')).rejects.toMatchObject({
+        code: 'wrong_placement',
+      });
+      expect(calls).toEqual([
+        ['shop_items.select', 'placement'],
+        ['shop_items.select.eq', 'id', 'jg-pennant'],
+        ['shop_items.select.eq.maybeSingle'],
+      ]);
+    });
+
+    it('rejects an unknown item id with not_owned, sending no delete', async () => {
+      const { client, calls } = makeFakeClient();
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID });
+
+      await expect(store.setSlot(7, 'hoverboard')).rejects.toMatchObject({ code: 'not_owned' });
+      expect(calls.some(([op]) => op.startsWith('igloo_slots.'))).toBe(false);
+    });
+
+    it('hangs a wall item: reads its placement, deletes it by item_id, then upserts slot 9', async () => {
+      const { client, calls } = makeFakeClient();
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID });
+
+      await store.setSlot(9, 'jg-pennant');
+
+      expect(calls.map(([op]) => op)).toEqual([
+        'shop_items.select',
+        'shop_items.select.eq',
+        'shop_items.select.eq.maybeSingle',
+        'igloo_slots.delete',
+        'igloo_slots.delete.eq',
+        'igloo_slots.delete.eq.eq',
+        'igloo_slots.upsert',
+      ]);
+      expect(calls.at(-1)).toEqual([
+        'igloo_slots.upsert',
+        { player_id: PLAYER_ID, slot: 9, item_id: 'jg-pennant' },
+        { onConflict: 'player_id,slot' },
+      ]);
+    });
+
+    it('maps the trigger wrong_placement message and emits its toast', async () => {
+      const { client } = makeFakeClient({
+        upsertSlot: { error: { message: 'wrong_placement', code: '23514' } },
+      });
+      const messages: string[] = [];
+      const emitter = createEmitter<GameEventMap>();
+      emitter.on('ui:toast', ({ message }) => messages.push(message));
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID, emitter });
+
+      await expect(store.setSlot(1, 'beanbag')).rejects.toMatchObject({
+        code: 'wrong_placement',
+      });
+      expect(messages).toEqual(["That item doesn't go there"]);
     });
 
     it('maps a 23503 on the upsert to not_owned', async () => {

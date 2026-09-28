@@ -27,6 +27,7 @@ import {
   type QuestProgress,
   ProgressStoreError,
   emptySlots,
+  fitsSlot,
   isIglooSlot,
   validateLook,
   type IglooSlot,
@@ -368,6 +369,12 @@ export function createInMemoryProgressStoreWithControls(
     }
     if (!state.ownedItems.has(itemId)) {
       throw new ProgressStoreError('not_owned');
+    }
+    // #135: mirrors the database's igloo_slots_placement_guard, checked
+    // before anything moves so a rejected move leaves the item in place.
+    const item = IGLOO_GEAR_CATALOG.find((entry) => entry.id === itemId);
+    if (item && !fitsSlot(item, slot)) {
+      throw new ProgressStoreError('wrong_placement');
     }
     for (const otherSlot of IGLOO_SLOTS) {
       if (state.slots[otherSlot] === itemId) {
