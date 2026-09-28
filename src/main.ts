@@ -88,6 +88,7 @@ import { createPenguinCreator } from './ui/penguin-creator';
 import { createPenguinEditor } from './penguin/penguin-editor';
 import { initDevCreatorHook } from './penguin/dev-creator-hook';
 import { createNpcDialog } from './ui/npc-dialog/npc-dialog';
+import { hasQuestStarter, startQuest } from './npcs/quest-giver';
 import { recordNpcTalked, recordOpenStall } from './game/rooms/dev-room-hook';
 import { createTrophyCase, TROPHY_CASE_OVERLAY_ID } from './ui/trophy-case';
 import { createMapScreen } from './ui/map-screen';
@@ -935,6 +936,15 @@ createNpcDialog(getUiLayer(), {
       hud.overlays.open(MARKET_OVERLAY_ID, () => market.close());
       void market.open();
     },
+    startQuest: (questId) => {
+      startQuest(questId);
+    },
+  },
+  // #144: quest givers read the Quests panel's own view; each Quest's issue
+  // registers its starter in `src/npcs/quest-giver.ts`.
+  quests: {
+    status: (questId) => quests.view()?.statuses.find((status) => status.quest.id === questId),
+    canStart: hasQuestStarter,
   },
 });
 gameEvents.on('npc:talked', ({ npcId }) => {

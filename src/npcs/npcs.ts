@@ -125,6 +125,23 @@ export interface NpcBubbleLine {
   window?: readonly [start: number, end: number];
 }
 
+/**
+ * A quest giver's "Got any work for me?" hook (#144 D5). Adding a Quest or a
+ * line here is a data-only change; `quest-giver.ts` does the routing.
+ */
+export interface NpcQuestGiver {
+  /** The Quest this NPC gives, once its issue lands (#121 'beystadium', #140, #141, #142). */
+  questId?: string;
+  /**
+   * For a steps Quest whose "talk to <giver>" step starts it: the Quest counts
+   * as not started until that step is done. Without it, not started means
+   * progress 0.
+   */
+  startStepId?: string;
+  /** The in-character "nothing right now" reply while no Quest is connected. BA copy only. */
+  nothingRightNowLine?: string;
+}
+
 interface NpcDefinitionBase {
   id: NpcId;
   /** The character sheet's full name (#36 round-1 review item 1); shown in the dialog panel. */
@@ -153,13 +170,25 @@ interface NpcDefinitionBase {
   /** The idle speech-bubble cycle, from the Room design's own `say` bubbles. */
   idleLines: NpcBubbleLine[];
   /**
-   * The line `npc-dialog.ts` shows for a `kind: 'line'` or `kind: 'stall'`
-   * NPC's dialog panel: the character sheet's own short quote (distinct from
-   * `idleLines` above, which is the Room design's separate in-World bubble
-   * cycle). A `kind: 'minigame'` NPC's dialog uses `dialog.triggerLine`
-   * instead.
+   * This NPC's own dialog lines (#144): element 0 is #36's single
+   * `dialogLine` (usually the character sheet's quote, otherwise the
+   * `humans.js` `line`), then any other lines the designs or the BA give the
+   * person (`humans.js`, the Mullet and HUD designs). The dialog shows
+   * `dialogLinePool()` of these plus this appearance's `idleLines`, one at
+   * random, never the same line twice in a row. A `kind: 'minigame'` NPC's
+   * dialog keeps its verbatim `dialog.triggerLine` instead (#144 Q15).
    */
-  dialogLine: string;
+  dialogLines: readonly [string, ...string[]];
+  /**
+   * `idleLines` texts left out of the dialog pool (#144 Q16): near-duplicates
+   * of a `dialogLines` entry. They still show as bubbles in the Room.
+   */
+  dialogOmit?: readonly string[];
+  /**
+   * Set on the one appearance of a QUEST GIVER (`design/Characters.dc.html`)
+   * that offers "Got any work for me?" (#144 D5): the Room its Quest names.
+   */
+  questGiver?: NpcQuestGiver;
   dialog: NpcDialog;
   /**
    * A per-NPC horizontal nudge, layered on top of the tile-derived bubble
@@ -451,6 +480,51 @@ const JETHRO_FIGURE: HumanFigureSpec = {
 };
 
 /**
+ * Person-wide dialog lines (#144 D2), shared by every appearance of the same
+ * person like the `*_FIGURE` constants above, so the copies can't drift.
+ * Element 0 is #36's single `dialogLine` (usually the character sheet's
+ * quote, otherwise the `humans.js` `line`). Sources are the character sheet
+ * (`design/Characters.dc.html`), `design/build/humans.js`'s `line`, the
+ * Mullet design (`design/The Mullet.dc.html`) and the BA (#144). A line tied
+ * to one Room reaches that appearance only through its own `idleLines`.
+ */
+const DARRIN_LINES = ['Show me energy.'] as const;
+const SYDNEY_LINES = ['Welcome to JG HQ!'] as const;
+/** "Living the dream!" is the BA's (#144); "Clucknelius coming at you!" is the Mullet design's. */
+const ASHLEY_LINES = [
+  'The chicken stays. Non-negotiable.',
+  'Living the dream!',
+  'Clucknelius coming at you!',
+] as const;
+const IAN_LINES = ['Who broke CI? Be honest.'] as const;
+/** humans.js's line, the sheet's quote and the Mullet design's line. */
+const DOM_LINES = [
+  'p95 is spicy today.',
+  'Another day, another trophy.',
+  'Undefeated. I always win.',
+] as const;
+/** humans.js's line, then the sheet's quote. */
+const RYAN_LINES = ['LGTM. One nit.', 'Hold on, dropping the bass.'] as const;
+/** humans.js's line, then the sheet's quote. */
+const SAM_LINES = [
+  'Have you tried turning it off?',
+  "Mic check. This one's about merge conflicts.",
+] as const;
+/** humans.js's line, then the sheet's quote. */
+const MILLIE_LINES = [
+  'Quick question before you go in.',
+  "So what I'm hearing you say is...",
+] as const;
+const ANTHONY_LINES = ['Would you click this link? Wrong.'] as const;
+const CASEY_LINES = ['Snow by name. Snowcones by trade.'] as const;
+/** The sheet's quote, plus his two Icebox bubbles, reused in Team Room 1 (#144 H4). */
+const JETHRO_LINES = [
+  "Act natural. Camera's rolling.",
+  'One more for the recap.',
+  'Say hackathon!',
+] as const;
+
+/**
  * `NPCS`: every prototype Room's NPC, keyed by `NpcId` (#36 D1). Names come
  * from `design/Characters.dc.html`'s character sheet (D1/A3); titles come
  * from the same sheet, with `null` for every "TITLE TBD" card its footnote
@@ -459,8 +533,9 @@ const JETHRO_FIGURE: HumanFigureSpec = {
  * `design/build/humans.js`'s figure `spec`s are used for the Human NPCs'
  * rendered figures only, never for name/title. `idleLines` come from each
  * Room design's own `say`-cycling (or static) speech bubbles (round-1 item
- * 2), and `dialogLine` is the sheet's own short quote, shown in the dialog
- * panel instead.
+ * 2), and `dialogLines` starts with #36's single `dialogLine` (usually the
+ * sheet's own short quote, otherwise the `humans.js` `line`), shown in the
+ * dialog panel (#144).
  *
  * The 5 Penguin-kind background NPCs (Front Desk, Kevin, Tristin, Tonya,
  * Jesse) are named, drawn characters in their own Room's
@@ -475,7 +550,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'town-center',
     kind: 'human',
     tagName: 'Darrin Jahnel',
-    dialogLine: 'Show me energy.',
+    dialogLines: DARRIN_LINES,
     // `sayDarrin` (9%-28%) and `sayDarrin2` (55%-76%), 11 s, no delay.
     idleLines: [
       { text: "LET'S GO! Who's shipping today?!", periodS: 11, delayS: 0, window: [0.09, 0.28] },
@@ -494,7 +569,8 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'town-center',
     kind: 'human',
     tagName: 'Jon Keller',
-    dialogLine: 'Welcome to JG. Sunglasses stay on.',
+    dialogLines: ['Welcome to JG. Sunglasses stay on.'],
+    questGiver: { nothingRightNowLine: 'Just enjoy the tour. Sunglasses stay on.' },
     // `sayJon` shows the same line twice per 14 s cycle: 19%-32% and 61%-74%.
     idleLines: [
       { text: 'Wanna see a magic trick?', periodS: 14, delayS: 0, window: [0.19, 0.32] },
@@ -522,7 +598,10 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'town-center',
     kind: 'human',
     tagName: 'Sydney Murauskas',
-    dialogLine: 'Welcome to JG HQ!',
+    // `design/Club JenGuin HUD Menus.dc.html`'s Town Center scene gives her
+    // one more line; it's this appearance's own, not Team Room 3's.
+    dialogLines: [...SYDNEY_LINES, 'lobby snowball fight?'],
+    questGiver: {},
     // `saySyd` (21%-33%) and `saySyd2` (60%-84%), 24 s, no delay.
     idleLines: [
       { text: 'Look what we won!', periodS: 24, delayS: 0, window: [0.21, 0.33] },
@@ -541,7 +620,8 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'town-center',
     kind: 'human',
     tagName: 'Jory Hutchins',
-    dialogLine: 'The tribe has spoken.',
+    dialogLines: ['The tribe has spoken.'],
+    questGiver: {},
     // `sayJory` (63%-88%), 9 s, no delay.
     idleLines: [{ text: 'COUCH. IS. LAVA.', periodS: 9, delayS: 0, window: [0.63, 0.88] }],
     dialog: LINE_DIALOG,
@@ -565,7 +645,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'town-center',
     kind: 'penguin',
     tagName: 'Front Desk',
-    dialogLine: 'Welcome to JG HQ!',
+    dialogLines: ['Welcome to JG HQ!'],
     idleLines: staticLine('Welcome to JG HQ!'),
     dialog: LINE_DIALOG,
     look: MARKET_PENGUIN_LOOK,
@@ -577,7 +657,8 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'dev-pit',
     kind: 'human',
     tagName: 'Ashley',
-    dialogLine: 'The chicken stays. Non-negotiable.',
+    dialogLines: ASHLEY_LINES,
+    questGiver: {},
     // The Dev Pit design gives her group no `animation:` at all.
     still: true,
     idleLines: [
@@ -603,7 +684,8 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'dev-pit',
     kind: 'human',
     tagName: 'Ian',
-    dialogLine: 'Who broke CI? Be honest.',
+    dialogLines: IAN_LINES,
+    questGiver: {},
     idleLines: [
       { text: 'Who broke CI? Be honest.', periodS: 22, delayS: -1 },
       { text: 'Grab the hammer. CI is red.', periodS: 22, delayS: -10 },
@@ -622,7 +704,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'dev-pit',
     kind: 'human',
     tagName: 'Steven',
-    dialogLine: 'Architecture question. Ready?',
+    dialogLines: ['Architecture question. Ready?'],
     idleLines: [
       { text: 'Boxes and arrows. Mostly arrows.', periodS: 14, delayS: -2 },
       { text: 'This diagram scales. Trust me.', periodS: 14, delayS: -9 },
@@ -650,7 +732,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'dev-pit',
     kind: 'human',
     tagName: 'Dom',
-    dialogLine: 'p95 is spicy today.',
+    dialogLines: DOM_LINES,
     idleLines: [
       { text: 'Parkour!', periodS: 18, delayS: -1 },
       { text: 'Dashboards are lava.', periodS: 18, delayS: -7 },
@@ -666,7 +748,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'dev-pit',
     kind: 'human',
     tagName: 'Ryan',
-    dialogLine: 'LGTM. One nit.',
+    dialogLines: RYAN_LINES,
     idleLines: [
       { text: 'LGTM. One nit.', periodS: 20, delayS: -2 },
       { text: 'This diagram is load-bearing.', periodS: 20, delayS: -8 },
@@ -687,7 +769,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'dev-pit',
     kind: 'human',
     tagName: 'Sam',
-    dialogLine: 'Have you tried turning it off?',
+    dialogLines: SAM_LINES,
     idleLines: [
       { text: 'Have you tried turning it off?', periodS: 20, delayS: -4 },
       { text: 'Drawing the architecture. Again.', periodS: 20, delayS: -11 },
@@ -709,7 +791,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'roof-deck',
     kind: 'penguin',
     tagName: 'Kevin',
-    dialogLine: 'Hexles bounce. 800 tokens.',
+    dialogLines: ['Hexles bounce. 800 tokens.'],
     idleLines: [
       { text: 'Hexles bounce. 800 tokens.', periodS: 13, delayS: -2 },
       { text: 'They bite. Gently.', periodS: 13, delayS: -9 },
@@ -725,7 +807,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'roof-deck',
     kind: 'human',
     tagName: 'Ann Marie',
-    dialogLine: 'That cap? Totally your color.',
+    dialogLines: ['That cap? Totally your color.', 'OK great :) now do it now'],
     idleLines: [
       { text: 'Cyan cap? 120 tokens.', periodS: 12, delayS: 0 },
       { text: 'Try it on!', periodS: 12, delayS: -6 },
@@ -753,7 +835,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'roof-deck',
     kind: 'human',
     tagName: 'Millie',
-    dialogLine: 'Quick question before you go in.',
+    dialogLines: MILLIE_LINES,
     idleLines: [{ text: 'Team lead perk: free cone.', periodS: 20, delayS: -7 }],
     dialog: LINE_DIALOG,
     figure: MILLIE_FIGURE,
@@ -765,7 +847,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'roof-deck',
     kind: 'human',
     tagName: 'Josh',
-    dialogLine: 'Pumpkin spice is a lifestyle.',
+    dialogLines: ['Pumpkin spice is a lifestyle.'],
     idleLines: [
       { text: 'Snowcones are 15!', periodS: 11, delayS: -3 },
       { text: 'Pumpkin spice, obviously.', periodS: 11, delayS: -8.5 },
@@ -791,7 +873,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'roof-deck',
     kind: 'human',
     tagName: 'Brandon',
-    dialogLine: "Giddy up. Arcade's this way.",
+    dialogLines: ["Giddy up. Arcade's this way."],
     idleLines: [
       { text: 'Giddy up!', periodS: 26, delayS: -2 },
       { text: 'Does it come in horse?', periodS: 26, delayS: -10 },
@@ -818,7 +900,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'roof-deck',
     kind: 'human',
     tagName: 'Anthony',
-    dialogLine: 'Would you click this link? Wrong.',
+    dialogLines: ANTHONY_LINES,
     idleLines: [
       { text: 'Catch of the day: your password.', periodS: 28, delayS: -2 },
       { text: 'Never click the bait!', periodS: 28, delayS: -11 },
@@ -836,7 +918,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'roof-deck',
     kind: 'penguin',
     tagName: 'Tristin',
-    dialogLine: "It's 12° out here.",
+    dialogLines: ["It's 12° out here."],
     idleLines: [
       { text: "It's 12° out here.", periodS: 24, delayS: -1 },
       { text: 'Worth it for snacks.', periodS: 24, delayS: -13 },
@@ -851,7 +933,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'roof-deck',
     kind: 'human',
     tagName: 'Casey',
-    dialogLine: 'Snow by name. Snowcones by trade.',
+    dialogLines: CASEY_LINES,
     idleLines: [
       { text: 'Roof igloo: BYO fish.', periodS: 12, delayS: -4 },
       { text: 'New gear drops Friday.', periodS: 12, delayS: -10 },
@@ -870,7 +952,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'the-melt',
     kind: 'human',
     tagName: 'Tom',
-    dialogLine: 'Fresh pot. Do not touch.',
+    dialogLines: ['Fresh pot. Do not touch.'],
     idleLines: [
       { text: 'Fresh pot. Do not touch.', periodS: 16, delayS: -1 },
       { text: 'Coffee run?', periodS: 16, delayS: -6 },
@@ -899,7 +981,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'the-melt',
     kind: 'human',
     tagName: 'Chelsea',
-    dialogLine: 'Flip it NOW.',
+    dialogLines: ['Flip it NOW.'],
     idleLines: [
       { text: 'Flip it NOW.', periodS: 13, delayS: 0 },
       { text: 'GOLDEN. Not before.', periodS: 13, delayS: -4.5 },
@@ -931,7 +1013,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'the-melt',
     kind: 'penguin',
     tagName: 'Tonya',
-    dialogLine: 'Clean your mug.',
+    dialogLines: ['Clean your mug.'],
     idleLines: [
       { text: 'Clean your mug.', periodS: 15, delayS: -5 },
       { text: 'I made the sign. I mean it.', periodS: 15, delayS: -12 },
@@ -949,7 +1031,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'the-melt',
     kind: 'penguin',
     tagName: 'Jesse',
-    dialogLine: 'Is this decaf? Be honest.',
+    dialogLines: ['Is this decaf? Be honest.'],
     idleLines: [
       { text: 'Is this decaf? Be honest.', periodS: 15, delayS: -2 },
       { text: 'Snack drawer is a lie.', periodS: 15, delayS: -9 },
@@ -970,7 +1052,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'the-icebox',
     kind: 'human',
     tagName: 'Millie',
-    dialogLine: 'Quick question before you go in.',
+    dialogLines: MILLIE_LINES,
     idleLines: [
       { text: 'Team lead question: who owns this?', periodS: 26, delayS: -3 },
       { text: 'Standup was 4 minutes. Record.', periodS: 26, delayS: -12 },
@@ -988,7 +1070,8 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'the-icebox',
     kind: 'human',
     tagName: 'Nicole',
-    dialogLine: "The client loved it. Next one's at 2.",
+    dialogLines: ["The client loved it. Next one's at 2."],
+    questGiver: {},
     idleLines: [
       { text: 'Client call in 5. Shh.', periodS: 15, delayS: -2 },
       { text: 'Account manager mode: on.', periodS: 15, delayS: -7 },
@@ -1015,7 +1098,9 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'the-icebox',
     kind: 'human',
     tagName: 'Jason',
-    dialogLine: 'Answer three and you may pass.',
+    dialogLines: ['Answer three and you may pass.'],
+    // A near-duplicate of his dialog line; it stays a bubble in the Room.
+    dialogOmit: ['Three questions and you may pass.'],
     idleLines: [
       { text: 'Stairs challenge. You are behind.', periodS: 26, delayS: -1 },
       { text: 'Three questions and you may pass.', periodS: 26, delayS: -10 },
@@ -1041,7 +1126,9 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'the-icebox',
     kind: 'human',
     tagName: 'Jethro',
-    dialogLine: "Act natural. Camera's rolling.",
+    dialogLines: JETHRO_LINES,
+    // A near-duplicate of his dialog line; it stays a bubble in the Room.
+    dialogOmit: ['Act natural. Camera is rolling.'],
     idleLines: [
       { text: 'Act natural. Camera is rolling.', periodS: 21, delayS: -2 },
       { text: 'One more for the recap.', periodS: 21, delayS: -9 },
@@ -1059,7 +1146,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'the-icebox',
     kind: 'human',
     tagName: 'Darrin',
-    dialogLine: 'Show me energy.',
+    dialogLines: DARRIN_LINES,
     idleLines: [
       { text: 'Show me energy.', periodS: 15, delayS: -1 },
       { text: 'Serve. Grind. Grow. Inspire.', periodS: 15, delayS: -6 },
@@ -1091,7 +1178,9 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'office-hallway',
     kind: 'human',
     tagName: 'Emily Smith',
-    dialogLine: 'Ever thought about joining JG?',
+    dialogLines: ['Ever thought about joining JG?'],
+    // A near-duplicate of her dialog line; it stays a bubble in the Room.
+    dialogOmit: ['Joining JG?'],
     idleLines: staticLine('Joining JG?'),
     // The Hallway design draws her without any idle bob.
     still: true,
@@ -1113,7 +1202,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'office-hallway',
     kind: 'human',
     tagName: 'Anthony Conway',
-    dialogLine: 'Would you click this link? Wrong.',
+    dialogLines: ANTHONY_LINES,
     idleLines: staticLine('Is this link safe?'),
     // The design stands him 140 px right of Emily; the grid stands him one
     // tile (50 px) away, where his always-shown bubble would cover her
@@ -1131,7 +1220,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'team-room-1',
     kind: 'human',
     tagName: 'Jethro',
-    dialogLine: "Act natural. Camera's rolling.",
+    dialogLines: JETHRO_LINES,
     // `jtalk 4s`, shown from 38%: (0.38 - 0.07) * 4 = 1.24s, i.e. -2.76s.
     idleLines: [{ text: "Act natural. Camera's rolling.", periodS: 4, delayS: -2.76 }],
     dialog: LINE_DIALOG,
@@ -1144,7 +1233,8 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'team-room-1',
     kind: 'human',
     tagName: 'Dom',
-    dialogLine: 'p95 is spicy today.',
+    dialogLines: DOM_LINES,
+    questGiver: {},
     // `domtalk 6s`, shown from 39%: (0.39 - 0.07) * 6 = 1.92s, i.e. -4.08s.
     idleLines: [{ text: 'you gotta be faster than that', periodS: 6, delayS: -4.08 }],
     dialog: LINE_DIALOG,
@@ -1159,7 +1249,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'team-room-2',
     kind: 'human',
     tagName: 'Ian',
-    dialogLine: 'Who broke CI? Be honest.',
+    dialogLines: IAN_LINES,
     idleLines: staticLine('have you installed the atlas plugin yet?'),
     // Team Room 2's own name badge, not Dev Pit's "DEV PIT · VP OF
     // ENGINEERING" (#51 review fix 2): the trigger line and action/decline
@@ -1175,7 +1265,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'team-room-3',
     kind: 'human',
     tagName: 'Millie',
-    dialogLine: 'Quick question before you go in.',
+    dialogLines: MILLIE_LINES,
     // The design gives her no bubble here.
     idleLines: [],
     // Team Room 3's design draws its NPCs without any idle bob.
@@ -1190,7 +1280,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'team-room-3',
     kind: 'human',
     tagName: 'Casey',
-    dialogLine: 'Snow by name. Snowcones by trade.',
+    dialogLines: CASEY_LINES,
     // `rats 10s`, shown from 80%: (0.80 - 0.07) * 10 = 7.3s, i.e. -2.7s.
     idleLines: [{ text: 'RATS', periodS: 10, delayS: -2.7 }],
     // The Igloo Gear stall is the Roof Deck's; here she is just gaming.
@@ -1206,7 +1296,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'team-room-3',
     kind: 'human',
     tagName: 'Sydney',
-    dialogLine: 'Welcome to JG HQ!',
+    dialogLines: SYDNEY_LINES,
     idleLines: staticLine('So, open to new roles?'),
     // Team Room 3's design draws its NPCs without any idle bob.
     still: true,
@@ -1220,7 +1310,8 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'team-room-4',
     kind: 'human',
     tagName: 'Michael',
-    dialogLine: '3-0. Again.',
+    dialogLines: ['3-0. Again.'],
+    questGiver: {},
     idleLines: staticLine('I challenge you to a Beyblade battle!'),
     // Team Room 4's design draws its NPCs without any idle bob.
     still: true,
@@ -1245,7 +1336,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'team-room-4',
     kind: 'human',
     tagName: 'Sam',
-    dialogLine: 'Have you tried turning it off?',
+    dialogLines: SAM_LINES,
     // The design gives him music notes, not a bubble.
     idleLines: [],
     // Team Room 4's design draws its NPCs without any idle bob.
@@ -1260,7 +1351,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'team-room-4',
     kind: 'human',
     tagName: 'Ryan',
-    dialogLine: 'LGTM. One nit.',
+    dialogLines: RYAN_LINES,
     // The design gives him no bubble here.
     idleLines: [],
     // Team Room 4's design draws its NPCs without any idle bob.

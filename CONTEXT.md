@@ -95,6 +95,9 @@ A per-Minigame ranking of named Players' personal bests, shown by Penguin name; 
 **Quest**
 A tracked objective shown in the Quests panel and the HUD quest widget. Stretch for the prototype. "Task" is not part of this project's vocabulary.
 
+**Quest giver**
+An NPC labelled QUEST GIVER on the character sheet. Its Dialogue offers "Got any work for me?", which starts, shows progress on, or thanks the Player for its Quest; with no Quest yet, it answers with an in-character "nothing right now" line. Only the appearance in the Room its Quest names makes the offer; with no Quest yet, one chosen appearance makes it instead.
+
 ### Progress and rewards
 
 **Token**
