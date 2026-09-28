@@ -2,6 +2,44 @@
 
 Newest first. Written by design_resync.py apply.
 
+## 2026-09-27 · plan 2937811514f1
+
+From Club JenGuin logo directions.zip by milliehime.
+
+Final door network: JG HQ Lobby game start, Hallway A/B, Swag Room, Mug Shot wall, minigame exits to origin room
+
+- added: `Door Network Proposal.dc.html`
+- added: `Room 00 JGHQ Lobby.dc.html`
+- added: `Room 14 Swag Room.dc.html`
+- added: `Room 15 Hallway B.dc.html`
+- added: `door-nav.js`
+- changed: `Characters.dc.html`
+- changed: `Club JenGuin Landing.dc.html`
+- changed: `Club JenGuin Map.dc.html`
+- changed: `Elevator.dc.html`
+- changed: `Kitchen.dc.html`
+- changed: `Minigame Beystadium.dc.html`
+- changed: `Minigame Bug Squash.dc.html`
+- changed: `Minigame Coffee Rush.dc.html`
+- changed: `Minigame Pancake Flip.dc.html`
+- changed: `Minigame Phishing Quiz.dc.html`
+- changed: `Minigame Snow Cone Stand.dc.html`
+- changed: `Penguin Creator.dc.html`
+- changed: `Room 01 Town Center.dc.html`
+- changed: `Room 02 Dev Pit.dc.html`
+- changed: `Room 03 The Icebox.dc.html`
+- changed: `Room 05 Roof Deck.dc.html`
+- changed: `Room 05b Roof Deck Day.dc.html`
+- changed: `Room 06 Igloo.dc.html`
+- changed: `Room 11 Office Hallway.dc.html`
+- changed: `Room 13 Bathroom.dc.html`
+- changed: `Stairwell.dc.html`
+- changed: `Team Room 1.dc.html`
+- changed: `Team Room 2.dc.html`
+- changed: `Team Room 3.dc.html`
+- changed: `Team Room 4.dc.html`
+- changed: `The Mullet.dc.html`
+
 ## 2026-09-25 · plan b98436c5f966
 
 From Club JenGuin logo directions.zip by milliehime.

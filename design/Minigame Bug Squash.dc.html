@@ -100,7 +100,7 @@ class Component extends DCLogic {
   }
   onKey = (e) => { const k = e.key.toUpperCase(); const i = this.KEYS.indexOf(k); if (i > -1) { e.preventDefault(); this.hit(i); } else if (k === 'P') this.togglePause(); };
   togglePause = () => this.setState(s => ({ paused: !s.paused }));
-  quit = () => { clearInterval(this.t); this.setState({ phase: 'trigger', bugs: {}, splats: {} }); };
+  quit = () => { window.location.href='Room 02 Dev Pit.dc.html'; clearInterval(this.t); this.setState({ phase: 'trigger', bugs: {}, splats: {} }); };
   componentWillUnmount() { clearInterval(this.t); }
   renderVals() { const s = this.state; const mult = Math.min(4, 1 + Math.floor(s.combo / 4));
     return {

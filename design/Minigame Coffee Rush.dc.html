@@ -101,7 +101,7 @@ class Component extends DCLogic {
   componentDidMount(){this.up=(e)=>{if(e.key===' ')this.pourStop();};window.addEventListener('keyup',this.up);}
   componentWillUnmount(){clearInterval(this.t);window.removeEventListener('keyup',this.up);}
   togglePause=()=>this.setState(s=>({paused:!s.paused,pouring:false}));
-  quit=()=>{clearInterval(this.t);this.setState({phase:'trigger',pouring:false});};
+  quit=()=>{ window.location.href='Kitchen.dc.html';clearInterval(this.t);this.setState({phase:'trigger',pouring:false});};
   renderVals(){const s=this.state;const t0=s.tickets[0];return {
     stateLabel:s.phase.toUpperCase(),isTrigger:s.phase==='trigger',isHowTo:s.phase==='howto',isPlaying:s.phase==='play',isDone:s.phase==='done',
     startHowTo:()=>this.setState({phase:'howto'}),backToTrigger:()=>this.setState({phase:'trigger'}),decline:()=>this.setState({tom:'Then get in line like everyone else.'}),startGame:this.start,quit:this.quit,togglePause:this.togglePause,onKey:this.onKey,pourStart:this.pourStart,pourStop:this.pourStop,
