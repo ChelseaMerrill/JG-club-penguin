@@ -489,7 +489,7 @@ describe('NPCS', () => {
         name: 'Tony Mercadante',
         title: 'Project Manager',
         tagName: 'Tony Mercadante',
-        dialogLine: 'Eight ball, corner pocket.',
+        dialogLines: ['Eight ball, corner pocket.'],
         idleLines: [{ text: 'corner pocket', periodS: 0, delayS: 0 }],
       },
       'jon-mullet': { name: 'Jon Keller', title: 'President', tagName: 'Jon', idleLines: [] },

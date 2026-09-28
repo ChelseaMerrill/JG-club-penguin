@@ -648,6 +648,12 @@ const JETHRO_LINES = [
   'One more for the recap.',
   'Say hackathon!',
 ] as const;
+const JON_LINES = ['Welcome to JG. Sunglasses stay on.'] as const;
+const JORY_LINES = ['The tribe has spoken.'] as const;
+const ANN_MARIE_LINES = ['That cap? Totally your color.', 'OK great :) now do it now'] as const;
+const BRANDON_LINES = ["Giddy up. Arcade's this way."] as const;
+const NICOLE_LINES = ["The client loved it. Next one's at 2."] as const;
+const JASON_LINES = ['Answer three and you may pass.'] as const;
 
 /**
  * `NPCS`: every prototype Room's NPC, keyed by `NpcId` (#36 D1). Names come
@@ -694,7 +700,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'town-center',
     kind: 'human',
     tagName: 'Jon Keller',
-    dialogLines: ['Welcome to JG. Sunglasses stay on.'],
+    dialogLines: JON_LINES,
     questGiver: { nothingRightNowLine: 'Just enjoy the tour. Sunglasses stay on.' },
     // `sayJon` shows the same line twice per 14 s cycle: 19%-32% and 61%-74%.
     idleLines: [
@@ -735,7 +741,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'town-center',
     kind: 'human',
     tagName: 'Jory Hutchins',
-    dialogLines: ['The tribe has spoken.'],
+    dialogLines: JORY_LINES,
     questGiver: {},
     // `sayJory` (63%-88%), 9 s, no delay.
     idleLines: [{ text: 'COUCH. IS. LAVA.', periodS: 9, delayS: 0, window: [0.63, 0.88] }],
@@ -903,7 +909,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'roof-deck',
     kind: 'human',
     tagName: 'Ann Marie',
-    dialogLines: ['That cap? Totally your color.', 'OK great :) now do it now'],
+    dialogLines: ANN_MARIE_LINES,
     idleLines: [
       { text: 'Cyan cap? 120 tokens.', periodS: 12, delayS: 0 },
       { text: 'Try it on!', periodS: 12, delayS: -6 },
@@ -960,7 +966,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'roof-deck',
     kind: 'human',
     tagName: 'Brandon',
-    dialogLines: ["Giddy up. Arcade's this way."],
+    dialogLines: BRANDON_LINES,
     idleLines: [
       { text: 'Giddy up!', periodS: 26, delayS: -2 },
       { text: 'Does it come in horse?', periodS: 26, delayS: -10 },
@@ -1146,7 +1152,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'the-icebox',
     kind: 'human',
     tagName: 'Nicole',
-    dialogLines: ["The client loved it. Next one's at 2."],
+    dialogLines: NICOLE_LINES,
     questGiver: {},
     idleLines: [
       { text: 'Client call in 5. Shh.', periodS: 15, delayS: -2 },
@@ -1166,7 +1172,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'the-icebox',
     kind: 'human',
     tagName: 'Jason',
-    dialogLines: ['Answer three and you may pass.'],
+    dialogLines: JASON_LINES,
     // A near-duplicate of his dialog line; it stays a bubble in the Room.
     dialogOmit: ['Three questions and you may pass.'],
     idleLines: [
@@ -1420,8 +1426,8 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
   // #51 slice 3: the Mullet's nine NPCs. Names and titles from
   // design/Characters.dc.html (Dom and Ashley are on its TITLE TBD list), tags
   // and `idleLines` from design/The Mullet.dc.html's own nameplates and
-  // bubbles, verbatim. A repeat appearance shares its person's figure constant
-  // and dialog line. The design animates several of them with SMIL (Dom's lap,
+  // bubbles, verbatim. A repeat appearance shares its person's figure and
+  // dialog-lines constants. The design animates several of them with SMIL (Dom's lap,
   // Tony's walk round the pool table, Jory's walk, Jon's and Brandon's
   // ping-pong sway, Ashley's pacing); none of that is ported here: each stands
   // at its rest slot, and only a figure the design gives a plain up-down bob
@@ -1433,7 +1439,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'the-mullet',
     kind: 'human',
     tagName: 'Jason',
-    dialogLine: 'Answer three and you may pass.',
+    dialogLines: JASON_LINES,
     // At the Ms. Pac-Man, with no bubble.
     idleLines: [],
     // The design jiggles him at the joystick rather than bobbing him.
@@ -1448,7 +1454,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'the-mullet',
     kind: 'human',
     tagName: 'Nicole',
-    dialogLine: "The client loved it. Next one's at 2.",
+    dialogLines: NICOLE_LINES,
     // The design floats a laugh ("hehe") off her on a 3 s cycle; ported as a
     // static line (#149 follow-up).
     idleLines: staticLine('hehe'),
@@ -1462,7 +1468,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'the-mullet',
     kind: 'human',
     tagName: 'Ann Marie',
-    dialogLine: 'That cap? Totally your color.',
+    dialogLines: ANN_MARIE_LINES,
     // As Nicole's: the design's floating "haha", ported as a static line.
     idleLines: staticLine('haha'),
     dialog: LINE_DIALOG,
@@ -1475,7 +1481,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'the-mullet',
     kind: 'human',
     tagName: 'Jory',
-    dialogLine: 'The tribe has spoken.',
+    dialogLines: JORY_LINES,
     idleLines: staticLine('Tribe has spoken.'),
     // The grid stands her two tiles (100 px) right of Brandon, where her
     // always-shown bubble would cover the end of his nameplate (the design
@@ -1493,7 +1499,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'the-mullet',
     kind: 'human',
     tagName: 'Ashley',
-    dialogLine: 'The chicken stays. Non-negotiable.',
+    dialogLines: ASHLEY_LINES,
     // One bubble the design shows three times per 18 s cycle (a discrete SMIL
     // opacity: shown 4.4%-16.7%, 41.1%-53.3% and 70.6%-82.8%), each time
     // Clucknelius is thrown.
@@ -1512,7 +1518,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'the-mullet',
     kind: 'human',
     tagName: 'Tony Mercadante',
-    dialogLine: 'Eight ball, corner pocket.',
+    dialogLines: ['Eight ball, corner pocket.'],
     idleLines: staticLine('corner pocket'),
     // The design walks him round the pool table with his cue rather than
     // bobbing him.
@@ -1538,7 +1544,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'the-mullet',
     kind: 'human',
     tagName: 'Jon',
-    dialogLine: 'Welcome to JG. Sunglasses stay on.',
+    dialogLines: JON_LINES,
     // At the ping-pong table, with no bubble.
     idleLines: [],
     // The design sways him side to side with the rally rather than bobbing.
@@ -1553,7 +1559,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'the-mullet',
     kind: 'human',
     tagName: 'Brandon',
-    dialogLine: "Giddy up. Arcade's this way.",
+    dialogLines: BRANDON_LINES,
     // Jon's ping-pong opponent, also with no bubble. The arcade is out of
     // scope, so his Interaction is Dialogue.
     idleLines: [],
@@ -1568,7 +1574,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'the-mullet',
     kind: 'human',
     tagName: 'Dom',
-    dialogLine: 'p95 is spicy today.',
+    dialogLines: DOM_LINES,
     // A discrete SMIL opacity on a 9.4 s cycle shows it from 86% of one cycle
     // to 12% of the next: two windows either side of the cycle's start.
     idleLines: [

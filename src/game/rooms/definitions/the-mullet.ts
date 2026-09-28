@@ -88,9 +88,10 @@ export const theMullet: RoomDefinition = {
   npcSlots: [
     // Each slot is the tile under the NPC's ground shadow as the design
     // draws it at rest, with its group transforms applied (Tony's group is
-    // translated by (-30, -81), so his shadow sits at (470, 437)). Nicole
-    // and Ann Marie sit on the couch and draw no shadow, so theirs is the
-    // tile under their feet. Jory's shadow (1172, 769) falls just off the
+    // translated by (-30, -81), so his shadow sits at (470, 437)). Jory and
+    // Dom, whom the design moves with SMIL, take their t=0 animated position
+    // as their rest slot. Nicole and Ann Marie sit on the couch and draw no
+    // shadow, so theirs is the tile under their feet. Jory's shadow (1172, 769) falls just off the
     // floor's front-right edge, at col 14.1, so she takes the nearest floor
     // tile, (13,6).
     { npcId: 'jason-mullet', tile: { col: 1, row: 1 } },
