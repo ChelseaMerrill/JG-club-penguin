@@ -1,31 +1,49 @@
--- Beystadium: the fifth Minigame (a best-of-3 Beyblade match against
--- Michael, `design/Minigame Beystadium.dc.html`) and its Let It Rip Badge.
+-- Beystadium (#121): the fifth Minigame (a best-of-3 Beyblade match against
+-- Michael, `design/Minigame Beystadium.dc.html`) and its Let It Rip Badge,
+-- on #138's Badge system.
 --
--- Runs after 20260925000000_quests.sql (#46), and needs #27's
--- 20260924010000_saved_progress.sql and #70's 20260924020000_leaderboard.sql.
+-- Runs after 20260927010000_igloo_wall_slots.sql (#135), and needs #27's
+-- 20260924010000_saved_progress.sql, #70's 20260924020000_leaderboard.sql,
+-- #46's 20260925000000_quests.sql and #138's 20260927000000_badges.sql.
 -- Apply by pasting into the Supabase SQL editor (no CLI). Safe to rerun.
 -- Proof: supabase/tests/80_beystadium_proof.sql (run in PGlite by
 -- src/persistence/sql-beystadium.test.ts; the reviewer re-runs it on real
 -- Postgres/Supabase).
 --
--- Decisions for red-team review (owner-approved defaults, 2026-09-25; no
--- GitHub issue yet). Each is numbered so a review comment can cite it.
+-- Deploy order (#138 D15): apply this migration before the client that
+-- turns Let It Rip on merges or deploys (including a Vercel preview). An
+-- old client on this schema keeps working: it ignores badgesEarned (B8) and
+-- shows Let It Rip as soon as public.badges says it is available.
 --
--- B1 Scope. No new tables, columns, policies or table grants. This file
--- only (a) re-adds three named check constraints with the new ids,
--- 'beystadium' in minigame_bests/minigame_rounds and 'let-it-rip' in
--- player_badges, and (b) replaces three existing functions with the same
--- signatures: record_round(text, int, jsonb) (new 'beystadium' branch),
--- leaderboard(text, int) (accepts 'beystadium'; body otherwise identical to
--- #70's) and quest_progress() (adds matchWins). Every other line of those
--- bodies is copied unchanged from the migration that last defined them.
+-- Decisions for red-team review (#121; owner-approved defaults 2026-09-25,
+-- rebased on #138 per milliehime's contract on #121). Each is numbered so a
+-- review comment can cite it.
 --
--- B2 Payout, computed on the server from the stats, never from a
+-- B1 Scope. No new tables, columns, policies, table grants or error codes.
+-- This file only (a) re-adds #27's two Minigame id check constraints,
+-- minigame_bests_minigame_id_check and minigame_rounds_minigame_id_check
+-- (last defined by 20260924010000_saved_progress.sql; nothing later changed
+-- them), with 'beystadium' added; (b) switches Let It Rip on in #138's
+-- catalog (B2); and (c) replaces three functions with the same signatures:
+-- record_round(text, int, jsonb), rebased on #138's (the latest definition,
+-- 20260927000000_badges.sql), leaderboard(text, int), rebased on #70's (the
+-- latest), and quest_progress(), rebased on #46's (the latest). Every other
+-- line of those bodies is copied unchanged from those files. It adds no
+-- Badge check constraint: #138's player_badges_badge_id_fkey decides which
+-- Badge ids exist.
+--
+-- B2 Let It Rip on: `update public.badges set available = true where id =
+-- 'let-it-rip'`. #138 seeded it coming soon (D2), and its insert never
+-- touches `available` on conflict, so rerunning #138 keeps it on. The
+-- client mirrors this in src/persistence/badge-catalog.ts (BADGE_CATALOG's
+-- entry is available, and 'let-it-rip' is in BADGE_AVAILABILITY_OVERRIDES).
+--
+-- B3 Payout, computed on the server from the stats, never from a
 -- client-sent amount: 60 Tokens when stats.won = 1 (a match win), else 15
 -- (a loss, or a match that ended unfinished: the Minigame shell's timer ran
 -- out or the test hook ended it). Cap 60, i.e. exactly the win payout.
 --
--- B3 Anti-farm (#27 RT3's interval rule, unchanged): a round less than 10 s
+-- B4 Anti-farm (#27 RT3's interval rule, unchanged): a round less than 10 s
 -- after the Player's previous Beystadium round is round_too_soon; otherwise
 -- the payout is at most floor(60 * min(1, seconds since previous / 45)).
 -- Why duration 45: an honest match (Bey pick, up to three launches and
@@ -35,7 +53,7 @@
 -- one 60-Token cap per 45 s (80 Tokens a minute; Bug Squash's is 250 per
 -- 60 s). A loss replayed every 10 s pays floor(60 * 10 / 45) = 13.
 --
--- B4 Validation (invalid_stats, raised before anything is written, like
+-- B5 Validation (invalid_stats, raised before anything is written, like
 -- every other stats check). On top of #27's shared checks (whole numbers
 -- 0-100000, at most 16 keys of at most 32 characters) the Beystadium branch
 -- requires: won is 0 or 1; roundsWon and roundsLost are each 0-2 and not
@@ -44,66 +62,79 @@
 -- MinigameStatsMap['beystadium'] (src/contracts/game-events.ts): won,
 -- roundsWon, roundsLost, strikes, perfectLaunches, bey.
 --
--- B5 Score and best: score is strikes landed; the personal best (and so
+-- B6 Score and best: score is strikes landed; the personal best (and so
 -- the leaderboard) is stats.strikes, the most strikes in one match.
 --
--- B6 Let It Rip is a different Badge shape from the score thresholds: it is
--- earned by the Player's third match win in total. On a winning round,
--- record_round counts the Player's earlier public.minigame_rounds rows for
--- 'beystadium' whose stats.won = 1, adds 1 for this round, and awards the
--- Badge at 3 or more (the existing first-time +50 bonus, once, via the
--- player_badges primary key's `on conflict do nothing`). A losing round
--- never awards it. The count runs after the Player's row is locked (`for
--- update`, like every Token change), so two parallel rounds can't both miss
--- or double-count it; the 10 s rule then rejects the second one anyway.
--- It compares `stats -> 'won' = '1'::jsonb` (jsonb numeric equality, so a
+-- B7 Let It Rip is earned by the Player's third match win in total, not by
+-- a score threshold. On a winning round, after the Player's row is locked
+-- (`for update`, like every Token change), record_round counts the Player's
+-- earlier public.minigame_rounds rows for 'beystadium' whose stats.won = 1,
+-- adds 1 for this round, and at 3 or more calls
+-- public.award_badge(v_uid, 'let-it-rip') (#138 D4), exactly as #138's
+-- record_round does for the threshold Badges. award_badge awards it once
+-- and pays the +50 once (the 4th and later wins get false back and pay
+-- nothing extra); there is no inline player_badges insert or bonus here any
+-- more. A losing round never calls it. The lock means two parallel rounds
+-- can't both miss or double-count the third win; the 10 s rule then
+-- rejects the second one anyway. If the Badge were ever switched off again,
+-- award_badge raises badge_unavailable and the third win fails as a whole
+-- (nothing written), the same as #138's threshold Badges. The count
+-- compares `stats -> 'won' = '1'::jsonb` (jsonb numeric equality, so a
 -- stored 1.0 also counts) rather than the text form stats ->> 'won' = '1',
--- which would miss a 1.0 that B4 accepts as a win.
+-- which would miss a 1.0 that B5 accepts as a win.
 --
--- B7 quest_progress() adds `matchWins`: an object of Minigame id to match
--- wins (the same row count as B6, including rounds recorded before this
--- migration, of which there are none for 'beystadium'), for the Beystadium
--- Quest's "x / 3". Only Minigames with a match-win Badge are counted
--- (Beystadium); a Minigame with no win has no key. Read-only, like the rest
--- of quest_progress().
+-- B8 Return contract, following #138's complete_quest: record_round now
+-- also returns badgesEarned, a text array (default '{}') of the Badge ids
+-- this call awarded, for every Minigame (["let-it-rip"] only on the third
+-- Beystadium win; a threshold Badge's id on the round that first earns it).
+-- tokensAwarded, balance, newBest and badgeEarned are unchanged, so an older
+-- client keeps working. The award runs before the round's own Token update,
+-- whose `returning` re-reads the balance, so the balance includes the +50
+-- (#138's order). 138_badges_proof.sql's record_round shape check accepts
+-- the new key.
 --
--- B8 leaderboard(): 'beystadium' joins the known ids. No plausibility
--- ceiling (the `else` branch): strikes are not hard-bounded by the game
--- (every SPACE press inside the 450 ms strike zone lands one), matching
--- LEADERBOARD_SCORE_CEILINGS['beystadium'] = null in
+-- B9 quest_progress() adds `matchWins`: an object of Minigame id to match
+-- wins (the same row count as B7), for the Beystadium Quest's "x / 3".
+-- Only Minigames with a match-win Badge are counted (Beystadium); a
+-- Minigame with no win has no key. Read-only, like the rest of
+-- quest_progress(). leaderboard(): 'beystadium' joins the known ids, with
+-- no plausibility ceiling (the `else` branch): strikes are not hard-bounded
+-- by the game (every SPACE press inside the 450 ms strike zone lands one),
+-- matching LEADERBOARD_SCORE_CEILINGS['beystadium'] = null in
 -- src/persistence/leaderboard-rules.ts.
 --
--- B9 Security posture, unchanged from #27/#46/#70: every function is
+-- B10 Security posture, unchanged from #27/#46/#70/#138: every function is
 -- `security definer` with `set search_path = ''`, every relation
 -- schema-qualified, `#variable_conflict use_column`, identity from
 -- auth.uid() only (no player id argument), EXECUTE revoked from
 -- public/anon/authenticated and granted back to authenticated only. anon
--- gets nothing (42501). No new error codes.
---
--- B10 Residual risk (stated plainly): like every Minigame, the stats are
--- client-asserted. A signed-in Player calling record_round directly can
--- claim a win: that pays at most what B3 allows (60 per 45 s, the honest
--- rate), and three claimed wins (at least 20 s apart) earn Let It Rip --
--- the same trust model as the threshold Badges, each of which one forged
--- round can earn. A forged strikes count can top the Beystadium
--- leaderboard (B8); removing it is a one-line moderation delete from
+-- gets nothing (42501). award_badge stays internal (this file grants
+-- nothing on it). Residual risk, stated plainly: like every Minigame, the
+-- stats are client-asserted. A signed-in Player calling record_round
+-- directly can claim a win: that pays at most what B4 allows (60 per 45 s,
+-- the honest rate), and three claimed wins (at least 20 s apart) earn Let
+-- It Rip -- the same trust model as the threshold Badges, each of which one
+-- forged round can earn. A forged strikes count can top the Beystadium
+-- leaderboard (B9); removing it is a one-line moderation delete from
 -- public.minigame_bests.
 --
--- B11 Reruns and ordering. Every statement is idempotent (drop/re-add
--- constraints, create or replace, revoke/grant). Because this file
--- replaces functions an earlier migration defined, rerunning
--- saved_progress.sql, leaderboard.sql or quests.sql after it reverts those
--- functions (and, once any 'beystadium' round or 'let-it-rip' Badge exists,
--- saved_progress.sql's own constraint re-add fails on those rows). After
--- rerunning an earlier migration, rerun this one.
+-- B11 Ordering and reruns. It sorts after 20260927010000 (#138's rule for
+-- any migration that touches Badges or redefines record_round) and before
+-- the feedback branch's 20260928010000; a later migration that redefines
+-- record_round or quest_progress must copy them from this file and keep
+-- the Beystadium branch, badgesEarned and matchWins. Every statement is
+-- idempotent (drop/re-add constraints, a plain update, create or replace,
+-- revoke/grant). Rerunning #27, #70, #46 or #138 after this file silently
+-- reverts the function it defines (#138 keeps Let It Rip available, B2),
+-- and rerunning #27 also re-adds its 4-id constraints, which fail once any
+-- 'beystadium' round exists. The rule stays #138's: after rerunning any
+-- earlier migration, rerun this file and then every later one, in
+-- timestamp order.
 
 -- ---------------------------------------------------------------------------
--- Constraints (named, dropped and re-added each run, as #27 does)
+-- Minigame id constraints (named, dropped and re-added each run, as #27 does)
 -- ---------------------------------------------------------------------------
 
-alter table public.player_badges drop constraint if exists player_badges_badge_id_check;
-alter table public.player_badges add constraint player_badges_badge_id_check
-  check (badge_id in ('exterminator', 'breakfast-club', 'barista', 'brain-freeze', 'let-it-rip'));
 alter table public.minigame_bests drop constraint if exists minigame_bests_minigame_id_check;
 alter table public.minigame_bests add constraint minigame_bests_minigame_id_check
   check (minigame_id in ('bug-squash', 'pancake-flip', 'coffee-rush', 'snow-cone-stand', 'beystadium'));
@@ -112,16 +143,25 @@ alter table public.minigame_rounds add constraint minigame_rounds_minigame_id_ch
   check (minigame_id in ('bug-squash', 'pancake-flip', 'coffee-rush', 'snow-cone-stand', 'beystadium'));
 
 -- ---------------------------------------------------------------------------
+-- Let It Rip on (B2)
+-- ---------------------------------------------------------------------------
+
+update public.badges set available = true where id = 'let-it-rip';
+
+-- ---------------------------------------------------------------------------
 -- record_round(minigame_id, score, stats)
 --
--- #27's function (see 20260924010000_saved_progress.sql for its full
--- contract, rules table and interval rule) plus one Minigame:
+-- #138's function (20260927000000_badges.sql; see #27's
+-- 20260924010000_saved_progress.sql for the full contract, rules table and
+-- interval rule) plus one Minigame and the badgesEarned key (B8):
 --
 --   Minigame     Payout per round        Best      Badge                         Cap  Duration
 --   beystadium   60 if won = 1, else 15  strikes   let-it-rip (3rd match win)    60   45 s
 --
+-- Returns { tokensAwarded, balance, newBest, badgeEarned, badgesEarned }.
 -- Errors (the message is the code), unchanged: not_authenticated,
--- no_player, unknown_minigame, invalid_score, invalid_stats, round_too_soon.
+-- no_player, unknown_minigame, invalid_score, invalid_stats, round_too_soon,
+-- and award_badge's unknown_badge / badge_unavailable.
 -- ---------------------------------------------------------------------------
 
 create or replace function public.record_round(minigame_id text, score int, stats jsonb)
@@ -144,13 +184,14 @@ declare
   v_raw int;
   v_best int;
   v_payout int;
-  v_bonus int := 0;
   v_balance int;
   v_last_finished timestamptz;
   v_prev_best int;
   v_new_best boolean;
   v_badge_earned boolean := false;
-  -- Beystadium (B4/B6): the match result, and the match-win count its
+  -- B8: the Badge ids this call awarded.
+  v_badges text[] := '{}';
+  -- Beystadium (B5/B7): the match result, and the match-win count its
   -- Badge needs (null for every threshold-Badge Minigame).
   v_won int;
   v_rounds_won int;
@@ -165,9 +206,6 @@ begin
     raise exception 'invalid_score';
   end if;
 
-  -- Every stat must be a whole number from 0 to 100000. A negative count
-  -- would otherwise turn a penalty (Burnt -5) into a reward. At most 16 keys
-  -- of at most 32 characters, so a round can't be used to bloat storage.
   if jsonb_typeof(v_stats) <> 'object'
     or (select count(*) from jsonb_object_keys(v_stats)) > 16
     or exists (select 1 from jsonb_object_keys(v_stats) as k (key) where char_length(k.key) > 32) then
@@ -240,7 +278,7 @@ begin
       v_won := coalesce((v_stats -> 'won')::numeric, 0)::int;
       v_rounds_won := coalesce((v_stats -> 'roundsWon')::numeric, 0)::int;
       v_rounds_lost := coalesce((v_stats -> 'roundsLost')::numeric, 0)::int;
-      -- B4: a match result that can't happen is rejected outright.
+      -- B5: a match result that can't happen is rejected outright.
       if v_won not in (0, 1)
         or v_rounds_won > 2
         or v_rounds_lost > 2
@@ -249,9 +287,11 @@ begin
         or coalesce((v_stats -> 'bey')::numeric, 0) > 2 then
         raise exception 'invalid_stats';
       end if;
+      -- B3: 60 for a win, 15 otherwise.
       v_raw := case when v_won = 1 then 60 else 15 end;
+      -- B6: the best is strikes landed.
       v_best := coalesce((v_stats -> 'strikes')::numeric, 0)::int;
-      -- B6: decided below, after the Player's row is locked.
+      -- B7: decided below, after the Player's row is locked.
       v_badge_match_wins := 3;
       v_badge_met := false;
 
@@ -259,10 +299,8 @@ begin
       raise exception 'unknown_minigame';
   end case;
 
-  -- Floor at 0, then cap.
   v_payout := least(greatest(v_raw, 0), v_cap);
 
-  -- Lock the Player's row so parallel rounds and purchases run one at a time.
   select p.tokens into v_balance
   from public.players p
   where p.id = v_uid
@@ -285,7 +323,7 @@ begin
     );
   end if;
 
-  -- B6: a match-win Badge counts the earlier winning rounds plus this one
+  -- B7: a match-win Badge counts the earlier winning rounds plus this one
   -- (inserted at the end of this function), under the row lock above.
   if v_badge_match_wins is not null then
     v_badge_met := v_won = 1 and (
@@ -300,7 +338,6 @@ begin
   select b.best_score into v_prev_best
   from public.minigame_bests b
   where b.player_id = v_uid and b.minigame_id = v_game;
-  -- A best must beat the previous one; a first round scoring 0 is not a best.
   v_new_best := v_best > coalesce(v_prev_best, 0);
   if v_new_best then
     insert into public.minigame_bests (player_id, minigame_id, best_score, updated_at)
@@ -310,18 +347,18 @@ begin
           updated_at = excluded.updated_at;
   end if;
 
+  -- #138: the Badge and its first-time +50 go through award_badge.
+  -- B7: Let It Rip too; B8: an awarded id goes into badgesEarned.
   if v_badge_met then
-    insert into public.player_badges (player_id, badge_id)
-    values (v_uid, v_badge)
-    on conflict (player_id, badge_id) do nothing;
-    v_badge_earned := found;
+    v_badge_earned := public.award_badge(v_uid, v_badge);
     if v_badge_earned then
-      v_bonus := 50;
+      v_badges := array_append(v_badges, v_badge);
     end if;
   end if;
 
+  -- The balance is re-read here, after the award, so it includes the +50.
   update public.players p
-  set tokens = p.tokens + v_payout + v_bonus
+  set tokens = p.tokens + v_payout
   where p.id = v_uid
   returning p.tokens into v_balance;
 
@@ -332,7 +369,8 @@ begin
     'tokensAwarded', v_payout,
     'balance', v_balance,
     'newBest', v_new_best,
-    'badgeEarned', v_badge_earned
+    'badgeEarned', v_badge_earned,
+    'badgesEarned', to_jsonb(v_badges)
   );
 end;
 $$;
@@ -341,7 +379,7 @@ $$;
 -- leaderboard(minigame_id, max_rows)
 --
 -- #70's function (see 20260924020000_leaderboard.sql for its R1-R9
--- decisions), unchanged except that 'beystadium' is a known id (B8).
+-- decisions), unchanged except that 'beystadium' is a known id (B9).
 -- ---------------------------------------------------------------------------
 
 create or replace function public.leaderboard(minigame_id text, max_rows int default 10)
@@ -418,7 +456,7 @@ $$;
 -- ---------------------------------------------------------------------------
 -- quest_progress()
 --
--- #46's function, plus `matchWins` (B7). Returns { devPitVisited,
+-- #46's function, plus `matchWins` (B9). Returns { devPitVisited,
 -- roundsFinished, completedQuests, matchWins } for the caller. Read-only.
 -- Errors: not_authenticated.
 -- ---------------------------------------------------------------------------
@@ -456,7 +494,7 @@ begin
       from public.player_quest_completions c
       where c.player_id = v_uid
     ), '[]'::jsonb),
-    -- B7: the same count record_round's B6 makes, per match-win Minigame.
+    -- B9: the same count record_round's B7 makes, per match-win Minigame.
     'matchWins', coalesce((
       select jsonb_object_agg(w.minigame_id, w.wins)
       from (

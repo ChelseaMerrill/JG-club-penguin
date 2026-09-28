@@ -185,7 +185,7 @@ begin
         'devPitVisited', true,
         'roundsFinished', jsonb_build_array('bug-squash', 'pancake-flip'),
         'completedQuests', jsonb_build_array('main'),
-        -- Added by 20260925010000_beystadium.sql (B7): no Beystadium wins here.
+        -- Added by 20260928000000_beystadium.sql (B9): no Beystadium wins here.
         'matchWins', '{}'::jsonb
       )
     );

@@ -206,9 +206,13 @@ begin
     v_names := array_append(v_names, 'record_round_shape_and_badge_unchanged');
     v_pass := array_append(
       v_pass,
-      v_result = jsonb_build_object(
+      (v_result - 'badgesEarned') = jsonb_build_object(
         'tokensAwarded', 50, 'balance', 1150, 'newBest', true, 'badgeEarned', true
       )
+      -- #121's 20260928000000_beystadium.sql (B8) adds badgesEarned; before
+      -- it is applied the key is absent.
+      and coalesce(v_result -> 'badgesEarned', '["exterminator"]'::jsonb)
+        = '["exterminator"]'::jsonb
     );
     v_detail := array_append(v_detail, format('result=%s', v_result));
 

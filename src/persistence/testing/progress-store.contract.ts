@@ -184,11 +184,13 @@ export function describeProgressStoreContract(
 
       const first = await store.recordRound('pancake-flip', 0, stacked20);
       expect(first.badgeEarned).toBe(true);
+      expect(first.badgesEarned).toEqual(['breakfast-club']);
       expect(first.balance).toBe(150);
 
       await advanceSeconds(90);
       const second = await store.recordRound('pancake-flip', 0, stacked20);
       expect(second.badgeEarned).toBe(false);
+      expect(second.badgesEarned).toEqual([]);
       expect(second.balance).toBe(first.balance);
     });
 
@@ -369,6 +371,7 @@ export function describeProgressStoreContract(
           balance: 160,
           newBest: true,
           badgeEarned: false,
+          badgesEarned: [],
         });
         expect((await store.loadAll()).bests).toEqual({ beystadium: 7 });
       });
@@ -401,6 +404,14 @@ export function describeProgressStoreContract(
           false,
           true,
           false,
+        ]);
+        // #138's contract: badgesEarned names Let It Rip on that call only.
+        expect([first, loss, second, third, fourth].map((r) => r.badgesEarned)).toEqual([
+          [],
+          [],
+          [],
+          ['let-it-rip'],
+          [],
         ]);
         // 100 + 60 + 15 + 60 + (60 + 50 bonus) + 60.
         expect(third.balance).toBe(345);

@@ -1,5 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
+import { teamRoom4 } from '../src/game/rooms/definitions/team-room-4';
+import { tileToScreen } from '../src/game/rooms/iso';
+import { GAME_HEIGHT, GAME_WIDTH } from '../src/game/stage-size';
 import type { MinigameTestHandle } from '../src/minigames/minigame-test-handle';
+import type { RoomDebugInfo } from './support/room-debug-types';
 
 declare global {
   interface Window {
@@ -26,8 +30,7 @@ test('beystadium: pick a Bey, perfect launch, strike, dodge, MATCH OVER', async 
   // Installed before navigation, like e2e/coffee-rush.spec.ts, so the
   // game's 50 ms `setInterval` is faked from the first script run.
   await page.clock.install();
-  // #51 will launch this from Michael's LET IT RIP button in Team Room 4;
-  // until then the Minigame test launcher is the way in.
+  // The Minigame test launcher; the test below starts it from Michael.
   await page.goto('/?minigame=beystadium');
 
   await expect(page.locator('.minigame__howto')).toBeVisible();
@@ -104,6 +107,73 @@ test('beystadium: pick a Bey, perfect launch, strike, dodge, MATCH OVER', async 
     'Michael: "Told you. Rematch whenever you want to lose again."',
   );
   await page.screenshot({ path: 'test-results/beystadium/done.png' });
+
+  expect(errors).toEqual([]);
+});
+
+async function debugInfo(page: Page): Promise<RoomDebugInfo | undefined> {
+  return page.evaluate(() => window.__roomDebug);
+}
+
+async function clickStagePoint(page: Page, point: { x: number; y: number }): Promise<void> {
+  const canvasBox = await page.locator('#game canvas').boundingBox();
+  if (!canvasBox) throw new Error('canvas not visible');
+  const scaleX = canvasBox.width / GAME_WIDTH;
+  const scaleY = canvasBox.height / GAME_HEIGHT;
+  await page.mouse.click(canvasBox.x + point.x * scaleX, canvasBox.y + point.y * scaleY);
+}
+
+test('Team Room 4: Michael challenges you, BACK AWAY SLOWLY closes, LET IT RIP opens Beystadium (#121)', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+
+  await page.goto(`/?room=${teamRoom4.id}`);
+  await expect(page.locator('#game canvas')).toBeVisible();
+  await expect(page.locator('#ui .landing')).toBeVisible();
+  await page.evaluate(() => {
+    document.querySelector<HTMLElement>('#ui .landing')!.hidden = true;
+  });
+  await expect
+    .poll(async () => (await debugInfo(page))?.localPenguin, { timeout: 15_000 })
+    .not.toBeUndefined();
+  expect((await debugInfo(page))?.roomId).toBe('team-room-4');
+  // Team Room 4 is on another floor: wait out the elevator screen, if any.
+  await expect(page.locator('.elevator-screen')).toBeHidden();
+
+  const michael = teamRoom4.npcSlots.find((slot) => slot.npcId === 'michael');
+  if (!michael) throw new Error('expected team-room-4 to have a "michael" NPC slot');
+  const michaelPoint = tileToScreen(michael.tile, teamRoom4.grid.origin);
+
+  await clickStagePoint(page, michaelPoint);
+  await expect
+    .poll(async () => (await debugInfo(page))?.npcArrivedLog, { timeout: 15_000 })
+    .toContain('michael');
+
+  const dialog = page.locator('.npc-dialog');
+  await expect(dialog).toBeVisible();
+  await expect(dialog.locator('.npc-dialog__name')).toHaveText('Michael Prete');
+  await expect(dialog.locator('.npc-dialog__subtitle')).toHaveText(
+    'THE POD · IT ASSOCIATE · BEYSTADIUM CHAMP',
+  );
+  await expect(dialog).toContainText("You walked into the Pod. That's a challenge.");
+  await page.evaluate(() => document.fonts.ready);
+  await page.screenshot({ path: 'test-results/beystadium/michael-dialog.png' });
+
+  await dialog.getByRole('button', { name: 'BACK AWAY SLOWLY' }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.locator('.minigame__howto')).toBeHidden();
+
+  await clickStagePoint(page, michaelPoint);
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name: 'LET IT RIP' }).click();
+
+  await expect(dialog).toBeHidden();
+  await expect(page.locator('.minigame__howto')).toBeVisible();
+  await expect(page.locator('.minigame__howto-subtitle')).toHaveText(
+    'BEYSTADIUM · BEST OF 3 · VS MICHAEL',
+  );
+  await page.screenshot({ path: 'test-results/beystadium/launched-from-michael.png' });
 
   expect(errors).toEqual([]);
 });

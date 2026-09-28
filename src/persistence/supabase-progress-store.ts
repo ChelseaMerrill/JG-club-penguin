@@ -514,10 +514,21 @@ export function createSupabaseProgressStore(
       if (error) {
         throw toProgressError(error);
       }
-      const result = data as RoundResult;
+      const raw = data as Omit<RoundResult, 'badgesEarned'> & { badgesEarned?: unknown };
+      // #121 (B8): the server names the Badges this round awarded. A schema
+      // before 20260928000000_beystadium.sql has only badgeEarned, which
+      // means the Minigame's own Badge.
+      const result: RoundResult = {
+        ...raw,
+        badgesEarned: Array.isArray(raw.badgesEarned)
+          ? (raw.badgesEarned as BadgeId[])
+          : raw.badgeEarned
+            ? [MINIGAME_RULES[minigameId].badgeId]
+            : [],
+      };
       emitter?.emit('tokens:changed', { balance: result.balance });
-      if (result.badgeEarned) {
-        emitter?.emit('badge:earned', { badgeId: MINIGAME_RULES[minigameId].badgeId });
+      for (const badgeId of result.badgesEarned) {
+        emitter?.emit('badge:earned', { badgeId });
       }
       return result;
     });

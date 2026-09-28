@@ -169,7 +169,10 @@ describe('the Beystadium Quest (Let It Rip: win 3 matches)', () => {
 
     expect(quest).toMatchObject({
       title: 'LET IT RIP · WIN 3 MATCHES',
-      location: 'THE POD · TEAM ROOM 4 · TALK TO MICHAEL',
+      location: 'TEAM ROOM 4 · TALK TO MICHAEL',
+      // #121: Team Room 4 is a Room now, so the Quest is located from its definition.
+      roomId: 'team-room-4',
+      hintLocation: 'TEAM ROOM 4',
     });
   });
 

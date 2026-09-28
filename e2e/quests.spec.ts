@@ -115,9 +115,7 @@ test('the widget tracks the main Quest and opens the Quests panel; TRACK and BAD
   await expect(panel.locator('.quests__row')).toHaveCount(6);
   const bey = panel.locator('[data-quest-id="beystadium"]');
   await expect(bey.locator('.quests__row-title')).toHaveText('LET IT RIP · WIN 3 MATCHES');
-  await expect(bey.locator('.quests__row-location')).toHaveText(
-    'THE POD · TEAM ROOM 4 · TALK TO MICHAEL',
-  );
+  await expect(bey.locator('.quests__row-location')).toHaveText('TEAM ROOM 4 · TALK TO MICHAEL');
   await expect(bey.locator('.quests__row-progress')).toHaveText('0 / 3');
   const main = panel.locator('[data-quest-id="main"]');
   await expect(main.locator('.quests__row-progress')).toHaveText('1 / 5');
