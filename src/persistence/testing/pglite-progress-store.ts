@@ -49,6 +49,7 @@ export const MIGRATIONS = [
   ['quests', '20260925000000_quests.sql'],
   ['badges', '20260927000000_badges.sql'],
   ['igloo-wall-slots', '20260927010000_igloo_wall_slots.sql'],
+  ['beystadium', '20260928000000_beystadium.sql'],
 ] as const;
 
 export type MigrationName = (typeof MIGRATIONS)[number][0];

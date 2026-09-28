@@ -1,4 +1,4 @@
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
@@ -63,6 +63,24 @@ describe('BADGE_CATALOG', () => {
         available: expected,
       });
     }
+  });
+
+  it('backs every availability override with a later migration that turns that Badge on', () => {
+    const migrationsDir = path.dirname(MIGRATION);
+    const laterSql = readdirSync(migrationsDir)
+      .filter((file) => file.endsWith('.sql') && file > path.basename(MIGRATION))
+      .map((file) => readFileSync(path.join(migrationsDir, file), 'utf8'))
+      .join('\n');
+
+    for (const badgeId of BADGE_AVAILABILITY_OVERRIDES) {
+      expect({
+        badgeId,
+        turnedOn: laterSql.includes(
+          `update public.badges set available = true where id = '${badgeId}';`,
+        ),
+      }).toEqual({ badgeId, turnedOn: true });
+    }
+    expect([...BADGE_AVAILABILITY_OVERRIDES]).toContain('let-it-rip');
   });
 
   it('seeds the four Minigame Badges and the four #138 Badges available, and the rest coming soon', () => {

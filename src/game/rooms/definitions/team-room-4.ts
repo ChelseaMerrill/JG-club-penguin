@@ -44,8 +44,8 @@ const WALKABLE: readonly (readonly boolean[])[] = [
  * Its one door, "HALLWAY →" on the back-right wall, is the bounding box of
  * the design's own door-frame polygon (`1030,450 1100,485 1100,355
  * 1030,320`). The floor arrow is unlabelled floor art, not a door, and the
- * Beystadium is a prop: Beystadium is not a Minigame in this build, so
- * Michael's Interaction is Dialogue.
+ * Beystadium is a prop: the Beystadium Minigame (#121) starts from
+ * Michael's LET IT RIP, not from the prop.
  */
 export const teamRoom4: RoomDefinition = {
   id: 'team-room-4',

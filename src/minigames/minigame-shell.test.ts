@@ -105,6 +105,7 @@ function createFakeStore(overrides: Partial<ProgressStore> = {}): ProgressStore 
       balance: 125,
       newBest: true,
       badgeEarned: false,
+      badgesEarned: [],
     })),
     purchase: vi.fn(async () => ({ balance: 100 })),
     setSlot: vi.fn(async () => {}),
@@ -251,7 +252,13 @@ describe('minigame shell: finish vs quit', () => {
     expect(() => overlays.close(MINIGAME_OVERLAY_ID)).not.toThrow();
     expect(layer.querySelector('.minigame')).toBeNull();
 
-    gate.resolve({ tokensAwarded: 2, balance: 102, newBest: false, badgeEarned: false });
+    gate.resolve({
+      tokensAwarded: 2,
+      balance: 102,
+      newBest: false,
+      badgeEarned: false,
+      badgesEarned: [],
+    });
     await Promise.resolve();
     await Promise.resolve();
     await Promise.resolve();
@@ -360,7 +367,13 @@ describe('minigame shell: pending state', () => {
     expect(isHidden(layer, '[data-done-stat="tokens"]')).toBe(true);
     expect(isHidden(layer, '[data-done-stat="best"]')).toBe(true);
 
-    gate.resolve({ tokensAwarded: 5, balance: 105, newBest: false, badgeEarned: false });
+    gate.resolve({
+      tokensAwarded: 5,
+      balance: 105,
+      newBest: false,
+      badgeEarned: false,
+      badgesEarned: [],
+    });
     await vi.waitFor(() => expect(isHidden(layer, '.minigame__done-saving')).toBe(true));
     expect(isHidden(layer, '[data-done-stat="tokens"]')).toBe(false);
   });
@@ -561,11 +574,12 @@ describe('minigame shell: done screen', () => {
     const withBadge = setup({
       store: createFakeStore({
         loadAll: vi.fn(async () => baseSnapshot({ bests: { 'bug-squash': 500 } })),
-        recordRound: vi.fn(async () => ({
+        recordRound: vi.fn(async (): Promise<RoundResult> => ({
           tokensAwarded: 250,
           balance: 350,
           newBest: true,
           badgeEarned: true,
+          badgesEarned: ['exterminator'],
         })),
       }),
     });
@@ -603,6 +617,7 @@ describe('minigame shell: done screen', () => {
           balance: 177,
           newBest: false,
           badgeEarned: false,
+          badgesEarned: [],
         })),
       }),
     });
@@ -629,6 +644,7 @@ describe('minigame shell: done screen', () => {
           balance: 110,
           newBest: true,
           badgeEarned: false,
+          badgesEarned: [],
         })),
       }),
     });
@@ -649,6 +665,7 @@ describe('minigame shell: done screen', () => {
           balance: 105,
           newBest: false,
           badgeEarned: false,
+          badgesEarned: [],
         })),
       }),
     });
@@ -675,6 +692,7 @@ describe('minigame shell: done screen', () => {
           balance: 115,
           newBest: true,
           badgeEarned: false,
+          badgesEarned: [],
         })),
       }),
     });
@@ -778,7 +796,13 @@ describe('minigame shell: leaderboard panel (R4)', () => {
     expect(() => overlays.close(MINIGAME_OVERLAY_ID)).not.toThrow();
     expect(layer.querySelector('.minigame')).toBeNull();
 
-    gate.resolve({ tokensAwarded: 2, balance: 102, newBest: false, badgeEarned: false });
+    gate.resolve({
+      tokensAwarded: 2,
+      balance: 102,
+      newBest: false,
+      badgeEarned: false,
+      badgesEarned: [],
+    });
     await Promise.resolve();
     await Promise.resolve();
     await Promise.resolve();

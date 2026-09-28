@@ -221,11 +221,13 @@ describe('createSupabaseProgressStore', () => {
           stats: { score: 520, squashed: 520, bestCombo: 0, escaped: 0 },
         },
       ]);
+      // A response without badgesEarned (a schema before #121) reads as none.
       expect(result).toEqual({
         tokensAwarded: 52,
         balance: 152,
         newBest: true,
         badgeEarned: false,
+        badgesEarned: [],
       });
       expect(balances).toEqual([152]);
       expect(badgeEvents).toEqual([]);
@@ -252,6 +254,37 @@ describe('createSupabaseProgressStore', () => {
 
       expect(badgeEvents).toEqual([MINIGAME_RULES['bug-squash'].badgeId]);
       expect(badgeEvents).toEqual(['exterminator']);
+    });
+
+    it("reports and announces the server's badgesEarned: Let It Rip on Beystadium's third win (#121)", async () => {
+      const { client } = makeFakeClient({
+        recordRound: {
+          data: {
+            tokensAwarded: 60,
+            balance: 390,
+            newBest: false,
+            badgeEarned: true,
+            badgesEarned: ['let-it-rip'],
+          },
+          error: null,
+        },
+      });
+      const badgeEvents: BadgeId[] = [];
+      const emitter = createEmitter<GameEventMap>();
+      emitter.on('badge:earned', ({ badgeId }) => badgeEvents.push(badgeId));
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID, emitter });
+
+      const result = await store.recordRound('beystadium', 7, {
+        won: 1,
+        roundsWon: 2,
+        roundsLost: 1,
+        strikes: 7,
+        perfectLaunches: 2,
+        bey: 0,
+      });
+
+      expect(result.badgesEarned).toEqual(['let-it-rip']);
+      expect(badgeEvents).toEqual(['let-it-rip']);
     });
 
     it('rejects round_too_soon and emits its toast', async () => {

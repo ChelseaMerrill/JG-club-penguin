@@ -58,8 +58,7 @@ export interface MinigameQuestDefinition {
   goal: number;
   /** The HUD widget's next-step text. */
   hint: string;
-  /** Where the Minigame is played; `null` while its Room isn't in the build
-   *  (Beystadium's Team Room 4, #51). */
+  /** Where the Minigame is played; `null` while its Room isn't in the build. */
   roomId: RoomId | null;
   /** The HUD widget's next-step location. */
   hintLocation: string;
@@ -100,24 +99,6 @@ function minigameQuest(
     hintLocation: room,
   };
 }
-
-/**
- * Beystadium's Quest, the design's "QUEST · LET IT RIP · WIN 3 MATCHES",
- * located from the design's header ("THE POD · TEAM ROOM 4"). Team Room 4
- * isn't a Room in this build yet (#51), so its location lines are spelled
- * out here instead of read from the Room registry.
- */
-const BEYSTADIUM_QUEST: MinigameQuestDefinition = {
-  kind: 'minigame',
-  id: 'beystadium',
-  minigameId: 'beystadium',
-  title: 'LET IT RIP · WIN 3 MATCHES',
-  location: 'THE POD · TEAM ROOM 4 · TALK TO MICHAEL',
-  ...badgeGoal('beystadium'),
-  hint: 'Win 3 Beystadium matches',
-  roomId: null,
-  hintLocation: 'TEAM ROOM 4',
-};
 
 /** Every Quest this code knows about, in panel order. `questsInBuild` narrows it to the build. */
 export const QUEST_DEFINITIONS: readonly QuestDefinition[] = [
@@ -176,7 +157,15 @@ export const QUEST_DEFINITIONS: readonly QuestDefinition[] = [
     'Earn 200 tokens in one round',
   ),
   minigameQuest('coffee-rush', 'Coffee Rush', 'the-melt', null, 'Serve 15 cups in one round'),
-  BEYSTADIUM_QUEST,
+  // The design's "QUEST · LET IT RIP · WIN 3 MATCHES" as its title; located
+  // from Team Room 4's own definition, where Michael launches it (#121).
+  minigameQuest(
+    'beystadium',
+    'LET IT RIP · WIN 3 MATCHES',
+    'team-room-4',
+    'TALK TO MICHAEL',
+    'Win 3 Beystadium matches',
+  ),
 ];
 
 /**

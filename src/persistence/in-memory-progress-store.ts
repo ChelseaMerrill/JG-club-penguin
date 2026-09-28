@@ -285,7 +285,13 @@ export function createInMemoryProgressStoreWithControls(
       emitter?.emit('badge:earned', { badgeId: rule.badgeId });
     }
 
-    return { tokensAwarded: payout, balance: state.tokens, newBest, badgeEarned };
+    return {
+      tokensAwarded: payout,
+      balance: state.tokens,
+      newBest,
+      badgeEarned,
+      badgesEarned: badgeEarned ? [rule.badgeId] : [],
+    };
   }
 
   async function purchase(itemId: string): Promise<PurchaseResult> {
