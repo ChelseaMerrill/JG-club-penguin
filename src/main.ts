@@ -109,6 +109,15 @@ import { createQuestsPanel, QUESTS_OVERLAY_ID, type QuestsTab } from './ui/quest
 import { createQuestWidget } from './ui/quest-widget';
 import { createQuestBanner } from './ui/quest-banner';
 import type { QuestsTestHandle } from './quests/quests-test-handle';
+import { createSupabaseFeedbackClient, type FeedbackClient } from './feedback/feedback-client';
+import { createInMemoryFeedbackClient } from './feedback/in-memory-feedback-client';
+import type { FeedbackTestHandle } from './feedback/feedback-test-handle';
+import {
+  createFeedbackButton,
+  createFeedbackModal,
+  FEEDBACK_OVERLAY_ID,
+} from './ui/feedback-modal';
+import { SPAWN_ROOM_ID } from './contracts';
 import type { MinigameId } from './contracts';
 
 // Fail fast on a missing or malformed .env before anything boots.
@@ -967,6 +976,45 @@ if (e2eHooksEnabled) {
   };
 }
 
+// In-game feedback: the HUD's "!?" button opens the FEEDBACK modal, which
+// submits through `public.submit_feedback` (a Database Webhook emails the
+// owner). Without a signed-in Player in a dev/e2e-hook build it goes to the
+// in-memory fake instead, the same way the progress store falls back above.
+const supabaseFeedbackClient = createSupabaseFeedbackClient({
+  rpc: (fn, args) => client.rpc(fn, args),
+});
+const devFeedbackClient = e2eHooksEnabled ? createInMemoryFeedbackClient() : null;
+const feedbackClient: FeedbackClient = {
+  submit: (submission) =>
+    (!currentPlayer && devFeedbackClient ? devFeedbackClient : supabaseFeedbackClient).submit(
+      submission,
+    ),
+};
+let feedbackRoomId: RoomId = SPAWN_ROOM_ID;
+gameEvents.on('room:enter', ({ roomId }) => {
+  feedbackRoomId = roomId;
+});
+const feedbackModal = createFeedbackModal(uiLayer, {
+  client: feedbackClient,
+  overlays: hud.overlays,
+  currentRoomId: () => feedbackRoomId,
+  resolveRoomTitle,
+  clientInfo: () => `${window.innerWidth}x${window.innerHeight} ${navigator.userAgent}`,
+});
+createFeedbackButton(hud.feedbackSlot, { onClick: () => feedbackModal.open() });
+
+declare global {
+  interface Window {
+    /** Test-only; see `src/feedback/feedback-test-handle.ts`. */
+    __feedbackTest?: FeedbackTestHandle;
+  }
+}
+
+// Test-only, gated exactly like `__questsTest` above.
+if (devFeedbackClient) {
+  window.__feedbackTest = { submissions: () => devFeedbackClient.submissions() };
+}
+
 // NPC dialog (#36). #37 is on `main`, so GRAB THE HAMMER/GRAB THE SPATULA
 // open the real Minigame shell via `minigameLauncher.launch`. #40 is also on
 // `main` now, so Casey's own stall button opens the same real Market panel
@@ -1164,6 +1212,7 @@ const auth = startAuth({
     hud.overlays.close(MARKET_OVERLAY_ID);
     hud.overlays.close(CORE_VALUES_OVERLAY_ID);
     hud.overlays.close(QUESTS_OVERLAY_ID);
+    hud.overlays.close(FEEDBACK_OVERLAY_ID);
     iglooEditor?.exitEditMode();
     iglooEditor?.setVisible(false);
     overlay.showSignedOut();

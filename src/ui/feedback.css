@@ -1,0 +1,170 @@
+/* In-game feedback: the HUD's "!?" button and the FEEDBACK modal. Every size
+   is Stage pixels (the #ui layer is the 1600x900 Stage), following
+   market.css's pattern. */
+
+/* Bottom right, stacked 12px above the bottom bar's rightmost button: the
+   only HUD corner with no widget of its own (Room title top left, Tokens/
+   PENGUIN/MENU and the quest widget top right, chat bottom left, the button
+   row along the bottom). */
+.hud__feedback-slot {
+  position: absolute;
+  right: var(--hud-inset-x);
+  bottom: calc(var(--hud-inset-y) + 52px + 12px);
+  pointer-events: auto;
+}
+
+/* Takes the bottom bar's hexagon look (`.hud__button--bottom`), squared up
+   into an icon. */
+.feedback-button {
+  width: 72px;
+  padding: 0;
+  font-size: 22px;
+}
+
+.feedback-button:focus-visible {
+  outline: none;
+  box-shadow:
+    inset 0 -5px 0 #06303d,
+    inset 0 0 0 3px var(--jg-light);
+}
+
+.feedback {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 12, 15, 0.78);
+  backdrop-filter: blur(3px);
+  color: var(--jg-light);
+  font-family: var(--font-body);
+}
+
+.feedback[hidden] {
+  display: none;
+}
+
+.feedback__frame {
+  width: 560px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 22px 24px;
+  background: rgba(22, 23, 25, 0.96);
+  border: 3px solid var(--jg-secondary);
+  box-shadow: 0 10px 0 var(--jg-secondary);
+}
+
+.feedback__title {
+  font-family: var(--font-game-display);
+  font-size: 32px;
+  line-height: 1;
+  color: var(--jg-primary);
+  -webkit-text-stroke: 3px var(--jg-secondary);
+  paint-order: stroke fill;
+}
+
+.feedback__subtitle {
+  margin-top: -8px;
+  font: 400 11px var(--font-display);
+  letter-spacing: 0.16em;
+  color: var(--jg-inactive);
+}
+
+.feedback__kinds {
+  display: flex;
+  gap: 10px;
+}
+
+.feedback__kind {
+  flex: 1;
+  height: 40px;
+  border: 2px solid var(--jg-secondary);
+  background: transparent;
+  font: 400 14px var(--font-display);
+  letter-spacing: 0.1em;
+  color: var(--fg-primary);
+  cursor: pointer;
+}
+
+.feedback__kind[aria-pressed='true'] {
+  background: var(--jg-secondary);
+}
+
+.feedback__kind:focus-visible,
+.feedback__button:focus-visible {
+  outline: 2px solid var(--jg-light);
+  outline-offset: 2px;
+}
+
+.feedback__textarea {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 160px;
+  padding: 12px 14px;
+  resize: none;
+  border: 2px solid var(--jg-secondary);
+  background: rgba(var(--jg-dark-rgb), 0.9);
+  font: 400 16px var(--font-body);
+  color: var(--fg-primary);
+}
+
+.feedback__textarea:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--jg-light);
+}
+
+.feedback__meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font: 400 12px var(--font-display);
+  letter-spacing: 0.08em;
+  color: var(--jg-inactive);
+}
+
+.feedback__room[hidden],
+.feedback__error[hidden] {
+  display: none;
+}
+
+.feedback__counter {
+  margin-left: auto;
+}
+
+.feedback__error {
+  padding: 10px 12px;
+  border: 2px solid var(--jg-primary);
+  font: 400 14px var(--font-display);
+  letter-spacing: 0.04em;
+  color: var(--fg-primary);
+}
+
+.feedback__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+}
+
+.feedback__button {
+  height: 44px;
+  padding: 0 26px;
+  border: none;
+  background: transparent;
+  box-shadow: inset 0 0 0 2px var(--jg-secondary);
+  font: 400 16px var(--font-display);
+  letter-spacing: 0.1em;
+  color: var(--fg-primary);
+  cursor: pointer;
+}
+
+.feedback__button--primary {
+  background: var(--jg-secondary);
+  box-shadow: none;
+}
+
+.feedback__button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
