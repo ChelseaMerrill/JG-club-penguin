@@ -31,7 +31,11 @@ import {
   type AssertionSOptions,
   type PenguinSample,
 } from './support/penguin-samples';
-import { completeCreatorIfShown, waitUntilJoined } from './support/two-browser-session';
+import {
+  completeCreatorIfShown,
+  READY_TIMEOUT,
+  waitUntilJoined,
+} from './support/two-browser-session';
 import './support/room-debug-types';
 
 const AUTH_STATE_A = process.env.AUTH_STATE_A;
@@ -69,16 +73,23 @@ async function clearSamples(page: Page): Promise<void> {
 
 /**
  * Assertion S (see `assertionSFailures`) for the saved look `look`. With
- * `options.prior`, S's window starts at the first hidden sample.
+ * `options.prior`, S's window starts at the first hidden sample. Writes the
+ * sample log to `samplesPath` before asserting, so it's saved whether or not
+ * the assertion passes.
  */
 async function expectOnlySavedLook(
   page: Page,
   look: PenguinLook,
+  samplesPath: string,
   options: AssertionSOptions = {},
 ): Promise<PenguinSample[]> {
-  // Let at least a few more frames land after the join.
+  // Wait for the reveal, then let at least a few more frames land after it.
+  await page.waitForFunction(() => window.__roomDebug?.localPenguin?.visible === true, undefined, {
+    timeout: READY_TIMEOUT,
+  });
   await page.waitForTimeout(500);
   const samples = await page.evaluate(() => window.__penguinSamples ?? []);
+  await writeSamples(samplesPath, samples);
   const expected = { ...look, texturePrefix: `penguin:${penguinLookHash(look)}:` };
   expect(assertionSFailures(samples, expected, options), 'assertion S').toEqual([]);
   return samples;
@@ -140,9 +151,8 @@ test.describe('own-penguin-sign-in', () => {
     await delayProgressLoads(page);
     await page.reload();
     await waitUntilJoined(page);
-    const samples = await expectOnlySavedLook(page, saved);
+    await expectOnlySavedLook(page, saved, `${OUT}/restored/samples.json`);
     await page.screenshot({ path: `${OUT}/restored/joined.png` });
-    await writeSamples(`${OUT}/restored/samples.json`, samples);
     await close();
   });
 
@@ -168,9 +178,10 @@ test.describe('own-penguin-sign-in', () => {
     await signInInPage(page, 'B', origin);
     await waitUntilJoined(page);
     const lookB = await ownLook(page);
-    const samples = await expectOnlySavedLook(page, lookB, { prior: { kind: 'landing' } });
+    await expectOnlySavedLook(page, lookB, `${OUT}/signed-out-then-in/samples.json`, {
+      prior: { kind: 'landing' },
+    });
     await page.screenshot({ path: `${OUT}/signed-out-then-in/joined.png` });
-    await writeSamples(`${OUT}/signed-out-then-in/samples.json`, samples);
     await close();
   });
 
@@ -196,12 +207,14 @@ test.describe('own-penguin-sign-in', () => {
       .toBe(true);
     await waitUntilJoined(page);
     const lookB = await ownLook(page);
-    const samples = await expectOnlySavedLook(page, lookB, {
+    expect(penguinLookHash(lookA), 'A and B must have different saved looks').not.toBe(
+      penguinLookHash(lookB),
+    );
+    await expectOnlySavedLook(page, lookB, `${OUT}/account-switch/samples.json`, {
       prior: { kind: 'look', look: lookA },
       forbidden: lookA,
     });
     await page.screenshot({ path: `${OUT}/account-switch/joined.png` });
-    await writeSamples(`${OUT}/account-switch/samples.json`, samples);
     await close();
   });
 });

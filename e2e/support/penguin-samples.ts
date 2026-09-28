@@ -109,6 +109,8 @@ export function assertionSFailures(
 
   const firstVisible = span.findIndex((s) => s.visible);
   if (firstVisible === -1) return [...failures, 'no visible sample'];
+  // Only real signal when `prior` is unset: with `prior`, span[0] is already
+  // the guaranteed-hidden sample the window starts at, so this is trivially true.
   if (!span.slice(0, firstVisible).some((s) => !s.visible))
     failures.push('no hidden sample before the first visible one');
   const visible = span.filter((s) => s.visible);
