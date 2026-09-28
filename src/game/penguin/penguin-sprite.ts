@@ -261,7 +261,9 @@ export function createPenguin(
   // top-layer container, not the body's, so the ceiling item (which hangs
   // above every Tile depth) never draws over them. The body keeps its own
   // Tile depth ordering; the overlay copies its position, visibility and
-  // depth just before every render, so no caller has to move both.
+  // depth on POST_UPDATE (#135 review fix), after `scene.update` and tweens
+  // have run but before `Systems.render` sorts the display list by depth, so
+  // the overlay's depth takes effect the same frame instead of one frame late.
   const overlay = scene.add.container(x, y, [pill, nameText, bubblePill, bubbleText]);
   overlay.setName(PENGUIN_OVERLAY_NAME);
   function syncOverlay(): void {
@@ -270,7 +272,7 @@ export function createPenguin(
     overlay.setDepth(penguinOverlayDepth(container.depth));
   }
   syncOverlay();
-  scene.events.on(Scenes.Events.PRE_RENDER, syncOverlay);
+  scene.events.on(Scenes.Events.POST_UPDATE, syncOverlay);
 
   function clearPendingListener(): void {
     if (pendingKey !== null && pendingListener !== null) {
@@ -293,7 +295,7 @@ export function createPenguin(
     clearPendingListener();
     stopFrameTimer();
     motion.stop(false);
-    scene.events.off(Scenes.Events.PRE_RENDER, syncOverlay);
+    scene.events.off(Scenes.Events.POST_UPDATE, syncOverlay);
     overlay.destroy();
   });
 

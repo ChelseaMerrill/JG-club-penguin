@@ -102,7 +102,7 @@ vi.mock('phaser', () => {
       Container: FakeObject,
       Events: { DESTROY: 'destroy' },
     },
-    Scenes: { Events: { PRE_RENDER: 'prerender' } },
+    Scenes: { Events: { POST_UPDATE: 'postupdate' } },
     Textures: { Events: { ADD_KEY: 'addtexture-' } },
   };
 });
@@ -238,11 +238,11 @@ describe('createPenguin body-motion cleanup (#68 review fix 3)', () => {
     expect(penguin.overlay.list).toHaveLength(4);
     expect(penguin.overlay.name).toBe(PENGUIN_OVERLAY_NAME);
 
-    // The body keeps its Tile depth; the overlay follows it on the next render.
+    // The body keeps its Tile depth; the overlay follows it on POST_UPDATE (#135).
     const bodyDepth = depthForTile({ col: 11, row: 9 });
     penguin.container.setDepth(bodyDepth);
     penguin.container.setPosition(1000, 400);
-    scene.events.emit('prerender');
+    scene.events.emit('postupdate');
 
     expect(penguin.container.depth).toBe(bodyDepth);
     expect(bodyDepth).toBeLessThan(CEILING_FURNITURE_DEPTH);
@@ -251,10 +251,10 @@ describe('createPenguin body-motion cleanup (#68 review fix 3)', () => {
 
     // Even the farthest Tile's tag stays above the ceiling item.
     penguin.container.setDepth(depthForTile({ col: 0, row: 0 }));
-    scene.events.emit('prerender');
+    scene.events.emit('postupdate');
     expect(penguin.overlay.depth).toBeGreaterThan(CEILING_FURNITURE_DEPTH);
 
     penguin.destroy();
-    expect(listeners.prerender?.size ?? 0).toBe(0);
+    expect(listeners.postupdate?.size ?? 0).toBe(0);
   });
 });
