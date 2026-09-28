@@ -240,20 +240,37 @@ and the guard trigger's presence and security shape.
 
 1. Local: covered automatically by `sql-igloo-placement.test.ts`'s PGlite run
    in `npm test`, including the data migration for existing Players and both
-   merge orders with #138 (skipped until #138's `*_badges.sql` exists).
+   apply orders with #138's `20260927000000_badges.sql`.
 2. Real Supabase (gate H2), right before the #135 PR merges and **after
    #138's migration is applied**:
    1. Save the pre-counts:
       - Floor-placed: `select count(*) filter (where item_id='rgb-light-strip') as rgb_floor, count(*) filter (where item_id='disco-ball') as disco_floor from public.igloo_slots where slot between 1 and 6;`
       - Owned but unplaced: `select count(*) filter (where o.item_id='rgb-light-strip') as rgb_unplaced, count(*) filter (where o.item_id='disco-ball') as disco_unplaced from public.player_items o where o.item_id in ('rgb-light-strip','disco-ball') and not exists (select 1 from public.igloo_slots s where s.player_id=o.player_id and s.item_id=o.item_id);`
+      - Floor-furniture fingerprint (every placed item except the two that
+        move), a row count and an md5:
+
+        ```sql
+        select count(*), md5(string_agg(player_id::text||':'||slot||':'||item_id, ',' order by player_id, slot))
+        from public.igloo_slots
+        where item_id not in ('rgb-light-strip','disco-ball');
+        ```
    2. Paste and run `supabase/migrations/20260927010000_igloo_wall_slots.sql`.
-   3. Run the post-counts:
+   3. Run the post-counts **immediately** after the apply, before any
+      Player acts: until the new build deploys, an old client tab can unplace
+      a moved RGB Light Strip or Disco Ball (it deletes it from slot 7 or 11,
+      then the guard rejects the floor-slot upsert), and any Player moving
+      floor furniture changes the fingerprint, either of which would change
+      the counts for a reason that isn't the migration's. Run steps 1-3 in a
+      quiet window.
       - `select count(*) filter (where item_id='rgb-light-strip' and slot between 7 and 10) as rgb_wall, count(*) filter (where item_id='disco-ball' and slot = 11) as disco_ceiling from public.igloo_slots;`
       - Mismatches: `select count(*) from public.igloo_slots s join public.shop_items i on i.id=s.item_id where i.placement <> public.igloo_slot_placement(s.slot);`
       - The owned-but-unplaced query again.
+      - The floor-furniture fingerprint again.
    4. Expect `rgb_wall = rgb_floor`, `disco_ceiling = disco_floor`, 0
-      mismatches, and `rgb_unplaced`/`disco_unplaced` unchanged. Any
-      difference is a failure: stop and record it on #135.
+      mismatches, `rgb_unplaced`/`disco_unplaced` unchanged, and the
+      fingerprint's `count` and `md5` unchanged (the migration never touches
+      any other placed item). Any difference is a failure: stop and record
+      it on #135.
    5. Open `135_igloo_placement_proof.sql`, replace every
       `00000000-0000-0000-0000-00000000f1f0` with the #9 H1 fixture Player's
       id, and run it. Expect every row's `pass` to be `true`, including

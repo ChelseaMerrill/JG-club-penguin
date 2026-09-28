@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import type { RoomId } from '../../contracts';
 import { getRoomDefinition, ROOM_DEFINITIONS } from './registry';
 import { IGLOO_SLOT_PLACEMENT, IGLOO_SLOTS } from '../../persistence/progress-store';
+import { WALL_ART_MAX_WIDTH } from './furniture-art';
 import { iglooSlotForSlotId } from './furniture-slots';
+import { tileToScreen } from './iso';
 import type { RoomDefinition } from './room-definition';
 import { validateRoomDefinitions } from './validate';
 
@@ -504,12 +506,53 @@ describe('ROOM_DEFINITIONS registry', () => {
       {
         id: 'slot-11',
         placement: 'ceiling',
-        anchor: { x: 850, y: 320 },
+        anchor: { x: 868, y: 356 },
         cordTopY: 40,
-        shadow: { x: 850, y: 525 },
+        shadow: { x: 868, y: 525 },
       },
     ]);
     expect(igloo.subtitle).toBe('PLAYER HOME · 1 PENGUIN · 1 HEXLE · 11 FURNITURE SLOTS');
+  });
+
+  it("hangs the Disco Ball's cord clear of the wall art and its ball clear of floor slots 1 and 5 (#161 review)", () => {
+    const igloo = getRoomDefinition('igloo');
+    const slots = igloo.furnitureSlots ?? [];
+    const byId = (id: string) => slots.find((slot) => slot.id === id)!;
+    const ceiling = byId('slot-11');
+    if (ceiling.placement !== 'ceiling') throw new Error('slot-11 is not the ceiling slot');
+    const half = WALL_ART_MAX_WIDTH / 2;
+    const ballRadius = 18;
+    // Floor art spans at most 26 px either side of its Tile point and sits on
+    // or above it (the beanbag reaches 7 px below).
+    const floorArt = (id: string) => {
+      const slot = byId(id);
+      if (slot.placement !== 'floor') throw new Error(`${id} is not a floor slot`);
+      const point = tileToScreen(slot.tile, igloo.grid.origin);
+      return { left: point.x - 26, right: point.x + 26, top: point.y - 50, bottom: point.y + 7 };
+    };
+
+    for (const id of ['slot-9', 'slot-10']) {
+      const wall = byId(id);
+      if (wall.placement !== 'wall') throw new Error(`${id} is not a wall slot`);
+      const clear =
+        ceiling.anchor.x < wall.anchor.x - half || ceiling.anchor.x > wall.anchor.x + half;
+      expect(clear, `cord x=${ceiling.anchor.x} crosses ${id}'s art`).toBe(true);
+    }
+    for (const id of ['slot-1', 'slot-5']) {
+      const art = floorArt(id);
+      const ball = {
+        left: ceiling.anchor.x - ballRadius,
+        right: ceiling.anchor.x + ballRadius,
+        top: ceiling.anchor.y - ballRadius,
+        bottom: ceiling.anchor.y + ballRadius,
+      };
+      const overlaps =
+        ball.left < art.right &&
+        ball.right > art.left &&
+        ball.top < art.bottom &&
+        ball.bottom > art.top;
+      expect(overlaps, `the ball overlaps ${id}'s art`).toBe(false);
+    }
   });
 
   it('gives Town Center a core-values-poster hotspot (#77 D5)', () => {

@@ -1,8 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
-import type { RoomId } from '../src/contracts';
+import { DEFAULT_LOOK, type RoomId } from '../src/contracts';
 import { igloo } from '../src/game/rooms/definitions/igloo';
 import { roofDeck } from '../src/game/rooms/definitions/roof-deck';
-import { tileToScreen } from '../src/game/rooms/iso';
+import { CEILING_FURNITURE_DEPTH, tileToScreen } from '../src/game/rooms/iso';
 import type { RoomFurnitureSlot } from '../src/game/rooms/room-definition';
 import { GAME_HEIGHT, GAME_WIDTH } from '../src/game/stage-size';
 import { IGLOO_GEAR_CATALOG } from '../src/persistence/minigame-rules';
@@ -208,6 +208,17 @@ test('hangs a wall item, moves it between wall slots, keeps it after re-entering
   await place(page, 10, 'rgb-light-strip');
   await page.locator('.igloo-editor__button').click();
   await page.screenshot({ path: `${SHOTS}/all-slots-filled-alt-wall-items.png` });
+
+  // #161 review (milliehime): a Player's name tag and chat bubble draw above
+  // the Disco Ball; only the Penguin's body keeps its Tile depth.
+  const local = (await debugInfo(page))?.localPenguin;
+  expect(local?.nameTagDepth).toBeGreaterThan(CEILING_FURNITURE_DEPTH);
+  // A named Penguin just under the ball, so the screenshot shows its tag on top.
+  await page.evaluate((look) => window.__roomDebug?.spawnDebugPenguin?.({ col: 2, row: 1 }, look), {
+    ...DEFAULT_LOOK,
+    name: 'Under The Ball',
+  });
+  await page.screenshot({ path: `${SHOTS}/name-tag-over-disco-ball.png` });
 
   expect(errors).toEqual([]);
 });

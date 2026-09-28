@@ -93,6 +93,8 @@ export interface LocalPenguinDebugInfo {
   containerY?: number;
   /** The name tag's `y` in container px: the #68 body motion never moves it. */
   nameTagY?: number;
+  /** The name tag and chat bubble overlay's depth: `NPC_BUBBLE_LAYER` + the body's, above the ceiling item (#161 review). */
+  nameTagDepth?: number;
 }
 
 /** One `room:leave`/`room:enter` #15's navigator has emitted, in emission order. */

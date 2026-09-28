@@ -26,7 +26,13 @@ import { npcLayout } from '../npcs/npc-layout';
 import { NpcClickPause } from '../npcs/npc-motion';
 import { createNpcSprite, type NpcSprite } from '../npcs/npc-sprite';
 import { RoomNpcMotions } from '../npcs/room-npc-motions';
-import { createPenguin, PLAYER_PENGUIN_SCALE, type Penguin, type PenguinAnim } from '../penguin';
+import {
+  createPenguin,
+  PENGUIN_OVERLAY_NAME,
+  PLAYER_PENGUIN_SCALE,
+  type Penguin,
+  type PenguinAnim,
+} from '../penguin';
 import { GAME_HEIGHT, GAME_WIDTH } from '../stage-size';
 import { planBackgroundDraw } from './background';
 import {
@@ -43,6 +49,7 @@ import {
 } from './furniture-art';
 import { iglooSlotForSlotId } from './furniture-slots';
 import {
+  CEILING_FURNITURE_DEPTH,
   depthForTile,
   NPC_BUBBLE_LAYER,
   screenToTile,
@@ -205,12 +212,12 @@ const SNOWBALL_HINT_OFFSET_Y = 56;
 const FURNITURE_SLOT_HIGHLIGHT_COLOR = 0x00bdff;
 // #135: wall art sits flat on the back walls, above the Room art and floor
 // but below every Tile depth, so Penguins always walk in front of it. The
-// ceiling item hangs above floor content, below NPC speech bubbles; its
-// shadow lies on the floor. Edit-mode markers for wall and ceiling slots
+// ceiling item (`iso.ts`'s `CEILING_FURNITURE_DEPTH`) hangs above floor
+// content, below NPC speech bubbles and Player name tags and chat bubbles;
+// its shadow lies on the floor. Edit-mode markers for wall and ceiling slots
 // sit just under the bubble layer so they win clicks over the door hotspot.
 const WALL_FURNITURE_DEPTH = -0.5;
 const CEILING_SHADOW_DEPTH = -0.4;
-const CEILING_FURNITURE_DEPTH = NPC_BUBBLE_LAYER - 20;
 const HANGING_SLOT_MARKER_DEPTH = NPC_BUBBLE_LAYER - 10;
 /** A wall slot's edit-mode outline and hit area (the wall art box, before shear). */
 const WALL_SLOT_BOX = 38;
@@ -728,10 +735,11 @@ export class RoomScene extends Scene {
             bodyTweenCount: this.penguin?.bodyMotionTweenCount(),
             containerX: this.penguin?.container.x,
             containerY: this.penguin?.container.y,
-            // The name tag is the container's first `Text`; the chat bubble's comes after it.
-            nameTagY: this.penguin?.container.list.find(
+            // The name tag is the overlay's first `Text`; the chat bubble's comes after it.
+            nameTagY: this.penguin?.overlay.list.find(
               (child): child is GameObjects.Text => child instanceof GameObjects.Text,
             )?.y,
+            nameTagDepth: this.penguin?.overlay.depth,
           }
         : undefined,
       textureListenerCount: countActiveTextureListeners(this),
@@ -782,7 +790,10 @@ export class RoomScene extends Scene {
    */
   private countPenguinContainers(matches: (name: string) => boolean): number {
     return this.children.list.filter(
-      (child) => child instanceof GameObjects.Container && matches(child.name),
+      (child) =>
+        child instanceof GameObjects.Container &&
+        child.name !== PENGUIN_OVERLAY_NAME &&
+        matches(child.name),
     ).length;
   }
 

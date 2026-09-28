@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url';
 import type { PGliteInterface } from '@electric-sql/pglite';
 import { afterEach, describe, expect, it } from 'vitest';
 import { DEFAULT_LOOK } from '../contracts/penguin';
+import type { IglooSlot, ShopItem } from './progress-store';
 import {
   createPgliteDb,
   createPgliteLeaderboardFixture,
@@ -102,6 +103,18 @@ const SIX_ITEMS = [
   'arcade-cabinet',
   'rgb-light-strip',
 ];
+
+/**
+ * The slot the RGB Light Strip fits: slot 6 while the catalog has no
+ * placement (before #135), slot 7 once #135 makes it a wall item. The raw
+ * `placeItems` fixtures above run before #135's migration, so they keep it in
+ * slot 6; a client write after #135 must use a wall slot.
+ */
+function rgbLightStripSlot(catalog: readonly ShopItem[]): IglooSlot {
+  const rgb = catalog.find((item) => item.id === 'rgb-light-strip') as
+    (ShopItem & { placement?: string }) | undefined;
+  return (rgb?.placement === 'wall' ? 7 : 6) as IglooSlot;
+}
 
 // #138: the badges migration against a real Postgres database (PGlite). The
 // shared contract suite (`sql-progress-store.test.ts`) covers the store-level
@@ -266,15 +279,17 @@ describe('badges migration (PGlite)', () => {
       for (const itemId of SIX_ITEMS) {
         await harness.store.purchase(itemId);
       }
-      const before = (await harness.store.loadAll()).tokens;
+      const { catalog, tokens: before } = await harness.store.loadAll();
+      const rgbSlot = rgbLightStripSlot(catalog);
 
-      for (const [index, itemId] of SIX_ITEMS.entries()) {
-        await harness.store.setSlot((index + 1) as 1 | 2 | 3 | 4 | 5 | 6, itemId);
+      for (const [index, itemId] of SIX_ITEMS.slice(0, 5).entries()) {
+        await harness.store.setSlot((index + 1) as IglooSlot, itemId);
       }
+      await harness.store.setSlot(rgbSlot, SIX_ITEMS[5]);
       const afterSixth = (await harness.store.loadAll()).tokens;
       // Re-placing a slot fires the trigger again, and pays nothing.
-      await harness.store.setSlot(6, null);
-      await harness.store.setSlot(6, SIX_ITEMS[5]);
+      await harness.store.setSlot(rgbSlot, null);
+      await harness.store.setSlot(rgbSlot, SIX_ITEMS[5]);
 
       expect(afterSixth).toBe(before + 50);
       const reloaded = await (await createPgliteProgressStoreFor(harness.playerId)).loadAll();

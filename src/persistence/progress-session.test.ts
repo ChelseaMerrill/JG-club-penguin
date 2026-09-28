@@ -417,9 +417,11 @@ describe('createProgressSession', () => {
         for (const itemId of [...FLOOR_ITEMS, 'rgb-light-strip']) {
           await wrapped.purchase(itemId);
         }
-        for (const [index, itemId] of [...FLOOR_ITEMS, 'rgb-light-strip'].entries()) {
-          await wrapped.setSlot((index + 1) as 1 | 2 | 3 | 4 | 5 | 6, itemId);
+        for (const [index, itemId] of FLOOR_ITEMS.entries()) {
+          await wrapped.setSlot((index + 1) as 1 | 2 | 3 | 4 | 5, itemId);
         }
+        // #135: the RGB Light Strip is a wall item, so it hangs in wall slot 7.
+        await wrapped.setSlot(7, 'rgb-light-strip');
       }
 
       it('Ship It through completeQuest, then a Session check', async () => {

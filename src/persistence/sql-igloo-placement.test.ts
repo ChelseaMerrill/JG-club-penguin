@@ -1,12 +1,14 @@
 import { randomUUID } from 'node:crypto';
-import { existsSync, readdirSync } from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
 import { PGlite, type PGliteInterface } from '@electric-sql/pglite';
 import { afterEach, describe, expect, it } from 'vitest';
 import { IGLOO_GEAR_CATALOG } from './minigame-rules';
 import { IGLOO_SLOTS, IGLOO_SLOT_PLACEMENT } from './progress-store';
-import { createPgliteLeaderboardFixture, readSqlFile } from './testing/pglite-progress-store';
+import {
+  MIGRATIONS,
+  createPgliteLeaderboardFixture,
+  readSqlFile,
+  type MigrationName,
+} from './testing/pglite-progress-store';
 
 // #135: the Igloo wall/ceiling slots migration against a real Postgres
 // database (PGlite). The shared contract suite (`sql-progress-store.test.ts`)
@@ -14,17 +16,19 @@ import { createPgliteLeaderboardFixture, readSqlFile } from './testing/pglite-pr
 // reviewer reruns on real Supabase, the data migration for existing Players,
 // anon denials, SQL/TypeScript parity, and the merge-order checks with #138.
 
-const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
-const MIGRATIONS_DIR = path.join(REPO_ROOT, 'supabase', 'migrations');
-const IGLOO_MIGRATION = '20260927010000_igloo_wall_slots.sql';
+/** A migration's file name, from the harness's one `MIGRATIONS` list. */
+function migrationFile(name: MigrationName): string {
+  return MIGRATIONS.find(([migration]) => migration === name)![1];
+}
+
+const IGLOO_MIGRATION = migrationFile('igloo-wall-slots');
+const BADGES_MIGRATION = migrationFile('badges');
 
 /** #9, #27, #70 and #46: every migration before #138 and #135. */
-const BASE_MIGRATIONS = [
-  '20260924000000_players.sql',
-  '20260924010000_saved_progress.sql',
-  '20260924020000_leaderboard.sql',
-  '20260925000000_quests.sql',
-];
+const BASE_MIGRATIONS = MIGRATIONS.slice(
+  0,
+  MIGRATIONS.findIndex(([name]) => name === 'badges'),
+).map(([, file]) => file);
 
 const openDbs: PGliteInterface[] = [];
 
@@ -80,6 +84,22 @@ async function misplacedCount(db: PGliteInterface): Promise<number> {
      where i.placement <> public.igloo_slot_placement(s.slot)`,
   );
   return res.rows[0].n;
+}
+
+/** H2's floor-furniture fingerprint query, read from `supabase/tests/README.md`'s #135 section. */
+async function floorFingerprint(db: PGliteInterface): Promise<{ count: number; md5: string }> {
+  const readme = readSqlFile('supabase', 'tests', 'README.md').replace(/\r\n/g, '\n');
+  const fenced =
+    /```sql\n((?: {8}.*\n)*? {8}where item_id not in \('rgb-light-strip','disco-ball'\);)\n {8}```/.exec(
+      readme,
+    );
+  expect(fenced).not.toBeNull();
+  const sql = fenced![1]
+    .split('\n')
+    .map((line) => line.replace(/^ {8}/, ''))
+    .join('\n');
+  const res = await db.query<{ count: number | bigint; md5: string }>(sql);
+  return { count: Number(res.rows[0].count), md5: res.rows[0].md5 };
 }
 
 async function asPlayer<T>(
@@ -198,8 +218,16 @@ describe('igloo wall slots migration (PGlite)', () => {
     await place(db, a, 6, 'desk');
     // Owned but never placed: stays unplaced.
     const unplacedOwner = await addPlayer(db, ['rgb-light-strip']);
+    const floorOnly = await addPlayer(db, ['speakers', 'arcade-cabinet']);
+    await place(db, floorOnly, 3, 'speakers');
+    await place(db, floorOnly, 4, 'arcade-cabinet');
+    const fingerprintBefore = await floorFingerprint(db);
 
     await db.exec(readSqlFile('supabase', 'migrations', IGLOO_MIGRATION));
+
+    // H2's floor-furniture fingerprint, run exactly as the README gives it.
+    expect(fingerprintBefore.count).toBe(4);
+    expect(await floorFingerprint(db)).toEqual(fingerprintBefore);
 
     expect(await slotsOf(db, a)).toEqual({
       1: 'beanbag',
@@ -286,14 +314,8 @@ describe('igloo wall slots migration (PGlite)', () => {
 });
 
 // #135 D6(d): #138 (badges, Interior Penguin) and #135 must work in either
-// merge order. Whichever PR lands second turns this block on simply by
-// adding its migration file: it is skipped until #138's `*_badges.sql`
-// exists.
-const badgesMigration = existsSync(MIGRATIONS_DIR)
-  ? readdirSync(MIGRATIONS_DIR).find((file) => file.endsWith('_badges.sql'))
-  : undefined;
-
-describe.skipIf(!badgesMigration)('igloo wall slots with #138 badges, both orders (PGlite)', () => {
+// apply order. #138 merged first, so this block always runs.
+describe('igloo wall slots with #138 badges, both orders (PGlite)', () => {
   const FLOOR = ['beanbag', 'desk', 'speakers', 'dual-monitors'];
 
   async function interiorPenguin(db: PGliteInterface, playerId: string) {
@@ -309,7 +331,7 @@ describe.skipIf(!badgesMigration)('igloo wall slots with #138 badges, both order
   }
 
   it('#138 first, then #135: the data migration runs with the Interior Penguin trigger live and the badge is paid once', async () => {
-    const db = await freshDb([...BASE_MIGRATIONS, badgesMigration!]);
+    const db = await freshDb([...BASE_MIGRATIONS, BADGES_MIGRATION]);
     const p = await addPlayer(db, [...FLOOR, 'rgb-light-strip', 'disco-ball']);
     const start = (await interiorPenguin(db, p)).tokens;
     for (const [i, item] of FLOOR.entries()) await place(db, p, i + 1, item);
@@ -337,7 +359,7 @@ describe.skipIf(!badgesMigration)('igloo wall slots with #138 badges, both order
     await place(db, p1, 11, 'disco-ball');
     const p1Start = (await interiorPenguin(db, p1)).tokens;
 
-    await db.exec(readSqlFile('supabase', 'migrations', badgesMigration!));
+    await db.exec(readSqlFile('supabase', 'migrations', BADGES_MIGRATION));
     expect(await interiorPenguin(db, p1)).toEqual({ held: 1, tokens: p1Start + 50 });
 
     const p2 = await addPlayer(db, [...FLOOR, 'arcade-cabinet', 'jg-pennant']);
@@ -359,7 +381,7 @@ describe.skipIf(!badgesMigration)('igloo wall slots with #138 badges, both order
     );
     expect(await interiorPenguin(db, p2)).toEqual({ held: 1, tokens: p2Start + 50 });
 
-    await db.exec(readSqlFile('supabase', 'migrations', badgesMigration!));
+    await db.exec(readSqlFile('supabase', 'migrations', BADGES_MIGRATION));
     expect(await interiorPenguin(db, p1)).toEqual({ held: 1, tokens: p1Start + 50 });
     expect(await interiorPenguin(db, p2)).toEqual({ held: 1, tokens: p2Start + 50 });
   });

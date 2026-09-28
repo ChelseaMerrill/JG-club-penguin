@@ -1,5 +1,6 @@
-import { GameObjects, Textures, type Scene, type Time } from 'phaser';
+import { GameObjects, Scenes, Textures, type Scene, type Time } from 'phaser';
 import { DEFAULT_FACING, type Facing, type PenguinLook } from '../../contracts';
+import { NPC_BUBBLE_LAYER } from '../rooms/iso';
 import { penguinLookHash } from './look-hash';
 import { createBodyMotion, penguinMotionFor, prefersReducedMotion } from './motion';
 import { PLAYER_PENGUIN_SCALE } from './player-penguin-scale';
@@ -81,8 +82,32 @@ const SNOW_HAT_LUMP_CENTER_R = 5;
 /** Phaser's always-present built-in placeholder texture. */
 const PLACEHOLDER_TEXTURE_KEY = '__DEFAULT';
 
+/**
+ * The name of every Penguin's overlay container (its name tag and chat
+ * bubble), so `RoomScene`'s Penguin-container counts can skip it.
+ */
+export const PENGUIN_OVERLAY_NAME = 'penguin-overlay';
+
+/**
+ * The depth a Penguin's name tag and chat bubble draw at, for a body at
+ * `bodyDepth` (#135, #161 review, milliehime): the NPC bubbles' own top
+ * layer, `NPC_BUBBLE_LAYER + depth`, so a tag or bubble is never drawn under
+ * the ceiling item (`iso.ts`'s `CEILING_FURNITURE_DEPTH`) or any Room object,
+ * while tags and bubbles still sort nearer-over-farther among themselves.
+ */
+export function penguinOverlayDepth(bodyDepth: number): number {
+  return NPC_BUBBLE_LAYER + bodyDepth;
+}
+
 export interface Penguin {
+  /** The body (sprite and snow hat): callers position and depth-sort this. */
   readonly container: GameObjects.Container;
+  /**
+   * The name tag and chat bubble, a separate top-layer container (like an
+   * NPC's bubble) that follows `container`'s position, visibility and depth
+   * every frame, at `penguinOverlayDepth(container.depth)`.
+   */
+  readonly overlay: GameObjects.Container;
   idle(): void;
   walk(): void;
   /**
@@ -231,14 +256,21 @@ export function createPenguin(
   const motionProxy = { phase: 0, blend: 0 };
   const motion = createBodyMotion(scene.tweens, [sprite, snowHat], motionProxy);
 
-  const container = scene.add.container(x, y, [
-    sprite,
-    snowHat,
-    pill,
-    nameText,
-    bubblePill,
-    bubbleText,
-  ]);
+  const container = scene.add.container(x, y, [sprite, snowHat]);
+  // #161 review (milliehime): the name tag and chat bubble live in their own
+  // top-layer container, not the body's, so the ceiling item (which hangs
+  // above every Tile depth) never draws over them. The body keeps its own
+  // Tile depth ordering; the overlay copies its position, visibility and
+  // depth just before every render, so no caller has to move both.
+  const overlay = scene.add.container(x, y, [pill, nameText, bubblePill, bubbleText]);
+  overlay.setName(PENGUIN_OVERLAY_NAME);
+  function syncOverlay(): void {
+    overlay.setPosition(container.x, container.y);
+    overlay.setVisible(container.visible);
+    overlay.setDepth(penguinOverlayDepth(container.depth));
+  }
+  syncOverlay();
+  scene.events.on(Scenes.Events.PRE_RENDER, syncOverlay);
 
   function clearPendingListener(): void {
     if (pendingKey !== null && pendingListener !== null) {
@@ -261,6 +293,8 @@ export function createPenguin(
     clearPendingListener();
     stopFrameTimer();
     motion.stop(false);
+    scene.events.off(Scenes.Events.PRE_RENDER, syncOverlay);
+    overlay.destroy();
   });
 
   function redrawNameTag(): void {
@@ -373,6 +407,7 @@ export function createPenguin(
 
   return {
     container,
+    overlay,
     idle() {
       play(currentLook.emote);
     },

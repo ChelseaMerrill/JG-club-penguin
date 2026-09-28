@@ -203,7 +203,8 @@ begin
       v_state := sqlstate; v_err := sqlerrm;
     end;
     v_names := array_append(v_names, 'slot_12_fails_slot_check');
-    v_pass := array_append(v_pass, v_state = '23514' and v_err <> 'wrong_placement');
+    v_pass := array_append(v_pass, v_state = '23514' and v_err <> 'wrong_placement'
+      and v_err like '%igloo_slots_slot_check%');
     v_detail := array_append(v_detail, format('sqlstate=%s error=%s', v_state, v_err));
 
     select count(*) into v_count from public.igloo_slots where player_id <> fixture;

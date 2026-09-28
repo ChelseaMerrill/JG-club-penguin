@@ -66,6 +66,9 @@ export const igloo: RoomDefinition = {
   // dresser, door approach and spawn tile. Wall slots 7-10 sit in the gaps
   // between the wall fixtures (sign, windows, door, poster), so wall art is
   // at most 38 px wide. The ceiling slot hangs over the floor centre.
+  // Its cord runs at x=868 (#161 review, milliehime): right of slot 9's art
+  // (x 824-862) and left of slot 10's (x 879-917). The ball hangs low
+  // enough (y 338-374) to clear slot 1's floor art (x >= 874, y <= 332).
   furnitureSlots: [
     { id: 'slot-1', placement: 'floor', tile: { col: 2, row: 0 } },
     { id: 'slot-2', placement: 'floor', tile: { col: 4, row: 0 } },
@@ -80,9 +83,9 @@ export const igloo: RoomDefinition = {
     {
       id: 'slot-11',
       placement: 'ceiling',
-      anchor: { x: 850, y: 320 },
+      anchor: { x: 868, y: 356 },
       cordTopY: 40,
-      shadow: { x: 850, y: 525 },
+      shadow: { x: 868, y: 525 },
     },
   ],
   hotspots: [

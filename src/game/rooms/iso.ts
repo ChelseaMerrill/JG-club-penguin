@@ -106,3 +106,12 @@ export function depthForTile(tile: Tile): number {
  */
 export const NPC_BUBBLE_LAYER = 1_000_000;
 export const SNOWBALL_LAYER = 2_000_000;
+
+/**
+ * The Igloo's ceiling item (#135, the Disco Ball): above every Tile depth, so
+ * it hangs in front of every Penguin body and floor item, but below
+ * `NPC_BUBBLE_LAYER`, so every NPC speech bubble and every Player name tag
+ * and chat bubble (`penguin-sprite.ts`'s `penguinOverlayDepth`) draws over it
+ * (#161 review, milliehime).
+ */
+export const CEILING_FURNITURE_DEPTH = NPC_BUBBLE_LAYER - 20;
