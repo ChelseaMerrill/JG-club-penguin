@@ -1,5 +1,6 @@
 import { mkdirSync, rmSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
+import { npcLayout } from '../src/game/npcs/npc-layout';
 import { devPit } from '../src/game/rooms/definitions/dev-pit';
 import { tileToScreen } from '../src/game/rooms/iso';
 import { GAME_HEIGHT, GAME_WIDTH } from '../src/game/stage-size';
@@ -14,8 +15,8 @@ import type { NpcMotionDebugInfo, RoomDebugInfo } from './support/room-debug-typ
 const BOOT_TIMEOUT = 15_000;
 const LONG_WALK_TIMEOUT = 15_000;
 const PROOF_ROOT = 'test-results/npc-motion-dev-pit';
-/** `RoomScene`'s NPC click zone sits this far above the feet (`NPC_HIT_ZONE_OFFSET_Y`). */
-const HIT_ZONE_OFFSET_Y = -50;
+/** The centre of `RoomScene`'s click zone for a Human NPC, relative to its feet. */
+const HIT_ZONE_OFFSET_Y = npcLayout({ kind: 'human' }).hitArea.centerY;
 /** Ian walks an authored loop (owner request, 2026-09-25, Track D), Ryan
  *  walks-and-dances, Sam walks-and-spins. Dom was removed from this Room
  *  (same request). */

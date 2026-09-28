@@ -4,13 +4,30 @@ import type { RoomEventMap, RoomId } from './rooms';
 /**
  * Producers: #37 (played), #27 `record_round`. Consumers: #27, #34, #42.
  */
-export type MinigameId =
-  'bug-squash' | 'pancake-flip' | 'coffee-rush' | 'snow-cone-stand' | 'beystadium';
+export type MinigameId = 'bug-squash' | 'pancake-flip' | 'coffee-rush' | 'snow-cone-stand';
 
 /**
- * Producers: #37 (played), #27 `record_round`. Consumers: #27, #34, #42.
+ * Every Badge seeded in `public.badges` (#138's migration; mirrored by
+ * `BADGE_CATALOG` in `src/persistence/badge-catalog.ts`). The four Minigame
+ * Badges are awarded by `record_round` (#27); the rest by the server paths
+ * #138 and later issues add. Producers: #27, #138. Consumers: #34, #42, #138.
  */
-export type BadgeId = 'exterminator' | 'breakfast-club' | 'barista' | 'brain-freeze' | 'let-it-rip';
+export type BadgeId =
+  | 'exterminator'
+  | 'breakfast-club'
+  | 'barista'
+  | 'brain-freeze'
+  | 'first-waddle'
+  | 'snowmageddon'
+  | 'ship-it'
+  | 'rail-rider'
+  | 'hexle-parent'
+  | 'interior-penguin'
+  | 'night-owl'
+  | 'mullet-mania'
+  | 'let-it-rip'
+  | 'stair-master'
+  | 'phish-fry';
 
 /**
  * Per-minigame stats keys. Producer: #37. Consumers: #27 (SQL keys), #32,
@@ -65,23 +82,6 @@ export interface MinigameStatsMap {
     rushCone25: number;
     served: number;
     lost: number;
-  };
-  /** One Beystadium match (best of 3 battle rounds vs Michael): `won` is 1
-   *  for a match win, else 0, and is 1 exactly when `roundsWon` is 2;
-   *  `roundsWon`/`roundsLost` are battle rounds (0-2 each, never both 2);
-   *  `strikes` is strikes landed in the ring zone (the match's score and
-   *  personal best); `perfectLaunches` counts launches in the cyan zone;
-   *  `bey` is the picked Bey's index (0 GLACIER, 1 AVALANCHE, 2
-   *  PERMAFROST). Producer: `beystadium-engine.ts`. Consumer:
-   *  `record_round`'s `'beystadium'` branch
-   *  (`20260925010000_beystadium.sql`), which pays and validates from these. */
-  beystadium: {
-    won: number;
-    roundsWon: number;
-    roundsLost: number;
-    strikes: number;
-    perfectLaunches: number;
-    bey: number;
   };
 }
 

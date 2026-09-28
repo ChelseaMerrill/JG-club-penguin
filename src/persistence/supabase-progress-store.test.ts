@@ -3,7 +3,7 @@ import { createEmitter } from '../contracts/emitter';
 import { DEFAULT_LOOK, type PenguinLook } from '../contracts/penguin';
 import type { BadgeId, GameEventMap } from '../contracts/game-events';
 import { MINIGAME_RULES } from './minigame-rules';
-import { ProgressStoreError } from './progress-store';
+import { ProgressStoreError, emptySlots } from './progress-store';
 import { createSupabaseProgressStore } from './supabase-progress-store';
 import { defaultPlayerRow, makeFakeClient } from './testing/fake-progress-client';
 
@@ -57,7 +57,10 @@ describe('createSupabaseProgressStore', () => {
       expect(calls).toContainEqual(['igloo_slots.select', 'slot, item_id']);
       expect(calls).toContainEqual(['igloo_slots.select.eq', 'player_id', PLAYER_ID]);
 
-      expect(calls).toContainEqual(['shop_items.select', 'id, stall, name, price, art_key']);
+      expect(calls).toContainEqual([
+        'shop_items.select',
+        'id, stall, name, price, art_key, placement',
+      ]);
       expect(calls).toContainEqual(['shop_items.select.order', 'price', { ascending: true }]);
       expect(calls).toContainEqual(['shop_items.select.order', 'id', { ascending: true }]);
     });
@@ -88,7 +91,16 @@ describe('createSupabaseProgressStore', () => {
         items: { data: [{ item_id: 'beanbag' }], error: null },
         slots: { data: [{ slot: 1, item_id: 'beanbag' }], error: null },
         catalog: {
-          data: [{ id: 'beanbag', stall: 'igloo', name: 'Beanbag', price: 50, art_key: 'beanbag' }],
+          data: [
+            {
+              id: 'beanbag',
+              stall: 'igloo',
+              name: 'Beanbag',
+              price: 50,
+              art_key: 'beanbag',
+              placement: 'floor',
+            },
+          ],
           error: null,
         },
       });
@@ -102,9 +114,16 @@ describe('createSupabaseProgressStore', () => {
       expect(snapshot.badges).toEqual(['exterminator']);
       expect(snapshot.bests).toEqual({ 'bug-squash': 520 });
       expect(snapshot.ownedItems).toEqual(['beanbag']);
-      expect(snapshot.slots).toEqual({ 1: 'beanbag', 2: null, 3: null, 4: null, 5: null, 6: null });
+      expect(snapshot.slots).toEqual({ ...emptySlots(), 1: 'beanbag' });
       expect(snapshot.catalog).toEqual([
-        { id: 'beanbag', stall: 'igloo', name: 'Beanbag', price: 50, artKey: 'beanbag' },
+        {
+          id: 'beanbag',
+          stall: 'igloo',
+          name: 'Beanbag',
+          price: 50,
+          artKey: 'beanbag',
+          placement: 'floor',
+        },
       ]);
     });
 
@@ -380,7 +399,7 @@ describe('createSupabaseProgressStore', () => {
       const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID });
 
       await expect(
-        store.setSlot(7 as Parameters<typeof store.setSlot>[0], 'beanbag'),
+        store.setSlot(12 as Parameters<typeof store.setSlot>[0], 'beanbag'),
       ).rejects.toMatchObject({ code: 'invalid_slot' });
       expect(calls).toEqual([]);
     });
@@ -405,6 +424,9 @@ describe('createSupabaseProgressStore', () => {
       await store.setSlot(3, 'beanbag');
 
       expect(calls).toEqual([
+        ['shop_items.select', 'placement'],
+        ['shop_items.select.eq', 'id', 'beanbag'],
+        ['shop_items.select.eq.maybeSingle'],
         ['igloo_slots.delete'],
         ['igloo_slots.delete.eq', 'player_id', PLAYER_ID],
         ['igloo_slots.delete.eq.eq', 'item_id', 'beanbag'],
@@ -414,6 +436,68 @@ describe('createSupabaseProgressStore', () => {
           { onConflict: 'player_id,slot' },
         ],
       ]);
+    });
+
+    // #135 (red-team W1): the placement pre-check runs before the delete, so
+    // a move the database would reject never empties the item's old slot.
+    // The fake client keeps no state; the call log is the proof.
+    it('rejects a wall item moved to a floor slot with wrong_placement, sending no delete or upsert', async () => {
+      const { client, calls } = makeFakeClient();
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID });
+
+      await expect(store.setSlot(1, 'jg-pennant')).rejects.toMatchObject({
+        code: 'wrong_placement',
+      });
+      expect(calls).toEqual([
+        ['shop_items.select', 'placement'],
+        ['shop_items.select.eq', 'id', 'jg-pennant'],
+        ['shop_items.select.eq.maybeSingle'],
+      ]);
+    });
+
+    it('rejects an unknown item id with not_owned, sending no delete', async () => {
+      const { client, calls } = makeFakeClient();
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID });
+
+      await expect(store.setSlot(7, 'hoverboard')).rejects.toMatchObject({ code: 'not_owned' });
+      expect(calls.some(([op]) => op.startsWith('igloo_slots.'))).toBe(false);
+    });
+
+    it('hangs a wall item: reads its placement, deletes it by item_id, then upserts slot 9', async () => {
+      const { client, calls } = makeFakeClient();
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID });
+
+      await store.setSlot(9, 'jg-pennant');
+
+      expect(calls.map(([op]) => op)).toEqual([
+        'shop_items.select',
+        'shop_items.select.eq',
+        'shop_items.select.eq.maybeSingle',
+        'igloo_slots.delete',
+        'igloo_slots.delete.eq',
+        'igloo_slots.delete.eq.eq',
+        'igloo_slots.upsert',
+      ]);
+      expect(calls.at(-1)).toEqual([
+        'igloo_slots.upsert',
+        { player_id: PLAYER_ID, slot: 9, item_id: 'jg-pennant' },
+        { onConflict: 'player_id,slot' },
+      ]);
+    });
+
+    it('maps the trigger wrong_placement message and emits its toast', async () => {
+      const { client } = makeFakeClient({
+        upsertSlot: { error: { message: 'wrong_placement', code: '23514' } },
+      });
+      const messages: string[] = [];
+      const emitter = createEmitter<GameEventMap>();
+      emitter.on('ui:toast', ({ message }) => messages.push(message));
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID, emitter });
+
+      await expect(store.setSlot(1, 'beanbag')).rejects.toMatchObject({
+        code: 'wrong_placement',
+      });
+      expect(messages).toEqual(["That item doesn't go there"]);
     });
 
     it('maps a 23503 on the upsert to not_owned', async () => {
@@ -640,23 +724,52 @@ describe('createSupabaseProgressStore', () => {
       expect(calls).toContainEqual(['rpc.mark_dev_pit_visited', {}]);
     });
 
-    it('completeQuest sends quest_id and emits tokens:changed with the server balance', async () => {
+    it('completeQuest sends quest_id, emits tokens:changed with the server balance and badge:earned per awarded Badge', async () => {
       const { client, calls } = makeFakeClient({
         completeQuest: {
-          data: { tokensAwarded: 150, balance: 201, alreadyCompleted: false },
+          data: {
+            tokensAwarded: 150,
+            balance: 251,
+            alreadyCompleted: false,
+            badgesEarned: ['ship-it'],
+          },
           error: null,
         },
       });
       const balances: number[] = [];
+      const announced: string[] = [];
       const emitter = createEmitter<GameEventMap>();
       emitter.on('tokens:changed', ({ balance }) => balances.push(balance));
+      emitter.on('badge:earned', ({ badgeId }) => announced.push(badgeId));
       const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID, emitter });
 
       const result = await store.completeQuest('main');
 
       expect(calls).toContainEqual(['rpc.complete_quest', { quest_id: 'main' }]);
-      expect(result).toEqual({ tokensAwarded: 150, balance: 201, alreadyCompleted: false });
-      expect(balances).toEqual([201]);
+      expect(result).toEqual({
+        tokensAwarded: 150,
+        balance: 251,
+        alreadyCompleted: false,
+        badgesEarned: ['ship-it'],
+      });
+      expect(balances).toEqual([251]);
+      expect(announced).toEqual(['ship-it']);
+    });
+
+    it('completeQuest treats a response without badgesEarned (an old schema) as no Badges', async () => {
+      const { client } = makeFakeClient({
+        completeQuest: {
+          data: { tokensAwarded: 150, balance: 201, alreadyCompleted: false },
+          error: null,
+        },
+      });
+      const announced: string[] = [];
+      const emitter = createEmitter<GameEventMap>();
+      emitter.on('badge:earned', ({ badgeId }) => announced.push(badgeId));
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID, emitter });
+
+      await expect(store.completeQuest('main')).resolves.toMatchObject({ badgesEarned: [] });
+      expect(announced).toEqual([]);
     });
 
     it.each(['quest_incomplete', 'unknown_quest'] as const)(
@@ -672,5 +785,121 @@ describe('createSupabaseProgressStore', () => {
         await expect(rejection).rejects.toMatchObject({ code });
       },
     );
+  });
+
+  describe('Badges (#138)', () => {
+    it('loadAll reads the badge catalog ordered by sort_order then id, and maps it', async () => {
+      const { client, calls } = makeFakeClient({
+        badgeCatalog: {
+          data: [
+            {
+              id: 'first-waddle',
+              name: 'First Waddle',
+              how_to_earn: 'LOG IN',
+              sort_order: 1,
+              available: true,
+            },
+            {
+              id: 'snowmageddon',
+              name: 'Snowmageddon',
+              how_to_earn: '5 SNOWBALL HITS / DAY',
+              sort_order: 2,
+              available: false,
+            },
+          ],
+          error: null,
+        },
+      });
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID });
+
+      const snapshot = await store.loadAll();
+
+      expect(calls).toContainEqual([
+        'badges.select',
+        'id, name, how_to_earn, sort_order, available',
+      ]);
+      expect(calls).toContainEqual(['badges.select.order', 'sort_order', { ascending: true }]);
+      expect(calls).toContainEqual(['badges.select.order', 'id', { ascending: true }]);
+      expect(snapshot.badgeCatalog).toEqual([
+        {
+          id: 'first-waddle',
+          name: 'First Waddle',
+          howToEarn: 'LOG IN',
+          sortOrder: 1,
+          available: true,
+        },
+        {
+          id: 'snowmageddon',
+          name: 'Snowmageddon',
+          howToEarn: '5 SNOWBALL HITS / DAY',
+          sortOrder: 2,
+          available: false,
+        },
+      ]);
+    });
+
+    it('loadAll rejects when the badges table is missing (a new client on the old schema)', async () => {
+      const { client } = makeFakeClient({
+        badgeCatalog: { data: [], error: { message: 'relation "public.badges" does not exist' } },
+      });
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID });
+
+      await expect(store.loadAll()).rejects.toThrow('relation "public.badges" does not exist');
+    });
+
+    it('checkBadges calls check_session_badges with no arguments and emits nothing', async () => {
+      const { client, calls } = makeFakeClient({
+        checkSessionBadges: { data: { badges: ['first-waddle'], balance: 150 }, error: null },
+      });
+      const events: string[] = [];
+      const emitter = createEmitter<GameEventMap>();
+      emitter.on('badge:earned', () => events.push('badge'));
+      emitter.on('tokens:changed', () => events.push('tokens'));
+      emitter.on('ui:toast', () => events.push('toast'));
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID, emitter });
+
+      await expect(store.checkBadges()).resolves.toEqual({
+        badges: ['first-waddle'],
+        balance: 150,
+      });
+      expect(calls).toContainEqual(['rpc.check_session_badges', {}]);
+      expect(events).toEqual([]);
+    });
+
+    it.each([
+      ['no data', null],
+      ['no balance', { badges: ['first-waddle'] }],
+      ['a non-number balance', { badges: [], balance: '150' }],
+      ['no badges array', { badges: 'first-waddle', balance: 150 }],
+    ])(
+      'checkBadges rejects with invalid_response, not a balance of 0, on a malformed reply (%s)',
+      async (_label, data) => {
+        const { client } = makeFakeClient({ checkSessionBadges: { data, error: null } });
+        const events: string[] = [];
+        const emitter = createEmitter<GameEventMap>();
+        emitter.on('tokens:changed', () => events.push('tokens'));
+        emitter.on('ui:toast', () => events.push('toast'));
+        const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID, emitter });
+
+        await expect(store.checkBadges()).rejects.toMatchObject({
+          name: 'ProgressStoreError',
+          code: 'invalid_response',
+        });
+        expect(events).toEqual([]);
+      },
+    );
+
+    it('checkBadges rejects without a toast on a failure', async () => {
+      const { client } = makeFakeClient({
+        checkSessionBadges: { data: null, error: { message: 'not_authenticated', code: '42501' } },
+      });
+      const toasts: string[] = [];
+      const emitter = createEmitter<GameEventMap>();
+      emitter.on('ui:toast', ({ message }) => toasts.push(message));
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID, emitter });
+
+      await expect(store.checkBadges()).rejects.toMatchObject({ code: 'not_authenticated' });
+      expect(toasts).toEqual([]);
+    });
   });
 });

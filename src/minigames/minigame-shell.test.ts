@@ -91,6 +91,7 @@ function baseSnapshot(overrides: Partial<ProgressSnapshot> = {}): ProgressSnapsh
     ownedItems: [],
     slots: emptySlots(),
     catalog: [],
+    badgeCatalog: [],
     ...overrides,
   };
 }

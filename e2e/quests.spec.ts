@@ -4,6 +4,7 @@ import { GAME_HEIGHT, GAME_WIDTH } from '../src/game/stage-size';
 import type { MinigameTestHandle } from '../src/minigames/minigame-test-handle';
 import type { QuestsTestHandle } from '../src/quests/quests-test-handle';
 import type { RoomDebugInfo } from './support/room-debug-types';
+import './support/badge-popup-types';
 
 // `__roomDebug`'s ambient type comes from `./support/room-debug-types`.
 declare global {
@@ -194,17 +195,36 @@ test('steps complete in any order with 3-second toasts; the main Quest pays 150 
     y: stallHotspot.rect.y + stallHotspot.rect.height / 2,
   });
   await expect(page.locator('.market')).toBeVisible();
+  // #138: Ship It's popup must never be visible together with the QUEST
+  // COMPLETE banner. An in-page rAF loop records any frame where both are.
+  await page.evaluate(() => {
+    const visible = (selector: string) => {
+      const el = document.querySelector<HTMLElement>(selector);
+      if (!el || el.hidden) return false;
+      const box = el.getBoundingClientRect();
+      return box.width > 0 && box.height > 0;
+    };
+    window.__overlapSeen = false;
+    const watch = () => {
+      if (visible('.badge-popup') && visible('.quest-banner')) window.__overlapSeen = true;
+      requestAnimationFrame(watch);
+    };
+    requestAnimationFrame(watch);
+  });
   await page.locator('[data-item-id="beanbag"] .market__item-buy').click();
 
   const banner = page.locator('.quest-banner');
+  const popup = page.locator('.badge-popup');
   await expect(banner).toBeVisible();
+  await expect(popup).toBeHidden();
   await expect(banner.locator('.quest-banner__heading')).toHaveText('QUEST COMPLETE');
   await expect(banner.locator('.quest-banner__title')).toHaveText(
     'Ship something before the ice melts',
   );
   await expect(banner.locator('.quest-banner__reward')).toHaveText('+150 TOKENS');
-  // 100 start + 0 + 0 (both rounds scored nothing) - 50 Beanbag + 150 Quest.
-  await expect(page.locator('.hud__tokens-value')).toHaveText('200');
+  // 100 start + 0 + 0 (both rounds scored nothing) - 50 Beanbag + 150 Quest
+  // + 50 for Ship It (#138).
+  await expect(page.locator('.hud__tokens-value')).toHaveText('250');
   await page.locator('.market__close').click();
   await shot(page, 'quest-complete-banner');
 
@@ -212,10 +232,19 @@ test('steps complete in any order with 3-second toasts; the main Quest pays 150 
   await expect(widget.locator('.quest-widget__title')).toHaveText('Bug Squash');
   await expect(widget.locator('.quest-widget__count')).toHaveText('0 / 500');
 
-  // A second purchase re-reads progress but never pays or shows the banner again.
+  // #138: Ship It's popup appears only once the banner has gone.
   await expect(banner).toBeHidden({ timeout: 5_000 });
+  await expect(popup).toBeVisible();
+  await expect(popup).toContainText('Ship It');
+  await expect(popup).toContainText('+50 TOKENS');
+  await shot(page, 'ship-it-popup');
+  await popup.click();
+  await expect(popup).toBeHidden();
+  expect(await page.evaluate(() => window.__overlapSeen === true)).toBe(false);
+
+  // A second purchase re-reads progress but never pays or shows the banner again.
   await page.evaluate(() => window.__questsTest!.purchase('rgb-light-strip'));
-  await expect(page.locator('.hud__tokens-value')).toHaveText('140');
+  await expect(page.locator('.hud__tokens-value')).toHaveText('190');
   await page.waitForTimeout(500);
   await expect(banner).toBeHidden();
 

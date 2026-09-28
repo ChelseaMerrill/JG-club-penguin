@@ -76,7 +76,7 @@ test('opens from the Igloo hotspot showing the current Badge count, and Escape c
 
   await expect(page.locator('.trophy-case')).toBeVisible();
   await expect(page.locator('[data-tab="badges"]')).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.locator('.trophy-case__subtitle')).toHaveText('YOUR IGLOO · 0 / 12 BADGES');
+  await expect(page.locator('.trophy-case__subtitle')).toHaveText('YOUR IGLOO · BADGES · 0 / 15');
 
   const exterminator = page.locator('[data-badge-id="exterminator"]');
   await expect(exterminator).not.toHaveClass(/trophy-case__badge--earned/);
@@ -144,13 +144,73 @@ test('earning Exterminator in Bug Squash shows it unlocked in the Trophy Case', 
   await clickStagePoint(page, hotspotCenter);
 
   await expect(page.locator('.trophy-case')).toBeVisible();
-  await expect(page.locator('.trophy-case__subtitle')).toHaveText('YOUR IGLOO · 1 / 12 BADGES');
+  await expect(page.locator('.trophy-case__subtitle')).toHaveText('YOUR IGLOO · BADGES · 1 / 15');
   const exterminator = page.locator('[data-badge-id="exterminator"]');
   await expect(exterminator).toHaveClass(/trophy-case__badge--earned/);
   await expect(exterminator.locator('.trophy-case__badge-icon')).toHaveText('✓');
 
   await page.evaluate(() => document.fonts.ready);
   await page.screenshot({ path: 'test-results/trophy-case/screenshot.png' });
+
+  expect(errors).toEqual([]);
+});
+
+test('pages all 15 Badges over two pages by arrow, dot and keyboard, with COMING SOON tags on page 2', async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+
+  // Earn one Badge first (Exterminator), exactly as the test above does.
+  await page.goto('/?room=igloo&minigame=bug-squash');
+  await page.locator('.minigame__button--start').click();
+  await expect(page.locator('.minigame__play')).toBeVisible();
+  await page.evaluate(() => window.__minigameTest!.setStubScore(500));
+  await page.evaluate(() => window.__minigameTest!.finishNow());
+  await expect(page.locator('.minigame__done-badge')).toBeVisible();
+  await expect(page.locator('.minigame__done-saving')).toBeHidden();
+  await page.locator('.minigame__done-actions .minigame__button--quit').click();
+  await expect(page.locator('.minigame')).toHaveCount(0);
+  await waitForBoot(page);
+
+  await clickStagePoint(page, hotspotCenter);
+  await expect(page.locator('.trophy-case')).toBeVisible();
+  await expect(page.locator('.trophy-case__subtitle')).toHaveText('YOUR IGLOO · BADGES · 1 / 15');
+
+  const tiles = page.locator('.trophy-case__badge');
+  const prev = page.locator('[aria-label="Previous page"]');
+  const next = page.locator('[aria-label="Next page"]');
+  const dots = page.locator('.trophy-case__page-dot');
+
+  // Page 1: 12 tiles, the earned one first; the arrows and dots show it.
+  await expect(tiles).toHaveCount(12);
+  await expect(tiles.first()).toHaveAttribute('data-badge-id', 'exterminator');
+  await expect(tiles.first()).toHaveClass(/trophy-case__badge--earned/);
+  await expect(dots).toHaveCount(2);
+  await expect(page.locator('[aria-label="Page 1"]')).toHaveAttribute('aria-current', 'page');
+  await expect(prev).toBeDisabled();
+  await page.evaluate(() => document.fonts.ready);
+  await page.screenshot({ path: 'test-results/trophy-case-pages/page-1.png' });
+
+  // Page 2 by the arrow: the last three coming-soon Badges, each tagged.
+  await next.click();
+  await expect(tiles).toHaveCount(3);
+  await expect(page.locator('[aria-label="Page 2"]')).toHaveAttribute('aria-current', 'page');
+  await expect(next).toBeDisabled();
+  await expect(page.locator('.trophy-case__badge--coming-soon')).toHaveCount(3);
+  await expect(page.locator('.trophy-case__badge-tag')).toHaveText([
+    'COMING SOON',
+    'COMING SOON',
+    'COMING SOON',
+  ]);
+  await page.screenshot({ path: 'test-results/trophy-case-pages/page-2.png' });
+
+  // Back by the keyboard, forward again by a dot.
+  await page.keyboard.press('ArrowLeft');
+  await expect(tiles).toHaveCount(12);
+  await page.keyboard.press('ArrowRight');
+  await expect(tiles).toHaveCount(3);
+  await dots.first().click();
+  await expect(tiles).toHaveCount(12);
 
   expect(errors).toEqual([]);
 });

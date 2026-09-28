@@ -1,6 +1,8 @@
 import type { TypedEmitter } from '../contracts/emitter';
 import { DEFAULT_LOOK, type PenguinLook } from '../contracts/penguin';
 import type { BadgeId, GameEventMap, MinigameId, MinigameStatsMap } from '../contracts/game-events';
+import { BADGE_CATALOG } from './badge-catalog';
+import { isNightOwlTime } from './badge-rules';
 import { isBlankLeaderboardName, isUnderLeaderboardCeiling } from './leaderboard-rules';
 import {
   BADGE_BONUS,
@@ -21,10 +23,12 @@ import {
   IGLOO_SLOTS,
   MAIN_QUEST_REWARD,
   SERVER_QUEST_IDS,
+  type BadgeCheckResult,
   type CompleteQuestResult,
   type QuestProgress,
   ProgressStoreError,
   emptySlots,
+  fitsSlot,
   isIglooSlot,
   validateLook,
   type IglooSlot,
@@ -97,13 +101,33 @@ export interface InMemoryProgressStoreOptions {
 }
 
 /**
+ * Test-only controls over a fake's Player, mirroring what a test does as the
+ * postgres role against the real database (`ProgressStoreHarness`).
+ */
+export interface InMemoryProgressStoreTestControls {
+  store: ProgressStore;
+  /** Adds `tokens` to the balance directly. */
+  grantTokens(tokens: number): void;
+  /** Awards `badgeId` with its +50, as `award_badge` would, without emitting anything. */
+  holdBadge(badgeId: BadgeId): void;
+}
+
+/**
  * The in-memory fake for `ProgressStore`: enforces the same rules as #27's
  * `saved_progress` migration (`record_round`, `purchase_item`, the look and
- * Igloo slot constraints) without a database, for one Player per instance.
+ * Igloo slot constraints) and #138's Badge rules without a database, for one
+ * Player per instance.
  */
 export function createInMemoryProgressStore(
   options: InMemoryProgressStoreOptions = {},
 ): ProgressStore {
+  return createInMemoryProgressStoreWithControls(options).store;
+}
+
+/** `createInMemoryProgressStore`, plus test-only controls over its Player. */
+export function createInMemoryProgressStoreWithControls(
+  options: InMemoryProgressStoreOptions = {},
+): InMemoryProgressStoreTestControls {
   const now = options.now ?? (() => Date.now());
   const emitter = options.emitter;
 
@@ -134,7 +158,29 @@ export function createInMemoryProgressStore(
       catalog: [...IGLOO_GEAR_CATALOG]
         .sort((a, b) => a.price - b.price || a.id.localeCompare(b.id))
         .map((item) => ({ ...item })),
+      badgeCatalog: [...BADGE_CATALOG]
+        .sort((a, b) => a.sortOrder - b.sortOrder || a.id.localeCompare(b.id))
+        .map((badge) => ({ ...badge })),
     };
+  }
+
+  /**
+   * Mirrors #138's `award_badge_if_available`: awards an available Badge the
+   * Player doesn't hold yet and pays its +50 once. Returns true only when it
+   * awarded it. Emits nothing; callers decide what to announce.
+   */
+  function awardBadge(badgeId: BadgeId): boolean {
+    const badge = BADGE_CATALOG.find((entry) => entry.id === badgeId);
+    if (!badge?.available || state.badges.has(badgeId)) {
+      return false;
+    }
+    state.badges.set(badgeId, now());
+    state.tokens += BADGE_BONUS;
+    return true;
+  }
+
+  function placedSlotCount(): number {
+    return IGLOO_SLOTS.filter((slot) => state.slots[slot] !== null).length;
   }
 
   async function saveLook(look: PenguinLook): Promise<void> {
@@ -344,12 +390,23 @@ export function createInMemoryProgressStore(
     if (!state.ownedItems.has(itemId)) {
       throw new ProgressStoreError('not_owned');
     }
+    // #135: mirrors the database's igloo_slots_placement_guard, checked
+    // before anything moves so a rejected move leaves the item in place.
+    const item = IGLOO_GEAR_CATALOG.find((entry) => entry.id === itemId);
+    if (item && !fitsSlot(item, slot)) {
+      throw new ProgressStoreError('wrong_placement');
+    }
     for (const otherSlot of IGLOO_SLOTS) {
       if (state.slots[otherSlot] === itemId) {
         state.slots[otherSlot] = null;
       }
     }
     state.slots[slot] = itemId;
+    // Mirrors #138's igloo_slots trigger: silent, announced by the session
+    // wrapper's `checkBadges` diff.
+    if (placedSlotCount() >= 6) {
+      awardBadge('interior-penguin');
+    }
   }
 
   // #46: mirrors `20260925000000_quests.sql`'s `quest_progress`,
@@ -374,7 +431,7 @@ export function createInMemoryProgressStore(
     }
     if (state.completedQuests.has(questId)) {
       emitter?.emit('tokens:changed', { balance: state.tokens });
-      return { tokensAwarded: 0, balance: state.tokens, alreadyCompleted: true };
+      return { tokensAwarded: 0, balance: state.tokens, alreadyCompleted: true, badgesEarned: [] };
     }
     const stepsMet =
       state.profileCreatedAt !== null &&
@@ -387,19 +444,55 @@ export function createInMemoryProgressStore(
     }
     state.tokens += MAIN_QUEST_REWARD;
     state.completedQuests.add(questId);
+    const badgesEarned: BadgeId[] = awardBadge('ship-it') ? ['ship-it'] : [];
     emitter?.emit('tokens:changed', { balance: state.tokens });
-    return { tokensAwarded: MAIN_QUEST_REWARD, balance: state.tokens, alreadyCompleted: false };
+    for (const badgeId of badgesEarned) {
+      emitter?.emit('badge:earned', { badgeId });
+    }
+    return {
+      tokensAwarded: MAIN_QUEST_REWARD,
+      balance: state.tokens,
+      alreadyCompleted: false,
+      badgesEarned,
+    };
+  }
+
+  // #138: mirrors `check_session_badges` / `evaluate_session_badges`, with
+  // the injected clock standing in for the server's `now()`.
+  async function checkBadges(): Promise<BadgeCheckResult> {
+    if (state.profileCreatedAt !== null && state.look.name !== '') {
+      awardBadge('first-waddle');
+      if (isNightOwlTime(new Date(now()))) {
+        awardBadge('night-owl');
+      }
+      if (placedSlotCount() >= 6) {
+        awardBadge('interior-penguin');
+      }
+    }
+    return { badges: sortedByTimeThenId(state.badges), balance: state.tokens };
   }
 
   return {
-    loadAll,
-    saveLook,
-    recordRound,
-    purchase,
-    setSlot,
-    leaderboard,
-    questProgress,
-    markDevPitVisited,
-    completeQuest,
+    store: {
+      loadAll,
+      saveLook,
+      recordRound,
+      purchase,
+      setSlot,
+      leaderboard,
+      questProgress,
+      markDevPitVisited,
+      completeQuest,
+      checkBadges,
+    },
+    grantTokens(tokens: number): void {
+      state.tokens += tokens;
+    },
+    holdBadge(badgeId: BadgeId): void {
+      if (!state.badges.has(badgeId)) {
+        state.badges.set(badgeId, now());
+        state.tokens += BADGE_BONUS;
+      }
+    },
   };
 }

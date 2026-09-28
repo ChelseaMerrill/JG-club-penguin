@@ -16,6 +16,10 @@ import type { RoomPenguinView } from './game/rooms/room-penguin-view';
 import { createRoomNavigator, type RoomNavigator } from './game/rooms/room-navigator';
 import { ROOM_FLOORS } from './game/rooms/floors';
 import {
+  revealLocalPenguinAfter,
+  setLocalPenguinVisible,
+} from './game/rooms/local-penguin-visibility';
+import {
   HOOKS_ENABLED,
   registerRoomDebugNavigatorHooks,
   type RoomDebugEventLogEntry,
@@ -85,9 +89,11 @@ import { initDevMinigameHook } from './minigames/dev-minigame-hook';
 import { devLeaderboardSeed } from './minigames/dev-leaderboard-seed';
 import { MINIGAME_OVERLAY_ID } from './minigames/minigame-shell';
 import { createPenguinCreator } from './ui/penguin-creator';
+import { createPenguinLoadError } from './ui/penguin-load-error';
 import { createPenguinEditor } from './penguin/penguin-editor';
-import { initDevCreatorHook } from './penguin/dev-creator-hook';
+import { initDevCreatorHook, withDevLoadFailures } from './penguin/dev-creator-hook';
 import { createNpcDialog } from './ui/npc-dialog/npc-dialog';
+import { hasQuestStarter, startQuest } from './npcs/quest-giver';
 import { recordNpcTalked, recordOpenStall } from './game/rooms/dev-room-hook';
 import { createTrophyCase, TROPHY_CASE_OVERLAY_ID } from './ui/trophy-case';
 import { createMapScreen } from './ui/map-screen';
@@ -95,6 +101,8 @@ import { createElevatorScreen } from './ui/elevator-screen';
 import { createMarket, MARKET_OVERLAY_ID } from './ui/market';
 import { createIglooEditor, type IglooEditor } from './ui/igloo-editor';
 import { wireBadgeToast } from './ui/badge-toast';
+import { createBadgePopup } from './ui/badge-unlock-panel';
+import { startBadgeChecks } from './badges/badge-checks';
 import { createQuestController } from './quests/quest-controller';
 import { QUEST_DEFINITIONS, questsInBuild } from './quests/quest-definitions';
 import { createQuestsPanel, QUESTS_OVERLAY_ID, type QuestsTab } from './ui/quests-panel';
@@ -107,6 +115,10 @@ import type { MinigameId } from './contracts';
 loadEnv();
 
 const game = startGame();
+// #162: the own Penguin stays hidden (and the Stage ignores clicks) until
+// the Player's Session starts, so it's never drawn with anything but their
+// saved look. Signed-out and `?asPlayer` show it again below.
+setLocalPenguinVisible(game.registry, false);
 mountStage(game);
 const client = getSupabaseClient();
 const realtime = toRealtimeClient(client);
@@ -215,6 +227,8 @@ let roomScene: RoomScene | null = null;
 let penguins: RoomPenguinView | null = null;
 /** The Igloo's Furniture editor (#41): assigned once, after `hud`/`progressStore` exist below. */
 let iglooEditor: IglooEditor | null = null;
+/** Stops the running Session's Badge checks (#138 D11); null outside a Session. */
+let stopBadgeChecks: (() => void) | null = null;
 /**
  * The one producer of `room:leave`/`room:enter` (#15 A1, replacing #28's
  * `stub-rooms.ts` wholesale). Built once the Scene exists, since it restarts
@@ -485,6 +499,9 @@ function debugSnowHats(): Record<string, SnowHatDebugInfo> {
  * every remote Penguin view. Returns the Room channel still to stop.
  */
 function endSession(): RoomChannel | null {
+  // #162: hidden again until the next Session starts (an account switch, or
+  // sign-out, which shows it once the Session is torn down).
+  setLocalPenguinVisible(game.registry, false);
   signInGeneration += 1;
   const channel = roomChannel;
   roomNavigator?.leaveForSignOut();
@@ -506,6 +523,9 @@ function endSession(): RoomChannel | null {
   debugOverlay?.setSubscribed(false);
   // #46: Quest tracking lives and dies with the Session.
   quests.stop();
+  // #138: so do the Session Badge checks.
+  stopBadgeChecks?.();
+  stopBadgeChecks = null;
   questWidget.render(null);
   hud.overlays.close(QUESTS_OVERLAY_ID);
   return channel;
@@ -543,6 +563,30 @@ async function startSession(player: Player, previous: RoomChannel | null): Promi
   const view = await sceneReady;
   if (generation !== signInGeneration) return;
 
+  // #162: the own Penguin is shown once the spawn Room has been entered, so
+  // on the freshly spawned Penguin with the saved look, and still on a
+  // failure, so a broken start never leaves it hidden with the Stage gated.
+  // A sign-out or newer sign-in in between keeps it hidden.
+  let entered: Promise<void> | undefined;
+  try {
+    entered = wireSession(player, view);
+  } finally {
+    void revealLocalPenguinAfter(entered, () => generation === signInGeneration, game.registry);
+  }
+  // #46: loads Quest progress from saved data (steps already done aren't toasted).
+  void quests.start();
+  // #138 D11: the Session Badge check, now and every 5 minutes (First Waddle,
+  // Night Owl), by the server's own clock.
+  stopBadgeChecks?.();
+  stopBadgeChecks = startBadgeChecks({ store: progressStore });
+}
+
+/**
+ * `startSession`'s synchronous wiring (#162 split it out so the reveal can
+ * wrap it): the Room channel, chat, Emote and Snowball forwarding, then the
+ * spawn-Room entry, whose promise it returns.
+ */
+function wireSession(player: Player, view: Awaited<typeof sceneReady>): Promise<void> | undefined {
   channelPlayerId = player.id;
   setSessionActive(true);
   debugOverlay?.setOwnLook(player.look);
@@ -588,9 +632,7 @@ async function startSession(player: Player, previous: RoomChannel | null): Promi
 
   // After the Room channel exists (#15 A2), so it sees the first `room:enter`
   // and joins Presence.
-  void roomNavigator?.enterSpawnRoom();
-  // #46: loads Quest progress from saved data (steps already done aren't toasted).
-  void quests.start();
+  return roomNavigator?.enterSpawnRoom();
 }
 
 /**
@@ -625,6 +667,9 @@ function initDevAsPlayerHook(): boolean {
     look: DEFAULT_LOOK,
   };
   bindPlayer(game.registry, fixturePlayer);
+  // #162: the fixture's look is its saved look, so show it (and accept Stage
+  // clicks) straight away, before any e2e click.
+  setLocalPenguinVisible(game.registry, true);
   void sceneReady.then(() => {
     void roomNavigator?.enterSpawnRoom();
     if (!roomScene) return;
@@ -873,6 +918,10 @@ const questWidget = createQuestWidget(hud.questSlot, {
   onOpen: (tab) => openQuestsPanel(tab),
 });
 const questBanner = createQuestBanner(uiLayer);
+// #138 D13: the Badge popup for every Badge earned outside a Minigame done
+// screen. It waits for the QUEST COMPLETE banner, which shows at the same
+// moment Ship It is earned, so the two never overlap.
+const badgePopup = createBadgePopup(uiLayer, { blockers: [questBanner] });
 
 function openQuestsPanel(tab: QuestsTab): void {
   hud.overlays.open(QUESTS_OVERLAY_ID, () => {
@@ -935,6 +984,15 @@ createNpcDialog(getUiLayer(), {
       hud.overlays.open(MARKET_OVERLAY_ID, () => market.close());
       void market.open();
     },
+    startQuest: (questId) => {
+      startQuest(questId);
+    },
+  },
+  // #144: quest givers read the Quests panel's own view; each Quest's issue
+  // registers its starter in `src/npcs/quest-giver.ts`.
+  quests: {
+    status: (questId) => quests.view()?.statuses.find((status) => status.quest.id === questId),
+    canStart: hasQuestStarter,
   },
 });
 gameEvents.on('npc:talked', ({ npcId }) => {
@@ -953,9 +1011,10 @@ gameEvents.on('hotspot:click', ({ hotspotId }) => {
   tryOpenCoreValuesCard();
 });
 
-// A toast "wherever the Player is" for every earned Badge (#42), not just
-// while the Trophy Case happens to be open.
-wireBadgeToast();
+// A toast "wherever the Player is" for every earned Minigame Badge (#42),
+// not just while the Trophy Case happens to be open, and the Badge popup for
+// every other Badge (#138).
+wireBadgeToast({ popup: badgePopup });
 
 // Must run before `startAuth`: Supabase's `onAuthStateChange` always fires
 // asynchronously, so `devHudActive`/`devMinigameActive` need to be settled
@@ -973,10 +1032,20 @@ const creator = createPenguinCreator(uiLayer, {
   },
 });
 
+// #164: a failed sign-in load shows this retryable state, never the Creator.
+// Sign out uses the same late-bound `auth` as `overlay` and `hud` above.
+const penguinLoadError = createPenguinLoadError(uiLayer, {
+  onRetry: () => void penguinEditor.retry(),
+  onSignOut: () => void auth.signOut(),
+});
+
 const penguinEditor = createPenguinEditor({
   creator,
-  store: progressStore,
+  // Only the editor's store is wrapped (#164 RT B1): Quest loads and the
+  // `?creator=returning` seed keep the unwrapped `progressStore`.
+  store: withDevLoadFailures(progressStore),
   overlays: hud.overlays,
+  loadError: penguinLoadError,
   onLookChanged: applyLocalLook,
   onReady: () => {
     hud.show();
@@ -1020,7 +1089,13 @@ const auth = startAuth({
       iglooEditor?.setVisible(false);
     }
     currentPlayer = player;
-    // `room:enter` fires only after `registry.player` is set.
+    // #162: hidden until this Player's Session starts, including a sign-in
+    // that follows a sign-out in the same page. A dev hook owns its own
+    // Penguin, so a real sign-in there leaves it alone.
+    if (!devHookActive) setLocalPenguinVisible(game.registry, false);
+    // `room:enter` fires only after `registry.player` is set. This binds the
+    // colour-only look until progress loads; since #162 it's never drawn,
+    // because the own Penguin stays hidden until the Session starts.
     bindPlayer(game.registry, player);
     // Registers this Player's store before the Penguin Creator loads through
     // it, so that load shares the session's sign-in load (#34).
@@ -1029,7 +1104,8 @@ const auth = startAuth({
       createSupabaseProgressStore({
         client: toProgressClient(client),
         playerId: player.id,
-        emitter: gameEvents,
+        // #138: announces each Badge at most once per session.
+        emitter: progress.storeEmitter,
       }),
     );
     if (devHookActive) {
@@ -1040,6 +1116,10 @@ const auth = startAuth({
       // `?creator`) never exercises real auth in e2e, so this is a no-op in
       // practice; it's kept only so a real `SIGNED_IN` doesn't slip an
       // unnamed Player into a Session.
+      // #162: a hook opened with a stored session gets `SIGNED_IN` and never
+      // `SIGNED_OUT`, so show its Penguin here rather than leave it hidden
+      // from boot.
+      setLocalPenguinVisible(game.registry, true);
       return;
     }
     overlay.showSignedIn();
@@ -1063,6 +1143,9 @@ const auth = startAuth({
       // Per `src/contracts/rooms.ts`, `room:leave` comes before `bindPlayer(null)`.
       const channel = endSession();
       bindPlayer(game.registry, null);
+      // #162: signed out, the Landing page covers the Stage; the Penguin is
+      // drawn and clickable again, as every no-Session e2e spec expects.
+      setLocalPenguinVisible(game.registry, true);
       progress.stop();
       if (channel) void stopChannel(channel);
       if (pendingPrevious) void stopChannel(pendingPrevious);
@@ -1088,5 +1171,8 @@ const auth = startAuth({
   },
   onError: (message) => {
     overlay.showError(message);
+    // #162: an auth error with nobody signed in is a signed-out state (the
+    // Landing page shows it), so the Penguin mustn't stay hidden and gated.
+    if (currentPlayer === null) setLocalPenguinVisible(game.registry, true);
   },
 });

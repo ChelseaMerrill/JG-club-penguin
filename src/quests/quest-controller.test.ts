@@ -130,7 +130,8 @@ describe('createQuestController', () => {
 
     expect(completeQuest).toHaveBeenCalledTimes(1);
     expect(completions).toEqual([{ questId: 'main', tokensAwarded: 150 }]);
-    expect(balances.at(-1)).toBe(200);
+    // 150 for the Quest plus Ship It's first-time +50 (#138).
+    expect(balances.at(-1)).toBe(250);
     expect(controller.view()?.trackedId).toBe('bug-squash');
   });
 

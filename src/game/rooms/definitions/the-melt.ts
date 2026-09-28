@@ -19,7 +19,9 @@ const DOOR_HOTSPOT_SIZE = { width: 70, height: 165 };
 // and row 9's cols 0-1 sample as the same floor colour as the rest of the
 // open floor in the exported art (not the counters' white/teal), so they're
 // walkable rather than blocked under the counter cluster or the floor-arrow
-// decal near the TOWN CENTER door (#16 fix 5). Chelsea's and Jesse's own
+// decal by the left-wall counter (#16 fix 5); that decal is hidden from the
+// exported art since #132 (it wasn't a working door -- the Kitchen's real
+// TOWN CENTER exit is a framed door, not an elevator). Chelsea's and Jesse's own
 // tiles are blocked (#92 D3 round 2); Tom's is left walkable since he walks
 // in the design, so there's no single tile that's "his" the way there is for
 // every stationary NPC; Tonya's tile already sat on an unwalkable counter.

@@ -1,9 +1,32 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_BUBBLE_WIDTH } from '../game/npcs/bubble-geometry';
+import { estimateBubbleSize } from '../game/npcs/bubble-geometry';
+import { bubbleSchedule } from '../game/npcs/bubble-schedule';
+import { estimateNameplateWidth, npcLayout } from '../game/npcs/npc-layout';
 import { devPit } from '../game/rooms/definitions/dev-pit';
 import { tileToScreen } from '../game/rooms/iso';
 import { ROOM_DEFINITIONS } from '../game/rooms/registry';
-import { getNpcDefinition, NPCS, type NpcId } from './npcs';
+import { getNpcDefinition, NPCS, type NpcBubbleLine, type NpcId } from './npcs';
+
+/** Whether two idle lines are ever shown at once (a `periodS: 0` line always is). */
+function visibleAtTheSameTime(a: NpcBubbleLine, b: NpcBubbleLine): boolean {
+  if (a.periodS === 0 || b.periodS === 0) return true;
+  const windowsOf = (line: NpcBubbleLine, horizonMs: number): [number, number][] => {
+    const { firstShowMs, visibleMs, periodMs } = bubbleSchedule(line);
+    const windows: [number, number][] = [];
+    for (let start = firstShowMs - periodMs; start < horizonMs; start += periodMs) {
+      windows.push([start, start + visibleMs]);
+    }
+    return windows;
+  };
+  // Both cycles line up again after their least common multiple.
+  const gcd = (x: number, y: number): number => (y === 0 ? x : gcd(y, x % y));
+  const pa = Math.round(a.periodS * 1000);
+  const pb = Math.round(b.periodS * 1000);
+  const horizonMs = (pa / gcd(pa, pb)) * pb;
+  const wa = windowsOf(a, horizonMs);
+  const wb = windowsOf(b, horizonMs);
+  return wa.some(([s1, e1]) => wb.some(([s2, e2]) => s1 < e2 && s2 < e1));
+}
 
 describe('NPCS', () => {
   it("has a definition for every npcId in every prototype Room's npcSlots", () => {
@@ -60,7 +83,18 @@ describe('NPCS', () => {
     // npcSlot in this prototype; the rest (including Tom, who gained a slot
     // in #91's Kitchen resync) are asserted here (#36 round-1 review item 1,
     // blocking).
-    const tbdIds: NpcId[] = ['chelsea', 'dom', 'ashley', 'millie', 'casey', 'ryan', 'sam', 'tom'];
+    // #51 gives Emily her first slot (the Hallway); her card is on that list.
+    const tbdIds: NpcId[] = [
+      'chelsea',
+      'dom',
+      'ashley',
+      'millie',
+      'casey',
+      'ryan',
+      'sam',
+      'tom',
+      'emily',
+    ];
     for (const id of tbdIds) {
       expect(NPCS[id].title, `${id}'s title`).toBeNull();
     }
@@ -109,51 +143,94 @@ describe('NPCS', () => {
     }
   });
 
-  it("nudges Tristin's bubble up to clear Millie's nameplate (confirmed overlapping via an e2e screenshot)", () => {
-    expect(NPCS.tristin.bubbleOffsetY).toBe(-60);
-    expect(NPCS.millie.bubbleOffsetY).toBeUndefined();
-  });
-
   it(
-    "keeps Ryan/Steven/Sam's bubble rects from intersecting at the shared max bubble width, " +
-      "each rect (including Ian's) still spanning its own NPC's tile x (#36 round-2 review " +
-      'item 4: replaces a constants-only assertion after #92 moved them close together, ' +
-      'confirmed overlapping via an e2e screenshot; Dom dropped, owner request 2026-09-25 ' +
-      'removed him from this Room, so his own pairing with Ian no longer applies)',
+    "never shows an NPC's bubble over another NPC's bubble or nameplate while every NPC " +
+      'stands at its rest slot: any two lines whose visible windows overlap in time have ' +
+      "pill rects that don't intersect, and no line's pill ever covers another NPC's " +
+      "nameplate (#113: rest slots only; a roaming NPC's passing overlaps come from the " +
+      "designs' own paths)",
     () => {
-      const halfWidth = MAX_BUBBLE_WIDTH / 2;
-
-      function npcX(id: NpcId): number {
-        const slot = devPit.npcSlots.find((s) => s.npcId === id);
-        if (!slot) throw new Error(`expected dev-pit to have a "${id}" npcSlot`);
-        return tileToScreen(slot.tile, devPit.grid.origin).x;
+      interface Rect {
+        left: number;
+        right: number;
+        top: number;
+        bottom: number;
       }
-
-      function bubbleRect(id: NpcId): { min: number; max: number; npcTileX: number } {
-        const tileX = npcX(id);
-        const center = tileX + (NPCS[id].bubbleOffsetX ?? 0);
-        return { min: center - halfWidth, max: center + halfWidth, npcTileX: tileX };
+      const intersects = (a: Rect, b: Rect): boolean =>
+        a.left < b.right && b.left < a.right && a.top < b.bottom && b.top < a.bottom;
+      const collisions: string[] = [];
+      for (const room of ROOM_DEFINITIONS) {
+        // Penguin-kind NPCs are being removed from the Rooms (only Players
+        // appear as Penguins, PR #133), so they're left out.
+        const placed = room.npcSlots.flatMap((slot) => {
+          const npc = getNpcDefinition(slot.npcId)!;
+          if (npc.kind === 'penguin') return [];
+          return [{ npc, feet: tileToScreen(slot.tile, room.grid.origin) }];
+        });
+        const nameplates = placed.map(({ npc, feet }) => {
+          const layout = npcLayout(npc);
+          const width = estimateNameplateWidth(npc.tagName);
+          return {
+            npcId: npc.id,
+            tagName: npc.tagName,
+            rect: {
+              left: feet.x - width / 2,
+              right: feet.x + width / 2,
+              top: feet.y + layout.nameplateTopY,
+              bottom: feet.y + layout.nameplateBottomY,
+            },
+          };
+        });
+        const shown = placed.flatMap(({ npc, feet }) => {
+          const bottom = feet.y + npcLayout(npc).bubbleBottomY + (npc.bubbleOffsetY ?? 0);
+          const centerX = feet.x + (npc.bubbleOffsetX ?? 0);
+          return npc.idleLines.map((line) => {
+            const size = estimateBubbleSize(line.text);
+            return {
+              npcId: npc.id,
+              line,
+              rect: {
+                left: centerX - size.width / 2,
+                right: centerX + size.width / 2,
+                top: bottom - size.height,
+                bottom,
+              },
+            };
+          });
+        });
+        for (let i = 0; i < shown.length; i += 1) {
+          const a = shown[i]!;
+          for (let j = i + 1; j < shown.length; j += 1) {
+            const b = shown[j]!;
+            if (a.npcId === b.npcId) continue;
+            if (intersects(a.rect, b.rect) && visibleAtTheSameTime(a.line, b.line)) {
+              collisions.push(
+                `${room.id}: ${a.npcId} "${a.line.text}" x ${b.npcId} "${b.line.text}"`,
+              );
+            }
+          }
+          for (const plate of nameplates) {
+            if (plate.npcId === a.npcId) continue;
+            if (intersects(a.rect, plate.rect)) {
+              collisions.push(
+                `${room.id}: ${a.npcId} "${a.line.text}" x ${plate.npcId}'s nameplate "${plate.tagName}"`,
+              );
+            }
+          }
+        }
       }
-
-      const ids: NpcId[] = ['ian', 'ryan', 'steven', 'sam'];
-      const rects = new Map(ids.map((id) => [id, bubbleRect(id)]));
-
-      for (const id of ids) {
-        const rect = rects.get(id)!;
-        expect(rect.npcTileX, `${id}'s bubble rect`).toBeGreaterThanOrEqual(rect.min);
-        expect(rect.npcTileX, `${id}'s bubble rect`).toBeLessThanOrEqual(rect.max);
-      }
-
-      const adjacentPairs: [NpcId, NpcId][] = [
-        ['ryan', 'steven'],
-        ['steven', 'sam'],
+      // Overlaps the Room design itself draws at rest, kept as designed: Dev
+      // Pit's Steven's pills (`y="323.4"`, 30 tall, x 957.8-1202.2) cover the
+      // bottom 14 px of Ryan's nameplate (`<rect x="974" y="317.4"
+      // width="52" height="20">`); in-game only its bottom 4 px, below the
+      // text.
+      const drawnByTheDesign = [
+        `dev-pit: steven "Boxes and arrows. Mostly arrows." x ryan's nameplate "Ryan"`,
+        `dev-pit: steven "This diagram scales. Trust me." x ryan's nameplate "Ryan"`,
       ];
-      for (const [a, b] of adjacentPairs) {
-        const rectA = rects.get(a)!;
-        const rectB = rects.get(b)!;
-        const noOverlap = rectA.max <= rectB.min || rectB.max <= rectA.min;
-        expect(noOverlap, `${a}'s and ${b}'s bubble rects overlap`).toBe(true);
-      }
+      expect(collisions.filter((collision) => !drawnByTheDesign.includes(collision))).toEqual([]);
+      // Each allowed overlap still happens, so a stale entry can't linger.
+      for (const allowed of drawnByTheDesign) expect(collisions).toContain(allowed);
     },
   );
 
@@ -226,7 +303,7 @@ describe('NPCS', () => {
       title: 'Account Manager',
       roomId: 'the-icebox',
       tagName: 'Nicole',
-      dialogLine: "The client loved it. Next one's at 2.",
+      dialogLines: ["The client loved it. Next one's at 2."],
       idleLines: [
         { text: 'Client call in 5. Shh.', periodS: 15, delayS: -2 },
         { text: 'Account manager mode: on.', periodS: 15, delayS: -7 },
@@ -238,7 +315,7 @@ describe('NPCS', () => {
       title: 'COO',
       roomId: 'the-icebox',
       tagName: 'Jason',
-      dialogLine: 'Answer three and you may pass.',
+      dialogLines: ['Answer three and you may pass.'],
       idleLines: [
         { text: 'Stairs challenge. You are behind.', periodS: 26, delayS: -1 },
         { text: 'Three questions and you may pass.', periodS: 26, delayS: -10 },
@@ -250,7 +327,7 @@ describe('NPCS', () => {
       title: 'Director of Digital Media',
       roomId: 'the-icebox',
       tagName: 'Jethro',
-      dialogLine: "Act natural. Camera's rolling.",
+      dialogLines: ["Act natural. Camera's rolling.", 'One more for the recap.', 'Say hackathon!'],
       idleLines: [
         { text: 'Act natural. Camera is rolling.', periodS: 21, delayS: -2 },
         { text: 'One more for the recap.', periodS: 21, delayS: -9 },
@@ -262,7 +339,7 @@ describe('NPCS', () => {
       title: 'Founder & CEO',
       roomId: 'the-icebox',
       tagName: 'Darrin',
-      dialogLine: 'Show me energy.',
+      dialogLines: ['Show me energy.'],
       idleLines: [
         { text: 'Show me energy.', periodS: 15, delayS: -1 },
         { text: 'Serve. Grind. Grow. Inspire.', periodS: 15, delayS: -6 },
@@ -271,6 +348,225 @@ describe('NPCS', () => {
     });
     for (const id of ['millie-icebox', 'nicole', 'jason', 'jethro', 'darrin-icebox'] as const) {
       expect(NPCS[id].dialog, `${id}'s dialog`).toEqual({ kind: 'line' });
+    }
+  });
+
+  it("gives the Hallway's, Team Rooms 1-4's and the Bathroom's NPCs the sheet's names/titles and their Room design's own nameplates and lines (#51)", () => {
+    // Names/titles from design/Characters.dc.html (Emily, Dom, Millie, Casey,
+    // Ryan and Sam are on its TITLE TBD list); tags and idle lines verbatim
+    // from each Room design's nameplates and bubbles. Static bubbles are
+    // `periodS: 0`; Team Room 1's `jtalk` (4s, shown from 38%) and `domtalk`
+    // (6s, from 39%) and Team Room 3's `rats` (10s, from 80%) are
+    // re-expressed under the shared 7% show window: (0.38 - 0.07) * 4 =
+    // 1.24s -> -2.76s, (0.39 - 0.07) * 6 = 1.92s -> -4.08s, and
+    // (0.80 - 0.07) * 10 = 7.3s -> -2.7s. Repeat appearances get a
+    // `-<room>` suffixed id.
+    expect(NPCS.emily).toMatchObject({
+      kind: 'human',
+      name: 'Emily Smith',
+      title: null,
+      roomId: 'office-hallway',
+      tagName: 'Emily Smith',
+      dialogLines: ['Ever thought about joining JG?'],
+      idleLines: [{ text: 'Joining JG?', periodS: 0, delayS: 0 }],
+    });
+    expect(NPCS['anthony-hallway']).toMatchObject({
+      name: 'Anthony Conway',
+      title: 'Director of IT',
+      roomId: 'office-hallway',
+      tagName: 'Anthony Conway',
+      idleLines: [{ text: 'Is this link safe?', periodS: 0, delayS: 0 }],
+    });
+    expect(NPCS['jethro-team-room-1']).toMatchObject({
+      name: 'Jethro Breuer',
+      title: 'Director of Digital Media',
+      roomId: 'team-room-1',
+      tagName: 'Jethro',
+      idleLines: [{ text: "Act natural. Camera's rolling.", periodS: 4, delayS: -2.76 }],
+    });
+    expect(NPCS['dom-team-room-1']).toMatchObject({
+      name: 'Dom Favata',
+      title: null,
+      roomId: 'team-room-1',
+      tagName: 'Dom',
+      idleLines: [{ text: 'you gotta be faster than that', periodS: 6, delayS: -4.08 }],
+    });
+    expect(NPCS['ian-team-room-2']).toMatchObject({
+      name: 'Ian Ballard',
+      title: 'VP of Engineering',
+      roomId: 'team-room-2',
+      tagName: 'Ian',
+      idleLines: [{ text: 'have you installed the atlas plugin yet?', periodS: 0, delayS: 0 }],
+      // The design draws his "TALK · BUG SQUASH" prompt under him.
+      dialog: { kind: 'minigame', minigameId: 'bug-squash' },
+    });
+    expect(NPCS['millie-team-room-3']).toMatchObject({
+      name: 'Millie Elliott',
+      title: null,
+      roomId: 'team-room-3',
+      tagName: 'Millie',
+      idleLines: [],
+    });
+    expect(NPCS['casey-team-room-3']).toMatchObject({
+      name: 'Casey Snow',
+      title: null,
+      roomId: 'team-room-3',
+      tagName: 'Casey',
+      idleLines: [{ text: 'RATS', periodS: 10, delayS: -2.7 }],
+      // The Igloo Gear stall is the Roof Deck's; here she is just gaming.
+      dialog: { kind: 'line' },
+    });
+    expect(NPCS['sydney-team-room-3']).toMatchObject({
+      name: 'Sydney Murauskas',
+      title: 'Technical Recruiter',
+      roomId: 'team-room-3',
+      tagName: 'Sydney',
+      idleLines: [{ text: 'So, open to new roles?', periodS: 0, delayS: 0 }],
+    });
+    expect(NPCS.michael).toMatchObject({
+      kind: 'human',
+      name: 'Michael Prete',
+      title: 'IT Associate',
+      roomId: 'team-room-4',
+      tagName: 'Michael',
+      dialogLines: ['3-0. Again.'],
+      idleLines: [{ text: 'I challenge you to a Beyblade battle!', periodS: 0, delayS: 0 }],
+    });
+    expect(NPCS['sam-team-room-4']).toMatchObject({
+      name: 'Sam Schantz',
+      title: null,
+      roomId: 'team-room-4',
+      tagName: 'Sam',
+      idleLines: [],
+    });
+    expect(NPCS['ryan-team-room-4']).toMatchObject({
+      name: 'Ryan Shendler',
+      title: null,
+      roomId: 'team-room-4',
+      tagName: 'Ryan',
+      idleLines: [],
+    });
+  });
+
+  it("gives the Mullet's nine NPCs the sheet's names/titles and the design's own nameplates and lines (#51 slice 3)", () => {
+    // Names/titles from design/Characters.dc.html (Dom and Ashley are on its
+    // TITLE TBD list); tags and idle lines verbatim from design/The
+    // Mullet.dc.html. Its discrete SMIL bubbles keep their own windows:
+    // Ashley's on an 18 s cycle, Dom's either side of a 9.4 s cycle's start.
+    // Tony has no slot anywhere else, so he gets a bare id; the other eight
+    // are repeat appearances with a `-mullet` suffix.
+    const expected: Partial<Record<NpcId, Record<string, unknown>>> = {
+      'jason-mullet': { name: 'Jason Jahnel', title: 'COO', tagName: 'Jason', idleLines: [] },
+      'nicole-mullet': {
+        name: 'Nicole Roberts',
+        title: 'Account Manager',
+        tagName: 'Nicole',
+        idleLines: [{ text: 'hehe', periodS: 0, delayS: 0 }],
+      },
+      'ann-marie-mullet': {
+        name: 'Ann Marie Berdar',
+        title: 'SUBSCRIPTION AI',
+        tagName: 'Ann Marie',
+        idleLines: [{ text: 'haha', periodS: 0, delayS: 0 }],
+      },
+      'jory-mullet': {
+        name: 'Jory Hutchins',
+        title: 'Director of Career Development',
+        tagName: 'Jory',
+        idleLines: [{ text: 'Tribe has spoken.', periodS: 0, delayS: 0 }],
+      },
+      'ashley-mullet': {
+        name: 'Ashley Schuliger',
+        title: null,
+        tagName: 'Ashley',
+        idleLines: [
+          { text: 'Clucknelius coming at you!', periodS: 18, window: [0.0444, 0.1667] },
+          { text: 'Clucknelius coming at you!', periodS: 18, window: [0.4111, 0.5333] },
+          { text: 'Clucknelius coming at you!', periodS: 18, window: [0.7056, 0.8278] },
+        ],
+      },
+      tony: {
+        name: 'Tony Mercadante',
+        title: 'Project Manager',
+        tagName: 'Tony Mercadante',
+        dialogLines: ['Eight ball, corner pocket.'],
+        idleLines: [{ text: 'corner pocket', periodS: 0, delayS: 0 }],
+      },
+      'jon-mullet': { name: 'Jon Keller', title: 'President', tagName: 'Jon', idleLines: [] },
+      'brandon-mullet': {
+        name: 'Brandon Badgett',
+        title: 'Senior Vice President',
+        tagName: 'Brandon',
+        idleLines: [],
+      },
+      'dom-mullet': {
+        name: 'Dom Favata',
+        title: null,
+        tagName: 'Dom',
+        idleLines: [
+          { text: 'Undefeated. I always win.', periodS: 9.4, window: [0, 0.12] },
+          { text: 'Undefeated. I always win.', periodS: 9.4, window: [0.86, 1] },
+        ],
+      },
+    };
+    for (const [id, fields] of Object.entries(expected)) {
+      expect(NPCS[id as NpcId], id).toMatchObject({
+        kind: 'human',
+        roomId: 'the-mullet',
+        dialog: { kind: 'line' },
+        ...fields,
+      });
+    }
+  });
+
+  it("draws each repeat appearance with the same figure and dialog line as the person's first Room (#51)", () => {
+    const repeats: [NpcId, NpcId][] = [
+      ['dom-team-room-1', 'dom'],
+      ['ian-team-room-2', 'ian'],
+      ['millie-team-room-3', 'millie'],
+      ['casey-team-room-3', 'casey'],
+      ['sydney-team-room-3', 'sydney'],
+      // #51 slice 3: the Mullet.
+      ['jason-mullet', 'jason'],
+      ['ann-marie-mullet', 'ann-marie'],
+      ['jory-mullet', 'jory'],
+      ['ashley-mullet', 'ashley'],
+      ['brandon-mullet', 'brandon'],
+      ['dom-mullet', 'dom'],
+    ];
+    for (const [repeat, first] of repeats) {
+      const again = NPCS[repeat];
+      const original = NPCS[first];
+      if (again.kind !== 'human' || original.kind !== 'human') {
+        throw new Error(`expected ${repeat} and ${first} to be Human NPCs`);
+      }
+      expect(again.figure, repeat).toBe(original.figure);
+      expect(again.dialogLines[0], repeat).toBe(original.dialogLines[0]);
+    }
+  });
+
+  it("differs from a person's other appearances only by what that Room's design adds (#113: the Room design wins)", () => {
+    // Roof Deck's Anthony fishes instead of holding his laptop; the Icebox's
+    // Jethro wears a chest camera rig; Dev Pit's Ryan and Sam raise a
+    // whiteboard marker. Their other Rooms' designs draw none of that.
+    const overrides: [NpcId, NpcId, Record<string, unknown>][] = [
+      ['anthony', 'anthony-hallway', { prop: 'fishingRod' }],
+      ['jethro', 'jethro-team-room-1', { cameraRig: true }],
+      ['ryan', 'ryan-team-room-4', { marker: expect.anything() }],
+      ['sam', 'sam-team-room-4', { marker: expect.anything() }],
+      // Town Center's Jon holds playing cards and the Icebox's Nicole has a
+      // laptop on her lap; the Mullet's design draws neither (#51 slice 3).
+      ['jon', 'jon-mullet', { cards: true }],
+      ['nicole', 'nicole-mullet', { seated: 'laptop' }],
+    ];
+    for (const [roomOwn, other, added] of overrides) {
+      const withOverride = NPCS[roomOwn];
+      const plain = NPCS[other];
+      if (withOverride.kind !== 'human' || plain.kind !== 'human') {
+        throw new Error(`expected ${roomOwn} and ${other} to be Human NPCs`);
+      }
+      expect(withOverride.figure, roomOwn).toEqual({ ...plain.figure, ...added });
+      expect(withOverride.dialogLines[0], roomOwn).toBe(plain.dialogLines[0]);
     }
   });
 
@@ -366,7 +662,7 @@ describe('NPCS', () => {
   });
 
   it('every other NPC has a plain line dialog', () => {
-    const talkers: NpcId[] = ['ian', 'chelsea', 'casey', 'josh', 'tom'];
+    const talkers: NpcId[] = ['ian', 'ian-team-room-2', 'chelsea', 'casey', 'josh', 'tom'];
     for (const npc of Object.values(NPCS)) {
       if (talkers.includes(npc.id)) continue;
       expect(npc.dialog).toMatchObject({ kind: 'line' });

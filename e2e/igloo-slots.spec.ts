@@ -56,7 +56,9 @@ const stallHotspotCenter = {
 };
 
 const slot3 = igloo.furnitureSlots?.find((s) => s.id === 'slot-3');
-if (!slot3) throw new Error('expected the Igloo to have a slot-3 Furniture slot');
+if (!slot3 || slot3.placement !== 'floor') {
+  throw new Error('expected the Igloo to have a floor slot-3 Furniture slot');
+}
 const slot3Point = tileToScreen(slot3.tile, igloo.grid.origin);
 
 async function buyBeanbagAtRoofDeck(page: Page): Promise<void> {
@@ -100,7 +102,7 @@ test('buying the Beanbag, placing it in slot 3 via edit mode, and it stays there
   const moveLogBefore = (await debugInfo(page))?.localPenguinMoveLog?.length ?? 0;
   await clickStagePoint(page, slot3Point);
   await expect(page.locator('.igloo-slot-picker')).toBeVisible();
-  await expect(page.locator('.igloo-slot-picker__title')).toHaveText('SLOT 3');
+  await expect(page.locator('.igloo-slot-picker__title')).toHaveText('SLOT 3 · FLOOR');
   expect((await debugInfo(page))?.localPenguinMoveLog?.length ?? 0).toBe(moveLogBefore);
 
   // Only the owned Beanbag plus Empty are listed -- never an item never

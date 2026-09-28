@@ -39,7 +39,7 @@ The fixed 1600x900 surface every screen is authored on. It is scaled to fit the 
 One cell of a Room's isometric grid (2:1, 100x50 pixels), addressed by column and row. Penguin positions, movement targets, doors, spawn points and NPC positions are Tiles, never pixels.
 
 **Facing**
-Which way a Penguin is turned: left or right. The artwork is mirrored for the other direction.
+Which way a Penguin is turned: left or right. The artwork is mirrored for the other direction. Baked lettering (HA HA, the JG LOGO/JG CAP "JG", WAR WEEK) is counter-mirrored before the mirror is applied, so it still reads correctly rather than backwards when the Penguin faces left (#147).
 
 **Map**
 The in-game map screen, opened from the HUD. Clicking a prototype Room on the Map takes the Penguin there; Rooms outside the prototype show as coming soon.
@@ -95,13 +95,16 @@ A per-Minigame ranking of named Players' personal bests, shown by Penguin name; 
 **Quest**
 A tracked objective shown in the Quests panel and the HUD quest widget. Stretch for the prototype. "Task" is not part of this project's vocabulary.
 
+**Quest giver**
+An NPC labelled QUEST GIVER on the character sheet. Its Dialogue offers "Got any work for me?", which starts, shows progress on, or thanks the Player for its Quest; with no Quest yet, it answers with an in-character "nothing right now" line. Only the appearance in the Room its Quest names makes the offer; with no Quest yet, one chosen appearance makes it instead.
+
 ### Progress and rewards
 
 **Token**
 The in-game currency. Players earn Tokens from Minigame rounds and spend them at stalls. The balance changes only through validated database functions, never by a direct write from the client, so it cannot be cheated from the browser.
 
 **Badge**
-An award for reaching a Minigame's threshold (for example, the Exterminator Badge for Bug Squash). Earning a Badge the first time also pays a Token bonus.
+An award for a Minigame threshold (for example, the Exterminator Badge for Bug Squash), a Quest, the Igloo or play time, defined as data in the Badge catalog. Earning a Badge the first time pays +50 Tokens. A Badge can be *coming soon*: defined, shown in the Trophy Case, but not yet earnable.
 
 **Trophy**
 The visual form of an earned Badge, displayed in the Trophy Case.
@@ -113,7 +116,10 @@ The display in the Igloo where a Player's Trophies are shown.
 A place in a Room where an NPC sells items for Tokens, opening the Market panel. The prototype has one: the Igloo Gear stall at the Roof Deck Market, which sells Furniture.
 
 **Furniture**
-Items bought at the Igloo Gear stall and placed into the Igloo's furniture slots (six in the prototype). A Player owns each Furniture item they buy, and a slot can hold only Furniture its owner owns.
+Items bought at the Igloo Gear stall and placed into the Igloo's furniture slots. The Igloo has 11: six on the floor, four on the walls and one on the ceiling. A Player owns each Furniture item they buy, and a slot can hold only Furniture its owner owns and whose Placement matches the slot.
+
+**Placement**
+Where a Furniture item goes: floor, wall or ceiling. Every Igloo Gear item has exactly one Placement and fits only Igloo slots of that Placement (for example, the Disco Ball hangs only from the ceiling).
 
 ### Out of scope
 

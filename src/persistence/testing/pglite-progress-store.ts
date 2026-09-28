@@ -20,10 +20,13 @@ import {
   ProgressStoreError,
   emptySlots,
   isProgressErrorCode,
+  type BadgeCheckResult,
+  type BadgeDefinition,
   type CompleteQuestResult,
   type QuestProgress,
   type IglooSlot,
   type LeaderboardEntry,
+  type Placement,
   type ProgressSnapshot,
   type ProgressStore,
   type PurchaseResult,
@@ -34,8 +37,42 @@ import type { ProgressStoreHarness } from './progress-store.contract';
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(currentDir, '../../..');
 
-function readSqlFile(...segments: string[]): string {
+export function readSqlFile(...segments: string[]): string {
   return readFileSync(path.join(REPO_ROOT, ...segments), 'utf8');
+}
+
+/** Every migration, in timestamp order, keyed by the name `createPgliteDb` takes. */
+export const MIGRATIONS = [
+  ['players', '20260924000000_players.sql'],
+  ['saved-progress', '20260924010000_saved_progress.sql'],
+  ['leaderboard', '20260924020000_leaderboard.sql'],
+  ['quests', '20260925000000_quests.sql'],
+  ['badges', '20260927000000_badges.sql'],
+  ['igloo-wall-slots', '20260927010000_igloo_wall_slots.sql'],
+] as const;
+
+export type MigrationName = (typeof MIGRATIONS)[number][0];
+
+/** The SQL of one migration file, by its `MIGRATIONS` name. */
+export function migrationSql(name: MigrationName): string {
+  const file = MIGRATIONS.find(([migration]) => migration === name)![1];
+  return readSqlFile('supabase', 'migrations', file);
+}
+
+/**
+ * A fresh PGlite database with the local Supabase stub and every migration up
+ * to and including `through` (default: all of them). The caller closes it.
+ */
+export async function createPgliteDb(
+  options: { through?: MigrationName } = {},
+): Promise<PGliteInterface> {
+  const db = new PGlite();
+  await db.exec(readSqlFile('supabase', 'tests', 'local-supabase-stub.sql'));
+  for (const [name] of MIGRATIONS) {
+    await db.exec(migrationSql(name));
+    if (name === options.through) break;
+  }
+  return db;
 }
 
 let sharedDb: PGliteInterface | null = null;
@@ -45,15 +82,8 @@ async function getSharedDb(): Promise<PGliteInterface> {
   if (sharedDb) {
     return sharedDb;
   }
-  const db = new PGlite();
-  await db.exec(readSqlFile('supabase', 'tests', 'local-supabase-stub.sql'));
-  await db.exec(readSqlFile('supabase', 'migrations', '20260924000000_players.sql'));
-  await db.exec(readSqlFile('supabase', 'migrations', '20260924010000_saved_progress.sql'));
-  await db.exec(readSqlFile('supabase', 'migrations', '20260924020000_leaderboard.sql'));
-  await db.exec(readSqlFile('supabase', 'migrations', '20260925000000_quests.sql'));
-  await db.exec(readSqlFile('supabase', 'migrations', '20260925010000_beystadium.sql'));
-  sharedDb = db;
-  return db;
+  sharedDb = await createPgliteDb();
+  return sharedDb;
 }
 
 afterAll(async () => {
@@ -179,7 +209,19 @@ function createSqlProgressStore(db: PGliteInterface, playerId: string): Progress
         name: string;
         price: number;
         art_key: string;
-      }>('select id, stall, name, price, art_key from public.shop_items order by price, id');
+        placement: Placement;
+      }>(
+        'select id, stall, name, price, art_key, placement from public.shop_items order by price, id',
+      );
+      const badgeCatalogRes = await tx.query<{
+        id: string;
+        name: string;
+        how_to_earn: string;
+        sort_order: number;
+        available: boolean;
+      }>(
+        'select id, name, how_to_earn, sort_order, available from public.badges order by sort_order, id',
+      );
 
       const slots: Record<IglooSlot, string | null> = emptySlots();
       for (const row of slotsRes.rows) {
@@ -204,6 +246,14 @@ function createSqlProgressStore(db: PGliteInterface, playerId: string): Progress
           name: row.name,
           price: row.price,
           artKey: row.art_key,
+          placement: row.placement,
+        })),
+        badgeCatalog: badgeCatalogRes.rows.map((row): BadgeDefinition => ({
+          id: row.id,
+          name: row.name,
+          howToEarn: row.how_to_earn,
+          sortOrder: row.sort_order,
+          available: row.available,
         })),
       };
     });
@@ -331,6 +381,16 @@ function createSqlProgressStore(db: PGliteInterface, playerId: string): Progress
     });
   }
 
+  // #138: the Session Badge check, as the Supabase store calls it through rpc().
+  async function checkBadges(): Promise<BadgeCheckResult> {
+    return runAsPlayer(async (tx) => {
+      const res = await tx.query<{ result: BadgeCheckResult }>(
+        'select public.check_session_badges() as result',
+      );
+      return res.rows[0].result;
+    });
+  }
+
   return {
     loadAll,
     saveLook,
@@ -341,11 +401,22 @@ function createSqlProgressStore(db: PGliteInterface, playerId: string): Progress
     questProgress,
     markDevPitVisited,
     completeQuest,
+    checkBadges,
   };
 }
 
+/**
+ * A new `ProgressStore` instance for an existing Player on the shared PGlite
+ * database, e.g. to prove a write survives a reload in a fresh store (#138).
+ */
+export async function createPgliteProgressStoreFor(playerId: string): Promise<ProgressStore> {
+  return createSqlProgressStore(await getSharedDb(), playerId);
+}
+
 /** Builds a fresh Player (a new `auth.users` row) against the shared PGlite database. */
-export async function createPgliteProgressStoreHarness(): Promise<ProgressStoreHarness> {
+export async function createPgliteProgressStoreHarness(): Promise<
+  ProgressStoreHarness & { playerId: string }
+> {
   const db = await getSharedDb();
   const playerId = randomUUID();
   await db.query('insert into auth.users (id) values ($1)', [playerId]);
@@ -360,7 +431,17 @@ export async function createPgliteProgressStoreHarness(): Promise<ProgressStoreH
   });
 
   return {
+    playerId,
     store: createSqlProgressStore(db, playerId),
+    async grantTokens(tokens: number): Promise<void> {
+      await db.query('update public.players set tokens = tokens + $1 where id = $2', [
+        tokens,
+        playerId,
+      ]);
+    },
+    async holdBadge(badgeId: BadgeId): Promise<void> {
+      await db.query('select public.award_badge($1, $2)', [playerId, badgeId]);
+    },
     async advanceSeconds(seconds: number): Promise<void> {
       // Backdates relative to the database's own `now()` rather than each
       // row's stored `finished_at`, so a boundary test's margin depends only

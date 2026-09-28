@@ -111,7 +111,7 @@ class Component extends DCLogic {
   answer(i){ const s=this.state; if(s.phase!=='play'||s.picked!==null) return; clearInterval(this.t); const q=this.cur(); const ok=i===q.c; const streak=ok?s.streak+1:0; this.setState({ picked:i, streak, best:Math.max(s.best,streak), answered:s.answered+1, correct:s.correct+(ok?1:0), tokens:ok?10:0, ant:ok?['Correct. Suspicious of you, in a good way.','Yes. You have been paying attention.','Right. Reel it in.'][s.answered%3]:['Nope. That is how they get you.','Wrong. Do not feel bad. Feel alert.','Incorrect. Consider this your training.'][s.answered%3] }); }
   next=()=>{ const s=this.state; if(s.picked===null) return; const ok=s.picked===this.cur().c; this.setState({ phase:'done', wallet:s.wallet+(ok?10:0), qi:s.qi+1 }); };
   onKey=(e)=>{ const s=this.state; if(s.phase!=='play') return; const k=e.key.toUpperCase(); const i=['A','B','C','D'].indexOf(k); if(i>-1){ e.preventDefault(); this.answer(i); } else if(k==='ENTER'||k===' '){ e.preventDefault(); this.next(); } };
-  quit=()=>{ clearInterval(this.t); this.setState(s=>({ phase:'trigger', picked:null, qi:s.picked!==null?s.qi:s.qi })); };
+  quit=()=>{ window.location.href='Room 11 Office Hallway.dc.html'; clearInterval(this.t); this.setState(s=>({ phase:'trigger', picked:null, qi:s.picked!==null?s.qi:s.qi })); };
   componentWillUnmount(){ clearInterval(this.t); }
   renderVals(){ const s=this.state; const q=(s.phase==='play'||s.phase==='done')&&s.order.length?this.Q[s.order[Math.min(s.qi,s.order.length-1)]]:null; const answered=s.picked!==null; const lastOk=answered&&q&&s.picked===q.c;
     return {

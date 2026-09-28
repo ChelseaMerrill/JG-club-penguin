@@ -2,19 +2,46 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { gameEvents } from '../../contracts';
 import { createOverlayManager, type OverlayManager } from '../hud/overlay-manager';
-import { createNpcDialog, NPC_DIALOG_OVERLAY_ID, type NpcDialog } from './npc-dialog';
+import { dialogLinePool } from '../../npcs/dialog-lines';
+import { NPCS } from '../../npcs/npcs';
+import type { QuestStatus } from '../../quests/quest-engine';
+import {
+  createNpcDialog,
+  NPC_DIALOG_OVERLAY_ID,
+  type NpcDialog,
+  type NpcDialogQuests,
+} from './npc-dialog';
 
 let dialog: NpcDialog | undefined;
 let overlays: OverlayManager | undefined;
 
-function setup() {
+/**
+ * `random` defaults to always 0, so a fresh dialog shows the first line of
+ * its pool: #36's single `dialogLine` (`dialogLines[0]`), usually the
+ * character sheet's quote, otherwise the `humans.js` `line`.
+ */
+function setup(options: { random?: () => number; quests?: NpcDialogQuests } = {}) {
   const root = document.createElement('div');
   document.body.append(root);
   overlays = createOverlayManager();
   const launchMinigame = vi.fn();
   const openStall = vi.fn();
-  dialog = createNpcDialog(root, { overlays, actions: { launchMinigame, openStall } });
-  return { root, launchMinigame, openStall };
+  const startQuest = vi.fn();
+  dialog = createNpcDialog(root, {
+    overlays,
+    actions: { launchMinigame, openStall, startQuest },
+    quests: options.quests,
+    random: options.random ?? (() => 0),
+  });
+  return { root, launchMinigame, openStall, startQuest };
+}
+
+function lineText(root: HTMLElement): string | null | undefined {
+  return root.querySelector('.npc-dialog__line')?.textContent;
+}
+
+function questButton(root: HTMLElement): HTMLButtonElement | null {
+  return root.querySelector('.npc-dialog__button--quest');
 }
 
 function panel(root: HTMLElement): HTMLElement {
@@ -158,10 +185,10 @@ describe('createNpcDialog', () => {
 
   it('every other NPC shows its dialog line and a close button, with no extra action buttons', () => {
     const { root } = setup();
-    gameEvents.emit('npc:arrived', { npcId: 'jon' });
+    gameEvents.emit('npc:arrived', { npcId: 'steven' });
 
     expect(root.querySelector('.npc-dialog__line')?.textContent).toBe(
-      'Welcome to JG. Sunglasses stay on.',
+      'Architecture question. Ready?',
     );
     expect(root.querySelectorAll('.npc-dialog__actions button')).toHaveLength(0);
 
@@ -270,6 +297,7 @@ describe('createNpcDialog', () => {
     const nameEl = root.querySelector('.npc-dialog__name') as HTMLElement;
     expect(nameEl.id).toBeTruthy();
     expect(panelEl.getAttribute('aria-labelledby')).toBe(nameEl.id);
+    expect(root.querySelector('.npc-dialog__line')?.getAttribute('aria-live')).toBe('polite');
   });
 
   it('moves focus to the first action button on open, and restores prior focus on close', () => {
@@ -292,9 +320,170 @@ describe('createNpcDialog', () => {
 
   it('moves focus to the close button when the NPC has no action buttons', () => {
     const { root } = setup();
-    gameEvents.emit('npc:arrived', { npcId: 'jon' });
+    // Jon has "Got any work for me?" since #144, so Steven stands in.
+    gameEvents.emit('npc:arrived', { npcId: 'steven' });
 
     const closeButton = root.querySelector('.npc-dialog__close');
     expect(document.activeElement).toBe(closeButton);
+  });
+});
+
+describe('createNpcDialog rotating lines (#144)', () => {
+  it('shows a different line each time an NPC with two or more lines is opened', () => {
+    // Real randomness: the no-repeat rule must hold whatever the pick.
+    const { root } = setup({ random: Math.random });
+    const pool = dialogLinePool(NPCS.ashley);
+    let previous: string | null | undefined;
+    for (let i = 0; i < 30; i += 1) {
+      gameEvents.emit('npc:arrived', { npcId: 'ashley' });
+      const shown = lineText(root);
+      expect(pool).toContain(shown);
+      expect(shown).not.toBe(previous);
+      previous = shown;
+      overlays!.close(NPC_DIALOG_OVERLAY_ID);
+    }
+  });
+
+  it('keeps the same line when npc:arrived repeats for the dialog already open', () => {
+    const { root } = setup({ random: Math.random });
+    gameEvents.emit('npc:arrived', { npcId: 'ashley' });
+    const first = lineText(root);
+    for (let i = 0; i < 10; i += 1) {
+      gameEvents.emit('npc:arrived', { npcId: 'ashley' });
+      expect(lineText(root)).toBe(first);
+    }
+  });
+
+  it("keeps a Minigame NPC's verbatim trigger line on every open (Q15)", () => {
+    const { root } = setup({ random: Math.random });
+    const ian = NPCS.ian.dialog;
+    if (ian.kind !== 'minigame') throw new Error('expected Ian to launch a Minigame');
+    for (let i = 0; i < 5; i += 1) {
+      gameEvents.emit('npc:arrived', { npcId: 'ian' });
+      expect(lineText(root)).toBe(ian.triggerLine);
+      overlays!.close(NPC_DIALOG_OVERLAY_ID);
+    }
+  });
+});
+
+describe('createNpcDialog quest givers (#144)', () => {
+  function mainQuestStatus(overrides: Partial<QuestStatus>): QuestStatus {
+    return {
+      quest: {
+        kind: 'steps',
+        id: 'main',
+        title: 'Get started at JG',
+        location: 'ANYWHERE',
+        steps: [],
+        rewardTokens: 150,
+      },
+      progress: 0,
+      target: 5,
+      done: false,
+      steps: [],
+      nextHint: null,
+      ...overrides,
+    };
+  }
+
+  /** Points Jon at the main Quest for one test only. */
+  function withJonQuest(run: () => void): void {
+    const original = NPCS.jon.questGiver;
+    NPCS.jon.questGiver = { ...original, questId: 'main' };
+    try {
+      run();
+    } finally {
+      NPCS.jon.questGiver = original;
+    }
+  }
+
+  it('shows "Got any work for me?" for Jon, after his line, and not for Steven', () => {
+    const { root } = setup();
+    gameEvents.emit('npc:arrived', { npcId: 'jon' });
+    const button = questButton(root);
+    expect(button?.textContent).toBe('Got any work for me?');
+    expect(lineText(root)).toBe('Welcome to JG. Sunglasses stay on.');
+    // A line NPC had no action buttons, so focus now lands on the new one.
+    expect(document.activeElement).toBe(button);
+    overlays!.close(NPC_DIALOG_OVERLAY_ID);
+
+    gameEvents.emit('npc:arrived', { npcId: 'steven' });
+    expect(questButton(root)).toBeNull();
+  });
+
+  it("answers Jon's click with his nothing-right-now line and keeps the dialog open", () => {
+    const { root } = setup();
+    gameEvents.emit('npc:arrived', { npcId: 'jon' });
+    questButton(root)!.click();
+    expect(lineText(root)).toBe('Just enjoy the tour. Sunglasses stay on.');
+    expect(panel(root).hidden).toBe(false);
+  });
+
+  it('shows no button for a quest giver still waiting on BA copy and a Quest', () => {
+    const { root } = setup();
+    for (const npcId of ['ashley', 'sydney', 'jory', 'nicole', 'michael', 'ian'] as const) {
+      gameEvents.emit('npc:arrived', { npcId });
+      expect(questButton(root), npcId).toBeNull();
+      overlays!.close(NPC_DIALOG_OVERLAY_ID);
+    }
+  });
+
+  it('shows no button on the appearances a Quest does not name (Q17)', () => {
+    const quests: NpcDialogQuests = { status: () => mainQuestStatus({}), canStart: () => true };
+    const { root } = setup({ quests });
+    for (const npcId of ['sydney-team-room-3', 'ian-team-room-2', 'steven'] as const) {
+      gameEvents.emit('npc:arrived', { npcId });
+      expect(questButton(root), npcId).toBeNull();
+      overlays!.close(NPC_DIALOG_OVERLAY_ID);
+    }
+  });
+
+  it('not started, with a starter: starts the Quest and closes the dialog', () => {
+    withJonQuest(() => {
+      const quests: NpcDialogQuests = { status: () => mainQuestStatus({}), canStart: () => true };
+      const { root, startQuest } = setup({ quests });
+      gameEvents.emit('npc:arrived', { npcId: 'jon' });
+      questButton(root)!.click();
+      expect(startQuest).toHaveBeenCalledWith('main');
+      expect(panel(root).hidden).toBe(true);
+    });
+  });
+
+  it('in progress: shows "title · x / y" and keeps the dialog open', () => {
+    withJonQuest(() => {
+      const quests: NpcDialogQuests = {
+        status: () => mainQuestStatus({ progress: 2 }),
+        canStart: () => true,
+      };
+      const { root, startQuest } = setup({ quests });
+      gameEvents.emit('npc:arrived', { npcId: 'jon' });
+      questButton(root)!.click();
+      expect(lineText(root)).toBe('Get started at JG · 2 / 5');
+      expect(startQuest).not.toHaveBeenCalled();
+      expect(panel(root).hidden).toBe(false);
+    });
+  });
+
+  it('done: shows "Thanks again!"', () => {
+    withJonQuest(() => {
+      const quests: NpcDialogQuests = {
+        status: () => mainQuestStatus({ progress: 5, done: true }),
+        canStart: () => true,
+      };
+      const { root } = setup({ quests });
+      gameEvents.emit('npc:arrived', { npcId: 'jon' });
+      questButton(root)!.click();
+      expect(lineText(root)).toBe('Thanks again!');
+    });
+  });
+
+  it("keeps Ian's GRAB THE HAMMER and NOT MY TICKET, in order, with focus on the first", () => {
+    const { root } = setup();
+    gameEvents.emit('npc:arrived', { npcId: 'ian' });
+    const labels = [...root.querySelectorAll('.npc-dialog__actions button')].map(
+      (b) => b.textContent,
+    );
+    expect(labels).toEqual(['GRAB THE HAMMER', 'NOT MY TICKET']);
+    expect(document.activeElement?.textContent).toBe('GRAB THE HAMMER');
   });
 });
