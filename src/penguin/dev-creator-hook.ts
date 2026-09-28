@@ -89,7 +89,7 @@ export function createLoadFailureStore(
  * consume an injected failure nor show in the counts. Otherwise returns
  * `inner` unchanged.
  */
-export function withDevLoadFailures<T extends EditorStore>(inner: T): EditorStore {
+export function withDevLoadFailures(inner: EditorStore): EditorStore {
   const e2eHooksEnabled = import.meta.env.DEV || import.meta.env.VITE_E2E_HOOKS === 'true';
   if (!e2eHooksEnabled) return inner;
   const params = new URLSearchParams(window.location.search);

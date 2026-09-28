@@ -15,6 +15,6 @@ export interface CreatorDebugInfo {
 declare global {
   interface Window {
     /** Test-only (#164): the Penguin editor's own store call counts. */
-    __creatorDebug?: { readonly loadAllCalls: number; readonly saveLookCalls: number };
+    __creatorDebug?: CreatorDebugInfo;
   }
 }

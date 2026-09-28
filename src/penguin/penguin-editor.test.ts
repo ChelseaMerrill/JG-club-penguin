@@ -492,6 +492,15 @@ describe('createPenguinEditor', () => {
 
     expect(s.loadError.setRetrying).toHaveBeenCalledWith(false);
     expect(s.loadError.hide).toHaveBeenCalled();
+
+    // A new sign-in resets the same load-error state up front, before its
+    // own load settles (even one that will itself fail).
+    s.loadError.hide.mockClear();
+    s.loadError.setRetrying.mockClear();
+    const signIn = s.editor.playerSignedIn();
+    expect(s.loadError.setRetrying).toHaveBeenCalledWith(false);
+    expect(s.loadError.hide).toHaveBeenCalled();
+    await signIn;
   });
 
   it('drops a load that finishes after the Player signed out', async () => {
