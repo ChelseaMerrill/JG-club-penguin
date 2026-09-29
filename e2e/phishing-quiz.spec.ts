@@ -203,6 +203,9 @@ test('Anthony stands at the scheduled door, the same for two Players, and moves 
 test('clicking Anthony opens the quiz; a wrong answer keeps his door shut, a correct one pays and opens it', async ({
   page,
 }) => {
+  // Two walks to Anthony, two full quizzes and a walk through the door take
+  // ~45 s, past the 30 s default (like the lockout test below).
+  test.setTimeout(120_000);
   const dir = proofDir('quiz');
   const errors = collectErrors(page);
   await boot(page, TOWN_CENTER_ICEBOX);
