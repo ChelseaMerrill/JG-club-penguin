@@ -48,7 +48,9 @@ describe('NPCS', () => {
     // 2026-09-25, Track D), but his `NpcDefinition` stays (other tests here
     // still reference his name/title/figure) -- so he's an intentional
     // exception to "every NPC has exactly one Room slot".
-    const NO_LONGER_PLACED: NpcId[] = ['dom'];
+    // Anthony too (#146): the Phishing Quiz places him at the door he guards,
+    // one shared Room at a time, so no Room lists him.
+    const NO_LONGER_PLACED: NpcId[] = ['dom', 'anthony'];
 
     for (const npc of Object.values(NPCS)) {
       if (NO_LONGER_PLACED.includes(npc.id)) continue;
@@ -69,6 +71,17 @@ describe('NPCS', () => {
   it('no longer places Dom in the Dev Pit (owner request, 2026-09-25, Track D)', () => {
     expect(devPit.npcSlots.some((slot) => slot.npcId === 'dom')).toBe(false);
     expect(NPCS.dom).toBeDefined();
+  });
+
+  it('has no Room slot for Anthony, the door guard, but keeps his definition (#146)', () => {
+    expect(ROOM_DEFINITIONS.some((room) => room.npcSlots.some((s) => s.npcId === 'anthony'))).toBe(
+      false,
+    );
+    expect(NPCS.anthony).toMatchObject({
+      name: 'Anthony Conway',
+      title: 'Director of IT',
+      dialog: { kind: 'phishing-quiz', subtitle: 'DOOR BOSS · PHISHING QUIZ' },
+    });
   });
 
   it('covers every npcSlot exactly once across every Room (no duplicate npcId)', () => {
@@ -688,6 +701,7 @@ describe('NPCS', () => {
       'josh',
       'tom',
       'michael',
+      'anthony',
     ];
     for (const npc of Object.values(NPCS)) {
       if (talkers.includes(npc.id)) continue;

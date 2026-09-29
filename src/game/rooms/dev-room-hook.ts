@@ -13,6 +13,14 @@ import type { PenguinAnim } from '../penguin';
 import type { RemotePenguinDebugInfo } from './room-penguin-view';
 import type { NpcMotionDebugInfo } from '../npcs/room-npc-motions';
 
+/** #146: where the guard NPC stands, the door it guards (`null`: none), and whether that door is shut. */
+export interface GuardDebugInfo {
+  npcId: string;
+  tile: Tile;
+  doorLabel: string | null;
+  blocking: boolean;
+}
+
 /**
  * Gates every hook in this module. `true` in local `npm run dev` and in the
  * Playwright build (`playwright.config.ts` sets `VITE_E2E_HOOKS=true` for its
@@ -190,6 +198,8 @@ export interface RoomDebugInfo {
    * whether a click paused it (`paused`).
    */
   npcs?: Record<string, NpcMotionDebugInfo>;
+  /** #146: the guard NPC (Anthony) drawn in this Room by `setGuard`, or `null` for none. */
+  guard?: GuardDebugInfo | null;
 }
 
 declare global {

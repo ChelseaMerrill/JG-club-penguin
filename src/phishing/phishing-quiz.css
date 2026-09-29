@@ -1,0 +1,498 @@
+/* The Phishing Quiz (#146): design/Minigame Phishing Quiz.dc.html, without
+   its vendor branding. Fills the 1600x900 #ui layer like the Market and
+   the Trophy Case, so every size here is Stage pixels. */
+
+.phishing-quiz {
+  --pq-cyan: var(--jg-primary);
+  --pq-teal: var(--jg-secondary);
+  --pq-light: var(--jg-light);
+  --pq-dark: var(--jg-dark);
+  --pq-muted: #b3b6c9;
+  --pq-well: #0a0c0f;
+  --pq-panel: rgba(22, 23, 25, 0.96);
+
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  background: rgba(10, 12, 15, 0.78);
+  backdrop-filter: blur(3px);
+  color: var(--pq-light);
+  font-family: var(--font-body);
+}
+
+.phishing-quiz[hidden],
+.phishing-quiz [hidden] {
+  display: none !important;
+}
+
+@keyframes phishing-quiz-popin {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes phishing-quiz-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-8px);
+  }
+  75% {
+    transform: translateX(8px);
+  }
+}
+
+.phishing-quiz__panel {
+  position: absolute;
+  left: 160px;
+  right: 160px;
+  top: 70px;
+  bottom: 70px;
+  display: grid;
+  gap: 18px;
+  padding: 26px 30px;
+  background: var(--pq-panel);
+  border: 3px solid var(--pq-teal);
+  box-shadow: 0 10px 0 var(--pq-teal);
+  animation: phishing-quiz-popin 0.3s ease-out;
+}
+
+.phishing-quiz__howto {
+  top: 110px;
+  bottom: 110px;
+  grid-template-rows: auto 1fr auto;
+  gap: 24px;
+}
+
+.phishing-quiz__play {
+  grid-template-rows: auto auto 1fr auto;
+}
+
+.phishing-quiz__play--shake {
+  animation: phishing-quiz-shake 0.3s ease-in-out;
+}
+
+.phishing-quiz__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+}
+
+.phishing-quiz__titles {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.phishing-quiz__title {
+  font-family: var(--font-game-display);
+  font-size: 40px;
+  line-height: 1;
+  color: var(--pq-cyan);
+  -webkit-text-stroke: 5px var(--pq-teal);
+  paint-order: stroke fill;
+  text-shadow: 0 4px 0 var(--pq-teal);
+}
+
+.phishing-quiz__kicker {
+  font-family: var(--font-display);
+  font-size: 12px;
+  letter-spacing: 0.22em;
+  color: var(--pq-light);
+}
+
+.phishing-quiz__stat {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.phishing-quiz__stat-label {
+  font-family: var(--font-display);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  color: var(--pq-muted);
+}
+
+.phishing-quiz__time,
+.phishing-quiz__result-value {
+  font-family: var(--font-game-display);
+  font-size: 30px;
+  line-height: 1;
+  color: var(--pq-light);
+}
+
+.phishing-quiz__result-value {
+  color: var(--pq-cyan);
+}
+
+.phishing-quiz__timer {
+  height: 8px;
+  background: var(--pq-well);
+  border: 2px solid var(--pq-teal);
+}
+
+.phishing-quiz__timer-fill {
+  height: 100%;
+  width: 100%;
+  background: var(--pq-cyan);
+}
+
+.phishing-quiz__timer-fill--warning {
+  background: var(--pq-light);
+}
+
+.phishing-quiz__body {
+  display: grid;
+  grid-template-columns: 260px 1fr;
+  gap: 24px;
+  min-height: 0;
+}
+
+.phishing-quiz__anthony {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 16px;
+  background: var(--pq-well);
+  border: 2px solid var(--pq-teal);
+}
+
+.phishing-quiz__portrait {
+  width: 150px;
+  height: 163px;
+  object-fit: contain;
+}
+
+.phishing-quiz__ant-name {
+  font-family: var(--font-game-display);
+  font-size: 22px;
+  color: var(--pq-cyan);
+}
+
+.phishing-quiz__ant-line {
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1.4;
+  text-align: center;
+  color: var(--pq-muted);
+}
+
+.phishing-quiz__question {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-height: 0;
+}
+
+.phishing-quiz__prompt {
+  padding: 18px 20px;
+  background: var(--pq-well);
+  border: 2px solid var(--pq-cyan);
+  font-weight: 700;
+  font-size: 20px;
+  line-height: 1.4;
+  text-wrap: pretty;
+}
+
+.phishing-quiz__choices {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.phishing-quiz__choice {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 16px;
+  background: var(--pq-well);
+  border: 2px solid var(--pq-teal);
+  color: var(--pq-light);
+  font: 700 16px/1.35 var(--font-body);
+  text-align: left;
+  cursor: pointer;
+}
+
+.phishing-quiz__choice:disabled {
+  cursor: default;
+}
+
+.phishing-quiz__choice:not(:disabled):hover {
+  border-color: var(--pq-cyan);
+}
+
+.phishing-quiz__choice-key {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  background: #161719;
+  border: 2px solid var(--pq-teal);
+  font-family: var(--font-display);
+  font-size: 16px;
+  color: var(--pq-light);
+}
+
+.phishing-quiz__choice--correct {
+  background: rgba(0, 189, 255, 0.18);
+  border-color: var(--pq-cyan);
+}
+
+.phishing-quiz__choice--correct .phishing-quiz__choice-key {
+  background: var(--pq-cyan);
+  color: #161719;
+}
+
+.phishing-quiz__choice--wrong {
+  background: rgba(244, 244, 244, 0.08);
+  border-color: var(--pq-light);
+}
+
+.phishing-quiz__explain-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 16px;
+  background: rgba(12, 75, 95, 0.35);
+  border: 2px solid var(--pq-cyan);
+  animation: phishing-quiz-popin 0.2s ease-out;
+}
+
+.phishing-quiz__explain {
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.phishing-quiz__footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-top: 2px solid var(--pq-teal);
+  padding-top: 14px;
+}
+
+.phishing-quiz__hint {
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--pq-muted);
+}
+
+.phishing-quiz__buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.phishing-quiz__button {
+  display: flex;
+  align-items: center;
+  height: 48px;
+  padding: 0 24px;
+  border: 0;
+  background: var(--pq-cyan);
+  clip-path: polygon(
+    14px 0,
+    calc(100% - 14px) 0,
+    100% 50%,
+    calc(100% - 14px) 100%,
+    14px 100%,
+    0 50%
+  );
+  box-shadow: inset 0 -5px 0 var(--pq-teal);
+  font-family: var(--font-display);
+  font-size: 20px;
+  letter-spacing: 0.06em;
+  color: #161719;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.phishing-quiz__button--secondary {
+  background: var(--pq-teal);
+  box-shadow: inset 0 -5px 0 #06303d;
+  color: var(--pq-light);
+}
+
+.phishing-quiz__steps {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 18px;
+}
+
+.phishing-quiz__step {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 22px;
+  background: var(--pq-well);
+  border: 2px solid var(--pq-teal);
+}
+
+.phishing-quiz__step-number {
+  font-family: var(--font-game-display);
+  font-size: 44px;
+  line-height: 1;
+  color: var(--pq-teal);
+}
+
+.phishing-quiz__step-title {
+  font-family: var(--font-game-display);
+  font-size: 20px;
+  line-height: 1.15;
+  color: var(--pq-cyan);
+}
+
+.phishing-quiz__step-body {
+  font-weight: 700;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--pq-muted);
+}
+
+.phishing-quiz__card {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 720px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 22px;
+  padding: 34px 38px;
+  background: rgba(22, 23, 25, 0.97);
+  border: 3px solid var(--pq-cyan);
+  box-shadow:
+    0 0 0 3px var(--pq-teal),
+    0 12px 0 var(--pq-teal);
+  text-align: center;
+}
+
+.phishing-quiz__done-kicker {
+  font-family: var(--font-display);
+  font-size: 12px;
+  letter-spacing: 0.24em;
+  color: var(--pq-muted);
+}
+
+.phishing-quiz__result-title {
+  font-family: var(--font-game-display);
+  font-size: 52px;
+  line-height: 1;
+  color: var(--pq-cyan);
+  -webkit-text-stroke: 6px var(--pq-teal);
+  paint-order: stroke fill;
+  text-shadow: 0 5px 0 var(--pq-teal);
+}
+
+.phishing-quiz__stats {
+  display: flex;
+  gap: 40px;
+}
+
+.phishing-quiz__stats .phishing-quiz__stat {
+  align-items: center;
+}
+
+.phishing-quiz__badge {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 18px;
+  background: rgba(12, 75, 95, 0.4);
+  border: 2px solid var(--pq-cyan);
+  text-align: left;
+}
+
+.phishing-quiz__badge-hex {
+  width: 44px;
+  height: 50px;
+  display: grid;
+  place-items: center;
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  background: var(--pq-cyan);
+  font-family: var(--font-display);
+  font-size: 12px;
+  color: #161719;
+}
+
+.phishing-quiz__badge-name {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.phishing-quiz__badge-sub {
+  font-family: var(--font-display);
+  font-size: 11px;
+  letter-spacing: 0.16em;
+  color: var(--pq-muted);
+}
+
+.phishing-quiz__result-quote,
+.phishing-quiz__message-text {
+  font-weight: 700;
+  font-size: 15px;
+  color: var(--pq-muted);
+}
+
+/* The Security Training banner (#146): top centre over the Room while the
+   Map is locked. Read-only, so it never takes a click meant for the Stage. */
+.security-training-banner {
+  position: absolute;
+  top: 92px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 12px 26px;
+  background: rgba(22, 23, 25, 0.94);
+  border: 3px solid var(--jg-primary);
+  box-shadow:
+    0 0 0 3px var(--jg-secondary),
+    0 8px 0 var(--jg-secondary);
+  pointer-events: none;
+  text-align: center;
+}
+
+.security-training-banner[hidden] {
+  display: none;
+}
+
+.security-training-banner__title {
+  font-family: var(--font-game-display);
+  font-size: 26px;
+  line-height: 1;
+  white-space: nowrap;
+  color: var(--jg-primary);
+  -webkit-text-stroke: 3px var(--jg-secondary);
+  paint-order: stroke fill;
+}
+
+.security-training-banner__progress {
+  font-family: var(--font-display);
+  font-size: 13px;
+  letter-spacing: 0.22em;
+  color: var(--jg-light);
+}
+
+.security-training-banner__hint {
+  font-family: var(--font-body);
+  font-weight: 700;
+  font-size: 13px;
+  color: #b3b6c9;
+}

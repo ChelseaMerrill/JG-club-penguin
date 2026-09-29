@@ -295,26 +295,14 @@ describe('renderNpcSvg', () => {
 
 describe('renderNpcPropSvg (#113)', () => {
   it("draws a design prop layer in the figure's own padded frame, so it lines up with the figure", () => {
-    const rod = getNpcMotion('anthony')?.props?.[0];
-    if (!rod) throw new Error('expected Anthony to have a rod prop layer');
-    const doc = assertValidSvg(renderNpcPropSvg(rod.svg));
+    const arm = getNpcMotion('steven')?.props?.[0];
+    if (!arm) throw new Error('expected Steven to have a marker-arm prop layer');
+    const doc = assertValidSvg(renderNpcPropSvg(arm.svg));
     const svg = doc.querySelector('svg')!;
     const figureSvg = assertValidSvg(renderNpcSvg(humanFigures[0])).querySelector('svg')!;
     expect(svg.getAttribute('viewBox')).toBe(figureSvg.getAttribute('viewBox'));
     expect(svg.getAttribute('width')).toBe(String(PENGUIN_FRAME_WIDTH));
     expect(svg.getAttribute('height')).toBe(String(PENGUIN_FRAME_HEIGHT));
-    expect(doc.querySelector('path')?.getAttribute('d')).toBe('M92 96 L118 10');
-  });
-
-  it("baits Anthony's casting rod with the same outlined FREE $$$ as his resting rod (#137)", () => {
-    const line = getNpcMotion('anthony')?.props?.[0]?.children?.[0];
-    if (!line) throw new Error("expected Anthony's rod to carry its line and bait");
-    const bait = assertValidSvg(renderNpcSvg({ prop: 'fishingRod' }))
-      .querySelector('path[fill="#00BDFF"]')
-      ?.getAttribute('d');
-    expect(bait).toBeTruthy();
-    const moving = assertValidSvg(renderNpcPropSvg(line.svg));
-    expect(moving.querySelector('text')).toBeNull();
-    expect(moving.querySelector('path[fill="#00BDFF"]')?.getAttribute('d')).toBe(bait);
+    expect(doc.querySelector('path')?.getAttribute('d')).toBe('M92 78 L112 56');
   });
 });

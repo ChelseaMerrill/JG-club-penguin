@@ -24,6 +24,8 @@ export interface NpcDialogActions {
   openStall: (stallId: string) => void;
   /** Starts a Quest from its giver's "Got any work for me?" (#144 D9). */
   startQuest: (questId: string) => void;
+  /** Opens the Phishing Quiz from Anthony's TAKE THE QUIZ (#146). */
+  startPhishingQuiz?: () => void;
 }
 
 /** What a quest giver's button reads about Quests (#144 D9). */
@@ -204,6 +206,21 @@ export function createNpcDialog(root: HTMLElement, deps: NpcDialogDeps): NpcDial
         actionButton('npc-dialog__button npc-dialog__button--primary', actionLabel, () => {
           deps.actions.launchMinigame(minigameId);
           handleClose();
+        }),
+        actionButton('npc-dialog__button', declineLabel, handleClose),
+      );
+    } else if (npc.dialog.kind === 'phishing-quiz') {
+      // #146: the same trigger layout; the action opens the quiz. Closed
+      // first, so the quiz can take the overlay slot.
+      const { actionLabel, declineLabel, triggerLine, subtitle } = npc.dialog;
+      subtitleEl.textContent = subtitle;
+      subtitleEl.hidden = false;
+      titleEl.hidden = true;
+      lineEl.textContent = triggerLine;
+      actionsEl.append(
+        actionButton('npc-dialog__button npc-dialog__button--primary', actionLabel, () => {
+          handleClose();
+          deps.actions.startPhishingQuiz?.();
         }),
         actionButton('npc-dialog__button', declineLabel, handleClose),
       );

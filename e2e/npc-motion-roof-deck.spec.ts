@@ -17,8 +17,11 @@ const LONG_WALK_TIMEOUT = 15_000;
 const PROOF_ROOT = 'test-results/npc-motion-roof-deck';
 /** The centre of `RoomScene`'s click zone for a Human NPC, relative to its feet. */
 const HIT_ZONE_OFFSET_Y = npcLayout({ kind: 'human' }).hitArea.centerY;
-/** Kevin and Tristin are Penguins in the design, so they aren't placed (#133). */
-const MOVING_NPCS = ['brandon', 'anthony', 'millie'];
+/**
+ * Kevin and Tristin are Penguins in the design, so they aren't placed (#133);
+ * Anthony guards a door wherever the Phishing Quiz puts him, standing still (#146).
+ */
+const MOVING_NPCS = ['brandon', 'millie'];
 
 test.use({ viewport: { width: 1600, height: 900 } });
 
@@ -100,11 +103,6 @@ test('Roof Deck NPCs walk their designed paths; Brandon gallops his loop', async
   await page.screenshot({
     path: `${dir}/brandon-close-up.png`,
     clip: { x: now.x - 110, y: now.y - 170, width: 220, height: 210 },
-  });
-  const anthony = await npc(page, 'anthony');
-  await page.screenshot({
-    path: `${dir}/anthony-rod-close-up.png`,
-    clip: { x: anthony.x - 110, y: anthony.y - 170, width: 240, height: 210 },
   });
 
   expect(errors).toEqual([]);

@@ -55,9 +55,16 @@ describe('ensureNpcTexture: one of each prop while an NPC moves (#137 with PR #1
     }
   });
 
-  it("drops Anthony's resting rod while his casting rod plays", () => {
+  it("keeps Anthony's resting rod: he stands still at the door he guards (#146)", () => {
+    expect(getNpcMotion('anthony')).toBeUndefined();
     expect(stillFigureSvg('anthony')).toContain(ROD);
-    expect(movingFigureSvg('anthony')).not.toContain(ROD);
+    expect(movingFigureSvg('anthony')).toContain(ROD);
+  });
+
+  it('drops a figure prop that a moving prop replaces (`omitProp`)', () => {
+    const { manager, svgs } = fakeTextures();
+    const key = ensureNpcTexture({ textures: manager }, NPCS.anthony, { omitProp: true });
+    expect(svgs.get(key)).not.toContain(ROD);
   });
 
   it('keeps each variant under its own texture key', () => {
