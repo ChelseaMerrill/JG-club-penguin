@@ -150,6 +150,11 @@ export class RoomNpcMotions implements NpcPauseTarget {
     return result;
   }
 
+  /** Forgets one NPC (#146: a guard being redrawn); `RoomScene` destroys its sprite and props with it. */
+  remove(npcId: string): void {
+    this.entries.delete(npcId);
+  }
+
   /** Forgets every NPC; their Phaser objects (props included) go with the sprites `RoomScene` destroys. */
   destroy(): void {
     this.entries.clear();

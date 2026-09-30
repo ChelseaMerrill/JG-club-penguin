@@ -262,19 +262,14 @@ export interface PenguinNpcDefinition extends NpcDefinitionBase {
 export type NpcDefinition = HumanNpcDefinition | PenguinNpcDefinition;
 
 /**
- * Dev Pit's whiteboard markers (#113), verbatim from the design's raised-arm
- * `scribble` markup: Ryan's and Sam's cyan, Steven's red, each with its own
- * sleeve and hand colour as drawn.
+ * Dev Pit's cyan whiteboard marker (#113), verbatim from the design's
+ * raised-arm `scribble` markup for Ryan and Sam, with its own sleeve and hand
+ * colour as drawn. (Steven's red one went when he started walking.)
  */
 const DEV_PIT_CYAN_MARKER: HumanFigureSpec['marker'] = {
   arm: '#1f2a4a',
   hand: '#F3D3B8',
   color: '#00BDFF',
-};
-const DEV_PIT_RED_MARKER: HumanFigureSpec['marker'] = {
-  arm: '#2B3557',
-  hand: '#E4B896',
-  color: '#D63C3C',
 };
 
 const BUG_SQUASH_DIALOG: NpcMinigameDialog = {
@@ -842,19 +837,21 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: 'This diagram scales. Trust me.', periodS: 14, delayS: -9 },
     ],
     dialog: LINE_DIALOG,
+    // As `design/Characters.dc.html`'s STEVEN ZGALJIC card draws him (owner
+    // request, 2026-09-30, Track D), which is newer than `humans.js`'s spec:
+    // grey hair, no beard or grey streaks, a green android badge on his
+    // jacket, and arms down (the Dev Pit design's raised red marker is gone;
+    // he walks instead, `motions/dev-pit.ts`).
     figure: {
       style: 'shortDark',
-      hair: 'dark',
+      hair: 'grey',
       skin: 'med',
       top: '#2B3557',
       pattern: 'dots',
       jacket: '#161719',
       collar: 'crew',
-      beard: 'full',
       mouth: 'smirk',
-      greys: true,
-      // Dev Pit's design raises a red whiteboard marker (`scribble`).
-      marker: DEV_PIT_RED_MARKER,
+      badge: 'android',
     },
   },
   dom: {

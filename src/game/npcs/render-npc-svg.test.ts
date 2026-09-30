@@ -215,11 +215,10 @@ describe('renderNpcSvg', () => {
     expect(svg).toContain('<path d="M14 -1 l2 3 l-2 3 l-2 -3 z" fill="#00BDFF">');
   });
 
-  it("raises a whiteboard marker for Dev Pit's Ryan and Sam (cyan) and Steven (red)", () => {
+  it("raises a whiteboard marker for Dev Pit's Ryan and Sam (cyan), and not Steven", () => {
     const markers: [NpcId, string, string, string][] = [
       ['ryan', '#1f2a4a', '#F3D3B8', '#00BDFF'],
       ['sam', '#1f2a4a', '#F3D3B8', '#00BDFF'],
-      ['steven', '#2B3557', '#E4B896', '#D63C3C'],
     ];
     for (const [id, arm, hand, marker] of markers) {
       const svg = renderRosterNpc(id);
@@ -233,9 +232,27 @@ describe('renderNpcSvg', () => {
         `<rect x="110" y="44" width="6" height="14" rx="2" fill="${marker}" stroke="#0C4B5F" stroke-width="1.5">`,
       );
     }
-    for (const id of ['ryan-team-room-4', 'sam-team-room-4'] as const) {
+    for (const id of ['ryan-team-room-4', 'sam-team-room-4', 'steven'] as const) {
       expect(renderRosterNpc(id), id).not.toContain('M92 78 L112 56');
     }
+  });
+
+  it("draws Steven as design/Characters.dc.html's STEVEN ZGALJIC card does", () => {
+    const svg = renderRosterNpc('steven');
+    // Grey `shortDark` hair, and no beard or grey streaks.
+    expect(svg).toContain(
+      '<path d="M35 34 C32 14 48 8 62 10 C78 12 88 18 85 34 C80 24 40 22 35 34 Z" fill="#6E7075" stroke="#0C4B5F" stroke-width="2.5">',
+    );
+    expect(svg).not.toContain('M38 44 C38 66 48 72 60 72');
+    expect(svg).not.toContain('stroke="#B3B6C9"');
+    // The green android badge on his jacket.
+    expect(svg).toContain('<g transform="translate(44 82)">');
+    expect(svg).toContain('fill="#7ED957"');
+    // Medium skin, navy dotted shirt, black jacket, smirk.
+    expect(svg).toContain('<circle cx="60" cy="40" r="25" fill="#E4B896"');
+    expect(svg).toContain('fill="#2B3557"');
+    expect(svg).toContain('<path d="M34 78 L34 110 L52 110 L54 72 L44 66 Z" fill="#161719"');
+    expect(svg).toContain('<path d="M52 53 Q62 58 68 52"');
   });
 
   it("gives Roof Deck's Anthony a fishing rod with the FREE $$$ envelope bait instead of his laptop", () => {
@@ -295,14 +312,16 @@ describe('renderNpcSvg', () => {
 
 describe('renderNpcPropSvg (#113)', () => {
   it("draws a design prop layer in the figure's own padded frame, so it lines up with the figure", () => {
-    const arm = getNpcMotion('steven')?.props?.[0];
-    if (!arm) throw new Error('expected Steven to have a marker-arm prop layer');
+    const arm = getNpcMotion('darrin')?.props?.[0];
+    if (!arm) throw new Error('expected Darrin to have a hype-lines prop layer');
     const doc = assertValidSvg(renderNpcPropSvg(arm.svg));
     const svg = doc.querySelector('svg')!;
     const figureSvg = assertValidSvg(renderNpcSvg(humanFigures[0])).querySelector('svg')!;
     expect(svg.getAttribute('viewBox')).toBe(figureSvg.getAttribute('viewBox'));
     expect(svg.getAttribute('width')).toBe(String(PENGUIN_FRAME_WIDTH));
     expect(svg.getAttribute('height')).toBe(String(PENGUIN_FRAME_HEIGHT));
-    expect(doc.querySelector('path')?.getAttribute('d')).toBe('M92 78 L112 56');
+    expect(doc.querySelector('path')?.getAttribute('d')).toBe(
+      'M40 6 L44 -4 M60 2 L60 -10 M80 6 L76 -4',
+    );
   });
 });

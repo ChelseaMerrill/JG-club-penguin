@@ -13,6 +13,13 @@ import type { PenguinAnim } from '../penguin';
 import type { RemotePenguinDebugInfo } from './room-penguin-view';
 import type { NpcMotionDebugInfo } from '../npcs/room-npc-motions';
 
+/** How many chickens Ashley has thrown since the Room opened, at whom last, and whether one is in the air. */
+export interface ChickenTossDebugInfo {
+  tosses: number;
+  lastTargetId: string | null;
+  flying: boolean;
+}
+
 /** #146: where the guard NPC stands, the door it guards (`null`: none), and whether that door is shut. */
 export interface GuardDebugInfo {
   npcId: string;
@@ -200,6 +207,8 @@ export interface RoomDebugInfo {
   npcs?: Record<string, NpcMotionDebugInfo>;
   /** #146: the guard NPC (Anthony) drawn in this Room by `setGuard`, or `null` for none. */
   guard?: GuardDebugInfo | null;
+  /** Ashley's chicken toss, while this Room has one (the Dev Pit, motion allowed); else `null`. */
+  chickenToss?: ChickenTossDebugInfo | null;
 }
 
 declare global {

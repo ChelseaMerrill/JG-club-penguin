@@ -24,7 +24,9 @@ import { getNpcMotion } from '../../npcs/npc-motions';
 import { getNpcDefinition } from '../../npcs/npcs';
 import { npcLayout } from '../npcs/npc-layout';
 import { NpcClickPause } from '../npcs/npc-motion';
-import { createNpcSprite, type NpcSprite } from '../npcs/npc-sprite';
+import { createNpcSprite, prefersReducedMotion, type NpcSprite } from '../npcs/npc-sprite';
+import type { ChickenTarget } from '../npcs/chicken-toss';
+import { RoomChickenToss } from '../npcs/room-chicken-toss';
 import { RoomNpcMotions } from '../npcs/room-npc-motions';
 import {
   createPenguin,
@@ -79,6 +81,7 @@ import { arcPoint, clampTileToGrid, type ScreenPoint } from '../../snowball/snow
 import type { IglooSlot, ShopItem } from '../../persistence/progress-store';
 import {
   createBumpTracker,
+  guardPaceMotion,
   guardTile,
   isGuardedDoor,
   isNextTo,
@@ -203,6 +206,8 @@ export const DOOR_HINT_DURATION_MS = 2000;
 // NPC's speech bubble (`iso.ts`'s shared `SNOWBALL_LAYER`, one whole layer
 // above `NPC_BUBBLE_LAYER` -- #36 round-2 review item 3).
 const SNOWBALL_DEPTH = SNOWBALL_LAYER;
+/** The NPC who throws her squeaky chicken at the Room's Penguins (the Dev Pit's Ashley). */
+const CHICKEN_THROWER_ID = 'ashley';
 const SNOWBALL_CYAN = 0x00bdff;
 const SNOWBALL_WHITE = 0xf4f4f4;
 const SNOWBALL_OUTLINE = 0x0c4b5f;
@@ -335,6 +340,8 @@ export class RoomScene extends Scene {
   private npcSprites: NpcSprite[] = [];
   /** #113: the Room's NPC motions, and the click-to-pause rule for roaming NPCs. Rebuilt by every `create()`. */
   private npcMotions: RoomNpcMotions | null = null;
+  /** Ashley's chicken toss at the Room's Penguins, while she's in it and motion is allowed. Rebuilt by every `create()`. */
+  private chickenToss: RoomChickenToss | null = null;
   private npcClickPause: NpcClickPause | null = null;
   /** The `onArrive` of the latest NPC click (#113), to tell whether that walk is still pending. */
   private npcArrival: (() => void) | null = null;
@@ -347,6 +354,8 @@ export class RoomScene extends Scene {
     slot: RoomNpcSlot;
     sprite: NpcSprite;
     zone: GameObjects.Zone;
+    /** Whether he paces by his door, i.e. has an entry in `npcMotions`. */
+    paces: boolean;
   } | null = null;
   private readonly guardBumps = createBumpTracker();
   private hotspotHitAreas: HitArea<RoomHotspot>[] = [];
@@ -483,6 +492,8 @@ export class RoomScene extends Scene {
     this.unsubscribeNpcDialog = [];
     this.npcMotions?.destroy();
     this.npcMotions = null;
+    this.chickenToss?.destroy();
+    this.chickenToss = null;
     this.npcClickPause = null;
     this.npcArrival = null;
     this.guard?.sprite.destroy();
@@ -521,6 +532,7 @@ export class RoomScene extends Scene {
     this.debugPenguins = [];
     this.npcSprites = [];
     this.npcMotions = null;
+    this.chickenToss = null;
     this.npcClickPause = null;
     this.npcArrival = null;
     this.unsubscribeNpcDialog = [];
@@ -747,6 +759,7 @@ export class RoomScene extends Scene {
     this.events.once(Scenes.Events.SHUTDOWN, () => this.penguins.detach());
 
     this.live = true;
+    this.startChickenToss(room);
     this.drawGuard();
     if (HOOKS_ENABLED) this.publishRoomDebug();
     this.resolveReady();
@@ -757,6 +770,7 @@ export class RoomScene extends Scene {
     // keep the preview arc anchored to where it is drawn.
     if (this.aiming && this.reticleTile) this.drawReticle();
     this.npcMotions?.update(delta);
+    this.chickenToss?.update(delta);
     const npcArrival = this.npcArrival;
     this.npcClickPause?.settle({
       arrivalPending:
@@ -824,6 +838,7 @@ export class RoomScene extends Scene {
             blocking: this.guard.spec.blocking,
           }
         : null,
+      chickenToss: this.chickenToss?.debug() ?? null,
     });
   }
 
@@ -1747,10 +1762,14 @@ export class RoomScene extends Scene {
   /**
    * #146: draws `guardSpec` if it belongs to this Room, replacing any guard
    * already drawn: the NPC's own sprite and click zone (the same as
-   * `drawNpcs`, standing still), on `guardTile`'s tile.
+   * `drawNpcs`), on `guardTile`'s tile. At a door he paces beside it
+   * (`guardPaceMotion`), unless this Room has its own slot for him (the Roof
+   * Deck), whose motion owns his id here; next to a locked-out Player he
+   * stands still.
    */
   private drawGuard(): void {
     if (this.guard) {
+      if (this.guard.paces) this.npcMotions?.remove(this.guard.slot.npcId);
       this.guard.sprite.destroy();
       this.guard.zone.destroy();
       const zone = this.guard.zone;
@@ -1767,7 +1786,12 @@ export class RoomScene extends Scene {
 
     const point = tileToScreen(tile, room.grid.origin);
     const depth = depthForTile(tile);
-    const sprite = createNpcSprite(this, point.x, point.y, npc, depth);
+    const ownSlot = room.npcSlots.some((roomSlot) => roomSlot.npcId === spec.npcId);
+    const motion =
+      spec.doorLabel !== null && !ownSlot && this.npcMotions
+        ? guardPaceMotion(room, tile)
+        : undefined;
+    const sprite = createNpcSprite(this, point.x, point.y, npc, depth, { motion });
     sprite.container.setName(NPC_CONTAINER_NAME);
     const { hitArea } = npcLayout(npc);
     const zone = this.add
@@ -1777,8 +1801,45 @@ export class RoomScene extends Scene {
     const slot: RoomNpcSlot = { npcId: spec.npcId, tile };
     // First, so a click where his zone overlaps a Room NPC's reaches him.
     this.npcHitAreas.unshift({ object: zone, data: slot });
-    this.guard = { spec, slot, sprite, zone };
+    const paces = motion !== undefined;
+    if (paces) {
+      this.npcMotions?.add(
+        { npcId: spec.npcId, sprite, zone, zoneOffsetY: hitArea.centerY, rest: point },
+        motion,
+      );
+    }
+    this.guard = { spec, slot, sprite, zone, paces };
     this.guardBumps.reset(isNextTo(controller.state.tile, tile));
+  }
+
+  /**
+   * Ashley throws her squeaky chicken at the Penguins in this Room (owner
+   * request, 2026-09-30, Track D; `room-chicken-toss.ts`), when she has a
+   * slot here (the Dev Pit) and the Player allows motion. Each screen picks
+   * its own targets: nothing here touches Presence.
+   */
+  private startChickenToss(room: RoomDefinition): void {
+    if (prefersReducedMotion()) return;
+    if (!room.npcSlots.some((slot) => slot.npcId === CHICKEN_THROWER_ID)) return;
+    this.chickenToss = new RoomChickenToss(this, {
+      throwerFeet: () => this.npcMotions?.point(CHICKEN_THROWER_ID),
+      targets: () => this.chickenTargets(),
+      depth: SNOWBALL_DEPTH,
+    });
+  }
+
+  /** The Penguins in this Room right now: the local one while shown, and every remote one. */
+  private chickenTargets(): ChickenTarget[] {
+    if (!this.live) return [];
+    const targets: ChickenTarget[] = [];
+    if (this.penguin && isLocalPenguinVisible(this.registry)) {
+      targets.push({ id: 'local', feet: this.localFeetPoint() });
+    }
+    for (const playerId of this.penguins.shownRemoteIds()) {
+      const feet = this.penguins.pointOf(playerId);
+      if (feet) targets.push({ id: playerId, feet });
+    }
+    return targets;
   }
 
   /**
