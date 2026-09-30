@@ -1384,13 +1384,16 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     kind: 'human',
     tagName: 'Casey',
     dialogLines: CASEY_LINES,
-    // `rats 10s`, shown from 80%: (0.80 - 0.07) * 10 = 7.3s, i.e. -2.7s.
-    idleLines: [{ text: 'RATS', periodS: 10, delayS: -2.7 }],
+    // `rats 10s linear infinite`, no delay: fully shown 80%-98% (verbatim
+    // from `design/Team Room 3.dc.html`, owner request, 2026-09-30, Track D).
+    idleLines: [{ text: 'RATS', periodS: 10, delayS: 0, window: [0.8, 0.98] }],
     // The Igloo Gear stall is the Roof Deck's; here she is just gaming.
     // Team Room 3's design draws its NPCs without any idle bob.
     still: true,
     dialog: LINE_DIALOG,
-    figure: CASEY_FIGURE,
+    // The Room design hands her an open laptop, which the Roof Deck's
+    // `casey` doesn't carry (owner request, 2026-09-30, Track D).
+    figure: { ...CASEY_FIGURE, prop: 'openLaptop' },
   },
   'sydney-team-room-3': {
     id: 'sydney-team-room-3',
@@ -1404,7 +1407,9 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     // Team Room 3's design draws its NPCs without any idle bob.
     still: true,
     dialog: LINE_DIALOG,
-    figure: SYDNEY_FIGURE,
+    // The Room design adds a headset, which Town Center's `sydney` doesn't
+    // wear (owner request, 2026-09-30, Track D).
+    figure: { ...SYDNEY_FIGURE, headset: true },
   },
   michael: {
     id: 'michael',

@@ -1,6 +1,7 @@
 import type { NpcId } from './npcs';
 import { DEV_PIT_MOTIONS } from './motions/dev-pit';
 import { ROOF_DECK_MOTIONS } from './motions/roof-deck';
+import { TEAM_ROOM_3_MOTIONS } from './motions/team-room-3';
 import { THE_ICEBOX_MOTIONS } from './motions/the-icebox';
 import { THE_MELT_MOTIONS } from './motions/the-melt';
 import { TOWN_CENTER_MOTIONS } from './motions/town-center';
@@ -19,6 +20,7 @@ const NPC_MOTIONS: Partial<Record<NpcId, NpcMotionSpec>> = {
   ...THE_MELT_MOTIONS,
   ...ROOF_DECK_MOTIONS,
   ...THE_ICEBOX_MOTIONS,
+  ...TEAM_ROOM_3_MOTIONS,
 };
 
 /** The NPC's designed motion, looked up by a Room slot's loosely-typed `npcId`. */

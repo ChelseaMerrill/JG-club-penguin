@@ -286,6 +286,42 @@ describe('renderNpcSvg', () => {
     );
   });
 
+  it("hands Team Room 3's Casey the design's open laptop, but not the Roof Deck's", () => {
+    const svg = renderRosterNpc('casey-team-room-3');
+    expect(svg).toContain(
+      '<rect x="36" y="74" width="48" height="26" rx="2" fill="#2a2d31" stroke="#0C4B5F" stroke-width="2">',
+    );
+    expect(svg).toContain('<polygon points="60,81 65,84 65,90 60,93 55,90 55,84" fill="#00BDFF">');
+    expect(svg).toContain(
+      '<rect x="30" y="99" width="60" height="6" rx="2" fill="#3a4046" stroke="#0C4B5F" stroke-width="2">',
+    );
+    expect(svg).toContain(
+      '<circle cx="42" cy="100" r="5" fill="#F6DCC6" stroke="#0C4B5F" stroke-width="2">',
+    );
+    // Drawn over her headphones, as in the design.
+    expect(svg.indexOf('<rect x="36" y="74"')).toBeGreaterThan(svg.indexOf('<rect x="83" y="34"'));
+    expect(renderRosterNpc('casey')).not.toContain('<rect x="36" y="74"');
+  });
+
+  it("puts a headset on Team Room 3's Sydney, but not Town Center's", () => {
+    const svg = renderRosterNpc('sydney-team-room-3');
+    expect(svg).toContain(
+      '<path d="M34 38 C32 10 88 10 86 38" fill="none" stroke="#161719" stroke-width="4">',
+    );
+    expect(svg).toContain(
+      '<rect x="29" y="34" width="10" height="15" rx="4" fill="#161719" stroke="#0C4B5F" stroke-width="2">',
+    );
+    expect(svg).toContain(
+      '<path d="M34 48 Q38 60 50 59" fill="none" stroke="#161719" stroke-width="2.5" stroke-linecap="round">',
+    );
+    expect(svg).toContain('<circle cx="51" cy="59" r="2.6" fill="#00BDFF">');
+    // Drawn after her clipboard, as in the design.
+    expect(svg.indexOf('<path d="M34 38 C32 10')).toBeGreaterThan(
+      svg.indexOf('<rect x="86" y="82"'),
+    );
+    expect(renderRosterNpc('sydney')).not.toContain('M34 48 Q38 60 50 59');
+  });
+
   it("never draws a <text> element (an SVG loaded as a Phaser texture can't use page web fonts)", () => {
     for (const figure of humanFigures) {
       expect(renderNpcSvg(figure)).not.toContain('<text');
