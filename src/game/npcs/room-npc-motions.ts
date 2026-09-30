@@ -63,6 +63,8 @@ function applyProps(views: PropView[], poses: NpcPropPose[]): void {
     const pose = poses[index];
     if (!pose) return;
     applyAffine(view.container, pose.matrix);
+    // A container's alpha fades its children with it, like a CSS group's opacity.
+    view.container.setAlpha(pose.alpha);
     applyProps(view.children, pose.children);
   });
 }

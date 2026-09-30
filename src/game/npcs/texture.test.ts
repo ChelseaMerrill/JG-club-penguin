@@ -55,6 +55,18 @@ describe('ensureNpcTexture: one of each prop while an NPC moves (#137 with PR #1
     }
   });
 
+  it("drops Team Room 4's mic and DJ deck while their motions redraw them (Sam Schantz, Ryan Shendler)", () => {
+    const samMouth = '<ellipse cx="60" cy="54" rx="5" ry="3.5"';
+    const ryanDeck = '<rect x="30" y="90" width="60" height="18"';
+    expect(stillFigureSvg('sam-team-room-4')).toContain(samMouth);
+    expect(movingFigureSvg('sam-team-room-4')).not.toContain(samMouth);
+    expect(stillFigureSvg('ryan-team-room-4')).toContain(ryanDeck);
+    expect(movingFigureSvg('ryan-team-room-4')).not.toContain(ryanDeck);
+    // The Dev Pit copies only drop their markers, keeping the mic and deck.
+    expect(movingFigureSvg('sam')).toContain(samMouth);
+    expect(movingFigureSvg('ryan')).toContain(ryanDeck);
+  });
+
   it("keeps Anthony's resting rod: he stands still at the door he guards (#146)", () => {
     expect(getNpcMotion('anthony')).toBeUndefined();
     expect(stillFigureSvg('anthony')).toContain(ROD);
