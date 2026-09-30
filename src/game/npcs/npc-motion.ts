@@ -12,6 +12,7 @@ import {
   IDENTITY,
   multiplyAffine,
   sampleCssAnimation,
+  sampleCssOpacity,
   transformPoint,
   type Affine,
   type CompiledCssAnimation,
@@ -28,6 +29,12 @@ import {
 /** A prop layer's transform (in its parent's space, feet-relative) and its nested layers'. */
 export interface NpcPropPose {
   matrix: Affine;
+  /**
+   * The layer's own opacity from its design keyframes, 1 without any
+   * (owner request, 2026-09-30, Track D); a nested layer's multiplies with
+   * its parent's, as CSS/Phaser group opacity does.
+   */
+  alpha: number;
   children: NpcPropPose[];
 }
 
@@ -85,6 +92,7 @@ function compileProp(layer: NpcPropLayer): CompiledProp {
 function poseProp(prop: CompiledProp, elapsedMs: number): NpcPropPose {
   return {
     matrix: prop.animation ? feetRelative(sampleCssAnimation(prop.animation, elapsedMs)) : IDENTITY,
+    alpha: prop.animation ? sampleCssOpacity(prop.animation, elapsedMs) : 1,
     children: prop.children.map((child) => poseProp(child, elapsedMs)),
   };
 }

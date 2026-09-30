@@ -442,18 +442,20 @@ describe('NPCS', () => {
       dialogLines: ['3-0. Again.'],
       idleLines: [{ text: 'I challenge you to a Beyblade battle!', periodS: 0, delayS: 0 }],
     });
+    // Sam's and Ryan's nameplates are their full names, not the Room
+    // design's "Sam"/"Ryan" (owner request, 2026-09-30, Track D).
     expect(NPCS['sam-team-room-4']).toMatchObject({
       name: 'Sam Schantz',
       title: null,
       roomId: 'team-room-4',
-      tagName: 'Sam',
+      tagName: 'Sam Schantz',
       idleLines: [],
     });
     expect(NPCS['ryan-team-room-4']).toMatchObject({
       name: 'Ryan Shendler',
       title: null,
       roomId: 'team-room-4',
-      tagName: 'Ryan',
+      tagName: 'Ryan Shendler',
       idleLines: [],
     });
   });

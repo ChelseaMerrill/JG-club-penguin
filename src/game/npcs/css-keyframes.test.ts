@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { compileCssAnimation, sampleCssAnimation, transformPoint } from './css-keyframes';
+import {
+  compileCssAnimation,
+  sampleCssAnimation,
+  sampleCssOpacity,
+  transformPoint,
+} from './css-keyframes';
 
 // Verbatim from `design/Room 05 Roof Deck.dc.html`.
 const MK_BRANDON_GALLOP = {
@@ -105,6 +110,35 @@ describe('CSS keyframe animations from the Room designs', () => {
     const mid = pointAt(cartwheel, 1_900);
     expect(mid.x).toBeCloseTo(-7);
     expect(mid.y).toBeCloseTo(10);
+  });
+
+  it('samples opacity on its own track, eased per segment like the transform', () => {
+    // Verbatim from `design/Room 01 Town Center.dc.html` (Darrin's `hype`).
+    const hype = compileCssAnimation({
+      keyframes:
+        '@keyframes hype { 0%,100% { opacity:0; transform: scale(.6);} 45% { opacity:1; transform: scale(1);} }',
+      animation: 'hype .7s ease-in-out infinite',
+    });
+    expect(sampleCssOpacity(hype, 0)).toBeCloseTo(0);
+    expect(sampleCssOpacity(hype, 0.45 * 700)).toBeCloseTo(1);
+    // Half-way through the 0%->45% segment: ease-in-out is symmetric, so 0.5.
+    expect(sampleCssOpacity(hype, 0.225 * 700)).toBeCloseTo(0.5);
+    expect(sampleCssOpacity(hype, 700)).toBeCloseTo(0);
+  });
+
+  it('reads an opacity-only rule, leaving its transform the identity', () => {
+    const keyBlink = {
+      keyframes: '@keyframes keyBlink { 0%,100% { opacity:1;} 50% { opacity:.3;} }',
+      animation: 'keyBlink .5s linear infinite',
+    };
+    const blink = compileCssAnimation(keyBlink);
+    expect(sampleCssOpacity(blink, 250)).toBeCloseTo(0.3);
+    expect(sampleCssOpacity(blink, 125)).toBeCloseTo(0.65);
+    expect(pointAt(keyBlink, 125)).toEqual({ x: 0, y: 0 });
+  });
+
+  it('keeps an animation with no opacity stops fully opaque', () => {
+    expect(sampleCssOpacity(compileCssAnimation(MK_BRANDON_GALLOP), 1_000)).toBe(1);
   });
 
   it('rejects transform functions it cannot reproduce, so a port fails loudly', () => {

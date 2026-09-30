@@ -90,7 +90,26 @@ export interface HumanFigureSpec {
      * a cyan hex) facing out and both hands on its base, verbatim from
      * `design/Team Room 3.dc.html`.
      */
-    | 'openLaptop';
+    | 'openLaptop'
+    /**
+     * From the Characters sheet, not humans.js (`sheet: 'samSchantz'` only):
+     * Sam's open singing mouth and his right arm holding a mic up to it.
+     */
+    | 'mic'
+    /**
+     * From the Characters sheet, not humans.js (`sheet: 'ryanShendler'`
+     * only): Ryan's DJ deck, its eight keys (four lit) and his hands on it.
+     */
+    | 'djDeck';
+  /**
+   * From the Characters sheet (`design/Characters.dc.html`), not humans.js
+   * (owner request, 2026-09-30, Track D): draw this person's own card figure
+   * verbatim instead of the humans.js body, since the sheet redrew them
+   * (Sam's curls, striped shirt and tinted glasses; Ryan's headphones, dark
+   * shirt and DJ deck). With it set, only `prop` (`mic`/`djDeck`) and
+   * `marker` still apply; every other option is ignored.
+   */
+  sheet?: 'samSchantz' | 'ryanShendler';
   /** Town Center's three playing cards in Jon's right hand. */
   cards?: boolean;
   /** Dev Pit's raised arm holding a whiteboard marker (Ryan, Sam, Steven). */
@@ -128,6 +147,163 @@ const HAIR: Record<NonNullable<HumanFigureSpec['hair']>, string> = {
 const OUTLINE = '#0C4B5F';
 
 /**
+ * The parts of the Characters sheet's SAM SCHANTZ card that his Team Room 4
+ * motion animates (`src/npcs/motions/team-room-4.ts`), verbatim and at rest
+ * (the mouth at its SMIL base `ry="3.5"`): drawn here as his `mic` prop, and
+ * redrawn by the motion in the same order when it replaces that prop.
+ */
+export const SAM_SCHANTZ_SHEET = {
+  mouth: `<ellipse cx="60" cy="54" rx="5" ry="3.5" fill="#6B2B2B" stroke="${OUTLINE}" stroke-width="2"></ellipse>`,
+  micArm:
+    `<rect x="84" y="70" width="12" height="30" rx="6" fill="#F4F4F4" stroke="${OUTLINE}" stroke-width="2.5" transform="rotate(140 90 74)"></rect>` +
+    `<path d="M76 62 L69 54" stroke="#161719" stroke-width="4" stroke-linecap="round"></path>` +
+    `<circle cx="67" cy="52" r="4" fill="#5A5F68" stroke="#161719" stroke-width="1.5"></circle>` +
+    `<path d="M65 50 L69 54 M64 53 L68 50" stroke="#2f3338" stroke-width=".8"></path>` +
+    `<circle cx="75" cy="60" r="5.5" fill="#F2CDB0" stroke="${OUTLINE}" stroke-width="2"></circle>`,
+} as const;
+
+/**
+ * The Characters sheet's RYAN SHENDLER card's DJ deck, verbatim: the deck
+ * with its four unlit keys, the four lit keys (card order; each blinks in
+ * the card, so his Team Room 4 motion redraws them one layer each, drawn
+ * here at their full-brightness rest), and his two hands on the deck. None
+ * of the keys overlap, so drawing the lit ones after the unlit ones gives
+ * the card's exact pixels.
+ */
+export const RYAN_SHENDLER_SHEET = {
+  deck:
+    `<rect x="30" y="90" width="60" height="18" rx="3" fill="#1d1f22" stroke="${OUTLINE}" stroke-width="2"></rect>` +
+    `<rect x="48.5" y="94" width="10" height="5" rx="1" fill="#2f3338"></rect>` +
+    `<rect x="61" y="94" width="10" height="5" rx="1" fill="#2f3338"></rect>` +
+    `<rect x="36" y="100.5" width="10" height="5" rx="1" fill="#2f3338"></rect>` +
+    `<rect x="73.5" y="100.5" width="10" height="5" rx="1" fill="#2f3338"></rect>`,
+  litKeys: [
+    `<rect x="36" y="94" width="10" height="5" rx="1" fill="#00BDFF"></rect>`,
+    `<rect x="73.5" y="94" width="10" height="5" rx="1" fill="#00BDFF"></rect>`,
+    `<rect x="48.5" y="100.5" width="10" height="5" rx="1" fill="#00BDFF"></rect>`,
+    `<rect x="61" y="100.5" width="10" height="5" rx="1" fill="#0C4B5F"></rect>`,
+  ],
+  hands:
+    `<circle cx="30" cy="99" r="5.5" fill="#F2C9A8" stroke="${OUTLINE}" stroke-width="2"></circle>` +
+    `<circle cx="90" cy="99" r="5.5" fill="#F2C9A8" stroke="${OUTLINE}" stroke-width="2"></circle>`,
+} as const;
+
+/**
+ * The Characters sheet's own card figures (`spec.sheet`), verbatim in the
+ * card's draw order, minus the parts that only fade in while animating (the
+ * card's `opacity="0"` sound arcs and music notes, which only the Team Room
+ * 4 motion draws). The card's `clipPath` id becomes `${id}t`, unique per NPC
+ * like every other figure's; its SMIL `<animate>`s are dropped (a texture is
+ * a still image; the motion ports them).
+ */
+function renderSheetFigure(spec: HumanFigureSpec, id: string): string {
+  if (spec.sheet === 'samSchantz') {
+    let o =
+      `<rect x="46" y="104" width="12" height="18" rx="3" fill="#3B4252" stroke="${OUTLINE}" stroke-width="2"></rect>` +
+      `<rect x="62" y="104" width="12" height="18" rx="3" fill="#3B4252" stroke="${OUTLINE}" stroke-width="2"></rect>` +
+      `<rect x="43" y="118" width="17" height="7" rx="3.5" fill="#F4F4F4" stroke="${OUTLINE}" stroke-width="2"></rect>` +
+      `<rect x="60" y="118" width="17" height="7" rx="3.5" fill="#F4F4F4" stroke="${OUTLINE}" stroke-width="2"></rect>` +
+      `<clipPath id="${id}t"><rect x="34" y="66" width="52" height="44" rx="12"></rect></clipPath>` +
+      `<rect x="34" y="66" width="52" height="44" rx="12" fill="#F4F4F4" stroke="${OUTLINE}" stroke-width="2.5"></rect>`;
+    for (const [y, fill] of [
+      [70, '#1E2A4A'],
+      [76, '#F2C94C'],
+      [81, '#7FC8E8'],
+      [88, '#1E2A4A'],
+      [94, '#F2C94C'],
+      [99, '#7FC8E8'],
+      [105, '#1E2A4A'],
+    ] as const) {
+      o += `<rect x="34" y="${y}" width="52" height="3.5" fill="${fill}" clip-path="url(#${id}t)"></rect>`;
+    }
+    o +=
+      `<rect x="34" y="66" width="52" height="44" rx="12" fill="none" stroke="${OUTLINE}" stroke-width="2.5"></rect>` +
+      `<circle cx="60" cy="76" r="1.4" fill="#1E2A4A"></circle><circle cx="60" cy="83" r="1.4" fill="#1E2A4A"></circle>` +
+      `<rect x="24" y="70" width="12" height="30" rx="6" fill="#F4F4F4" stroke="${OUTLINE}" stroke-width="2.5" transform="rotate(120 30 74)"></rect>` +
+      `<circle cx="8" cy="61" r="5.5" fill="#F2CDB0" stroke="${OUTLINE}" stroke-width="2"></circle>` +
+      `<rect x="54" y="58" width="12" height="12" fill="#F2CDB0"></rect>` +
+      `<path d="M47 64 L60 70 L56 75 Z M73 64 L60 70 L64 75 Z" fill="#1E2A4A" stroke="${OUTLINE}" stroke-width="1.5" stroke-linejoin="round"></path>` +
+      `<circle cx="60" cy="40" r="25" fill="#F2CDB0" stroke="${OUTLINE}" stroke-width="2.5"></circle>` +
+      `<circle cx="36" cy="42" r="4" fill="#F2CDB0" stroke="${OUTLINE}" stroke-width="2"></circle>` +
+      `<circle cx="84" cy="42" r="4" fill="#F2CDB0" stroke="${OUTLINE}" stroke-width="2"></circle>`;
+    // Curls: ten outlined, then five unoutlined on top to hide inner seams.
+    for (const [cx, cy, r] of [
+      [40, 26, 7],
+      [48, 19, 7],
+      [57, 15, 7.5],
+      [67, 16, 7.5],
+      [76, 21, 7],
+      [82, 29, 6],
+      [37, 33, 5],
+      [62, 22, 6],
+      [50, 25, 5],
+      [72, 26, 5],
+    ]) {
+      o += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#4A3326" stroke="${OUTLINE}" stroke-width="1.5"></circle>`;
+    }
+    for (const [cx, cy, r] of [
+      [62, 22, 6],
+      [50, 25, 5],
+      [72, 26, 5],
+      [57, 20, 6],
+      [67, 21, 6],
+    ]) {
+      o += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="#4A3326"></circle>`;
+    }
+    o +=
+      `<path d="M45 32 Q50 30 55 32 M65 32 Q70 30 75 32" fill="none" stroke="#4A3326" stroke-width="2.2" stroke-linecap="round"></path>` +
+      `<path d="M43 35 H57 V41 Q57 45 50 45 Q43 45 43 41 Z M63 35 H77 V41 Q77 45 70 45 Q63 45 63 41 Z" fill="#B9A7D9" fill-opacity=".3" stroke="none"></path>` +
+      `<path d="M43 35.5 H57 M63 35.5 H77 M57 38 H63 M43 36 L36 37 M77 36 L84 37" stroke="#161719" stroke-width="2.2" stroke-linecap="round"></path>` +
+      `<path d="M43 36 V41 Q43 45 50 45 Q57 45 57 41 V36 M63 36 V41 Q63 45 70 45 Q77 45 77 41 V36" fill="none" stroke="#8A8F99" stroke-width="1"></path>` +
+      `<circle cx="50" cy="40" r="2.2" fill="#161719"></circle><circle cx="70" cy="40" r="2.2" fill="#161719"></circle>`;
+    if (spec.prop === 'mic') o += SAM_SCHANTZ_SHEET.mouth + SAM_SCHANTZ_SHEET.micArm;
+    return o;
+  }
+
+  // Ryan Shendler: no ears in his card (his head is r=26, not 25).
+  let o =
+    `<rect x="46" y="104" width="12" height="18" rx="3" fill="#2B3557" stroke="${OUTLINE}" stroke-width="2"></rect>` +
+    `<rect x="62" y="104" width="12" height="18" rx="3" fill="#2B3557" stroke="${OUTLINE}" stroke-width="2"></rect>` +
+    `<rect x="43" y="118" width="17" height="7" rx="3.5" fill="#0f1012" stroke="${OUTLINE}" stroke-width="2"></rect>` +
+    `<rect x="60" y="118" width="17" height="7" rx="3.5" fill="#0f1012" stroke="${OUTLINE}" stroke-width="2"></rect>` +
+    `<rect x="34" y="66" width="52" height="44" rx="12" fill="#15171C" stroke="${OUTLINE}" stroke-width="2.5"></rect>` +
+    `<path d="M60 68 V88" stroke="#2a2d33" stroke-width="1.5"></path>` +
+    `<circle cx="60" cy="74" r="1.5" fill="#E8ECEF"></circle><circle cx="60" cy="81" r="1.5" fill="#E8ECEF"></circle>` +
+    `<rect x="24" y="70" width="12" height="30" rx="6" fill="#15171C" stroke="${OUTLINE}" stroke-width="2.5"></rect>` +
+    `<rect x="84" y="70" width="12" height="30" rx="6" fill="#15171C" stroke="${OUTLINE}" stroke-width="2.5"></rect>` +
+    `<rect x="54" y="58" width="12" height="12" fill="#F2C9A8"></rect>` +
+    `<path d="M47 64 L60 70 L56 75 Z M73 64 L60 70 L64 75 Z" fill="#15171C" stroke="#3a3e46" stroke-width="1.5" stroke-linejoin="round"></path>`;
+  if (spec.prop === 'djDeck') {
+    o +=
+      RYAN_SHENDLER_SHEET.deck + RYAN_SHENDLER_SHEET.litKeys.join('') + RYAN_SHENDLER_SHEET.hands;
+  }
+  o +=
+    `<circle cx="60" cy="40" r="26" fill="#F2C9A8" stroke="${OUTLINE}" stroke-width="2.5"></circle>` +
+    `<path d="M36 34 C36 16 48 11 60 11 C72 11 84 16 84 34 C80 26 72 23 60 23 C48 23 40 26 36 34 Z" fill="#8A7458" stroke="${OUTLINE}" stroke-width="2"></path>` +
+    `<path d="M45 32 Q50 30 55 32 M65 32 Q70 30 75 32" fill="none" stroke="#6B5640" stroke-width="2.2" stroke-linecap="round"></path>` +
+    `<rect x="43" y="35" width="14" height="10" rx="2" fill="#F4F4F4" fill-opacity=".25" stroke="#1E2A4A" stroke-width="1.6"></rect>` +
+    `<rect x="63" y="35" width="14" height="10" rx="2" fill="#F4F4F4" fill-opacity=".25" stroke="#1E2A4A" stroke-width="1.6"></rect>` +
+    `<path d="M57 39 H63 M43 38 L36 37 M77 38 L84 37" stroke="#1E2A4A" stroke-width="1.6"></path>` +
+    `<circle cx="50" cy="40" r="2.2" fill="#161719"></circle><circle cx="70" cy="40" r="2.2" fill="#161719"></circle>` +
+    `<path d="M51 53 Q60 59 69 53" fill="none" stroke="${OUTLINE}" stroke-width="2.5" stroke-linecap="round"></path>` +
+    `<path d="M31 40 C29 10 91 10 89 40" fill="none" stroke="#161719" stroke-width="6"></path>` +
+    `<path d="M31 40 C29 10 91 10 89 40" fill="none" stroke="#00BDFF" stroke-width="2"></path>` +
+    `<rect x="25" y="33" width="12" height="18" rx="5" fill="#161719" stroke="#00BDFF" stroke-width="2"></rect>` +
+    `<rect x="83" y="33" width="12" height="18" rx="5" fill="#161719" stroke="#00BDFF" stroke-width="2"></rect>`;
+  return o;
+}
+
+/** Dev Pit's raised arm holding a whiteboard marker (#113's resting pose). */
+function renderMarker(marker: NonNullable<HumanFigureSpec['marker']>): string {
+  const { arm, hand, color } = marker;
+  return (
+    `<path d="M92 78 L112 56" stroke="${arm}" stroke-width="6" stroke-linecap="round"></path>` +
+    `<circle cx="113" cy="54" r="5.5" fill="${hand}" stroke="${OUTLINE}" stroke-width="2"></circle>` +
+    `<rect x="110" y="44" width="6" height="14" rx="2" fill="${color}" stroke="${OUTLINE}" stroke-width="1.5"></rect>`
+  );
+}
+
+/**
  * Ports `design/build/humans.js`'s `human(s, uid)` figure body (legs, torso,
  * head, hair, face, facial hair, glasses, prop), verbatim where a branch is
  * ported at all -- same path data, same draw order -- for the options
@@ -139,6 +315,9 @@ function renderHumanFigure(spec: HumanFigureSpec, idPrefix: string): string {
   const sk = SKIN[spec.skin ?? 'light'];
   const hc = HAIR[spec.hair ?? 'dark'];
   const id = `npc-${idPrefix}`;
+  if (spec.sheet) {
+    return renderSheetFigure(spec, id) + (spec.marker ? renderMarker(spec.marker) : '');
+  }
   let o = '';
 
   // Hair behind the head (long styles), drawn before the torso/legs so the
@@ -495,13 +674,7 @@ function renderHumanFigure(spec: HumanFigureSpec, idPrefix: string): string {
       `<path d="M14 -1 l2 3 l-2 3 l-2 -3 z" fill="#00BDFF"></path>` +
       `</g>`;
   }
-  if (spec.marker) {
-    const { arm, hand, color } = spec.marker;
-    o +=
-      `<path d="M92 78 L112 56" stroke="${arm}" stroke-width="6" stroke-linecap="round"></path>` +
-      `<circle cx="113" cy="54" r="5.5" fill="${hand}" stroke="${OUTLINE}" stroke-width="2"></circle>` +
-      `<rect x="110" y="44" width="6" height="14" rx="2" fill="${color}" stroke="${OUTLINE}" stroke-width="1.5"></rect>`;
-  }
+  if (spec.marker) o += renderMarker(spec.marker);
   // Keep this last: it wraps everything drawn so far (`o`) in the seated
   // offset, so any part added after it wouldn't sit with the figure.
   if (spec.seated === 'laptop') {

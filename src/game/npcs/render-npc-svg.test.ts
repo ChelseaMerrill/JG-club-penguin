@@ -215,6 +215,75 @@ describe('renderNpcSvg', () => {
     expect(svg).toContain('<path d="M14 -1 l2 3 l-2 3 l-2 -3 z" fill="#00BDFF">');
   });
 
+  it("draws Sam Schantz as the Characters sheet's card: curly hair, striped shirt, tinted glasses, singing into a mic", () => {
+    // Verbatim from design/Characters.dc.html's SAM SCHANTZ card.
+    const svg = renderRosterNpc('sam-team-room-4');
+    expect(svg).toContain(
+      '<rect x="43" y="118" width="17" height="7" rx="3.5" fill="#F4F4F4" stroke="#0C4B5F" stroke-width="2">',
+    );
+    expect(svg).toContain(
+      '<rect x="34" y="76" width="52" height="3.5" fill="#F2C94C" clip-path="url(#npc-sam-team-room-4t)">',
+    );
+    expect(svg).toContain(
+      '<rect x="24" y="70" width="12" height="30" rx="6" fill="#F4F4F4" stroke="#0C4B5F" stroke-width="2.5" transform="rotate(120 30 74)">',
+    );
+    expect(svg).toContain(
+      '<circle cx="57" cy="15" r="7.5" fill="#4A3326" stroke="#0C4B5F" stroke-width="1.5">',
+    );
+    expect(svg).toContain(
+      '<path d="M43 35 H57 V41 Q57 45 50 45 Q43 45 43 41 Z M63 35 H77 V41 Q77 45 70 45 Q63 45 63 41 Z" fill="#B9A7D9" fill-opacity=".3" stroke="none">',
+    );
+    expect(svg).toContain(
+      '<ellipse cx="60" cy="54" rx="5" ry="3.5" fill="#6B2B2B" stroke="#0C4B5F" stroke-width="2">',
+    );
+    expect(svg).toContain(
+      '<circle cx="67" cy="52" r="4" fill="#5A5F68" stroke="#161719" stroke-width="1.5">',
+    );
+    // Not the old humans.js look: no spiky hair, no coffee.
+    expect(svg).not.toContain('M36 34 C34 22 40 12 46 16');
+    expect(svg).not.toContain('<rect x="88" y="86" width="16" height="16"');
+  });
+
+  it("draws Ryan Shendler as the Characters sheet's card: headphones, glasses, DJ deck with lit keys", () => {
+    // Verbatim from design/Characters.dc.html's RYAN SHENDLER card.
+    const svg = renderRosterNpc('ryan-team-room-4');
+    expect(svg).toContain(
+      '<rect x="46" y="104" width="12" height="18" rx="3" fill="#2B3557" stroke="#0C4B5F" stroke-width="2">',
+    );
+    expect(svg).toContain(
+      '<circle cx="60" cy="40" r="26" fill="#F2C9A8" stroke="#0C4B5F" stroke-width="2.5">',
+    );
+    expect(svg).toContain(
+      '<path d="M36 34 C36 16 48 11 60 11 C72 11 84 16 84 34 C80 26 72 23 60 23 C48 23 40 26 36 34 Z" fill="#8A7458" stroke="#0C4B5F" stroke-width="2">',
+    );
+    expect(svg).toContain(
+      '<rect x="43" y="35" width="14" height="10" rx="2" fill="#F4F4F4" fill-opacity=".25" stroke="#1E2A4A" stroke-width="1.6">',
+    );
+    expect(svg).toContain(
+      '<path d="M31 40 C29 10 91 10 89 40" fill="none" stroke="#00BDFF" stroke-width="2">',
+    );
+    expect(svg).toContain(
+      '<rect x="30" y="90" width="60" height="18" rx="3" fill="#1d1f22" stroke="#0C4B5F" stroke-width="2">',
+    );
+    expect(svg).toContain('<rect x="36" y="94" width="10" height="5" rx="1" fill="#00BDFF">');
+    // Not the old humans.js look: no stubble, no laptop.
+    expect(svg).not.toContain('<rect x="86" y="84" width="22" height="14"');
+    expect(svg).not.toContain('M40 46 C42 62 50 66 60 66');
+  });
+
+  it("drops the sheet figures' held props when told to, for their motions to redraw", () => {
+    for (const id of ['sam-team-room-4', 'ryan-team-room-4'] as const) {
+      const npc = NPCS[id];
+      if (npc.kind !== 'human') throw new Error(`expected ${id} to be a Human NPC`);
+      const svg = renderNpcSvg({ ...npc.figure, prop: undefined }, { idPrefix: id });
+      assertValidSvg(svg);
+      expect(svg, id).not.toContain('<ellipse cx="60" cy="54" rx="5" ry="3.5"');
+      expect(svg, id).not.toContain('<rect x="30" y="90" width="60" height="18"');
+      // The rest of the card stays.
+      expect(svg, id).toContain('<rect x="54" y="58" width="12" height="12"');
+    }
+  });
+
   it("raises a whiteboard marker for Dev Pit's Ryan and Sam (cyan), and not Steven", () => {
     const markers: [NpcId, string, string, string][] = [
       ['ryan', '#1f2a4a', '#F3D3B8', '#00BDFF'],

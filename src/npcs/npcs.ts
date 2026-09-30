@@ -453,34 +453,30 @@ const CASEY_FIGURE: HumanFigureSpec = {
 
 /**
  * Sam Schantz's figure, shared by Dev Pit (`sam`) and Team Room 4
- * (`sam-team-room-4`) (#51): the same person, the same `humans.js` spec, in
- * one constant so the copies can't drift.
+ * (`sam-team-room-4`) (#51), in one constant so the copies can't drift. His
+ * card on the Characters sheet (`design/Characters.dc.html`, SAM SCHANTZ,
+ * "MC · FREESTYLE") replaced the older `humans.js` spec (spiky dark hair,
+ * cyan tee, thin glasses, coffee; owner request, 2026-09-30, Track D): brown
+ * curls, a white shirt striped navy/yellow/blue, lavender-tinted glasses,
+ * white sneakers, left arm thrown up and singing into a mic in his right.
  */
 const SAM_FIGURE: HumanFigureSpec = {
-  style: 'spiky',
-  hair: 'dark',
-  skin: 'med',
-  top: '#00BDFF',
-  collar: 'crew',
-  glasses: 'thin',
-  teeth: true,
-  prop: 'coffee',
+  sheet: 'samSchantz',
+  prop: 'mic',
 };
 
 /**
  * Ryan Shendler's figure, shared by Dev Pit (`ryan`) and Team Room 4
- * (`ryan-team-room-4`) (#51): the same person, the same `humans.js` spec, in
- * one constant so the copies can't drift.
+ * (`ryan-team-room-4`) (#51), in one constant so the copies can't drift. His
+ * card on the Characters sheet (`design/Characters.dc.html`, RYAN SHENDLER,
+ * "DJ · MUSIC TRACKS") replaced the older `humans.js` spec (short brown
+ * hair, teal tee, stubble, smirk, laptop; owner request, 2026-09-30, Track
+ * D): black-and-cyan headphones, rectangular glasses, a black shirt, navy
+ * trousers, and both hands on a DJ deck with blinking keys.
  */
 const RYAN_FIGURE: HumanFigureSpec = {
-  style: 'short',
-  hair: 'brown',
-  skin: 'fair',
-  top: '#0C4B5F',
-  collar: 'crew',
-  beard: 'stubble',
-  mouth: 'smirk',
-  prop: 'laptop',
+  sheet: 'ryanShendler',
+  prop: 'djDeck',
 };
 
 /**
@@ -1441,11 +1437,14 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     title: null,
     roomId: 'team-room-4',
     kind: 'human',
-    tagName: 'Sam',
+    // His full name, not the Room design's "Sam" (owner request, 2026-09-30,
+    // Track D).
+    tagName: 'Sam Schantz',
     dialogLines: SAM_LINES,
     // The design gives him music notes, not a bubble.
     idleLines: [],
-    // Team Room 4's design draws its NPCs without any idle bob.
+    // No #36 idle bob: his Team Room 4 motion plays his Characters sheet
+    // card's own `bob` instead (`src/npcs/motions/team-room-4.ts`).
     still: true,
     dialog: LINE_DIALOG,
     figure: SAM_FIGURE,
@@ -1456,11 +1455,14 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     title: null,
     roomId: 'team-room-4',
     kind: 'human',
-    tagName: 'Ryan',
+    // His full name, not the Room design's "Ryan" (owner request,
+    // 2026-09-30, Track D).
+    tagName: 'Ryan Shendler',
     dialogLines: RYAN_LINES,
     // The design gives him no bubble here.
     idleLines: [],
-    // Team Room 4's design draws its NPCs without any idle bob.
+    // No #36 idle bob: his Team Room 4 motion plays his Characters sheet
+    // card's own `bob` instead (`src/npcs/motions/team-room-4.ts`).
     still: true,
     dialog: LINE_DIALOG,
     figure: RYAN_FIGURE,
