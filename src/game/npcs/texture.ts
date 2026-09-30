@@ -54,7 +54,15 @@ export function ensureNpcTexture(
           {
             ...npc.figure,
             ...(omitProp ? { prop: undefined } : {}),
-            ...(omitRestPose ? { cards: undefined, marker: undefined } : {}),
+            ...(omitRestPose
+              ? {
+                  cards: undefined,
+                  marker: undefined,
+                  // Team Room 1's Jethro: his hands and camera belong to his
+                  // `jdown`/`jup` layers while they play.
+                  cameraRaise: npc.figure.cameraRaise ? ('raising' as const) : undefined,
+                }
+              : {}),
           },
           { idPrefix: npc.id },
         )

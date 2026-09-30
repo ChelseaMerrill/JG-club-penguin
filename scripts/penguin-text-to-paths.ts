@@ -110,8 +110,11 @@ const TEXT_SPECS: TextSpec<'haha' | 'jgLogo' | 'warWeek' | 'jgCap'>[] = [
 // font-family="Anton, Impact, sans-serif" font-size="9" fill="#F2C12E"
 // letter-spacing="1">SURVIVOR</text>` and the Roof Deck design's `<text
 // x="118" y="98" text-anchor="middle" font-family="Anton, Impact, sans-serif"
-// font-size="7" fill="#00BDFF">FREE $$$</text>`.
-const NPC_TEXT_SPECS: TextSpec<'survivorTee' | 'freeBait'>[] = [
+// font-size="7" fill="#00BDFF">FREE $$$</text>`, and Team Room 1's Dom's race
+// bib (owner request, 2026-09-30, Track D), `design/Team Room 1.dc.html`'s
+// `<text x="60" y="86.5" text-anchor="middle" font-family="Anton, sans-serif"
+// font-size="9" fill="#161719">17</text>`.
+const NPC_TEXT_SPECS: TextSpec<'survivorTee' | 'freeBait' | 'runnerBib'>[] = [
   {
     key: 'survivorTee',
     text: 'SURVIVOR',
@@ -133,6 +136,17 @@ const NPC_TEXT_SPECS: TextSpec<'survivorTee' | 'freeBait'>[] = [
     anchor: 'middle',
     letterSpacing: 0,
     fill: '#00BDFF',
+  },
+  {
+    key: 'runnerBib',
+    text: '17',
+    fontPath: ANTON_PATH,
+    fontSize: 9,
+    x: 60,
+    y: 86.5,
+    anchor: 'middle',
+    letterSpacing: 0,
+    fill: '#161719',
   },
 ];
 

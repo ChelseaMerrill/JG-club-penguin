@@ -126,6 +126,38 @@ describe('NPC motion (#113)', () => {
     expect(transformPoint(rod.matrix, { x: 58, y: -110 }).x).toBeLessThan(58);
   });
 
+  it("fades a prop layer with its design animation's opacity, nested layers included", () => {
+    // A camera that fades in (like Team Room 1's `jup`) holding a flash that
+    // blinks on its own (`jflash`); a layer without a motion stays opaque.
+    const spec: Parameters<typeof createNpcMotion>[0] = {
+      props: [
+        {
+          svg: '<rect x="34" y="30" width="52" height="32"/>',
+          motion: {
+            keyframes: '@keyframes fade { 0% { opacity:0; } 50%,100% { opacity:1; } }',
+            animation: 'fade 2s linear infinite',
+          },
+          children: [
+            {
+              svg: '<circle cx="73.5" cy="36.5" r="22"/>',
+              motion: {
+                keyframes: '@keyframes blink { 0%,100% { opacity:0; } 50% { opacity:.95; } }',
+                animation: 'blink 2s linear infinite',
+              },
+            },
+          ],
+        },
+        { svg: '<rect x="0" y="0" width="1" height="1"/>' },
+      ],
+    };
+    const motion = createNpcMotion(spec, { x: 900, y: 575 }, ORIGIN, { reducedMotion: false })!;
+    motion.advance(500);
+    const [camera, still] = motion.pose().props;
+    expect(camera.alpha).toBeCloseTo(0.5);
+    expect(camera.children[0].alpha).toBeCloseTo(0.475);
+    expect(still.alpha).toBe(1);
+  });
+
   it("fades a prop layer with its design's opacity keyframes, and keeps a layer without them opaque", () => {
     const fading: Parameters<typeof createNpcMotion>[0] = {
       props: [

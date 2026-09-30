@@ -403,9 +403,9 @@ const IAN_FIGURE: HumanFigureSpec = {
 };
 
 /**
- * Dom Favata's figure, shared by Dev Pit (`dom`) and Team Room 1
- * (`dom-team-room-1`) (#51): the same person, the same `humans.js` spec, in
- * one constant so the copies can't drift.
+ * Dom Favata's figure, humans.js's spec (#51), as the Dev Pit's `dom` still
+ * wears it. Team Room 1 and the Mullet dress him in running kit instead
+ * (`DOM_RUNNER_FIGURE`).
  */
 const DOM_FIGURE: HumanFigureSpec = {
   style: 'short',
@@ -415,6 +415,20 @@ const DOM_FIGURE: HumanFigureSpec = {
   collar: 'zip',
   teeth: true,
   prop: 'laptop',
+};
+
+/**
+ * Dom in running kit, shared by Team Room 1 (`dom-team-room-1`) and the
+ * Mullet (`dom-mullet`) so the copies can't drift: both Room designs dress
+ * him this way for his lap of the Room, as `design/Characters.dc.html`'s
+ * sheet now does too (owner requests, 2026-09-30, Track D). humans.js's spec
+ * minus its shirt colour and zip collar, which the kit replaces.
+ */
+const DOM_RUNNER_FIGURE: HumanFigureSpec = {
+  ...DOM_FIGURE,
+  top: undefined,
+  collar: undefined,
+  runner: true,
 };
 
 /**
@@ -498,7 +512,8 @@ const ANTHONY_FIGURE: HumanFigureSpec = {
 /**
  * Jethro Breuer's figure, shared by the Icebox (`jethro`) and Team Room 1
  * (`jethro-team-room-1`) (#51): the same person, the same `humans.js` spec,
- * in one constant so the copies can't drift.
+ * in one constant so the copies can't drift. Each Room adds its own camera
+ * pose on top.
  */
 const JETHRO_FIGURE: HumanFigureSpec = {
   style: 'short',
@@ -1317,10 +1332,17 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     kind: 'human',
     tagName: 'Jethro',
     dialogLines: JETHRO_LINES,
-    // `jtalk 4s`, shown from 38%: (0.38 - 0.07) * 4 = 1.24s, i.e. -2.76s.
-    idleLines: [{ text: "Act natural. Camera's rolling.", periodS: 4, delayS: -2.76 }],
+    // `jtalk 4s` (38%-76%), no delay (owner request, 2026-09-30, Track D):
+    // its own window, so the line stays up while `jup` holds the camera to
+    // his eye, instead of the generic `say` window shifted to 38%.
+    idleLines: [
+      { text: "Act natural. Camera's rolling.", periodS: 4, delayS: 0, window: [0.38, 0.76] },
+    ],
     dialog: LINE_DIALOG,
-    figure: JETHRO_FIGURE,
+    // The Room design draws his hands and camera as its `jdown` group, after
+    // his face (the resting pose of his camera raise, see
+    // `motions/team-room-1.ts`), not humans.js's `camera` prop in his hand.
+    figure: { ...JETHRO_FIGURE, prop: undefined, cameraRaise: 'lowered' },
   },
   'dom-team-room-1': {
     id: 'dom-team-room-1',
@@ -1331,12 +1353,14 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     tagName: 'Dom',
     dialogLines: DOM_LINES,
     questGiver: {},
-    // `domtalk 6s`, shown from 39%: (0.39 - 0.07) * 6 = 1.92s, i.e. -4.08s.
-    idleLines: [{ text: 'you gotta be faster than that', periodS: 6, delayS: -4.08 }],
+    // `domtalk 6s` (39%-66%), no delay (owner request, 2026-09-30, Track D):
+    // its own window rather than the generic `say` window shifted to 39%.
+    idleLines: [
+      { text: 'you gotta be faster than that', periodS: 6, delayS: 0, window: [0.39, 0.66] },
+    ],
     dialog: LINE_DIALOG,
-    // humans.js's spec; the Room design dresses him in running gear for his
-    // lap of the room, a scene-only costume the renderer doesn't draw.
-    figure: DOM_FIGURE,
+    // The Room design dresses him in running kit for his lap of the Room.
+    figure: DOM_RUNNER_FIGURE,
   },
   'ian-team-room-2': {
     id: 'ian-team-room-2',
@@ -1626,9 +1650,9 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: 'Undefeated. I always win.', periodS: 9.4, delayS: 0, window: [0.86, 1] },
     ],
     dialog: LINE_DIALOG,
-    // humans.js's spec; the Room design dresses him in running gear for his
-    // lap of the room, a scene-only costume the renderer doesn't draw.
-    figure: DOM_FIGURE,
+    // The Room design dresses him in running gear for his lap of the room,
+    // which the renderer now draws (owner request, 2026-09-30, Track D).
+    figure: DOM_RUNNER_FIGURE,
   },
   // Jessie: the design draws her as a Penguin in the Bathroom, but only
   // Players appear as Penguins in the World (owner decision 2026-09-25; see

@@ -22,7 +22,8 @@
  * property separately (only the stops that set it count, a missing 0%/100%
  * stop meaning the element's own opacity of 1), and sampled by
  * `sampleCssOpacity` (owner request, 2026-09-30, Track D: Team Room 4's
- * fading music notes). Only NPC `props` layers apply it
+ * fading music notes, and Team Room 1's Jethro fading his lowered camera out
+ * while he raises it, `jdown`/`jup`, and its `jflash`). Only NPC `props` layers apply it
  * (`room-npc-motions.ts`); `path`, `figure` and `stage` motions ignore it.
  */
 

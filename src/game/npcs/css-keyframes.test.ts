@@ -150,4 +150,43 @@ describe('CSS keyframe animations from the Room designs', () => {
       }),
     ).toThrow(/skewY/);
   });
+
+  // Verbatim from `design/Team Room 1.dc.html`: Jethro's camera rising to
+  // his eye (`jup`) fades in as it slides up, and his lowered camera
+  // (`jdown`) fades out, opacity only.
+  const JUP = {
+    keyframes:
+      '@keyframes jup { 0%,26% { opacity:0; transform:translate(20px,40px); } 34%,76% { opacity:1; transform:translate(0,0); } 84%,100% { opacity:0; transform:translate(20px,40px); } }',
+    animation: 'jup 4s ease-out infinite',
+  };
+  const JDOWN = {
+    keyframes:
+      '@keyframes jdown { 0%,26% { opacity:1; } 32%,78% { opacity:0; } 84%,100% { opacity:1; } }',
+    animation: 'jdown 4s linear infinite',
+  };
+
+  it('samples opacity stops alongside the transform (a prop fading in as it moves)', () => {
+    const jup = compileCssAnimation(JUP);
+    // 0%-26% hidden and down-right; 34%-76% shown at rest.
+    expect(sampleCssOpacity(jup, 500)).toBeCloseTo(0);
+    expect(pointAt(JUP, 500)).toEqual({ x: 20, y: 40 });
+    expect(sampleCssOpacity(jup, 2_000)).toBeCloseTo(1);
+    expect(pointAt(JUP, 2_000).x).toBeCloseTo(0);
+    // 3.2s is the 80% stop: ease-out, half-way from 76% to 84%, so past 0.5 faded.
+    expect(sampleCssOpacity(jup, 3_200)).toBeLessThan(0.5);
+    expect(sampleCssOpacity(jup, 3_200)).toBeGreaterThan(0);
+  });
+
+  it('interpolates an opacity-only animation linearly, and it never moves', () => {
+    const jdown = compileCssAnimation(JDOWN);
+    expect(sampleCssOpacity(jdown, 0)).toBeCloseTo(1);
+    // 29% is half-way from 26% (1) to 32% (0), linear.
+    expect(sampleCssOpacity(jdown, 1_160)).toBeCloseTo(0.5);
+    expect(sampleCssOpacity(jdown, 2_000)).toBeCloseTo(0);
+    expect(pointAt(JDOWN, 1_160)).toEqual({ x: 0, y: 0 });
+  });
+
+  it('is fully opaque when the keyframes never set opacity', () => {
+    expect(sampleCssOpacity(compileCssAnimation(MK_BRANDON_GALLOP), 3_000)).toBe(1);
+  });
 });

@@ -23,7 +23,9 @@ import { NPC_TEXT_PATHS } from './text-paths';
  * for Chelsea) and the static resting pose of each designed prop (Jon's
  * cards, the whiteboard markers, Anthony's fishing rod, Jethro's camera rig,
  * Nicole seated with a laptop). Each is copied verbatim from that Room
- * design's own figure markup; animating them is later work.
+ * design's own figure markup; animating them is later work. Team Room 1's
+ * port (owner request, 2026-09-30, Track D) adds Dom's `runner` kit and
+ * Jethro's `cameraRaise` resting pose, the latter animated by his motion.
  */
 export interface HumanFigureSpec {
   style?:
@@ -118,6 +120,25 @@ export interface HumanFigureSpec {
   cameraRig?: boolean;
   /** The Icebox's Nicole: seated, with a laptop on her lap. */
   seated?: 'laptop';
+  /**
+   * Team Room 1's Dom (owner request, 2026-09-30, Track D): the running kit
+   * `design/Team Room 1.dc.html` draws him in for his lap of the Room (and
+   * `design/Characters.dc.html`'s sheet now draws him in too, unlike
+   * `humans.js`): bare legs with white socks and blue sneakers, a red tank
+   * top over black shorts on a bare torso, a "17" race bib, a red headband
+   * and a blue wristband, copied verbatim from the Room design. It replaces
+   * the trousers, shoes, `top` and sleeves.
+   */
+  runner?: boolean;
+  /**
+   * Team Room 1's Jethro (owner request, 2026-09-30, Track D): the Room
+   * design draws his hands and camera inside a `jdown` group after his face,
+   * which fades out while `jup` raises the camera to his eye, so his arms end
+   * without hands. `'lowered'` draws that group's hands and camera (its
+   * resting pose, verbatim); `'raising'` leaves both to his motion's
+   * `jdown`/`jup` prop layers (`src/npcs/motions/team-room-1.ts`).
+   */
+  cameraRaise?: 'lowered' | 'raising';
   /**
    * Team Room 3's Sydney: a black headset with a mic boom, drawn over her
    * hair and held prop, verbatim from `design/Team Room 3.dc.html`.
@@ -353,17 +374,46 @@ function renderHumanFigure(spec: HumanFigureSpec, idPrefix: string): string {
       `<path d="M33 52 q3 3 1 6 M31 70 q3 3 1 6 M87 52 q-3 3 -1 6 M89 70 q-3 3 -1 6" fill="none" stroke="#F6E2B0" stroke-width="1.4" stroke-linecap="round"></path>`;
   }
 
-  // Legs + shoes.
-  o +=
-    `<rect x="46" y="104" width="12" height="18" rx="3" fill="#1d1f22" stroke="${OUTLINE}" stroke-width="2"></rect>` +
-    `<rect x="62" y="104" width="12" height="18" rx="3" fill="#1d1f22" stroke="${OUTLINE}" stroke-width="2"></rect>` +
-    `<rect x="43" y="118" width="17" height="7" rx="3.5" fill="#0f1012" stroke="${OUTLINE}" stroke-width="2"></rect>` +
-    `<rect x="60" y="118" width="17" height="7" rx="3.5" fill="#0f1012" stroke="${OUTLINE}" stroke-width="2"></rect>`;
+  // Legs + shoes (Team Room 1's runner: bare legs, socks and sneakers).
+  if (spec.runner) {
+    o +=
+      `<rect x="47" y="104" width="10" height="16" rx="3" fill="${sk}" stroke="${OUTLINE}" stroke-width="2"></rect>` +
+      `<rect x="63" y="104" width="10" height="16" rx="3" fill="${sk}" stroke="${OUTLINE}" stroke-width="2"></rect>` +
+      `<rect x="47" y="113" width="10" height="4" fill="#F4F4F4"></rect>` +
+      `<rect x="63" y="113" width="10" height="4" fill="#F4F4F4"></rect>` +
+      `<path d="M42 117 H58 Q61 117 61 121 V125 H42 Q39 125 39 121 Q39 117 42 117 Z" fill="#00BDFF" stroke="${OUTLINE}" stroke-width="2"></path>` +
+      `<path d="M62 117 H78 Q81 117 81 121 V125 H62 V121 Q59 117 62 117 Z" transform="translate(-1 0)" fill="#00BDFF" stroke="${OUTLINE}" stroke-width="2"></path>` +
+      `<rect x="39" y="122.5" width="22" height="2.5" fill="#F4F4F4"></rect>` +
+      `<rect x="60" y="122.5" width="22" height="2.5" fill="#F4F4F4"></rect>`;
+  } else {
+    o +=
+      `<rect x="46" y="104" width="12" height="18" rx="3" fill="#1d1f22" stroke="${OUTLINE}" stroke-width="2"></rect>` +
+      `<rect x="62" y="104" width="12" height="18" rx="3" fill="#1d1f22" stroke="${OUTLINE}" stroke-width="2"></rect>` +
+      `<rect x="43" y="118" width="17" height="7" rx="3.5" fill="#0f1012" stroke="${OUTLINE}" stroke-width="2"></rect>` +
+      `<rect x="60" y="118" width="17" height="7" rx="3.5" fill="#0f1012" stroke="${OUTLINE}" stroke-width="2"></rect>`;
+  }
 
   // Torso.
-  const top = spec.top ?? '#3a4046';
+  const top = spec.runner ? sk : (spec.top ?? '#3a4046');
   o += `<defs><clipPath id="${id}t"><rect x="34" y="66" width="52" height="44" rx="12"></rect></clipPath></defs>`;
   o += `<rect x="34" y="66" width="52" height="44" rx="12" fill="${top}" stroke="${OUTLINE}" stroke-width="2.5"></rect>`;
+  // Team Room 1's runner: tank top and shorts clipped to the torso, its
+  // outline redrawn over them, then the race bib. The design's `<text>` "17"
+  // is the pre-baked outline (`text-paths.ts`), since a texture can't use
+  // web fonts.
+  if (spec.runner) {
+    const bib = NPC_TEXT_PATHS.runnerBib;
+    o +=
+      `<g clip-path="url(#${id}t)">` +
+      `<path d="M42 66 H50 Q60 76 70 66 H78 L84 94 H36 Z" fill="#D9534F" stroke="${OUTLINE}" stroke-width="2"></path>` +
+      `<rect x="34" y="92" width="52" height="18" fill="#161719"></rect>` +
+      `<path d="M60 100 V110" stroke="${OUTLINE}" stroke-width="2"></path>` +
+      `<rect x="34" y="92" width="52" height="3" fill="#F4F4F4"></rect>` +
+      `</g>` +
+      `<rect x="34" y="66" width="52" height="44" rx="12" fill="none" stroke="${OUTLINE}" stroke-width="2.5"></rect>` +
+      `<rect x="50" y="77" width="20" height="12" rx="1.5" fill="#F4F4F4" stroke="${OUTLINE}" stroke-width="1.5"></rect>` +
+      `<path d="${bib.d}" fill="${bib.fill}"></path>`;
+  }
   if (spec.pattern === 'stripes') {
     for (let y = 70; y < 110; y += 7) {
       o += `<rect x="34" y="${y}" width="52" height="3.5" fill="${spec.pattern2 ?? '#F4F4F4'}" clip-path="url(#${id}t)"></rect>`;
@@ -406,13 +456,20 @@ function renderHumanFigure(spec: HumanFigureSpec, idPrefix: string): string {
     o += `<g transform="translate(44 82)"><path d="M0 -6 C5 -6 7 -3 7 0 C7 4 3 7 0 8 C-3 7 -7 4 -7 0 C-7 -3 -5 -6 0 -6 Z" fill="#7ED957" stroke="${OUTLINE}" stroke-width="1.5"></path><ellipse cx="-3" cy="0" rx="2.3" ry="1.3" transform="rotate(30 -3 0)" fill="#161719"></ellipse><ellipse cx="3" cy="0" rx="2.3" ry="1.3" transform="rotate(-30 3 0)" fill="#161719"></ellipse></g>`;
   }
 
-  // Sleeves/arms.
-  const sleeve = spec.sleeveless ? sk : (spec.jacket ?? top);
+  // Sleeves/arms (the runner's bare, with a wristband), then the hands,
+  // which Team Room 1's camera raise draws later instead.
+  const sleeve = spec.sleeveless || spec.runner ? sk : (spec.jacket ?? top);
   o +=
     `<rect x="24" y="70" width="12" height="30" rx="6" fill="${sleeve}" stroke="${OUTLINE}" stroke-width="2.5"></rect>` +
-    `<rect x="84" y="70" width="12" height="30" rx="6" fill="${sleeve}" stroke="${OUTLINE}" stroke-width="2.5"></rect>` +
-    `<circle cx="30" cy="101" r="5.5" fill="${sk}" stroke="${OUTLINE}" stroke-width="2"></circle>` +
-    `<circle cx="90" cy="101" r="5.5" fill="${sk}" stroke="${OUTLINE}" stroke-width="2"></circle>`;
+    `<rect x="84" y="70" width="12" height="30" rx="6" fill="${sleeve}" stroke="${OUTLINE}" stroke-width="2.5"></rect>`;
+  if (spec.runner) {
+    o += `<rect x="24" y="86" width="12" height="5" fill="#00BDFF" stroke="${OUTLINE}" stroke-width="1.5"></rect>`;
+  }
+  if (!spec.cameraRaise) {
+    o +=
+      `<circle cx="30" cy="101" r="5.5" fill="${sk}" stroke="${OUTLINE}" stroke-width="2"></circle>` +
+      `<circle cx="90" cy="101" r="5.5" fill="${sk}" stroke="${OUTLINE}" stroke-width="2"></circle>`;
+  }
 
   // Collar.
   if (spec.collar === 'button') {
@@ -504,6 +561,10 @@ function renderHumanFigure(spec: HumanFigureSpec, idPrefix: string): string {
   }
   if (spec.greys) {
     o += `<path d="M40 24 q6 -6 12 -8 M48 18 q8 -5 16 -6 M74 20 q5 3 8 8 M38 32 q3 -4 6 -6" fill="none" stroke="#B3B6C9" stroke-width="2" stroke-linecap="round" opacity=".85"></path>`;
+  }
+  // Team Room 1's runner's headband, over the hair.
+  if (spec.runner) {
+    o += `<path d="M35.5 27 Q60 19 84.5 27 L85 33 Q60 25 35 33 Z" fill="#D9534F" stroke="${OUTLINE}" stroke-width="2"></path>`;
   }
 
   // Dotted stubble: the Room designs draw it before the eyes and mouth,
@@ -664,6 +725,17 @@ function renderHumanFigure(spec: HumanFigureSpec, idPrefix: string): string {
       `<circle cx="60" cy="83" r="9" fill="#2f3338" stroke="${OUTLINE}" stroke-width="2"></circle>` +
       `<circle cx="60" cy="83" r="4" fill="#0a3d4d"></circle>` +
       `<rect x="66" y="66" width="10" height="6" rx="1" fill="#F4F4F4" stroke="${OUTLINE}" stroke-width="1.5"></rect>`;
+  }
+  // Team Room 1's `jdown` group: both hands and the lowered camera.
+  if (spec.cameraRaise === 'lowered') {
+    o +=
+      `<circle cx="30" cy="101" r="5.5" fill="${sk}" stroke="${OUTLINE}" stroke-width="2"></circle>` +
+      `<circle cx="90" cy="101" r="5.5" fill="${sk}" stroke="${OUTLINE}" stroke-width="2"></circle>` +
+      `<rect x="84" y="82" width="26" height="18" rx="3" fill="#161719" stroke="${OUTLINE}" stroke-width="2"></rect>` +
+      `<rect x="90" y="78" width="10" height="5" rx="1" fill="#161719" stroke="${OUTLINE}" stroke-width="1.5"></rect>` +
+      `<circle cx="97" cy="91" r="6" fill="#0a3d4d" stroke="#00BDFF" stroke-width="2"></circle>` +
+      `<circle cx="97" cy="91" r="2.5" fill="#00BDFF"></circle>` +
+      `<rect x="104" y="85" width="3" height="3" fill="#D63C3C"></rect>`;
   }
   if (spec.cards) {
     o +=

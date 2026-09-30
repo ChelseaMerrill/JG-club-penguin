@@ -667,14 +667,9 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
       texts: ['You'],
       comment: "The local player's static figure and nameplate.",
     },
-    {
-      kind: 'selector',
-      selectors: [
-        'polygon[points="700,605 730,620 695,637.5 705,642.5 650,645 655,617.5 665,622.5"]',
-      ],
-      comment:
-        "Non-working floor arrow decal (#132): this Room's only working exit is the 'HALLWAY ↓' HUD nav pill below, not this floor paint.",
-    },
+    // #132's floor-arrow hide rule is gone (owner request, 2026-09-30, Track
+    // D): the 2026-09-27 design resync removed that arrow from the design
+    // itself, so the rule matched nothing and stopped this Room's export.
     {
       kind: 'animation',
       names: ['blink'],
