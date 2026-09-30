@@ -63,6 +63,9 @@ function applyProps(views: PropView[], poses: NpcPropPose[]): void {
     const pose = poses[index];
     if (!pose) return;
     applyAffine(view.container, pose.matrix);
+    // A nested container's alpha multiplies with its parent's when Phaser
+    // draws it, as CSS opacity does for a nested group.
+    view.container.setAlpha(pose.alpha);
     applyProps(view.children, pose.children);
   });
 }

@@ -61,6 +61,16 @@ describe('ensureNpcTexture: one of each prop while an NPC moves (#137 with PR #1
     expect(movingFigureSvg('anthony')).toContain(ROD);
   });
 
+  it("hands Team Room 1's Jethro's hands and camera to his `jdown`/`jup` layers while they play", () => {
+    const hand = '<circle cx="30" cy="101"';
+    const camera = '<rect x="84" y="82" width="26" height="18"';
+    expect(stillFigureSvg('jethro-team-room-1')).toContain(hand);
+    expect(stillFigureSvg('jethro-team-room-1')).toContain(camera);
+    const moving = movingFigureSvg('jethro-team-room-1');
+    expect(moving).not.toContain(hand);
+    expect(moving).not.toContain(camera);
+  });
+
   it('drops a figure prop that a moving prop replaces (`omitProp`)', () => {
     const { manager, svgs } = fakeTextures();
     const key = ensureNpcTexture({ textures: manager }, NPCS.anthony, { omitProp: true });

@@ -17,6 +17,12 @@
  * function, `alternate` direction, the individual `rotate:` property)
  * throws, so a port that needs more fails loudly instead of silently
  * drifting from the design.
+ *
+ * `opacity` stops are read too, into their own track (`sampleCssOpacity`),
+ * for a prop layer that fades as well as moves: Team Room 1's Jethro raising
+ * his camera (`jup`) while the lowered one fades out (`jdown`) and the flash
+ * blinks (`jflash`) (owner request, 2026-09-30, Track D). Other properties
+ * (`filter`, ...) are still ignored.
  */
 
 export interface Point {
@@ -58,6 +64,11 @@ interface Stop {
   fns: TransformFn[];
 }
 
+interface OpacityStop {
+  offset: number;
+  value: number;
+}
+
 export interface CompiledCssAnimation {
   name: string;
   durationMs: number;
@@ -65,6 +76,8 @@ export interface CompiledCssAnimation {
   origin: Point;
   easing: (t: number) => number;
   stops: Stop[];
+  /** Empty when the keyframes never set `opacity` (always fully opaque). */
+  opacityStops: OpacityStop[];
 }
 
 export const IDENTITY: Affine = { a: 1, b: 0, c: 0, d: 1, e: 0, f: 0 };
@@ -227,39 +240,60 @@ function parseTransform(value: string): TransformFn[] {
   return fns;
 }
 
-function parseKeyframes(rule: string): { name: string; stops: Stop[] } {
+function parseKeyframes(rule: string): {
+  name: string;
+  stops: Stop[];
+  opacityStops: OpacityStop[];
+} {
   const header = /@keyframes\s+([\w-]+)\s*\{/.exec(rule);
   if (!header) throw new Error('css-keyframes: expected an "@keyframes name { ... }" rule');
   const body = rule.slice(header.index + header[0].length, rule.lastIndexOf('}'));
   const stops: Stop[] = [];
+  const opacityStops: OpacityStop[] = [];
   const blockRe = /([^{}]+)\{([^{}]*)\}/g;
   let block: RegExpExecArray | null;
   while ((block = blockRe.exec(body))) {
     let transform: TransformFn[] | null = null;
+    let opacity: number | null = null;
     for (const declaration of block[2].split(';')) {
       const colon = declaration.indexOf(':');
       if (colon < 0) continue;
       const property = declaration.slice(0, colon).trim();
       const value = declaration.slice(colon + 1);
       if (property === 'transform') transform = parseTransform(value);
+      else if (property === 'opacity') opacity = parseOpacity(value);
       else if (property === 'rotate' || property === 'translate' || property === 'scale') {
         throw new Error(`css-keyframes: unsupported individual "${property}:" property`);
       }
-      // Anything else (opacity, filter, ...) isn't a motion; ignored.
+      // Anything else (filter, ...) isn't a motion; ignored.
     }
-    if (!transform) continue;
     for (const selector of block[1].split(',')) {
       const s = selector.trim();
       const offset = s === 'from' ? 0 : s === 'to' ? 1 : Number(s.replace('%', '')) / 100;
       if (!Number.isFinite(offset)) throw new Error(`css-keyframes: bad keyframe selector "${s}"`);
-      stops.push({ offset, fns: transform });
+      if (transform) stops.push({ offset, fns: transform });
+      if (opacity !== null) opacityStops.push({ offset, value: opacity });
     }
   }
   stops.sort((p, q) => p.offset - q.offset);
   // CSS: a missing 0%/100% stop uses the element's own (untransformed) value.
   if (stops[0]?.offset !== 0) stops.unshift({ offset: 0, fns: [] });
   if (stops[stops.length - 1].offset !== 1) stops.push({ offset: 1, fns: [] });
-  return { name: header[1], stops };
+  if (opacityStops.length > 0) {
+    opacityStops.sort((p, q) => p.offset - q.offset);
+    // The same rule for opacity: a prop layer's own opacity is 1.
+    if (opacityStops[0].offset !== 0) opacityStops.unshift({ offset: 0, value: 1 });
+    if (opacityStops[opacityStops.length - 1].offset !== 1) {
+      opacityStops.push({ offset: 1, value: 1 });
+    }
+  }
+  return { name: header[1], stops, opacityStops };
+}
+
+function parseOpacity(value: string): number {
+  const opacity = Number(value.trim());
+  if (!Number.isFinite(opacity)) throw new Error(`css-keyframes: bad opacity "${value}"`);
+  return Math.min(1, Math.max(0, opacity));
 }
 
 function parseAnimation(shorthand: string): {
@@ -326,6 +360,7 @@ export function compileCssAnimation(source: CssAnimationSource): CompiledCssAnim
     origin: parseOrigin(source.transformOrigin),
     easing: animation.easing,
     stops: keyframes.stops,
+    opacityStops: keyframes.opacityStops,
   };
 }
 
@@ -393,7 +428,32 @@ function interpolateFns(from: TransformFn[], to: TransformFn[], t: number): Affi
  * the browser would draw it.
  */
 export function sampleCssAnimation(animation: CompiledCssAnimation, elapsedMs: number): Affine {
-  const { durationMs, stops } = animation;
+  const { from, to, t } = segmentAt(animation, animation.stops, elapsedMs);
+  const matrix = interpolateFns(from.fns, to.fns, t);
+
+  const { x, y } = animation.origin;
+  if (x === 0 && y === 0) return matrix;
+  return multiplyAffine(multiplyAffine(translation(x, y), matrix), translation(-x, -y));
+}
+
+/**
+ * The animation's opacity `elapsedMs` after it started, timed exactly like
+ * `sampleCssAnimation` (same loop, delay and per-segment timing function):
+ * 1 when its keyframes never set `opacity`.
+ */
+export function sampleCssOpacity(animation: CompiledCssAnimation, elapsedMs: number): number {
+  if (animation.opacityStops.length === 0) return 1;
+  const { from, to, t } = segmentAt(animation, animation.opacityStops, elapsedMs);
+  return lerp(from.value, to.value, t);
+}
+
+/** The two stops around `elapsedMs`'s point in the cycle, and the eased progress between them. */
+function segmentAt<S extends { offset: number }>(
+  animation: CompiledCssAnimation,
+  stops: readonly S[],
+  elapsedMs: number,
+): { from: S; to: S; t: number } {
+  const { durationMs } = animation;
   const cycleMs = (((elapsedMs - animation.delayMs) % durationMs) + durationMs) % durationMs;
   const phase = cycleMs / durationMs;
 
@@ -403,9 +463,5 @@ export function sampleCssAnimation(animation: CompiledCssAnimation, elapsedMs: n
   const to = stops[index + 1];
   const span = to.offset - from.offset;
   const local = span <= 0 ? 1 : Math.min(1, Math.max(0, (phase - from.offset) / span));
-  const matrix = interpolateFns(from.fns, to.fns, animation.easing(local));
-
-  const { x, y } = animation.origin;
-  if (x === 0 && y === 0) return matrix;
-  return multiplyAffine(multiplyAffine(translation(x, y), matrix), translation(-x, -y));
+  return { from, to, t: animation.easing(local) };
 }

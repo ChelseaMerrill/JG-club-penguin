@@ -368,12 +368,11 @@ describe('NPCS', () => {
     // Names/titles from design/Characters.dc.html (Emily, Dom, Millie, Casey,
     // Ryan and Sam are on its TITLE TBD list); tags and idle lines verbatim
     // from each Room design's nameplates and bubbles. Static bubbles are
-    // `periodS: 0`; Team Room 1's `jtalk` (4s, shown from 38%) and `domtalk`
-    // (6s, from 39%) and Team Room 3's `rats` (10s, from 80%) are
-    // re-expressed under the shared 7% show window: (0.38 - 0.07) * 4 =
-    // 1.24s -> -2.76s, (0.39 - 0.07) * 6 = 1.92s -> -4.08s, and
-    // (0.80 - 0.07) * 10 = 7.3s -> -2.7s. Repeat appearances get a
-    // `-<room>` suffixed id.
+    // `periodS: 0`; Team Room 3's `rats` (10s, from 80%) is re-expressed
+    // under the shared 7% show window: (0.80 - 0.07) * 10 = 7.3s -> -2.7s.
+    // Team Room 1's `jtalk` (4s, shown 38%-76%) and `domtalk` (6s, shown
+    // 39%-66%) carry their own windows (owner request, 2026-09-30, Track D).
+    // Repeat appearances get a `-<room>` suffixed id.
     expect(NPCS.emily).toMatchObject({
       kind: 'human',
       name: 'Emily Smith',
@@ -395,14 +394,18 @@ describe('NPCS', () => {
       title: 'Director of Digital Media',
       roomId: 'team-room-1',
       tagName: 'Jethro',
-      idleLines: [{ text: "Act natural. Camera's rolling.", periodS: 4, delayS: -2.76 }],
+      idleLines: [
+        { text: "Act natural. Camera's rolling.", periodS: 4, delayS: 0, window: [0.38, 0.76] },
+      ],
     });
     expect(NPCS['dom-team-room-1']).toMatchObject({
       name: 'Dom Favata',
       title: null,
       roomId: 'team-room-1',
       tagName: 'Dom',
-      idleLines: [{ text: 'you gotta be faster than that', periodS: 6, delayS: -4.08 }],
+      idleLines: [
+        { text: 'you gotta be faster than that', periodS: 6, delayS: 0, window: [0.39, 0.66] },
+      ],
     });
     expect(NPCS['ian-team-room-2']).toMatchObject({
       name: 'Ian Ballard',
@@ -534,7 +537,6 @@ describe('NPCS', () => {
 
   it("draws each repeat appearance with the same figure and dialog line as the person's first Room (#51)", () => {
     const repeats: [NpcId, NpcId][] = [
-      ['dom-team-room-1', 'dom'],
       ['ian-team-room-2', 'ian'],
       ['millie-team-room-3', 'millie'],
       ['casey-team-room-3', 'casey'],
@@ -564,7 +566,6 @@ describe('NPCS', () => {
     // whiteboard marker. Their other Rooms' designs draw none of that.
     const overrides: [NpcId, NpcId, Record<string, unknown>][] = [
       ['anthony', 'anthony-hallway', { prop: 'fishingRod' }],
-      ['jethro', 'jethro-team-room-1', { cameraRig: true }],
       ['ryan', 'ryan-team-room-4', { marker: expect.anything() }],
       ['sam', 'sam-team-room-4', { marker: expect.anything() }],
       // Town Center's Jon holds playing cards and the Icebox's Nicole has a
@@ -581,6 +582,34 @@ describe('NPCS', () => {
       expect(withOverride.figure, roomOwn).toEqual({ ...plain.figure, ...added });
       expect(withOverride.dialogLines[0], roomOwn).toBe(plain.dialogLines[0]);
     }
+
+    // Team Room 1's design wins for its own two NPCs (owner request,
+    // 2026-09-30, Track D): Dom runs in a kit that replaces his shirt and
+    // collar, and Jethro's hands and camera are its `jdown` camera-raise
+    // group. The Icebox's Jethro wears a chest camera rig instead, so Jethro
+    // has no plain appearance left; both keep the same sheet spec underneath.
+    const [dom, domTeamRoom1, jethro, jethroTeamRoom1] = (
+      ['dom', 'dom-team-room-1', 'jethro', 'jethro-team-room-1'] as const
+    ).map((id) => {
+      const npc = NPCS[id];
+      if (npc.kind !== 'human') throw new Error(`expected ${id} to be a Human NPC`);
+      return npc;
+    });
+    expect(domTeamRoom1.figure).toEqual({
+      ...dom.figure,
+      top: undefined,
+      collar: undefined,
+      runner: true,
+    });
+    expect(domTeamRoom1.dialogLines[0]).toBe(dom.dialogLines[0]);
+    const { cameraRig, ...jethroSheet } = jethro.figure;
+    expect(cameraRig).toBe(true);
+    expect(jethroTeamRoom1.figure).toEqual({
+      ...jethroSheet,
+      prop: undefined,
+      cameraRaise: 'lowered',
+    });
+    expect(jethroTeamRoom1.dialogLines[0]).toBe(jethro.dialogLines[0]);
   });
 
   it('gives Front Desk a single static (periodS: 0) idle line', () => {

@@ -286,6 +286,61 @@ describe('renderNpcSvg', () => {
     );
   });
 
+  it("dresses Team Room 1's Dom in the design's running kit, and only there", () => {
+    // Verbatim from `design/Team Room 1.dc.html` (and `design/Characters.dc.html`'s sheet).
+    const svg = renderRosterNpc('dom-team-room-1');
+    const tankTop =
+      '<path d="M42 66 H50 Q60 76 70 66 H78 L84 94 H36 Z" fill="#D9534F" stroke="#0C4B5F" stroke-width="2">';
+    expect(svg).toContain(tankTop);
+    expect(svg).toContain('<rect x="34" y="92" width="52" height="18" fill="#161719">');
+    expect(svg).toContain(
+      '<rect x="50" y="77" width="20" height="12" rx="1.5" fill="#F4F4F4" stroke="#0C4B5F" stroke-width="1.5">',
+    );
+    expect(svg).toContain(
+      '<path d="M35.5 27 Q60 19 84.5 27 L85 33 Q60 25 35 33 Z" fill="#D9534F" stroke="#0C4B5F" stroke-width="2">',
+    );
+    expect(svg).toContain(
+      '<rect x="24" y="86" width="12" height="5" fill="#00BDFF" stroke="#0C4B5F" stroke-width="1.5">',
+    );
+    expect(svg).toContain(
+      '<path d="M42 117 H58 Q61 117 61 121 V125 H42 Q39 125 39 121 Q39 117 42 117 Z" fill="#00BDFF" stroke="#0C4B5F" stroke-width="2">',
+    );
+    // Bare legs and arms, and a bare torso under the tank top.
+    expect(svg).toContain(
+      '<rect x="47" y="104" width="10" height="16" rx="3" fill="#F6DCC6" stroke="#0C4B5F" stroke-width="2">',
+    );
+    expect(svg).toContain(
+      '<rect x="34" y="66" width="52" height="44" rx="12" fill="#F6DCC6" stroke="#0C4B5F" stroke-width="2.5">',
+    );
+    expect(svg).toContain(
+      '<rect x="24" y="70" width="12" height="30" rx="6" fill="#F6DCC6" stroke="#0C4B5F" stroke-width="2.5">',
+    );
+    expect(svg).not.toContain('<rect x="46" y="104" width="12" height="18"');
+    // His laptop, as in the design.
+    expect(svg).toContain('<rect x="86" y="84" width="22" height="14"');
+    // The Dev Pit's and the Mullet's Dom keep humans.js's office clothes.
+    expect(renderRosterNpc('dom')).not.toContain(tankTop);
+    expect(renderRosterNpc('dom-mullet')).not.toContain(tankTop);
+  });
+
+  it("draws Team Room 1's Jethro with his hands and camera after his face, as the design's `jdown` group", () => {
+    const svg = renderRosterNpc('jethro-team-room-1');
+    const hand =
+      '<circle cx="30" cy="101" r="5.5" fill="#F6DCC6" stroke="#0C4B5F" stroke-width="2">';
+    const camera =
+      '<rect x="84" y="82" width="26" height="18" rx="3" fill="#161719" stroke="#0C4B5F" stroke-width="2">';
+    const beard = '<path d="M38 44 C38 66 48 72 60 72';
+    expect(svg.split(hand)).toHaveLength(2);
+    expect(svg.split(camera)).toHaveLength(2);
+    expect(svg.indexOf(hand)).toBeGreaterThan(svg.indexOf(beard));
+    expect(svg.indexOf(camera)).toBeGreaterThan(svg.indexOf(hand));
+    // While the camera raise plays, both belong to its prop layers instead.
+    const raising = renderNpcSvg({ style: 'short', cameraRaise: 'raising' });
+    expect(raising).not.toContain('<circle cx="30" cy="101"');
+    expect(raising).not.toContain('<circle cx="90" cy="101"');
+    expect(raising).not.toContain('<rect x="84" y="82" width="26"');
+  });
+
   it("never draws a <text> element (an SVG loaded as a Phaser texture can't use page web fonts)", () => {
     for (const figure of humanFigures) {
       expect(renderNpcSvg(figure)).not.toContain('<text');
