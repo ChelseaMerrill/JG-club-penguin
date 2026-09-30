@@ -49,8 +49,9 @@ describe('NPCS', () => {
     // still reference his name/title/figure) -- so he's an intentional
     // exception to "every NPC has exactly one Room slot".
     // Anthony too (#146): the Phishing Quiz places him at the door he guards,
-    // one shared Room at a time, so no Room lists him.
-    const NO_LONGER_PLACED: NpcId[] = ['dom', 'anthony'];
+    // one shared Room at a time, so no Room lists him. Ryan and Sam likewise
+    // left the Dev Pit (owner request, 2026-09-30); Team Room 4 has its own.
+    const NO_LONGER_PLACED: NpcId[] = ['dom', 'anthony', 'ryan', 'sam'];
 
     for (const npc of Object.values(NPCS)) {
       if (NO_LONGER_PLACED.includes(npc.id)) continue;
@@ -232,15 +233,11 @@ describe('NPCS', () => {
           }
         }
       }
-      // Overlaps the Room design itself draws at rest, kept as designed: Dev
-      // Pit's Steven's pills (`y="323.4"`, 30 tall, x 957.8-1202.2) cover the
-      // bottom 14 px of Ryan's nameplate (`<rect x="974" y="317.4"
-      // width="52" height="20">`); in-game only its bottom 4 px, below the
-      // text.
-      const drawnByTheDesign = [
-        `dev-pit: steven "Boxes and arrows. Mostly arrows." x ryan's nameplate "Ryan"`,
-        `dev-pit: steven "This diagram scales. Trust me." x ryan's nameplate "Ryan"`,
-      ];
+      // Overlaps the Room design itself draws at rest, kept as designed. None
+      // now: the only one, Dev Pit's Steven's pills over the bottom of Ryan's
+      // nameplate, went when Ryan left the Dev Pit (owner request,
+      // 2026-09-30).
+      const drawnByTheDesign: string[] = [];
       expect(collisions.filter((collision) => !drawnByTheDesign.includes(collision))).toEqual([]);
       // Each allowed overlap still happens, so a stale entry can't linger.
       for (const allowed of drawnByTheDesign) expect(collisions).toContain(allowed);

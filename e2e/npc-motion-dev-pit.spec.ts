@@ -17,13 +17,14 @@ const LONG_WALK_TIMEOUT = 15_000;
 const PROOF_ROOT = 'test-results/npc-motion-dev-pit';
 /** The centre of `RoomScene`'s click zone for a Human NPC, relative to its feet. */
 const HIT_ZONE_OFFSET_Y = npcLayout({ kind: 'human' }).hitArea.centerY;
-/** Ian walks an authored loop (owner request, 2026-09-25, Track D), Ryan
- *  walks-and-dances, Sam walks-and-spins. Dom was removed from this Room
- *  (same request). */
-const MOVING_NPCS = ['ian', 'ryan', 'sam'];
-/** Ashley and Steven stay at their slot: Steven's scribbling pen is an
- *  in-place prop only, so his own feet never move. */
-const STILL_NPCS = ['ashley', 'steven'];
+/** Ian and Steven walk authored loops (owner requests, 2026-09-25 and
+ *  2026-09-30, Track D). Dom, Ryan and Sam were removed from this Room
+ *  (the same requests). */
+const MOVING_NPCS = ['ian', 'steven'];
+/** Ashley stays at her slot; she throws her chicken instead. */
+const STILL_NPCS = ['ashley'];
+/** No longer Dev Pit NPCs: no slot, and no `__roomDebug.npcs` entry. */
+const REMOVED_NPCS = ['dom', 'ryan', 'sam'];
 
 test.use({ viewport: { width: 1600, height: 900 } });
 
@@ -77,22 +78,22 @@ async function bootDevPit(page: Page): Promise<string[]> {
   return errors;
 }
 
-test('Dev Pit NPCs perform their designed motions: Ian, Ryan and Sam walk', async ({ page }) => {
+test('Dev Pit NPCs perform their motions: Ian and Steven walk', async ({ page }) => {
   const dir = proofDir('npcs-move');
   const errors = await bootDevPit(page);
 
   for (const id of MOVING_NPCS) expect((await npc(page, id)).moving).toBe(true);
-  // Ashley and Steven never leave their slot tile.
+  // Ashley never leaves her slot tile.
   for (const id of STILL_NPCS) {
     const slot = devPit.npcSlots.find((s) => s.npcId === id);
     if (!slot) throw new Error(`expected dev-pit to have a "${id}" NPC slot`);
     const rest = tileToScreen(slot.tile, devPit.grid.origin);
     expect(await npc(page, id)).toMatchObject({ x: rest.x, y: rest.y, moving: false });
   }
-  // Dom removed from the Dev Pit (owner request, 2026-09-25, Track D): no
-  // slot, and no `__roomDebug.npcs` entry either.
-  expect(devPit.npcSlots.some((slot) => slot.npcId === 'dom')).toBe(false);
-  expect((await debugInfo(page))?.npcs?.dom).toBeUndefined();
+  for (const id of REMOVED_NPCS) {
+    expect(devPit.npcSlots.some((slot) => slot.npcId === id)).toBe(false);
+    expect((await debugInfo(page))?.npcs?.[id]).toBeUndefined();
+  }
 
   const start = await npc(page, 'ian');
   const seen = [start];
@@ -108,28 +109,15 @@ test('Dev Pit NPCs perform their designed motions: Ian, Ryan and Sam walk', asyn
   expect(new Set(seen.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`)).size).toBeGreaterThan(1);
   expect(last.x).not.toBeCloseTo(start.x);
 
-  // Close-ups: Ian mid-walk, Ryan and Sam with their scribbling pens, and
-  // Steven at his slot (still, but his pen prop moves in place).
-  const ian = await npc(page, 'ian');
-  await page.screenshot({
-    path: `${dir}/ian-walk-close-up.png`,
-    clip: { x: ian.x - 110, y: ian.y - 170, width: 220, height: 210 },
-  });
-  const ryan = await npc(page, 'ryan');
-  await page.screenshot({
-    path: `${dir}/ryan-scribble-close-up.png`,
-    clip: { x: ryan.x - 110, y: ryan.y - 170, width: 220, height: 210 },
-  });
-  const sam = await npc(page, 'sam');
-  await page.screenshot({
-    path: `${dir}/sam-scribble-close-up.png`,
-    clip: { x: sam.x - 110, y: sam.y - 170, width: 220, height: 210 },
-  });
-  const steven = await npc(page, 'steven');
-  await page.screenshot({
-    path: `${dir}/steven-scribble-close-up.png`,
-    clip: { x: steven.x - 110, y: steven.y - 170, width: 220, height: 210 },
-  });
+  // Close-ups: Ian and Steven mid-walk (Steven drawn as the Characters
+  // sheet's STEVEN ZGALJIC card).
+  for (const id of MOVING_NPCS) {
+    const p = await npc(page, id);
+    await page.screenshot({
+      path: `${dir}/${id}-walk-close-up.png`,
+      clip: { x: p.x - 110, y: p.y - 170, width: 220, height: 210 },
+    });
+  }
 
   expect(errors).toEqual([]);
 });
@@ -189,6 +177,28 @@ test('clicking a walking Ian pauses him, opens his dialog, and GRAB THE HAMMER o
   expect(errors).toEqual([]);
 });
 
+test('Ashley throws her chicken at the Penguin in the Room, again and again', async ({ page }) => {
+  const dir = proofDir('chicken-toss');
+  const errors = await bootDevPit(page);
+
+  // The first toss goes 2.5 s in, then one every 9 s.
+  await expect
+    .poll(async () => (await debugInfo(page))?.chickenToss?.flying, { timeout: BOOT_TIMEOUT })
+    .toBe(true);
+  // Alone in the Room, the local Penguin is the only target.
+  expect((await debugInfo(page))?.chickenToss).toMatchObject({ tosses: 1, lastTargetId: 'local' });
+  await page.waitForTimeout(500);
+  await page.screenshot({ path: `${dir}/in-flight.png` });
+  await expect
+    .poll(async () => (await debugInfo(page))?.chickenToss?.flying, { timeout: BOOT_TIMEOUT })
+    .toBe(false);
+  await expect
+    .poll(async () => (await debugInfo(page))?.chickenToss?.tosses, { timeout: 12_000 })
+    .toBe(2);
+
+  expect(errors).toEqual([]);
+});
+
 test('with prefers-reduced-motion, every NPC stands still at its slot tile', async ({ page }) => {
   const dir = proofDir('reduced-motion');
   await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -203,6 +213,8 @@ test('with prefers-reduced-motion, every NPC stands still at its slot tile', asy
     expect(first[slot.npcId]).toMatchObject({ x: rest.x, y: rest.y, moving: false });
     expect(later[slot.npcId]).toEqual(first[slot.npcId]);
   }
+  // No chicken toss either.
+  expect((await debugInfo(page))?.chickenToss).toBeNull();
   await page.screenshot({ path: `${dir}/still.png` });
 
   expect(errors).toEqual([]);

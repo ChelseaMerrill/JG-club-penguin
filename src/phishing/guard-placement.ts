@@ -1,6 +1,13 @@
 import type { RoomId, Tile } from '../contracts';
 import { doorApproachTile, npcInteractionTile } from '../game/movement/targets';
+import {
+  compileCssAnimation,
+  sampleCssAnimation,
+  transformPoint,
+} from '../game/npcs/css-keyframes';
+import { screenToTile, TILE_HEIGHT, TILE_WIDTH, tileToScreen } from '../game/rooms/iso';
 import type { RoomDefinition, RoomDoor } from '../game/rooms/room-definition';
+import { getNpcMotion, type NpcMotionSpec } from '../npcs/npc-motions';
 import type { NpcId } from '../npcs/npcs';
 import { GUARD_NPC_ID, type GuardWindow, type PhishingState } from './phishing-client';
 
@@ -64,19 +71,112 @@ export function guardTile(
   }
   // Clear of the Room's own NPCs where there's room (not on or next to one,
   // so he and his click zone don't overlap theirs), else just not on one.
+  // Where there's room he's also off every tile a roaming NPC walks over:
+  // one passing in front of him would otherwise take the clicks meant for
+  // him (Phaser hit-tests only the topmost zone).
   const npcTiles = room.npcSlots.map((slot) => slot.tile);
+  const pathTiles = npcOccupiedTiles(room);
+  const on = (tiles: Tile[], tile: Tile) =>
+    tiles.some((npc) => npc.col === tile.col && npc.row === tile.row);
   const without = (blocked: (tile: Tile) => boolean) =>
     room.walkable.map((row, rowIndex) =>
       row.map((cell, col) => cell && !blocked({ col, row: rowIndex })),
     );
   for (const blocked of [
+    (tile: Tile) => npcTiles.some((npc) => isNextTo(npc, tile)) || on(pathTiles, tile),
+    (tile: Tile) => on(pathTiles, tile),
     (tile: Tile) => npcTiles.some((npc) => isNextTo(npc, tile)),
-    (tile: Tile) => npcTiles.some((npc) => npc.col === tile.col && npc.row === tile.row),
+    (tile: Tile) => on(npcTiles, tile),
   ]) {
     const tile = npcInteractionTile(without(blocked), { npcId: GUARD_NPC_ID, tile: playerTile });
     if (tile.col !== playerTile.col || tile.row !== playerTile.row) return tile;
   }
   return npcInteractionTile(room.walkable, { npcId: GUARD_NPC_ID, tile: playerTile });
+}
+
+/** How finely `npcOccupiedTiles` samples each path loop: well under a tile per step. */
+const PATH_SAMPLES = 200;
+
+/**
+ * Every Tile a Room NPC stands on or walks over: its slot tile, plus each
+ * tile its designed `path` (`npc-motions.ts`) crosses during one loop.
+ */
+export function npcOccupiedTiles(room: RoomDefinition): Tile[] {
+  const seen = new Map<string, Tile>();
+  const add = (tile: Tile): void => {
+    seen.set(`${tile.col},${tile.row}`, tile);
+  };
+  for (const slot of room.npcSlots) {
+    add(slot.tile);
+    const path = getNpcMotion(slot.npcId)?.path;
+    if (!path) continue;
+    const compiled = compileCssAnimation(path);
+    const rest = tileToScreen(slot.tile, room.grid.origin);
+    for (let step = 0; step < PATH_SAMPLES; step += 1) {
+      const matrix = sampleCssAnimation(compiled, (compiled.durationMs * step) / PATH_SAMPLES);
+      const offset = transformPoint(matrix, { x: 0, y: 0 });
+      add(screenToTile({ x: rest.x + offset.x, y: rest.y + offset.y }, room.grid.origin));
+    }
+  }
+  return [...seen.values()];
+}
+
+/**
+ * How long one pacing loop takes: out to one side, back, out to the other,
+ * back.
+ */
+export const GUARD_PACE_PERIOD_S = 10;
+
+/**
+ * Anthony pacing at the door he guards (owner request, 2026-09-30, Track D):
+ * from his post `tile` out one tile to one side and back, then out to the
+ * other side and back, over walkable tiles no Room NPC stands on or walks
+ * over (`npcOccupiedTiles`).
+ * The two sides are opposite each other where they can be (across the door
+ * first, then along it), so he stays in front of it. `undefined` when no
+ * tile next to him is free (he then stands still, as before). His post
+ * doesn't move: the door stays guarded and his dialog still opens from it.
+ *
+ * The `translate()`s are `tileToScreen` deltas (Stage pixels) from his post,
+ * the same units every NPC's `path` uses (`motions/types.ts`).
+ */
+export function guardPaceMotion(room: RoomDefinition, tile: Tile): NpcMotionSpec | undefined {
+  const occupied = npcOccupiedTiles(room);
+  const free = (dc: number, dr: number): boolean => {
+    const col = tile.col + dc;
+    const row = tile.row + dr;
+    if (room.walkable[row]?.[col] !== true) return false;
+    return !occupied.some((npc) => npc.col === col && npc.row === row);
+  };
+  const axes: [number, number][][] = [
+    [
+      [-1, 0],
+      [1, 0],
+    ],
+    [
+      [0, -1],
+      [0, 1],
+    ],
+  ];
+  const opposite = axes.find((pair) => pair.every(([dc, dr]) => free(dc, dr)));
+  const sides = opposite ?? axes.flat().filter(([dc, dr]) => free(dc, dr));
+  const [first, second] = sides;
+  if (!first) return undefined;
+  const offset = ([dc, dr]: [number, number]): string =>
+    `translate(${((dc - dr) * TILE_WIDTH) / 2}px,${((dc + dr) * TILE_HEIGHT) / 2}px)`;
+  const home = 'translate(0,0)';
+  return {
+    path: {
+      keyframes: `@keyframes guardPace { 0%,10% { transform: ${home};} 25%,35% { transform: ${offset(first)};} 50%,60% { transform: ${home};} 75%,85% { transform: ${second ? offset(second) : home};} 100% { transform: ${home};} }`,
+      animation: `guardPace ${GUARD_PACE_PERIOD_S}s ease-in-out infinite`,
+    },
+    // The design's generic `idle` bob, as every authored walk uses.
+    figure: {
+      keyframes:
+        '@keyframes idle { 0%,100% { transform: translateY(0);} 50% { transform: translateY(-3px);} }',
+      animation: 'idle 3s ease-in-out infinite',
+    },
+  };
 }
 
 /** Whether two Tiles touch (the same tile or one of its eight neighbours). */
