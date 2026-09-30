@@ -20,6 +20,12 @@ describe('npcScale', () => {
     expect(npcScale({ kind: 'human' })).toBe(0.62);
     expect(npcScale({ kind: 'penguin' })).toBe(0.58);
   });
+
+  it("uses an NPC's own scale when its Room design draws it at another (Team Room 3's 0.58)", () => {
+    expect(npcScale({ kind: 'human', scale: 0.58 })).toBe(0.58);
+    expect(npcScale(NPCS['millie-team-room-3'])).toBe(0.58);
+    expect(npcScale(NPCS.millie)).toBe(0.62);
+  });
 });
 
 describe('npcLayout', () => {

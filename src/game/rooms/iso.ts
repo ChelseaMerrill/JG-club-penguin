@@ -49,6 +49,18 @@ export function tileToScreen(tile: Tile, origin: GridOrigin): ScreenPoint {
 }
 
 /**
+ * Where an NPC slot's NPC is drawn: its tile's point, shifted by the slot's
+ * own `offset` (a `RoomNpcSlot`'s exact design position) when it has one.
+ */
+export function npcSlotPoint(
+  slot: { tile: Tile; offset?: ScreenPoint },
+  origin: GridOrigin,
+): ScreenPoint {
+  const point = tileToScreen(slot.tile, origin);
+  return slot.offset ? { x: point.x + slot.offset.x, y: point.y + slot.offset.y } : point;
+}
+
+/**
  * Inverts the tile diamond geometry: given any screen point, finds the tile
  * whose diamond contains it (not just a tile's exact centre or corner), by
  * flooring the real-valued inverse of `tileCornerToScreen`'s linear map.

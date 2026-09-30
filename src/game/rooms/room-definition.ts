@@ -50,6 +50,30 @@ export interface RoomDoor {
 export interface RoomNpcSlot {
   npcId: string;
   tile: Tile;
+  /**
+   * Stage pixels from `tile`'s point to where the Room design actually
+   * stands the NPC, when that isn't the tile's centre: e.g. Team Room 3's
+   * Millie, seated at the end of her desk. Only where the NPC is drawn (and
+   * clicked) moves; walking to it, blocking and depth stay on `tile`.
+   */
+  offset?: StagePoint;
+}
+
+/**
+ * A piece of the Room design's furniture drawn in front of an NPC, as the
+ * design paints it after that NPC's figure: Team Room 3's desks in front of
+ * Millie and Sydney and the couch's front around Casey, so they sit at them
+ * instead of standing on top of the baked-in art. A transparent 1600x900
+ * image exported from the design by `scripts/export-room-art.ts`
+ * (`FOREGROUND_LAYERS`), sorted just in front of `overNpcId`'s slot tile:
+ * a Penguin behind the furniture is covered by it too, and one in front of it
+ * draws over it. NPC nameplates are drawn with the figure, so a layer must
+ * not overlap one (the designs never do).
+ */
+export interface RoomForeground {
+  key: string;
+  url: string;
+  overNpcId: string;
 }
 
 /** A point in Stage pixels (1600x900), for things that aren't on a floor Tile. */
@@ -156,4 +180,6 @@ export interface RoomDefinition {
   hotspots?: readonly RoomHotspot[];
   /** DOM-rendered wall/signage text (#77 D2): e.g. Town Center's Core Values poster. */
   wallText?: readonly RoomWallText[];
+  /** Furniture the design draws in front of its NPCs (see `RoomForeground`). */
+  foregrounds?: readonly RoomForeground[];
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   depthForTile,
+  npcSlotPoint,
   screenToTile,
   tileCornerToScreen,
   tileToScreen,
@@ -121,5 +122,17 @@ describe('depthForTile', () => {
 
   it('is stable for the same tile', () => {
     expect(depthForTile({ col: 4, row: 6 })).toBe(depthForTile({ col: 4, row: 6 }));
+  });
+});
+
+describe('npcSlotPoint', () => {
+  it('draws an NPC at its tile point, shifted by its slot offset when it has one', () => {
+    const tile = { col: 2, row: 3 };
+    expect(npcSlotPoint({ tile }, ORIGIN)).toEqual(tileToScreen(tile, ORIGIN));
+    const { x, y } = tileToScreen(tile, ORIGIN);
+    expect(npcSlotPoint({ tile, offset: { x: -35, y: -2.5 } }, ORIGIN)).toEqual({
+      x: x - 35,
+      y: y - 2.5,
+    });
   });
 });

@@ -1095,6 +1095,107 @@ type ArtFix = {
   comment: string;
 };
 
+/**
+ * Furniture a Room design paints *after* an NPC's figure, so it covers that
+ * NPC (owner request, 2026-09-30, Track D): each layer is exported on its
+ * own, on a transparent Stage, to `public/rooms/<roomId>-front-<name>.png`,
+ * and drawn by `RoomScene` just in front of its NPC (`RoomForeground`,
+ * `src/game/rooms/room-definition.ts`). The same shapes stay in the Room's
+ * own background PNG too, underneath. Selectors match the design's own
+ * shapes exactly, one element each.
+ */
+const FOREGROUND_LAYERS: Partial<
+  Record<RoomId, Array<{ name: string; selectors: string[]; comment: string }>>
+> = {
+  'team-room-3': [
+    {
+      name: 'millie-desk',
+      selectors: [
+        'polygon[points="535,448 645,503 595,528 485,473"]',
+        'polygon[points="485,520.5 595,575.5 595,528 485,473"]',
+        'polygon[points="645,550.5 595,575.5 595,528 645,503"]',
+        'polygon[points="535,441.5 650,499 595,526.5 480,469"]',
+        'polygon[points="480,473 595,530.5 595,526.5 480,469"]',
+        'polygon[points="650,503 595,530.5 595,526.5 650,499"]',
+        'polygon[points="530,451.5 575,474 571,476 526,453.5"]',
+        'polygon[points="526,481 571,503.5 571,476 526,453.5"]',
+        'polygon[points="575,501.5 571,503.5 571,476 575,474"]',
+        'polygon[points="560,464.5 595,482 582.5,488.3 547.5,470.8"]',
+        'polygon[points="547.5,472.8 582.5,490.3 582.5,488.3 547.5,470.8"]',
+        'polygon[points="595,484 582.5,490.3 582.5,488.3 595,482"]',
+      ],
+      comment:
+        "Millie's desk, its monitor and keyboard, drawn after her figure: she sits behind it, hidden from the waist down.",
+    },
+    {
+      name: 'casey-couch-arm',
+      selectors: [
+        'polygon[points="868,402 882,409 882,425 868,418"]',
+        'polygon[points="932,384 882,409 882,425 932,400"]',
+        'polygon[points="918,377 932,384 882,409 868,402"]',
+      ],
+      comment:
+        "The couch's right arm, drawn after Casey's figure: she sits in the couch, beside it.",
+    },
+    {
+      name: 'sydney-desk',
+      selectors: [
+        'polygon[points="780,594 790,599 790,643 780,638"]',
+        'polygon[points="840,574 790,599 790,643 840,618"]',
+        'polygon[points="830,569 840,574 790,599 780,594"]',
+        'polygon[points="880,644 890,649 890,693 880,688"]',
+        'polygon[points="940,624 890,649 890,693 940,668"]',
+        'polygon[points="930,619 940,624 890,649 880,644"]',
+        'polygon[points="780,588 890,643 890,649 780,594"]',
+        'polygon[points="940,618 890,643 890,649 940,624"]',
+        'polygon[points="830,563 940,618 890,643 780,588"]',
+        'polygon[points="818,543 852,560 852,590 818,573"]',
+        'polygon[points="856,558 852,560 852,590 856,588"]',
+        'polygon[points="822,541 856,558 852,560 818,543"]',
+        'polygon[points="825,578.5 833,582.5 833,586.5 825,582.5"]',
+        'polygon[points="839,579.5 833,582.5 833,586.5 839,583.5"]',
+        'polygon[points="831,575.5 839,579.5 833,582.5 825,578.5"]',
+        'polygon[points="840,602 864,614 864,616 840,604"]',
+        'polygon[points="874,609 864,614 864,616 874,611"]',
+        'polygon[points="850,597 874,609 864,614 840,602"]',
+      ],
+      comment:
+        "Sydney's desk, its monitor, mouse and keyboard, drawn after her figure: she sits behind it, hidden from the waist down.",
+    },
+  ],
+};
+
+/**
+ * On a transparent Stage, shows only the elements matching `selectors`
+ * (`visibility` is inherited but a descendant can opt back in, in HTML and
+ * SVG alike, so their hidden ancestors don't hide them). The Stage element
+ * itself stays visible, with no background, border or shadow, so it can
+ * still be screenshotted.
+ */
+function isolateElements({ stage, selectors }: { stage: string; selectors: string[] }): void {
+  const style = document.createElement('style');
+  style.textContent =
+    'html, body, body * { visibility: hidden !important; background: transparent !important; }';
+  document.head.append(style);
+  const stageElement = document.querySelector<HTMLElement>(stage);
+  if (!stageElement) throw new Error(`no Stage element: ${stage}`);
+  for (const [property, value] of [
+    ['visibility', 'visible'],
+    ['border-color', 'transparent'],
+    ['box-shadow', 'none'],
+    ['outline', 'none'],
+  ]) {
+    stageElement.style.setProperty(property, value, 'important');
+  }
+  for (const selector of selectors) {
+    const matches = document.querySelectorAll<SVGElement | HTMLElement>(selector);
+    if (matches.length !== 1) {
+      throw new Error(`foreground selector matched ${matches.length} elements, not 1: ${selector}`);
+    }
+    matches[0].style.setProperty('visibility', 'visible', 'important');
+  }
+}
+
 const ART_FIXES: Partial<Record<RoomId, ArtFix[]>> = {
   'the-melt': [
     {
@@ -1470,13 +1571,16 @@ function hideLiveElements(rules: HideRule[]): void {
   }
 }
 
-async function exportRoom(
+/** Opens `roomId`'s design with its animations frozen and fonts loaded, ready to screenshot its Stage. */
+async function openRoomStage(
   browser: import('@playwright/test').Browser,
   port: number,
   roomId: RoomId,
-): Promise<{ roomId: RoomId; outPath: string; bytes: number }> {
+): Promise<{
+  page: import('@playwright/test').Page;
+  stage: import('@playwright/test').Locator;
+}> {
   const file = ROOM_FILES[roomId];
-  const rules = LIVE_ELEMENT_RULES[roomId];
   const page = await browser.newPage({ viewport: { width: STAGE_WIDTH, height: STAGE_HEIGHT } });
 
   const pageErrors: string[] = [];
@@ -1503,6 +1607,16 @@ async function exportRoom(
     await page.close();
     throw new Error(`${file} raised page errors: ${pageErrors.join('; ')}`);
   }
+  return { page, stage };
+}
+
+async function exportRoom(
+  browser: import('@playwright/test').Browser,
+  port: number,
+  roomId: RoomId,
+): Promise<{ roomId: RoomId; outPath: string; bytes: number }> {
+  const rules = LIVE_ELEMENT_RULES[roomId];
+  const { page, stage } = await openRoomStage(browser, port, roomId);
 
   await page.evaluate(hideLiveElements, rules);
   await page.evaluate(applyArtFixes, ART_FIXES[roomId] ?? []);
@@ -1518,6 +1632,29 @@ async function exportRoom(
 
   const { size } = await stat(outPath);
   return { roomId, outPath, bytes: size };
+}
+
+/** Exports each of `roomId`'s `FOREGROUND_LAYERS` to its own transparent PNG. */
+async function exportForegrounds(
+  browser: import('@playwright/test').Browser,
+  port: number,
+  roomId: RoomId,
+): Promise<Array<{ roomId: RoomId; outPath: string; bytes: number }>> {
+  const results: Array<{ roomId: RoomId; outPath: string; bytes: number }> = [];
+  for (const layer of FOREGROUND_LAYERS[roomId] ?? []) {
+    const { page, stage } = await openRoomStage(browser, port, roomId);
+    await page.evaluate(isolateElements, {
+      stage: STAGE_SELECTORS[roomId] ?? STAGE_SELECTOR,
+      selectors: layer.selectors,
+    });
+    await page.waitForTimeout(POST_HIDE_SETTLE_MS);
+    const outPath = path.join(OUTPUT_DIR, `${roomId}-front-${layer.name}.png`);
+    await stage.screenshot({ path: outPath, omitBackground: true });
+    await page.close();
+    const { size } = await stat(outPath);
+    results.push({ roomId, outPath, bytes: size });
+  }
+  return results;
 }
 
 /**
@@ -1543,13 +1680,17 @@ async function main(): Promise<void> {
   try {
     const results: Array<{ roomId: RoomId; outPath: string; bytes: number }> = [];
     for (const roomId of roomIds) {
-      const result = await exportRoom(browser, port, roomId);
-      results.push(result);
-      const kb = (result.bytes / 1024).toFixed(0);
-      const warn = result.bytes > MAX_BYTES ? '  ** OVER 1.5 MB **' : '';
-      console.log(
-        `  ${result.roomId.padEnd(12)} -> ${path.relative(REPO_ROOT, result.outPath)} (${kb} KB)${warn}`,
-      );
+      for (const result of [
+        await exportRoom(browser, port, roomId),
+        ...(await exportForegrounds(browser, port, roomId)),
+      ]) {
+        results.push(result);
+        const kb = (result.bytes / 1024).toFixed(0);
+        const warn = result.bytes > MAX_BYTES ? '  ** OVER 1.5 MB **' : '';
+        console.log(
+          `  ${result.roomId.padEnd(12)} -> ${path.relative(REPO_ROOT, result.outPath)} (${kb} KB)${warn}`,
+        );
+      }
     }
 
     const oversized = results.filter((r) => r.bytes > MAX_BYTES);
