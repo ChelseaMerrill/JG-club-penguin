@@ -18,11 +18,13 @@
  * throws, so a port that needs more fails loudly instead of silently
  * drifting from the design.
  *
- * `opacity` stops are read too, into their own track (`sampleCssOpacity`),
- * for a prop layer that fades as well as moves: Team Room 1's Jethro raising
- * his camera (`jup`) while the lowered one fades out (`jdown`) and the flash
- * blinks (`jflash`) (owner request, 2026-09-30, Track D). Other properties
- * (`filter`, ...) are still ignored.
+ * `opacity` is read too, on its own track the way CSS interpolates each
+ * property separately (only the stops that set it count, a missing 0%/100%
+ * stop meaning the element's own opacity of 1), and sampled by
+ * `sampleCssOpacity` (owner request, 2026-09-30, Track D: Team Room 4's
+ * fading music notes, and Team Room 1's Jethro fading his lowered camera out
+ * while he raises it, `jdown`/`jup`, and its `jflash`). Only NPC `props` layers apply it
+ * (`room-npc-motions.ts`); `path`, `figure` and `stage` motions ignore it.
  */
 
 export interface Point {
@@ -76,7 +78,7 @@ export interface CompiledCssAnimation {
   origin: Point;
   easing: (t: number) => number;
   stops: Stop[];
-  /** Empty when the keyframes never set `opacity` (always fully opaque). */
+  /** Empty when no stop sets `opacity` (the element then stays fully opaque). */
   opacityStops: OpacityStop[];
 }
 
@@ -240,6 +242,12 @@ function parseTransform(value: string): TransformFn[] {
   return fns;
 }
 
+function parseOpacity(token: string): number {
+  const value = Number(token.trim());
+  if (!Number.isFinite(value)) throw new Error(`css-keyframes: unsupported opacity "${token}"`);
+  return Math.min(1, Math.max(0, value));
+}
+
 function parseKeyframes(rule: string): {
   name: string;
   stops: Stop[];
@@ -267,6 +275,7 @@ function parseKeyframes(rule: string): {
       }
       // Anything else (filter, ...) isn't a motion; ignored.
     }
+    if (!transform && opacity === null) continue;
     for (const selector of block[1].split(',')) {
       const s = selector.trim();
       const offset = s === 'from' ? 0 : s === 'to' ? 1 : Number(s.replace('%', '')) / 100;
@@ -279,21 +288,15 @@ function parseKeyframes(rule: string): {
   // CSS: a missing 0%/100% stop uses the element's own (untransformed) value.
   if (stops[0]?.offset !== 0) stops.unshift({ offset: 0, fns: [] });
   if (stops[stops.length - 1].offset !== 1) stops.push({ offset: 1, fns: [] });
+  opacityStops.sort((p, q) => p.offset - q.offset);
+  // The same rule for opacity: the element's own value, fully opaque.
   if (opacityStops.length > 0) {
-    opacityStops.sort((p, q) => p.offset - q.offset);
-    // The same rule for opacity: a prop layer's own opacity is 1.
     if (opacityStops[0].offset !== 0) opacityStops.unshift({ offset: 0, value: 1 });
     if (opacityStops[opacityStops.length - 1].offset !== 1) {
       opacityStops.push({ offset: 1, value: 1 });
     }
   }
   return { name: header[1], stops, opacityStops };
-}
-
-function parseOpacity(value: string): number {
-  const opacity = Number(value.trim());
-  if (!Number.isFinite(opacity)) throw new Error(`css-keyframes: bad opacity "${value}"`);
-  return Math.min(1, Math.max(0, opacity));
 }
 
 function parseAnimation(shorthand: string): {
@@ -366,6 +369,39 @@ export function compileCssAnimation(source: CssAnimationSource): CompiledCssAnim
 
 // --- Sampling ---------------------------------------------------------------
 
+/**
+ * The pair of `stops` around the animation's phase `elapsedMs` after it
+ * started (looping forever, `animation-delay` applied), with the eased
+ * progress `t` between them.
+ */
+function segmentAt<S extends { offset: number }>(
+  animation: CompiledCssAnimation,
+  stops: readonly S[],
+  elapsedMs: number,
+): { from: S; to: S; t: number } {
+  const { durationMs } = animation;
+  const cycleMs = (((elapsedMs - animation.delayMs) % durationMs) + durationMs) % durationMs;
+  const phase = cycleMs / durationMs;
+
+  let index = 0;
+  while (index < stops.length - 2 && phase >= stops[index + 1].offset) index += 1;
+  const from = stops[index];
+  const to = stops[index + 1];
+  const span = to.offset - from.offset;
+  const local = span <= 0 ? 1 : Math.min(1, Math.max(0, (phase - from.offset) / span));
+  return { from, to, t: animation.easing(local) };
+}
+
+/**
+ * The animation's `opacity` `elapsedMs` after it started, timed exactly like
+ * `sampleCssAnimation`'s transform; 1 when no stop sets it.
+ */
+export function sampleCssOpacity(animation: CompiledCssAnimation, elapsedMs: number): number {
+  if (animation.opacityStops.length === 0) return 1;
+  const { from, to, t } = segmentAt(animation, animation.opacityStops, elapsedMs);
+  return lerp(from.value, to.value, t);
+}
+
 function fnToAffine(fn: TransformFn): Affine {
   if (fn.kind === 'translate') return translation(fn.x, fn.y);
   if (fn.kind === 'scale') return { ...IDENTITY, a: fn.x, d: fn.y };
@@ -428,40 +464,10 @@ function interpolateFns(from: TransformFn[], to: TransformFn[], t: number): Affi
  * the browser would draw it.
  */
 export function sampleCssAnimation(animation: CompiledCssAnimation, elapsedMs: number): Affine {
-  const { from, to, t } = segmentAt(animation, animation.stops, elapsedMs);
-  const matrix = interpolateFns(from.fns, to.fns, t);
+  const segment = segmentAt(animation, animation.stops, elapsedMs);
+  const matrix = interpolateFns(segment.from.fns, segment.to.fns, segment.t);
 
   const { x, y } = animation.origin;
   if (x === 0 && y === 0) return matrix;
   return multiplyAffine(multiplyAffine(translation(x, y), matrix), translation(-x, -y));
-}
-
-/**
- * The animation's opacity `elapsedMs` after it started, timed exactly like
- * `sampleCssAnimation` (same loop, delay and per-segment timing function):
- * 1 when its keyframes never set `opacity`.
- */
-export function sampleCssOpacity(animation: CompiledCssAnimation, elapsedMs: number): number {
-  if (animation.opacityStops.length === 0) return 1;
-  const { from, to, t } = segmentAt(animation, animation.opacityStops, elapsedMs);
-  return lerp(from.value, to.value, t);
-}
-
-/** The two stops around `elapsedMs`'s point in the cycle, and the eased progress between them. */
-function segmentAt<S extends { offset: number }>(
-  animation: CompiledCssAnimation,
-  stops: readonly S[],
-  elapsedMs: number,
-): { from: S; to: S; t: number } {
-  const { durationMs } = animation;
-  const cycleMs = (((elapsedMs - animation.delayMs) % durationMs) + durationMs) % durationMs;
-  const phase = cycleMs / durationMs;
-
-  let index = 0;
-  while (index < stops.length - 2 && phase >= stops[index + 1].offset) index += 1;
-  const from = stops[index];
-  const to = stops[index + 1];
-  const span = to.offset - from.offset;
-  const local = span <= 0 ? 1 : Math.min(1, Math.max(0, (phase - from.offset) / span));
-  return { from, to, t: animation.easing(local) };
 }

@@ -23,7 +23,7 @@ const DOOR_HOTSPOT_SIZE = { width: 70, height: 165 };
 // open.
 const WALKABLE: readonly (readonly boolean[])[] = [
   [true, true, true, true, true, true, true, true, true, true, true, true],
-  [true, false, false, false, true, false, true, false, true, false, true, true],
+  [true, false, false, false, true, true, true, false, true, true, true, true],
   [true, false, false, false, false, false, false, true, false, false, true, true],
   [true, true, false, false, false, false, false, true, false, false, true, false],
   [true, true, true, true, true, true, false, true, true, false, true, true],
@@ -87,8 +87,11 @@ export const devPit: RoomDefinition = {
     // there -- is left blocked: nothing in this file's own tests or
     // `reachability.test.ts` requires it to open back up (that test only
     // walks `npcSlots`, which no longer names him).
-    { npcId: 'ryan', tile: { col: 5, row: 1 } },
-    { npcId: 'sam', tile: { col: 9, row: 1 } },
+    // Ryan and Sam removed from the Dev Pit (owner request, 2026-09-30,
+    // Track D): as with Dom, their `NpcDefinition`s stay in `npcs.ts` (Team
+    // Room 4's own Ryan and Sam share their figures), but they no longer
+    // have a slot here. Their former tiles, (5,1) and (9,1), are open again
+    // in `WALKABLE` above; Steven's walk crosses (5,1).
     // Matt is a Penguin (a Player), like "You", not an NPC -- see the export
     // script's `LIVE_ELEMENT_RULES['dev-pit']` labels-rule comment. Players
     // are never part of a static `RoomDefinition`; presence (#28) places

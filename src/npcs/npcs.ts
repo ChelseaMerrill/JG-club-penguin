@@ -262,19 +262,14 @@ export interface PenguinNpcDefinition extends NpcDefinitionBase {
 export type NpcDefinition = HumanNpcDefinition | PenguinNpcDefinition;
 
 /**
- * Dev Pit's whiteboard markers (#113), verbatim from the design's raised-arm
- * `scribble` markup: Ryan's and Sam's cyan, Steven's red, each with its own
- * sleeve and hand colour as drawn.
+ * Dev Pit's cyan whiteboard marker (#113), verbatim from the design's
+ * raised-arm `scribble` markup for Ryan and Sam, with its own sleeve and hand
+ * colour as drawn. (Steven's red one went when he started walking.)
  */
 const DEV_PIT_CYAN_MARKER: HumanFigureSpec['marker'] = {
   arm: '#1f2a4a',
   hand: '#F3D3B8',
   color: '#00BDFF',
-};
-const DEV_PIT_RED_MARKER: HumanFigureSpec['marker'] = {
-  arm: '#2B3557',
-  hand: '#E4B896',
-  color: '#D63C3C',
 };
 
 const BUG_SQUASH_DIALOG: NpcMinigameDialog = {
@@ -472,34 +467,30 @@ const CASEY_FIGURE: HumanFigureSpec = {
 
 /**
  * Sam Schantz's figure, shared by Dev Pit (`sam`) and Team Room 4
- * (`sam-team-room-4`) (#51): the same person, the same `humans.js` spec, in
- * one constant so the copies can't drift.
+ * (`sam-team-room-4`) (#51), in one constant so the copies can't drift. His
+ * card on the Characters sheet (`design/Characters.dc.html`, SAM SCHANTZ,
+ * "MC · FREESTYLE") replaced the older `humans.js` spec (spiky dark hair,
+ * cyan tee, thin glasses, coffee; owner request, 2026-09-30, Track D): brown
+ * curls, a white shirt striped navy/yellow/blue, lavender-tinted glasses,
+ * white sneakers, left arm thrown up and singing into a mic in his right.
  */
 const SAM_FIGURE: HumanFigureSpec = {
-  style: 'spiky',
-  hair: 'dark',
-  skin: 'med',
-  top: '#00BDFF',
-  collar: 'crew',
-  glasses: 'thin',
-  teeth: true,
-  prop: 'coffee',
+  sheet: 'samSchantz',
+  prop: 'mic',
 };
 
 /**
  * Ryan Shendler's figure, shared by Dev Pit (`ryan`) and Team Room 4
- * (`ryan-team-room-4`) (#51): the same person, the same `humans.js` spec, in
- * one constant so the copies can't drift.
+ * (`ryan-team-room-4`) (#51), in one constant so the copies can't drift. His
+ * card on the Characters sheet (`design/Characters.dc.html`, RYAN SHENDLER,
+ * "DJ · MUSIC TRACKS") replaced the older `humans.js` spec (short brown
+ * hair, teal tee, stubble, smirk, laptop; owner request, 2026-09-30, Track
+ * D): black-and-cyan headphones, rectangular glasses, a black shirt, navy
+ * trousers, and both hands on a DJ deck with blinking keys.
  */
 const RYAN_FIGURE: HumanFigureSpec = {
-  style: 'short',
-  hair: 'brown',
-  skin: 'fair',
-  top: '#0C4B5F',
-  collar: 'crew',
-  beard: 'stubble',
-  mouth: 'smirk',
-  prop: 'laptop',
+  sheet: 'ryanShendler',
+  prop: 'djDeck',
 };
 
 /**
@@ -857,19 +848,21 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: 'This diagram scales. Trust me.', periodS: 14, delayS: -9 },
     ],
     dialog: LINE_DIALOG,
+    // As `design/Characters.dc.html`'s STEVEN ZGALJIC card draws him (owner
+    // request, 2026-09-30, Track D), which is newer than `humans.js`'s spec:
+    // grey hair, no beard or grey streaks, a green android badge on his
+    // jacket, and arms down (the Dev Pit design's raised red marker is gone;
+    // he walks instead, `motions/dev-pit.ts`).
     figure: {
       style: 'shortDark',
-      hair: 'dark',
+      hair: 'grey',
       skin: 'med',
       top: '#2B3557',
       pattern: 'dots',
       jacket: '#161719',
       collar: 'crew',
-      beard: 'full',
       mouth: 'smirk',
-      greys: true,
-      // Dev Pit's design raises a red whiteboard marker (`scribble`).
-      marker: DEV_PIT_RED_MARKER,
+      badge: 'android',
     },
   },
   dom: {
@@ -1408,13 +1401,16 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     kind: 'human',
     tagName: 'Casey',
     dialogLines: CASEY_LINES,
-    // `rats 10s`, shown from 80%: (0.80 - 0.07) * 10 = 7.3s, i.e. -2.7s.
-    idleLines: [{ text: 'RATS', periodS: 10, delayS: -2.7 }],
+    // `rats 10s linear infinite`, no delay: fully shown 80%-98% (verbatim
+    // from `design/Team Room 3.dc.html`, owner request, 2026-09-30, Track D).
+    idleLines: [{ text: 'RATS', periodS: 10, delayS: 0, window: [0.8, 0.98] }],
     // The Igloo Gear stall is the Roof Deck's; here she is just gaming.
     // Team Room 3's design draws its NPCs without any idle bob.
     still: true,
     dialog: LINE_DIALOG,
-    figure: CASEY_FIGURE,
+    // The Room design hands her an open laptop, which the Roof Deck's
+    // `casey` doesn't carry (owner request, 2026-09-30, Track D).
+    figure: { ...CASEY_FIGURE, prop: 'openLaptop' },
   },
   'sydney-team-room-3': {
     id: 'sydney-team-room-3',
@@ -1428,7 +1424,9 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     // Team Room 3's design draws its NPCs without any idle bob.
     still: true,
     dialog: LINE_DIALOG,
-    figure: SYDNEY_FIGURE,
+    // The Room design adds a headset, which Town Center's `sydney` doesn't
+    // wear (owner request, 2026-09-30, Track D).
+    figure: { ...SYDNEY_FIGURE, headset: true },
   },
   michael: {
     id: 'michael',
@@ -1463,11 +1461,14 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     title: null,
     roomId: 'team-room-4',
     kind: 'human',
-    tagName: 'Sam',
+    // His full name, not the Room design's "Sam" (owner request, 2026-09-30,
+    // Track D).
+    tagName: 'Sam Schantz',
     dialogLines: SAM_LINES,
     // The design gives him music notes, not a bubble.
     idleLines: [],
-    // Team Room 4's design draws its NPCs without any idle bob.
+    // No #36 idle bob: his Team Room 4 motion plays his Characters sheet
+    // card's own `bob` instead (`src/npcs/motions/team-room-4.ts`).
     still: true,
     dialog: LINE_DIALOG,
     figure: SAM_FIGURE,
@@ -1478,11 +1479,14 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     title: null,
     roomId: 'team-room-4',
     kind: 'human',
-    tagName: 'Ryan',
+    // His full name, not the Room design's "Ryan" (owner request,
+    // 2026-09-30, Track D).
+    tagName: 'Ryan Shendler',
     dialogLines: RYAN_LINES,
     // The design gives him no bubble here.
     idleLines: [],
-    // Team Room 4's design draws its NPCs without any idle bob.
+    // No #36 idle bob: his Team Room 4 motion plays his Characters sheet
+    // card's own `bob` instead (`src/npcs/motions/team-room-4.ts`).
     still: true,
     dialog: LINE_DIALOG,
     figure: RYAN_FIGURE,

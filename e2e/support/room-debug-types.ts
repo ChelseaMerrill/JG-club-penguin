@@ -85,6 +85,8 @@ export interface RoomDebugInfo {
   npcs?: Record<string, NpcMotionDebugInfo>;
   /** #146: the guard NPC (Anthony) in this Room, or `null` for none. */
   guard?: { npcId: string; tile: Tile; doorLabel: string | null; blocking: boolean } | null;
+  /** Ashley's chicken toss in the Dev Pit, or `null` without one (other Rooms, reduced motion). */
+  chickenToss?: { tosses: number; lastTargetId: string | null; flying: boolean } | null;
 }
 
 /** One NPC's motion state (#113). */

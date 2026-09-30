@@ -30,8 +30,9 @@ import {
 export interface NpcPropPose {
   matrix: Affine;
   /**
-   * The layer's own opacity from its design animation (1 without one); a
-   * nested layer's is its own, multiplied by its parent's when drawn.
+   * The layer's own opacity from its design keyframes, 1 without any
+   * (owner request, 2026-09-30, Track D); a nested layer's multiplies with
+   * its parent's, as CSS/Phaser group opacity does.
    */
   alpha: number;
   children: NpcPropPose[];

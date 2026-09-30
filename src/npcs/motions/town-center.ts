@@ -14,10 +14,9 @@ import type { NpcMotionSpec } from './types';
  *   nothing.
  * - `trophyReach`, `trophyShow`: Sydney reaching for, then holding up, a
  *   trophy. Every stop in both `@keyframes` rules sets only `opacity`, never
- *   `transform` -- exactly the case `css-keyframes.ts`'s own docs call out
- *   as unsupported ("opacity, filter, ... ignored"): with no `transform` to
- *   sample, porting these would show the trophy motionless and permanently
- *   visible instead of the design's brief reach-then-show flash.
+ *   `transform`, which `css-keyframes.ts` couldn't read when this Room was
+ *   ported (it can since 2026-09-30, for `props` layers only); they're
+ *   still left out, not re-ported.
  * - `swim`, `feedMe`: Gil the betta fish and his "feed me" bubble, a fish
  *   tank decoration beside Anthony's Roof Deck cameo (see `riders` below),
  *   not an NPC. `swim` also uses `skewY()`, which `css-keyframes.ts` doesn't

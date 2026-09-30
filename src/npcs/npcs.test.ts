@@ -49,8 +49,9 @@ describe('NPCS', () => {
     // still reference his name/title/figure) -- so he's an intentional
     // exception to "every NPC has exactly one Room slot".
     // Anthony too (#146): the Phishing Quiz places him at the door he guards,
-    // one shared Room at a time, so no Room lists him.
-    const NO_LONGER_PLACED: NpcId[] = ['dom', 'anthony'];
+    // one shared Room at a time, so no Room lists him. Ryan and Sam likewise
+    // left the Dev Pit (owner request, 2026-09-30); Team Room 4 has its own.
+    const NO_LONGER_PLACED: NpcId[] = ['dom', 'anthony', 'ryan', 'sam'];
 
     for (const npc of Object.values(NPCS)) {
       if (NO_LONGER_PLACED.includes(npc.id)) continue;
@@ -232,15 +233,11 @@ describe('NPCS', () => {
           }
         }
       }
-      // Overlaps the Room design itself draws at rest, kept as designed: Dev
-      // Pit's Steven's pills (`y="323.4"`, 30 tall, x 957.8-1202.2) cover the
-      // bottom 14 px of Ryan's nameplate (`<rect x="974" y="317.4"
-      // width="52" height="20">`); in-game only its bottom 4 px, below the
-      // text.
-      const drawnByTheDesign = [
-        `dev-pit: steven "Boxes and arrows. Mostly arrows." x ryan's nameplate "Ryan"`,
-        `dev-pit: steven "This diagram scales. Trust me." x ryan's nameplate "Ryan"`,
-      ];
+      // Overlaps the Room design itself draws at rest, kept as designed. None
+      // now: the only one, Dev Pit's Steven's pills over the bottom of Ryan's
+      // nameplate, went when Ryan left the Dev Pit (owner request,
+      // 2026-09-30).
+      const drawnByTheDesign: string[] = [];
       expect(collisions.filter((collision) => !drawnByTheDesign.includes(collision))).toEqual([]);
       // Each allowed overlap still happens, so a stale entry can't linger.
       for (const allowed of drawnByTheDesign) expect(collisions).toContain(allowed);
@@ -368,10 +365,9 @@ describe('NPCS', () => {
     // Names/titles from design/Characters.dc.html (Emily, Dom, Millie, Casey,
     // Ryan and Sam are on its TITLE TBD list); tags and idle lines verbatim
     // from each Room design's nameplates and bubbles. Static bubbles are
-    // `periodS: 0`; Team Room 3's `rats` (10s, from 80%) is re-expressed
-    // under the shared 7% show window: (0.80 - 0.07) * 10 = 7.3s -> -2.7s.
-    // Team Room 1's `jtalk` (4s, shown 38%-76%) and `domtalk` (6s, shown
-    // 39%-66%) carry their own windows (owner request, 2026-09-30, Track D).
+    // `periodS: 0`; Team Room 1's `jtalk` (4s, shown 38%-76%) and
+    // `domtalk` (6s, shown 39%-66%) and Team Room 3's `rats` (10s, shown
+    // 80%-98%) carry their own windows (owner request, 2026-09-30, Track D).
     // Repeat appearances get a `-<room>` suffixed id.
     expect(NPCS.emily).toMatchObject({
       kind: 'human',
@@ -428,7 +424,8 @@ describe('NPCS', () => {
       title: null,
       roomId: 'team-room-3',
       tagName: 'Casey',
-      idleLines: [{ text: 'RATS', periodS: 10, delayS: -2.7 }],
+      // `rats 10s linear infinite`, no delay, fully shown 80%-98%.
+      idleLines: [{ text: 'RATS', periodS: 10, delayS: 0, window: [0.8, 0.98] }],
       // The Igloo Gear stall is the Roof Deck's; here she is just gaming.
       dialog: { kind: 'line' },
     });
@@ -448,18 +445,20 @@ describe('NPCS', () => {
       dialogLines: ['3-0. Again.'],
       idleLines: [{ text: 'I challenge you to a Beyblade battle!', periodS: 0, delayS: 0 }],
     });
+    // Sam's and Ryan's nameplates are their full names, not the Room
+    // design's "Sam"/"Ryan" (owner request, 2026-09-30, Track D).
     expect(NPCS['sam-team-room-4']).toMatchObject({
       name: 'Sam Schantz',
       title: null,
       roomId: 'team-room-4',
-      tagName: 'Sam',
+      tagName: 'Sam Schantz',
       idleLines: [],
     });
     expect(NPCS['ryan-team-room-4']).toMatchObject({
       name: 'Ryan Shendler',
       title: null,
       roomId: 'team-room-4',
-      tagName: 'Ryan',
+      tagName: 'Ryan Shendler',
       idleLines: [],
     });
   });
@@ -539,8 +538,6 @@ describe('NPCS', () => {
     const repeats: [NpcId, NpcId][] = [
       ['ian-team-room-2', 'ian'],
       ['millie-team-room-3', 'millie'],
-      ['casey-team-room-3', 'casey'],
-      ['sydney-team-room-3', 'sydney'],
       // #51 slice 3: the Mullet.
       ['jason-mullet', 'jason'],
       ['ann-marie-mullet', 'ann-marie'],
@@ -573,6 +570,10 @@ describe('NPCS', () => {
       // laptop on her lap; the Mullet's design draws neither (#51 slice 3).
       ['jon', 'jon-mullet', { cards: true }],
       ['nicole', 'nicole-mullet', { seated: 'laptop' }],
+      // Team Room 3's Casey holds an open laptop and its Sydney wears a
+      // headset; the Roof Deck's and Town Center's designs draw neither.
+      ['casey-team-room-3', 'casey', { prop: 'openLaptop' }],
+      ['sydney-team-room-3', 'sydney', { headset: true }],
     ];
     for (const [roomOwn, other, added] of overrides) {
       const withOverride = NPCS[roomOwn];

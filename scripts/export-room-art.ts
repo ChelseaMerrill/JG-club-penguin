@@ -786,14 +786,10 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
       texts: ['You'],
       comment: "The local player's own Penguin: a translated <g> of shadow, figure and nameplate.",
     },
-    {
-      kind: 'selector',
-      selectors: [
-        'polygon[points="890,713 920,728 885,745.5 895,750.5 840,753 845,725.5 855,730.5"]',
-      ],
-      comment:
-        "Non-working floor arrow decal (#132): this Room's only working exit is the 'HALLWAY ↓' HUD nav pill below, not this floor paint.",
-    },
+    // #132's floor arrow rule is gone: the 2026-09-27 design resync removed
+    // that decal from `design/Team Room 3.dc.html` itself, so the selector
+    // matched nothing and failed the export (owner request, 2026-09-30,
+    // Track D).
     {
       kind: 'animation',
       names: ['blink'],

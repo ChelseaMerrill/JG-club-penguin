@@ -158,6 +158,31 @@ describe('NPC motion (#113)', () => {
     expect(still.alpha).toBe(1);
   });
 
+  it("fades a prop layer with its design's opacity keyframes, and keeps a layer without them opaque", () => {
+    const fading: Parameters<typeof createNpcMotion>[0] = {
+      props: [
+        {
+          svg: '<ellipse cx="98" cy="30" rx="2.6" ry="2" fill="#00BDFF"/>',
+          motion: {
+            keyframes:
+              '@keyframes note { 0% { transform: translate(0,0); opacity:0;} 50% { transform: translate(3px,-11px); opacity:1;} 100% { transform: translate(6px,-22px); opacity:0;} }',
+            animation: 'note 2.4s linear infinite',
+          },
+          children: [{ svg: '<circle cx="0" cy="0" r="1"/>' }],
+        },
+      ],
+    };
+    const motion = createNpcMotion(fading, { x: 0, y: 0 }, ORIGIN, { reducedMotion: false })!;
+    expect(motion.pose().props[0].alpha).toBeCloseTo(0);
+    motion.advance(600);
+    expect(motion.pose().props[0].alpha).toBeCloseTo(0.5);
+    motion.advance(600);
+    const [note] = motion.pose().props;
+    expect(note.alpha).toBeCloseTo(1);
+    expect(transformPoint(note.matrix, { x: 0, y: 0 }).y).toBeCloseTo(-11);
+    expect(note.children[0].alpha).toBe(1);
+  });
+
   it('does nothing under prefers-reduced-motion, or for an NPC with no designed motion', () => {
     expect(
       createNpcMotion(getNpcMotion('brandon'), BRANDON_REST, ORIGIN, { reducedMotion: true }),
