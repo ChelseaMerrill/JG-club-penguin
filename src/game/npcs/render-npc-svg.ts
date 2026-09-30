@@ -39,12 +39,19 @@ export interface HumanFigureSpec {
     | 'bald'
     /** Chelsea's hair in the Kitchen design: wavy, textured and long. */
     | 'texturedLong';
-  hair?: 'auburn' | 'ash' | 'caramel' | 'dark' | 'brown' | 'blond' | 'lblond' | 'sandy';
+  /** `grey`: the Characters sheet's Steven (not in `humans.js`). */
+  hair?: 'auburn' | 'ash' | 'caramel' | 'dark' | 'brown' | 'blond' | 'lblond' | 'sandy' | 'grey';
   skin?: 'light' | 'fair' | 'med';
   /** The torso/shirt colour. */
   top?: string;
   /** An open-front jacket/vest over the shirt, when given. */
   jacket?: string;
+  /**
+   * `android`: the Characters sheet's green android-head badge on Steven's
+   * left jacket panel (not in `humans.js`). Drawn over the jacket, under the
+   * arms.
+   */
+  badge?: 'android';
   pattern?: 'stripes' | 'plaid' | 'dots';
   pattern2?: string;
   sleeveless?: boolean;
@@ -79,6 +86,12 @@ export interface HumanFigureSpec {
     /** Roof Deck's rod, reel and line with a "FREE $$$" envelope as bait (Anthony). */
     | 'fishingRod'
     /**
+     * Team Room 3's Casey: an open laptop held in front of her, its lid (with
+     * a cyan hex) facing out and both hands on its base, verbatim from
+     * `design/Team Room 3.dc.html`.
+     */
+    | 'openLaptop'
+    /**
      * From the Characters sheet, not humans.js (`sheet: 'samSchantz'` only):
      * Sam's open singing mouth and his right arm holding a mic up to it.
      */
@@ -105,6 +118,11 @@ export interface HumanFigureSpec {
   cameraRig?: boolean;
   /** The Icebox's Nicole: seated, with a laptop on her lap. */
   seated?: 'laptop';
+  /**
+   * Team Room 3's Sydney: a black headset with a mic boom, drawn over her
+   * hair and held prop, verbatim from `design/Team Room 3.dc.html`.
+   */
+  headset?: boolean;
 }
 
 const SKIN: Record<NonNullable<HumanFigureSpec['skin']>, string> = {
@@ -122,6 +140,7 @@ const HAIR: Record<NonNullable<HumanFigureSpec['hair']>, string> = {
   blond: '#E5C27A',
   lblond: '#EDD9A3',
   sandy: '#C9A366',
+  grey: '#6E7075',
 };
 
 /** `humans.js`'s `OL` constant: the same teal stroke every figure outline uses. */
@@ -382,6 +401,10 @@ function renderHumanFigure(spec: HumanFigureSpec, idPrefix: string): string {
   if (spec.jacket) {
     o += `<path d="M34 78 L34 110 L52 110 L54 72 L44 66 Z" fill="${spec.jacket}" stroke="${OUTLINE}" stroke-width="2.5"></path><path d="M86 78 L86 110 L68 110 L66 72 L76 66 Z" fill="${spec.jacket}" stroke="${OUTLINE}" stroke-width="2.5"></path>`;
   }
+  // Verbatim from `design/Characters.dc.html`'s STEVEN ZGALJIC card.
+  if (spec.badge === 'android') {
+    o += `<g transform="translate(44 82)"><path d="M0 -6 C5 -6 7 -3 7 0 C7 4 3 7 0 8 C-3 7 -7 4 -7 0 C-7 -3 -5 -6 0 -6 Z" fill="#7ED957" stroke="${OUTLINE}" stroke-width="1.5"></path><ellipse cx="-3" cy="0" rx="2.3" ry="1.3" transform="rotate(30 -3 0)" fill="#161719"></ellipse><ellipse cx="3" cy="0" rx="2.3" ry="1.3" transform="rotate(-30 3 0)" fill="#161719"></ellipse></g>`;
+  }
 
   // Sleeves/arms.
   const sleeve = spec.sleeveless ? sk : (spec.jacket ?? top);
@@ -602,6 +625,9 @@ function renderHumanFigure(spec: HumanFigureSpec, idPrefix: string): string {
   if (spec.prop === 'clipboard') {
     o += `<rect x="86" y="82" width="18" height="24" rx="2" fill="#d9dcdf" stroke="${OUTLINE}" stroke-width="2"></rect><rect x="92" y="79" width="6" height="5" fill="${OUTLINE}"></rect><path d="M90 90 h10 M90 95 h10 M90 100 h6" stroke="${OUTLINE}" stroke-width="1.5"></path>`;
   }
+  if (spec.prop === 'openLaptop') {
+    o += `<rect x="36" y="74" width="48" height="26" rx="2" fill="#2a2d31" stroke="${OUTLINE}" stroke-width="2"></rect><polygon points="60,81 65,84 65,90 60,93 55,90 55,84" fill="#00BDFF"></polygon><rect x="30" y="99" width="60" height="6" rx="2" fill="#3a4046" stroke="${OUTLINE}" stroke-width="2"></rect><circle cx="42" cy="100" r="5" fill="${sk}" stroke="${OUTLINE}" stroke-width="2"></circle><circle cx="78" cy="100" r="5" fill="${sk}" stroke="${OUTLINE}" stroke-width="2"></circle>`;
+  }
   if (spec.prop === 'camera') {
     o += `<rect x="84" y="82" width="26" height="18" rx="3" fill="#161719" stroke="${OUTLINE}" stroke-width="2"></rect><rect x="90" y="78" width="10" height="5" rx="1" fill="#161719" stroke="${OUTLINE}" stroke-width="1.5"></rect><circle cx="97" cy="91" r="6" fill="#0a3d4d" stroke="#00BDFF" stroke-width="2"></circle><circle cx="97" cy="91" r="2.5" fill="#00BDFF"></circle><rect x="104" y="85" width="3" height="3" fill="#D63C3C"></rect>`;
   }
@@ -624,6 +650,11 @@ function renderHumanFigure(spec: HumanFigureSpec, idPrefix: string): string {
   }
   if (spec.prop === 'beyblade') {
     o += `<circle cx="18" cy="96" r="11" fill="#00BDFF" stroke="#F4F4F4" stroke-width="3"></circle><circle cx="18" cy="96" r="4" fill="#161719"></circle><path d="M18 85 L18 107 M7 96 L29 96 M10 88 L26 104 M26 88 L10 104" stroke="#161719" stroke-width="1.5"></path><circle cx="102" cy="96" r="11" fill="#F4F4F4" stroke="${OUTLINE}" stroke-width="3"></circle><circle cx="102" cy="96" r="4" fill="#161719"></circle><path d="M102 85 L102 107 M91 96 L113 96 M94 88 L110 104 M110 88 L94 104" stroke="${OUTLINE}" stroke-width="1.5"></path>`;
+  }
+
+  // After the prop, in the design's own order.
+  if (spec.headset) {
+    o += `<path d="M34 38 C32 10 88 10 86 38" fill="none" stroke="#161719" stroke-width="4"></path><rect x="29" y="34" width="10" height="15" rx="4" fill="#161719" stroke="${OUTLINE}" stroke-width="2"></rect><rect x="81" y="34" width="10" height="15" rx="4" fill="#161719" stroke="${OUTLINE}" stroke-width="2"></rect><path d="M34 48 Q38 60 50 59" fill="none" stroke="#161719" stroke-width="2.5" stroke-linecap="round"></path><circle cx="51" cy="59" r="2.6" fill="#00BDFF"></circle>`;
   }
 
   // Resting poses of the Room designs' animated props (#113).

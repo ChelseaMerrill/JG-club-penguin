@@ -48,11 +48,9 @@ describe('ensureNpcTexture: one of each prop while an NPC moves (#137 with PR #1
     expect(moving).toContain(JON_SCARF);
   });
 
-  it('drops the Dev Pit markers while each `scribble` arm plays (Steven, Ryan, Sam)', () => {
-    for (const id of ['steven', 'ryan', 'sam'] as const) {
-      expect(stillFigureSvg(id), id).toContain(MARKER_ARM);
-      expect(movingFigureSvg(id), id).not.toContain(MARKER_ARM);
-    }
+  it('draws Steven with no marker, still or walking: he no longer scribbles', () => {
+    expect(stillFigureSvg('steven')).not.toContain(MARKER_ARM);
+    expect(movingFigureSvg('steven')).not.toContain(MARKER_ARM);
   });
 
   it("drops Team Room 4's mic and DJ deck while their motions redraw them (Sam Schantz, Ryan Shendler)", () => {
@@ -67,7 +65,7 @@ describe('ensureNpcTexture: one of each prop while an NPC moves (#137 with PR #1
     expect(movingFigureSvg('ryan')).toContain(ryanDeck);
   });
 
-  it("keeps Anthony's resting rod: he stands still at the door he guards (#146)", () => {
+  it("keeps Anthony's resting rod while he guards a door (#146): his pacing replaces no prop", () => {
     expect(getNpcMotion('anthony')).toBeUndefined();
     expect(stillFigureSvg('anthony')).toContain(ROD);
     expect(movingFigureSvg('anthony')).toContain(ROD);
