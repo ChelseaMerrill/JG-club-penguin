@@ -39,12 +39,19 @@ export interface HumanFigureSpec {
     | 'bald'
     /** Chelsea's hair in the Kitchen design: wavy, textured and long. */
     | 'texturedLong';
-  hair?: 'auburn' | 'ash' | 'caramel' | 'dark' | 'brown' | 'blond' | 'lblond' | 'sandy';
+  /** `grey`: the Characters sheet's Steven (not in `humans.js`). */
+  hair?: 'auburn' | 'ash' | 'caramel' | 'dark' | 'brown' | 'blond' | 'lblond' | 'sandy' | 'grey';
   skin?: 'light' | 'fair' | 'med';
   /** The torso/shirt colour. */
   top?: string;
   /** An open-front jacket/vest over the shirt, when given. */
   jacket?: string;
+  /**
+   * `android`: the Characters sheet's green android-head badge on Steven's
+   * left jacket panel (not in `humans.js`). Drawn over the jacket, under the
+   * arms.
+   */
+  badge?: 'android';
   pattern?: 'stripes' | 'plaid' | 'dots';
   pattern2?: string;
   sleeveless?: boolean;
@@ -114,6 +121,7 @@ const HAIR: Record<NonNullable<HumanFigureSpec['hair']>, string> = {
   blond: '#E5C27A',
   lblond: '#EDD9A3',
   sandy: '#C9A366',
+  grey: '#6E7075',
 };
 
 /** `humans.js`'s `OL` constant: the same teal stroke every figure outline uses. */
@@ -213,6 +221,10 @@ function renderHumanFigure(spec: HumanFigureSpec, idPrefix: string): string {
   // Jacket/vest over the shirt.
   if (spec.jacket) {
     o += `<path d="M34 78 L34 110 L52 110 L54 72 L44 66 Z" fill="${spec.jacket}" stroke="${OUTLINE}" stroke-width="2.5"></path><path d="M86 78 L86 110 L68 110 L66 72 L76 66 Z" fill="${spec.jacket}" stroke="${OUTLINE}" stroke-width="2.5"></path>`;
+  }
+  // Verbatim from `design/Characters.dc.html`'s STEVEN ZGALJIC card.
+  if (spec.badge === 'android') {
+    o += `<g transform="translate(44 82)"><path d="M0 -6 C5 -6 7 -3 7 0 C7 4 3 7 0 8 C-3 7 -7 4 -7 0 C-7 -3 -5 -6 0 -6 Z" fill="#7ED957" stroke="${OUTLINE}" stroke-width="1.5"></path><ellipse cx="-3" cy="0" rx="2.3" ry="1.3" transform="rotate(30 -3 0)" fill="#161719"></ellipse><ellipse cx="3" cy="0" rx="2.3" ry="1.3" transform="rotate(-30 3 0)" fill="#161719"></ellipse></g>`;
   }
 
   // Sleeves/arms.
