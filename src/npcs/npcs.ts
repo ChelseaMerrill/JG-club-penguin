@@ -408,10 +408,9 @@ const IAN_FIGURE: HumanFigureSpec = {
 };
 
 /**
- * Dom Favata's figure, shared by Dev Pit (`dom`) and the Mullet
- * (`dom-mullet`) (#51): the same person, the same `humans.js` spec, in one
- * constant so the copies can't drift. Team Room 1 dresses him in its own
- * running kit instead (`dom-team-room-1`).
+ * Dom Favata's figure, humans.js's spec (#51), as the Dev Pit's `dom` still
+ * wears it. Team Room 1 and the Mullet dress him in running kit instead
+ * (`DOM_RUNNER_FIGURE`).
  */
 const DOM_FIGURE: HumanFigureSpec = {
   style: 'short',
@@ -421,6 +420,20 @@ const DOM_FIGURE: HumanFigureSpec = {
   collar: 'zip',
   teeth: true,
   prop: 'laptop',
+};
+
+/**
+ * Dom in running kit, shared by Team Room 1 (`dom-team-room-1`) and the
+ * Mullet (`dom-mullet`) so the copies can't drift: both Room designs dress
+ * him this way for his lap of the Room, as `design/Characters.dc.html`'s
+ * sheet now does too (owner requests, 2026-09-30, Track D). humans.js's spec
+ * minus its shirt colour and zip collar, which the kit replaces.
+ */
+const DOM_RUNNER_FIGURE: HumanFigureSpec = {
+  ...DOM_FIGURE,
+  top: undefined,
+  collar: undefined,
+  runner: true,
 };
 
 /**
@@ -1353,11 +1366,8 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: 'you gotta be faster than that', periodS: 6, delayS: 0, window: [0.39, 0.66] },
     ],
     dialog: LINE_DIALOG,
-    // The Room design dresses him in running kit for his lap of the Room
-    // (owner request, 2026-09-30, Track D; `design/Characters.dc.html`'s
-    // sheet draws him the same way now): humans.js's spec minus its shirt
-    // colour and zip collar, which the kit replaces.
-    figure: { ...DOM_FIGURE, top: undefined, collar: undefined, runner: true },
+    // The Room design dresses him in running kit for his lap of the Room.
+    figure: DOM_RUNNER_FIGURE,
   },
   'ian-team-room-2': {
     id: 'ian-team-room-2',
@@ -1636,9 +1646,9 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: 'Undefeated. I always win.', periodS: 9.4, delayS: 0, window: [0.86, 1] },
     ],
     dialog: LINE_DIALOG,
-    // humans.js's spec; the Room design dresses him in running gear for his
-    // lap of the room, a scene-only costume the renderer doesn't draw.
-    figure: DOM_FIGURE,
+    // The Room design dresses him in running gear for his lap of the room,
+    // which the renderer now draws (owner request, 2026-09-30, Track D).
+    figure: DOM_RUNNER_FIGURE,
   },
   // Jessie: the design draws her as a Penguin in the Bathroom, but only
   // Players appear as Penguins in the World (owner decision 2026-09-25; see

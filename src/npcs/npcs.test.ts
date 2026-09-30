@@ -547,7 +547,8 @@ describe('NPCS', () => {
       ['jory-mullet', 'jory'],
       ['ashley-mullet', 'ashley'],
       ['brandon-mullet', 'brandon'],
-      ['dom-mullet', 'dom'],
+      // Both Dom's running-kit appearances (owner request, 2026-09-30).
+      ['dom-mullet', 'dom-team-room-1'],
     ];
     for (const [repeat, first] of repeats) {
       const again = NPCS[repeat];

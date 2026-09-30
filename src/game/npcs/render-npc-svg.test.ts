@@ -286,7 +286,7 @@ describe('renderNpcSvg', () => {
     );
   });
 
-  it("dresses Team Room 1's Dom in the design's running kit, and only there", () => {
+  it("dresses Team Room 1's and the Mullet's Dom in the design's running kit, and not the Dev Pit's", () => {
     // Verbatim from `design/Team Room 1.dc.html` (and `design/Characters.dc.html`'s sheet).
     const svg = renderRosterNpc('dom-team-room-1');
     const tankTop =
@@ -318,9 +318,12 @@ describe('renderNpcSvg', () => {
     expect(svg).not.toContain('<rect x="46" y="104" width="12" height="18"');
     // His laptop, as in the design.
     expect(svg).toContain('<rect x="86" y="84" width="22" height="14"');
-    // The Dev Pit's and the Mullet's Dom keep humans.js's office clothes.
+    // The Mullet's Dom wears the same kit (owner request, 2026-09-30); the
+    // Dev Pit's unplaced `dom` keeps humans.js's office clothes.
+    expect(renderRosterNpc('dom-mullet')).toBe(
+      svg.replaceAll('npc-dom-team-room-1', 'npc-dom-mullet'),
+    );
     expect(renderRosterNpc('dom')).not.toContain(tankTop);
-    expect(renderRosterNpc('dom-mullet')).not.toContain(tankTop);
   });
 
   it("draws Team Room 1's Jethro with his hands and camera after his face, as the design's `jdown` group", () => {
