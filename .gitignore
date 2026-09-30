@@ -15,3 +15,5 @@ playwright-output/
 .auth/
 # Test evidence is local only; it is not committed (docs/agents/testing.md).
 test-results/
+# Supabase CLI link/cache state (project ref, CLI version); local only.
+supabase/.temp/
