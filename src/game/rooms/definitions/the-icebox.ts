@@ -90,7 +90,10 @@ export const theIcebox: RoomDefinition = {
     { npcId: 'millie-icebox', tile: { col: 1, row: 0 } },
     { npcId: 'nicole', tile: { col: 1, row: 7 } },
     { npcId: 'jason', tile: { col: 8, row: 0 } },
-    { npcId: 'jethro', tile: { col: 4, row: 9 } },
+    // Jethro: drawn at the design's own point for his walk's start, its
+    // shadow (590, 525) moved by `jetRoam`'s 0% translate(-20px, 65px), so
+    // (570, 590) (owner request, 2026-10-01, Track D).
+    { npcId: 'jethro', tile: { col: 4, row: 9 }, offset: { x: 20, y: -10 } },
     { npcId: 'darrin-icebox', tile: { col: 10, row: 6 } },
     // "You" is the local Player's own Penguin, never a static NPC slot
     // (compare Dev Pit's Matt).

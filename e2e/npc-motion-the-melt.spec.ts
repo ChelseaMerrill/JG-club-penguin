@@ -2,7 +2,7 @@ import { mkdirSync, rmSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 import { npcLayout } from '../src/game/npcs/npc-layout';
 import { theMelt } from '../src/game/rooms/definitions/the-melt';
-import { tileToScreen } from '../src/game/rooms/iso';
+import { npcSlotPoint } from '../src/game/rooms/iso';
 import { GAME_HEIGHT, GAME_WIDTH } from '../src/game/stage-size';
 import type { NpcMotionDebugInfo, RoomDebugInfo } from './support/room-debug-types';
 
@@ -88,7 +88,7 @@ test('the Kitchen: Tom walks his designed path; Chelsea stays put', async ({ pag
 
   for (const id of MOVING_NPCS) expect((await npc(page, id)).moving).toBe(true);
   for (const slot of theMelt.npcSlots.filter((slot) => STILL_NPCS.includes(slot.npcId))) {
-    const rest = tileToScreen(slot.tile, theMelt.grid.origin);
+    const rest = npcSlotPoint(slot, theMelt.grid.origin);
     expect(await npc(page, slot.npcId)).toMatchObject({ x: rest.x, y: rest.y, moving: false });
   }
 
@@ -177,7 +177,7 @@ test('with prefers-reduced-motion, every NPC stands still at its slot tile', asy
   const later = (await debugInfo(page))?.npcs ?? {};
 
   for (const slot of theMelt.npcSlots) {
-    const rest = tileToScreen(slot.tile, theMelt.grid.origin);
+    const rest = npcSlotPoint(slot, theMelt.grid.origin);
     expect(first[slot.npcId]).toMatchObject({ x: rest.x, y: rest.y, moving: false });
     expect(later[slot.npcId]).toEqual(first[slot.npcId]);
   }

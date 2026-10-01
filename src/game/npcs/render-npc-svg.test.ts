@@ -344,18 +344,18 @@ describe('renderNpcSvg', () => {
     );
   });
 
-  it("straps the Icebox design's camera rig to Jethro's chest", () => {
+  it("draws the Icebox's Jethro with Team Room 1's lowered camera, not a chest rig", () => {
+    // He takes photos as he walks, as in Team Room 1 (owner request,
+    // 2026-10-01, Track D), so the chest rig would be a second camera.
     const svg = renderRosterNpc('jethro');
+    expect(svg).not.toContain('<rect x="40" y="70" width="40" height="26"');
     expect(svg).toContain(
-      '<rect x="40" y="70" width="40" height="26" rx="4" fill="#161719" stroke="#0C4B5F" stroke-width="2.5">',
+      '<rect x="84" y="82" width="26" height="18" rx="3" fill="#161719" stroke="#0C4B5F" stroke-width="2">',
     );
-    expect(svg).toContain(
-      '<circle cx="60" cy="83" r="9" fill="#2f3338" stroke="#0C4B5F" stroke-width="2">',
+    // The same figure as Team Room 1's, apart from its element ids.
+    expect(svg.replaceAll('npc-jethro', 'npc-jethro-team-room-1')).toBe(
+      renderRosterNpc('jethro-team-room-1'),
     );
-    expect(svg).toContain(
-      '<rect x="66" y="66" width="10" height="6" rx="1" fill="#F4F4F4" stroke="#0C4B5F" stroke-width="1.5">',
-    );
-    expect(renderRosterNpc('jethro-team-room-1')).not.toContain('<rect x="40" y="70" width="40"');
   });
 
   it('seats Nicole with a laptop on her lap, the whole figure lowered 14 px', () => {
