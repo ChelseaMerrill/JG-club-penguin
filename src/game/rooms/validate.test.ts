@@ -643,7 +643,7 @@ describe('ROOM_DEFINITIONS registry', () => {
     // training progress, the stall occupancy) and, for the Bathroom, the
     // "SNOWBALLS DISABLED" rule this build doesn't implement.
     expect(getRoomDefinition('office-hallway')).toMatchObject({
-      title: 'THE CORRIDOR',
+      title: 'THE HALLWAY',
       subtitle: 'OFFICES 1–9 · KNOCK BEFORE YOU WADDLE',
     });
     expect(getRoomDefinition('team-room-1')).toMatchObject({

@@ -68,7 +68,8 @@ export const MAP_ROOMS: readonly MapRoomTile[] = [
   },
   {
     number: '11',
-    label: '11 · THE CORRIDOR',
+    // "THE HALLWAY", not the design's THE CORRIDOR (owner request, 2026-10-01, Track D).
+    label: '11 · THE HALLWAY',
     subtitle: 'TEAM ROOMS 1–9',
     roomId: 'office-hallway',
   },
