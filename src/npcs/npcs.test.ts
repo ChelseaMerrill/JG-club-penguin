@@ -588,8 +588,9 @@ describe('NPCS', () => {
     // Team Room 1's design wins for its own two NPCs (owner request,
     // 2026-09-30, Track D): Dom runs in a kit that replaces his shirt and
     // collar, and Jethro's hands and camera are its `jdown` camera-raise
-    // group. The Icebox's Jethro wears a chest camera rig instead, so Jethro
-    // has no plain appearance left; both keep the same sheet spec underneath.
+    // group. The Icebox's Jethro takes photos the same way (owner request,
+    // 2026-10-01, Track D), so Jethro has no plain appearance left; both keep
+    // the same sheet spec underneath.
     const [dom, domTeamRoom1, jethro, jethroTeamRoom1] = (
       ['dom', 'dom-team-room-1', 'jethro', 'jethro-team-room-1'] as const
     ).map((id) => {
@@ -604,13 +605,9 @@ describe('NPCS', () => {
       runner: true,
     });
     expect(domTeamRoom1.dialogLines[0]).toBe(dom.dialogLines[0]);
-    const { cameraRig, ...jethroSheet } = jethro.figure;
-    expect(cameraRig).toBe(true);
-    expect(jethroTeamRoom1.figure).toEqual({
-      ...jethroSheet,
-      prop: undefined,
-      cameraRaise: 'lowered',
-    });
+    expect(jethro.figure.cameraRig).toBeUndefined();
+    expect(jethroTeamRoom1.figure).toEqual(jethro.figure);
+    expect(jethroTeamRoom1.figure).toMatchObject({ prop: undefined, cameraRaise: 'lowered' });
     expect(jethroTeamRoom1.dialogLines[0]).toBe(jethro.dialogLines[0]);
   });
 

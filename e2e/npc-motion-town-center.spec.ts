@@ -2,7 +2,7 @@ import { mkdirSync, rmSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 import { npcLayout } from '../src/game/npcs/npc-layout';
 import { townCenter } from '../src/game/rooms/definitions/town-center';
-import { tileToScreen } from '../src/game/rooms/iso';
+import { npcSlotPoint } from '../src/game/rooms/iso';
 import { NPCS } from '../src/npcs/npcs';
 import { GAME_HEIGHT, GAME_WIDTH } from '../src/game/stage-size';
 import type { NpcMotionDebugInfo, RoomDebugInfo } from './support/room-debug-types';
@@ -159,7 +159,7 @@ test('clicking a moving Darrin pauses him, opens his dialog, and closing it resu
 function joryRest(): { x: number; y: number } {
   const slot = townCenter.npcSlots.find((candidate) => candidate.npcId === 'jory');
   if (!slot) throw new Error('Jory has no Town Center slot');
-  return tileToScreen(slot.tile, townCenter.grid.origin);
+  return npcSlotPoint(slot, townCenter.grid.origin);
 }
 
 test('Jory bounces on the couch as the design shows, her nameplate moving with her (#150)', async ({
@@ -244,7 +244,7 @@ test('with prefers-reduced-motion, every NPC stands still at its slot tile', asy
   const later = (await debugInfo(page))?.npcs ?? {};
 
   for (const slot of townCenter.npcSlots) {
-    const rest = tileToScreen(slot.tile, townCenter.grid.origin);
+    const rest = npcSlotPoint(slot, townCenter.grid.origin);
     expect(first[slot.npcId]).toMatchObject({ x: rest.x, y: rest.y, moving: false });
     expect(later[slot.npcId]).toEqual(first[slot.npcId]);
   }

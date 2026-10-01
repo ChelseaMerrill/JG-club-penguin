@@ -1252,9 +1252,10 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: 'Say hackathon!', periodS: 21, delayS: -16 },
     ],
     dialog: LINE_DIALOG,
-    // The Icebox design straps a camera rig to his chest; Team Room 1's
-    // doesn't, so it's this entry's own override.
-    figure: { ...JETHRO_FIGURE, cameraRig: true },
+    // He takes photos as he walks, with Team Room 1's camera raise, in place
+    // of the Icebox design's chest camera rig (owner request, 2026-10-01,
+    // Track D), so he carries one camera, not two.
+    figure: { ...JETHRO_FIGURE, prop: undefined, cameraRaise: 'lowered' },
   },
   'darrin-icebox': {
     id: 'darrin-icebox',

@@ -1,4 +1,5 @@
 import type { NpcId } from '../npcs';
+import { JETHRO_CAMERA_PROPS } from './team-room-1';
 import type { NpcMotionSpec } from './types';
 
 /**
@@ -61,13 +62,22 @@ export const THE_ICEBOX_MOTIONS: Partial<Record<NpcId, NpcMotionSpec>> = {
     },
     figure: ICEBOX_IDLE_BOB,
   },
+  // `jetRoam` starts at translate(-20px, 65px), not (0, 0), and his slot is
+  // already the tile under that start point, so playing it verbatim added
+  // the start twice and walked him off the floor's front edge. Here every
+  // stop is the design's own minus that start (owner request, 2026-10-01,
+  // Track D), so the loop traces the design's own path from his slot's
+  // `offset` point (see `the-icebox.ts`); stops and timing are verbatim.
+  // He also takes photos as he walks, with Team Room 1's camera raise.
   jethro: {
     path: {
       keyframes:
-        '@keyframes jetRoam { 0% { transform: translate(-20px, 65px); } 10% { transform: translate(-20px, 65px); } 30% { transform: translate(-120px, 35px); } 45% { transform: translate(-120px, 35px); } 65% { transform: translate(20px, 100px); } 80% { transform: translate(20px, 100px); } 100% { transform: translate(-20px, 65px); } }',
+        '@keyframes jetRoam { 0% { transform: translate(0px, 0px); } 10% { transform: translate(0px, 0px); } 30% { transform: translate(-100px, -30px); } 45% { transform: translate(-100px, -30px); } 65% { transform: translate(40px, 35px); } 80% { transform: translate(40px, 35px); } 100% { transform: translate(0px, 0px); } }',
       animation: 'jetRoam 26s ease-in-out infinite',
     },
     figure: ICEBOX_IDLE_BOB,
+    replaceFigureRestPose: true,
+    props: JETHRO_CAMERA_PROPS,
   },
   'darrin-icebox': {
     path: {

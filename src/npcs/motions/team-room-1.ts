@@ -1,5 +1,5 @@
 import type { NpcId } from '../npcs';
-import type { NpcMotionSpec } from './types';
+import type { NpcMotionSpec, NpcPropLayer } from './types';
 
 /**
  * Team Room 1's NPC motions (owner request, 2026-09-30, Track D), copied
@@ -27,6 +27,46 @@ const BOB_KEYFRAMES =
   '@keyframes bob { 0%,100% { transform: translateY(0) rotate(-2deg);} 50% { transform: translateY(-9.68px) rotate(2deg);} }';
 const BOB_ORIGIN = '60px 130px';
 
+/**
+ * Jethro's camera raise from `design/Team Room 1.dc.html`, verbatim: every 4 s
+ * his lowered camera and hands fade out (`jdown`), the camera rises to his eye
+ * with both hands on it (`jup`) and its flash fires once (`jflash`). It
+ * replaces his figure's resting `cameraRaise: 'lowered'` pose (use with
+ * `replaceFigureRestPose`). Shared with the Icebox's Jethro, who takes photos
+ * the same way as he walks (owner request, 2026-10-01, Track D).
+ */
+export const JETHRO_CAMERA_PROPS: readonly NpcPropLayer[] = [
+  {
+    svg: '<circle cx="30" cy="101" r="5.5" fill="#F6DCC6" stroke="#0C4B5F" stroke-width="2"/><circle cx="90" cy="101" r="5.5" fill="#F6DCC6" stroke="#0C4B5F" stroke-width="2"/><rect x="84" y="82" width="26" height="18" rx="3" fill="#161719" stroke="#0C4B5F" stroke-width="2"/><rect x="90" y="78" width="10" height="5" rx="1" fill="#161719" stroke="#0C4B5F" stroke-width="1.5"/><circle cx="97" cy="91" r="6" fill="#0a3d4d" stroke="#00BDFF" stroke-width="2"/><circle cx="97" cy="91" r="2.5" fill="#00BDFF"/><rect x="104" y="85" width="3" height="3" fill="#D63C3C"/>',
+    motion: {
+      keyframes:
+        '@keyframes jdown { 0%,26% { opacity:1; } 32%,78% { opacity:0; } 84%,100% { opacity:1; } }',
+      animation: 'jdown 4s linear infinite',
+    },
+  },
+  {
+    svg: '<rect x="34" y="30" width="52" height="32" rx="4" fill="#161719" stroke="#0C4B5F" stroke-width="2"/><rect x="42" y="24" width="14" height="7" rx="1.5" fill="#161719" stroke="#0C4B5F" stroke-width="1.5"/><rect x="68" y="34" width="11" height="5" rx="1" fill="#F4F4F4" stroke="#0C4B5F" stroke-width="1"/><circle cx="58" cy="47" r="12" fill="#0a3d4d" stroke="#00BDFF" stroke-width="2.5"/><circle cx="58" cy="47" r="5" fill="#00BDFF"/><circle cx="55" cy="44" r="1.8" fill="#F4F4F4"/><rect x="40" y="35" width="3" height="3" fill="#D63C3C"/><circle cx="32" cy="50" r="5.5" fill="#F6DCC6" stroke="#0C4B5F" stroke-width="2"/><circle cx="88" cy="50" r="5.5" fill="#F6DCC6" stroke="#0C4B5F" stroke-width="2"/>',
+    motion: {
+      keyframes:
+        '@keyframes jup { 0%,26% { opacity:0; transform:translate(20px,40px); } 34%,76% { opacity:1; transform:translate(0,0); } 84%,100% { opacity:0; transform:translate(20px,40px); } }',
+      animation: 'jup 4s ease-out infinite',
+    },
+    children: [
+      {
+        // The design's flash circle also carries `opacity="0"`, its look
+        // before the animation starts; `jflash` sets every frame's
+        // opacity from 0% to 100%, so here the layer's alpha does it.
+        svg: '<circle cx="73.5" cy="36.5" r="22" fill="#F4F4F4"/>',
+        motion: {
+          keyframes:
+            '@keyframes jflash { 0%,46% { opacity:0; } 48% { opacity:.95; } 56%,100% { opacity:0; } }',
+          animation: 'jflash 4s linear infinite',
+        },
+      },
+    ],
+  },
+];
+
 export const TEAM_ROOM_1_MOTIONS: Partial<Record<NpcId, NpcMotionSpec>> = {
   // Jethro stands and films: his figure sways on a slow `bob` while, every
   // 4 s, his lowered camera and hands fade out (`jdown`), the camera rises
@@ -41,37 +81,7 @@ export const TEAM_ROOM_1_MOTIONS: Partial<Record<NpcId, NpcMotionSpec>> = {
       transformOrigin: BOB_ORIGIN,
     },
     replaceFigureRestPose: true,
-    props: [
-      {
-        svg: '<circle cx="30" cy="101" r="5.5" fill="#F6DCC6" stroke="#0C4B5F" stroke-width="2"/><circle cx="90" cy="101" r="5.5" fill="#F6DCC6" stroke="#0C4B5F" stroke-width="2"/><rect x="84" y="82" width="26" height="18" rx="3" fill="#161719" stroke="#0C4B5F" stroke-width="2"/><rect x="90" y="78" width="10" height="5" rx="1" fill="#161719" stroke="#0C4B5F" stroke-width="1.5"/><circle cx="97" cy="91" r="6" fill="#0a3d4d" stroke="#00BDFF" stroke-width="2"/><circle cx="97" cy="91" r="2.5" fill="#00BDFF"/><rect x="104" y="85" width="3" height="3" fill="#D63C3C"/>',
-        motion: {
-          keyframes:
-            '@keyframes jdown { 0%,26% { opacity:1; } 32%,78% { opacity:0; } 84%,100% { opacity:1; } }',
-          animation: 'jdown 4s linear infinite',
-        },
-      },
-      {
-        svg: '<rect x="34" y="30" width="52" height="32" rx="4" fill="#161719" stroke="#0C4B5F" stroke-width="2"/><rect x="42" y="24" width="14" height="7" rx="1.5" fill="#161719" stroke="#0C4B5F" stroke-width="1.5"/><rect x="68" y="34" width="11" height="5" rx="1" fill="#F4F4F4" stroke="#0C4B5F" stroke-width="1"/><circle cx="58" cy="47" r="12" fill="#0a3d4d" stroke="#00BDFF" stroke-width="2.5"/><circle cx="58" cy="47" r="5" fill="#00BDFF"/><circle cx="55" cy="44" r="1.8" fill="#F4F4F4"/><rect x="40" y="35" width="3" height="3" fill="#D63C3C"/><circle cx="32" cy="50" r="5.5" fill="#F6DCC6" stroke="#0C4B5F" stroke-width="2"/><circle cx="88" cy="50" r="5.5" fill="#F6DCC6" stroke="#0C4B5F" stroke-width="2"/>',
-        motion: {
-          keyframes:
-            '@keyframes jup { 0%,26% { opacity:0; transform:translate(20px,40px); } 34%,76% { opacity:1; transform:translate(0,0); } 84%,100% { opacity:0; transform:translate(20px,40px); } }',
-          animation: 'jup 4s ease-out infinite',
-        },
-        children: [
-          {
-            // The design's flash circle also carries `opacity="0"`, its look
-            // before the animation starts; `jflash` sets every frame's
-            // opacity from 0% to 100%, so here the layer's alpha does it.
-            svg: '<circle cx="73.5" cy="36.5" r="22" fill="#F4F4F4"/>',
-            motion: {
-              keyframes:
-                '@keyframes jflash { 0%,46% { opacity:0; } 48% { opacity:.95; } 56%,100% { opacity:0; } }',
-              animation: 'jflash 4s linear infinite',
-            },
-          },
-        ],
-      },
-    ],
+    props: JETHRO_CAMERA_PROPS,
   },
   // Dom runs a lap of the Room (`domrun`, on his outer `<div>`) on a fast
   // running `bob`. The design's `domrun` translates are absolute Stage

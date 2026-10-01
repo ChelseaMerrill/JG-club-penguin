@@ -2,7 +2,7 @@ import { mkdirSync, rmSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 import { npcLayout } from '../src/game/npcs/npc-layout';
 import { devPit } from '../src/game/rooms/definitions/dev-pit';
-import { tileToScreen } from '../src/game/rooms/iso';
+import { npcSlotPoint } from '../src/game/rooms/iso';
 import { GAME_HEIGHT, GAME_WIDTH } from '../src/game/stage-size';
 import type { NpcMotionDebugInfo, RoomDebugInfo } from './support/room-debug-types';
 
@@ -87,7 +87,7 @@ test('Dev Pit NPCs perform their motions: Ian and Steven walk', async ({ page })
   for (const id of STILL_NPCS) {
     const slot = devPit.npcSlots.find((s) => s.npcId === id);
     if (!slot) throw new Error(`expected dev-pit to have a "${id}" NPC slot`);
-    const rest = tileToScreen(slot.tile, devPit.grid.origin);
+    const rest = npcSlotPoint(slot, devPit.grid.origin);
     expect(await npc(page, id)).toMatchObject({ x: rest.x, y: rest.y, moving: false });
   }
   for (const id of REMOVED_NPCS) {
@@ -209,7 +209,7 @@ test('with prefers-reduced-motion, every NPC stands still at its slot tile', asy
   const later = (await debugInfo(page))?.npcs ?? {};
 
   for (const slot of devPit.npcSlots) {
-    const rest = tileToScreen(slot.tile, devPit.grid.origin);
+    const rest = npcSlotPoint(slot, devPit.grid.origin);
     expect(first[slot.npcId]).toMatchObject({ x: rest.x, y: rest.y, moving: false });
     expect(later[slot.npcId]).toEqual(first[slot.npcId]);
   }

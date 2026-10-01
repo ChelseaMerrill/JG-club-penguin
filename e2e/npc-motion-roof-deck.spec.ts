@@ -2,7 +2,7 @@ import { mkdirSync, rmSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 import { npcLayout } from '../src/game/npcs/npc-layout';
 import { roofDeck } from '../src/game/rooms/definitions/roof-deck';
-import { tileToScreen } from '../src/game/rooms/iso';
+import { npcSlotPoint, tileToScreen } from '../src/game/rooms/iso';
 import { GAME_HEIGHT, GAME_WIDTH } from '../src/game/stage-size';
 import type { NpcMotionDebugInfo, RoomDebugInfo } from './support/room-debug-types';
 
@@ -157,7 +157,7 @@ test('with prefers-reduced-motion, every NPC stands still at its slot tile', asy
   const later = (await debugInfo(page))?.npcs ?? {};
 
   for (const slot of roofDeck.npcSlots) {
-    const rest = tileToScreen(slot.tile, roofDeck.grid.origin);
+    const rest = npcSlotPoint(slot, roofDeck.grid.origin);
     expect(first[slot.npcId]).toMatchObject({ x: rest.x, y: rest.y, moving: false });
     expect(later[slot.npcId]).toEqual(first[slot.npcId]);
   }

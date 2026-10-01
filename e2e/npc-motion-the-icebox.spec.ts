@@ -2,7 +2,7 @@ import { mkdirSync, rmSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 import { npcLayout } from '../src/game/npcs/npc-layout';
 import { theIcebox } from '../src/game/rooms/definitions/the-icebox';
-import { tileToScreen } from '../src/game/rooms/iso';
+import { npcSlotPoint } from '../src/game/rooms/iso';
 import { GAME_HEIGHT, GAME_WIDTH } from '../src/game/stage-size';
 import type { NpcMotionDebugInfo, RoomDebugInfo } from './support/room-debug-types';
 
@@ -171,7 +171,7 @@ test('with prefers-reduced-motion, every NPC stands still at its slot tile', asy
   const later = (await debugInfo(page))?.npcs ?? {};
 
   for (const slot of theIcebox.npcSlots) {
-    const rest = tileToScreen(slot.tile, theIcebox.grid.origin);
+    const rest = npcSlotPoint(slot, theIcebox.grid.origin);
     expect(first[slot.npcId]).toMatchObject({ x: rest.x, y: rest.y, moving: false });
     expect(later[slot.npcId]).toEqual(first[slot.npcId]);
   }

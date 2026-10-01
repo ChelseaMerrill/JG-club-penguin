@@ -4,7 +4,7 @@ import type { RoomId } from '../src/contracts';
 import { npcLayout } from '../src/game/npcs/npc-layout';
 import { devPit } from '../src/game/rooms/definitions/dev-pit';
 import { townCenter } from '../src/game/rooms/definitions/town-center';
-import { tileToScreen } from '../src/game/rooms/iso';
+import { npcSlotPoint } from '../src/game/rooms/iso';
 import type { RoomDefinition } from '../src/game/rooms/room-definition';
 import { GAME_HEIGHT, GAME_WIDTH } from '../src/game/stage-size';
 import { dialogLinePool } from '../src/npcs/dialog-lines';
@@ -71,7 +71,7 @@ async function bootRoom(page: Page, roomId: RoomId): Promise<string[]> {
 async function openDialog(page: Page, room: RoomDefinition, npcId: NpcId): Promise<void> {
   const slot = room.npcSlots.find((s) => s.npcId === npcId);
   if (!slot) throw new Error(`no ${npcId} slot in ${room.id}`);
-  const feet = tileToScreen(slot.tile, room.grid.origin);
+  const feet = npcSlotPoint(slot, room.grid.origin);
   await clickStagePoint(page, { x: feet.x, y: feet.y + HIT_ZONE_OFFSET_Y });
   const dialog = page.locator('.npc-dialog');
   await expect(dialog).toBeVisible({ timeout: LONG_WALK_TIMEOUT });
