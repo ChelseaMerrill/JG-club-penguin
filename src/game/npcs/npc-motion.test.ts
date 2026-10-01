@@ -183,6 +183,38 @@ describe('NPC motion (#113)', () => {
     expect(note.children[0].alpha).toBe(1);
   });
 
+  it('times a `pathClock` prop layer (and its children) by the walk, pausing with it, and any other by the in-place clock (owner request, 2026-10-01)', () => {
+    const blink = {
+      keyframes: '@keyframes show { 0%,49.99% { opacity:1; } 50%,100% { opacity:0; } }',
+      animation: 'show 4s linear infinite',
+    };
+    const spec: Parameters<typeof createNpcMotion>[0] = {
+      path: {
+        keyframes:
+          '@keyframes walk { 0% { transform: translate(0,0); } 100% { transform: translate(40px,0); } }',
+        animation: 'walk 4s linear infinite',
+      },
+      props: [
+        { svg: '', pathClock: true, motion: blink, children: [{ svg: '', motion: blink }] },
+        { svg: '', motion: blink },
+      ],
+    };
+    const motion = createNpcMotion(spec, { x: 0, y: 0 }, ORIGIN, { reducedMotion: false })!;
+    motion.advance(1_000);
+    motion.pause();
+    motion.advance(2_000);
+    const [walkTimed, inPlace] = motion.pose().props;
+    // The walk has stood 1s in for 3s: its layer and that layer's child still show...
+    expect(motion.pose().point.x).toBeCloseTo(10);
+    expect(walkTimed.alpha).toBe(1);
+    expect(walkTimed.children[0].alpha).toBe(1);
+    // ...while the in-place layer has played on to 3s and hidden.
+    expect(inPlace.alpha).toBe(0);
+    motion.resume();
+    motion.advance(1_500);
+    expect(motion.pose().props[0].alpha).toBe(0);
+  });
+
   it('does nothing under prefers-reduced-motion, or for an NPC with no designed motion', () => {
     expect(
       createNpcMotion(getNpcMotion('brandon'), BRANDON_REST, ORIGIN, { reducedMotion: true }),

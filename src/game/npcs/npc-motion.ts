@@ -59,6 +59,7 @@ export interface NpcMotionPose {
 interface CompiledProp {
   animation: CompiledCssAnimation | null;
   children: CompiledProp[];
+  pathClock: boolean;
 }
 
 /** The figure's feet (its sprite origin) in the design's 120x130 figure viewBox. */
@@ -86,14 +87,24 @@ function compileProp(layer: NpcPropLayer): CompiledProp {
   return {
     animation: layer.motion ? compileCssAnimation(layer.motion) : null,
     children: (layer.children ?? []).map(compileProp),
+    pathClock: layer.pathClock === true,
   };
 }
 
-function poseProp(prop: CompiledProp, elapsedMs: number): NpcPropPose {
+/** The NPC's two clocks: the path's (frozen while paused) and the in-place one (never paused). */
+interface MotionClocks {
+  pathMs: number;
+  inPlaceMs: number;
+}
+
+/** A layer runs on the in-place clock unless it, or a layer it's nested in, asks for the path's. */
+function poseProp(prop: CompiledProp, clocks: MotionClocks): NpcPropPose {
+  const own = prop.pathClock ? { pathMs: clocks.pathMs, inPlaceMs: clocks.pathMs } : clocks;
+  const elapsedMs = own.inPlaceMs;
   return {
     matrix: prop.animation ? feetRelative(sampleCssAnimation(prop.animation, elapsedMs)) : IDENTITY,
     alpha: prop.animation ? sampleCssOpacity(prop.animation, elapsedMs) : 1,
-    children: prop.children.map((child) => poseProp(child, elapsedMs)),
+    children: prop.children.map((child) => poseProp(child, own)),
   };
 }
 
@@ -161,7 +172,9 @@ export class NpcMotion {
       stage: this.stage
         ? restRelative(sampleCssAnimation(this.stage, this.inPlaceMs), this.rest)
         : null,
-      props: this.props.map((prop) => poseProp(prop, this.inPlaceMs)),
+      props: this.props.map((prop) =>
+        poseProp(prop, { pathMs: this.pathMs, inPlaceMs: this.inPlaceMs }),
+      ),
     };
   }
 }

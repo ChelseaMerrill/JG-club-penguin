@@ -14,6 +14,9 @@ const AWAITING_BA_LINE: readonly string[] = [
   'jason-mullet',
   'jon-mullet',
   'brandon-mullet',
+  // His "corner pocket" bubble is a fragment of his one line, so it's
+  // omitted from his dialog (owner request, 2026-10-01, Track D).
+  'tony',
 ];
 
 /**
@@ -113,6 +116,9 @@ describe('dialogLinePool', () => {
     expect(NPCS.emily.idleLines.map((line) => line.text)).toContain('Joining JG?');
     expect(dialogLinePool(NPCS.jason)).not.toContain('Three questions and you may pass.');
     expect(dialogLinePool(NPCS.jethro)).not.toContain('Act natural. Camera is rolling.');
+    // Tony's "corner pocket" bubble is a fragment of his one dialog line.
+    expect(dialogLinePool(NPCS.tony)).toEqual(['Eight ball, corner pocket.']);
+    expect(NPCS.tony.idleLines.map((line) => line.text)).toContain('corner pocket');
   });
 
   it("gives Jethro's Team Room 1 appearance his Icebox bubbles too (H4)", () => {

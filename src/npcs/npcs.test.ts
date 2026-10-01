@@ -476,13 +476,13 @@ describe('NPCS', () => {
         name: 'Nicole Roberts',
         title: 'Account Manager',
         tagName: 'Nicole',
-        idleLines: [{ text: 'hehe', periodS: 0, delayS: 0 }],
+        idleLines: [{ text: 'hehe', periodS: 3, delayS: 0, window: [0.05, 0.35] }],
       },
       'ann-marie-mullet': {
         name: 'Ann Marie Berdar',
         title: 'SUBSCRIPTION AI',
         tagName: 'Ann Marie',
-        idleLines: [{ text: 'haha', periodS: 0, delayS: 0 }],
+        idleLines: [{ text: 'haha', periodS: 3, delayS: -1.5, window: [0.05, 0.35] }],
       },
       'jory-mullet': {
         name: 'Jory Hutchins',
@@ -519,8 +519,8 @@ describe('NPCS', () => {
         title: null,
         tagName: 'Dom',
         idleLines: [
-          { text: 'Undefeated. I always win.', periodS: 9.4, window: [0, 0.12] },
-          { text: 'Undefeated. I always win.', periodS: 9.4, window: [0.86, 1] },
+          { text: 'Undefeated. I always win.', periodS: 9.4, window: [0, 0.1] },
+          { text: 'Undefeated. I always win.', periodS: 9.4, window: [0.88, 1] },
         ],
       },
     };
@@ -539,7 +539,6 @@ describe('NPCS', () => {
       ['ian-team-room-2', 'ian'],
       ['millie-team-room-3', 'millie'],
       // #51 slice 3: the Mullet.
-      ['jason-mullet', 'jason'],
       ['ann-marie-mullet', 'ann-marie'],
       ['jory-mullet', 'jory'],
       ['ashley-mullet', 'ashley'],
@@ -574,6 +573,9 @@ describe('NPCS', () => {
       // headset; the Roof Deck's and Town Center's designs draw neither.
       ['casey-team-room-3', 'casey', { prop: 'openLaptop' }],
       ['sydney-team-room-3', 'sydney', { headset: true }],
+      // The Mullet's Jason plays its arcade machine, his hands drawn by his
+      // motion's layers (owner request, 2026-10-01, Track D).
+      ['jason-mullet', 'jason', { arcadeHands: 'resting' }],
     ];
     for (const [roomOwn, other, added] of overrides) {
       const withOverride = NPCS[roomOwn];

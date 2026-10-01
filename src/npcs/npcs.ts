@@ -1508,11 +1508,11 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
   // design/Characters.dc.html (Dom and Ashley are on its TITLE TBD list), tags
   // and `idleLines` from design/The Mullet.dc.html's own nameplates and
   // bubbles, verbatim. A repeat appearance shares its person's figure and
-  // dialog-lines constants. The design animates several of them with SMIL (Dom's lap,
-  // Tony's walk round the pool table, Jory's walk, Jon's and Brandon's
-  // ping-pong sway, Ashley's pacing); none of that is ported here: each stands
-  // at its rest slot, and only a figure the design gives a plain up-down bob
-  // keeps the shared idle bob (#149 follow-up).
+  // dialog-lines constants. The design animates all nine with SMIL (Jason's
+  // arcade, the couch giggles, Dom's and Jory's lap, Tony's walk round the
+  // pool table, Jon's and Brandon's rally, Ashley's pacing and throws),
+  // ported in `src/npcs/motions/the-mullet.ts` (owner request, 2026-10-01,
+  // Track D).
   'jason-mullet': {
     id: 'jason-mullet',
     name: 'Jason Jahnel',
@@ -1526,7 +1526,9 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     // The design jiggles him at the joystick rather than bobbing him.
     still: true,
     dialog: LINE_DIALOG,
-    figure: JASON_FIGURE,
+    // His hands go up to the controls while his Mullet motion plays (owner
+    // request, 2026-10-01, Track D); at rest they're at his sides as usual.
+    figure: { ...JASON_FIGURE, arcadeHands: 'resting' },
   },
   'nicole-mullet': {
     id: 'nicole-mullet',
@@ -1536,9 +1538,10 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     kind: 'human',
     tagName: 'Nicole',
     dialogLines: NICOLE_LINES,
-    // The design floats a laugh ("hehe") off her on a 3 s cycle; ported as a
-    // static line (#149 follow-up).
-    idleLines: staticLine('hehe'),
+    // The design floats a laugh ("hehe") off her on a 3 s cycle: an SMIL
+    // opacity `0;1;1;0;0` at `keyTimes` `0;0.05;0.35;0.4;1`, fully shown from
+    // 5% to 35% (owner request, 2026-10-01, Track D; it was a static line).
+    idleLines: [{ text: 'hehe', periodS: 3, delayS: 0, window: [0.05, 0.35] }],
     dialog: LINE_DIALOG,
     figure: NICOLE_FIGURE,
   },
@@ -1550,8 +1553,8 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     kind: 'human',
     tagName: 'Ann Marie',
     dialogLines: ANN_MARIE_LINES,
-    // As Nicole's: the design's floating "haha", ported as a static line.
-    idleLines: staticLine('haha'),
+    // As Nicole's laugh, half a cycle later (`begin="1.5s"`).
+    idleLines: [{ text: 'haha', periodS: 3, delayS: -1.5, window: [0.05, 0.35] }],
     dialog: LINE_DIALOG,
     figure: ANN_MARIE_FIGURE,
   },
@@ -1600,6 +1603,10 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     kind: 'human',
     tagName: 'Tony Mercadante',
     dialogLines: ['Eight ball, corner pocket.'],
+    // A near-duplicate of his dialog line; it stays a bubble in the Room.
+    // Without it his dialog showed the fragment "corner pocket" half the
+    // time (and flaked e2e/npcs.spec.ts's "clicking Tony" test).
+    dialogOmit: ['corner pocket'],
     idleLines: staticLine('corner pocket'),
     // The design walks him round the pool table with his cue rather than
     // bobbing him.
@@ -1656,11 +1663,14 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     kind: 'human',
     tagName: 'Dom',
     dialogLines: DOM_LINES,
-    // A discrete SMIL opacity on a 9.4 s cycle shows it from 86% of one cycle
-    // to 12% of the next: two windows either side of the cycle's start.
+    // A linear SMIL opacity on his 9.4 s lap (`1;1;0;0;1;1` at `keyTimes`
+    // `0;0.1;0.12;0.86;0.88;1`) shows it fully from 88% of one cycle to 10% of
+    // the next, fading in and out either side: two windows either side of the
+    // cycle's start (owner request, 2026-10-01, Track D: the fades no longer
+    // count as shown, as `DEFAULT_BUBBLE_WINDOW` doesn't).
     idleLines: [
-      { text: 'Undefeated. I always win.', periodS: 9.4, delayS: 0, window: [0, 0.12] },
-      { text: 'Undefeated. I always win.', periodS: 9.4, delayS: 0, window: [0.86, 1] },
+      { text: 'Undefeated. I always win.', periodS: 9.4, delayS: 0, window: [0, 0.1] },
+      { text: 'Undefeated. I always win.', periodS: 9.4, delayS: 0, window: [0.88, 1] },
     ],
     dialog: LINE_DIALOG,
     // The Room design dresses him in running gear for his lap of the room,
