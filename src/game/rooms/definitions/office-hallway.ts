@@ -47,9 +47,9 @@ const WALKABLE: readonly (readonly boolean[])[] = [
 
 /**
  * Traced from `design/Room 11 Office Hallway.dc.html` (#51), which titles it
- * THE CORRIDOR. Doors: "← TOWN CENTER" on the back-left wall, "TEAM ROOM 1"
- * to "TEAM ROOM 6" along the back-right wall, and the "TEAM ROOM 7-9 ↓"
- * markers on the front edge. Each wall-door hotspot is the bounding box of
+ * THE CORRIDOR (the game says THE HALLWAY). Doors: "← TOWN CENTER" on the
+ * back-left wall, "TEAM ROOM 1" to "TEAM ROOM 6" along the back-right wall,
+ * and the "TEAM ROOM 7-9 ↓" markers on the front edge. Each wall-door hotspot is the bounding box of
  * the design's own door-frame polygon (e.g. TEAM ROOM 1's `830,344 900,379
  * 900,249 830,214`). TEAM ROOM 5-9 have no designs, so they stay disabled
  * (#51 D4). No prototype Room draws a door into the Hallway, so from them it
@@ -58,7 +58,9 @@ const WALKABLE: readonly (readonly boolean[])[] = [
  */
 export const officeHallway: RoomDefinition = {
   id: 'office-hallway',
-  title: 'THE CORRIDOR',
+  // "THE HALLWAY", not the design's THE CORRIDOR (owner request, 2026-10-01,
+  // Track D).
+  title: 'THE HALLWAY',
   // The banner's "OFFICES 1–9 · KNOCK BEFORE YOU WADDLE · 4 PENGUINS", minus
   // its fabricated live headcount (#16 D2's rule).
   subtitle: 'OFFICES 1–9 · KNOCK BEFORE YOU WADDLE',
