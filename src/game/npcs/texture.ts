@@ -61,6 +61,8 @@ export function ensureNpcTexture(
                   // Team Room 1's Jethro: his hands and camera belong to his
                   // `jdown`/`jup` layers while they play.
                   cameraRaise: npc.figure.cameraRaise ? ('raising' as const) : undefined,
+                  // The Mullet's Jason: his hands belong to his arcade layers.
+                  arcadeHands: npc.figure.arcadeHands ? ('playing' as const) : undefined,
                 }
               : {}),
           },

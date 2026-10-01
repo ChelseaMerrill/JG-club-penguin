@@ -94,15 +94,24 @@ export const theMullet: RoomDefinition = {
     // shadow, so theirs is the tile under their feet. Jory's shadow (1172, 769) falls just off the
     // floor's front-right edge, at col 14.1, so she takes the nearest floor
     // tile, (13,6).
+    //
+    // The NPCs the design moves (owner request, 2026-10-01, Track D:
+    // `src/npcs/motions/the-mullet.ts`) are drawn exactly where it stands
+    // their feet (its figure `<svg>`'s (60, 120) point, with every group
+    // transform applied) by an `offset`, so their moves trace its own: Dom
+    // at his lap's first point (860, 478.26), Brandon at (1062, 711.6), Tony
+    // at (470, 433.9) and Ashley at (620, 698.26). Jon's slot is already
+    // within 2.4 px of his, and Jory's lap is re-expressed relative to her
+    // on-floor slot instead (see her motion).
     { npcId: 'jason-mullet', tile: { col: 1, row: 1 } },
     { npcId: 'nicole-mullet', tile: { col: 6, row: 2 } },
     { npcId: 'ann-marie-mullet', tile: { col: 8, row: 2 } },
-    { npcId: 'dom-mullet', tile: { col: 5, row: 4 } },
+    { npcId: 'dom-mullet', tile: { col: 5, row: 4 }, offset: { x: 10, y: -19.74 } },
     { npcId: 'jon-mullet', tile: { col: 7, row: 6 } },
-    { npcId: 'brandon-mullet', tile: { col: 11, row: 6 } },
+    { npcId: 'brandon-mullet', tile: { col: 11, row: 6 }, offset: { x: 12, y: 13.6 } },
     { npcId: 'jory-mullet', tile: { col: 13, row: 6 } },
-    { npcId: 'tony', tile: { col: 0, row: 7 } },
-    { npcId: 'ashley-mullet', tile: { col: 7, row: 10 } },
+    { npcId: 'tony', tile: { col: 0, row: 7 }, offset: { x: 20, y: -14.1 } },
+    { npcId: 'ashley-mullet', tile: { col: 7, row: 10 }, offset: { x: -30, y: 0.26 } },
     // "You" is the local Player's own Penguin, never a static NPC slot.
   ],
 };

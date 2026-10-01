@@ -430,6 +430,26 @@ describe('renderNpcSvg', () => {
     expect(raising).not.toContain('<rect x="84" y="82" width="26"');
   });
 
+  it("draws the Mullet's Jason with his hands at his sides, and none while his arcade hands play (owner request, 2026-10-01)", () => {
+    const leftHand =
+      '<circle cx="30" cy="101" r="5.5" fill="#F6DCC6" stroke="#0C4B5F" stroke-width="2">';
+    const rightHand =
+      '<circle cx="90" cy="101" r="5.5" fill="#F6DCC6" stroke="#0C4B5F" stroke-width="2">';
+    const resting = renderRosterNpc('jason-mullet');
+    expect(resting).toContain(leftHand);
+    expect(resting).toContain(rightHand);
+    // Resting is exactly the Icebox's Jason, the same person.
+    expect(resting).toBe(renderRosterNpc('jason').replaceAll('npc-jason', 'npc-jason-mullet'));
+    const jason = NPCS['jason-mullet'];
+    if (jason.kind !== 'human') throw new Error('expected jason-mullet to be a Human NPC');
+    const playing = renderNpcSvg({ ...jason.figure, arcadeHands: 'playing' });
+    assertValidSvg(playing);
+    expect(playing).not.toContain('<circle cx="30" cy="101"');
+    expect(playing).not.toContain('<circle cx="90" cy="101"');
+    // His arms stay.
+    expect(playing).toContain('<rect x="24" y="70" width="12" height="30" rx="6" fill="#F4F4F4"');
+  });
+
   it("hands Team Room 3's Casey the design's open laptop, but not the Roof Deck's", () => {
     const svg = renderRosterNpc('casey-team-room-3');
     expect(svg).toContain(

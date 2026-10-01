@@ -140,6 +140,15 @@ export interface HumanFigureSpec {
    */
   cameraRaise?: 'lowered' | 'raising';
   /**
+   * The Mullet's Jason at the Ms. Pac-Man (owner request, 2026-10-01, Track
+   * D): `design/The Mullet.dc.html` raises both his hands to the controls and
+   * works them with SMIL (an `animateTransform` on each hand's `<g>`), leaving
+   * his arms where they are. `'resting'` draws his hands at his sides, as
+   * every figure's (his look under reduced motion); `'playing'` leaves both
+   * to his motion's hand layers (`src/npcs/motions/the-mullet.ts`).
+   */
+  arcadeHands?: 'resting' | 'playing';
+  /**
    * Team Room 3's Sydney: a black headset with a mic boom, drawn over her
    * hair and held prop, verbatim from `design/Team Room 3.dc.html`.
    */
@@ -457,7 +466,8 @@ function renderHumanFigure(spec: HumanFigureSpec, idPrefix: string): string {
   }
 
   // Sleeves/arms (the runner's bare, with a wristband), then the hands,
-  // which Team Room 1's camera raise draws later instead.
+  // which Team Room 1's camera raise draws later instead, and which the
+  // Mullet's playing Jason leaves to his motion.
   const sleeve = spec.sleeveless || spec.runner ? sk : (spec.jacket ?? top);
   o +=
     `<rect x="24" y="70" width="12" height="30" rx="6" fill="${sleeve}" stroke="${OUTLINE}" stroke-width="2.5"></rect>` +
@@ -465,7 +475,7 @@ function renderHumanFigure(spec: HumanFigureSpec, idPrefix: string): string {
   if (spec.runner) {
     o += `<rect x="24" y="86" width="12" height="5" fill="#00BDFF" stroke="${OUTLINE}" stroke-width="1.5"></rect>`;
   }
-  if (!spec.cameraRaise) {
+  if (!spec.cameraRaise && spec.arcadeHands !== 'playing') {
     o +=
       `<circle cx="30" cy="101" r="5.5" fill="${sk}" stroke="${OUTLINE}" stroke-width="2"></circle>` +
       `<circle cx="90" cy="101" r="5.5" fill="${sk}" stroke="${OUTLINE}" stroke-width="2"></circle>`;

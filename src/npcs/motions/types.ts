@@ -13,6 +13,15 @@ export interface NpcPropLayer {
   svg: string;
   motion?: CssAnimationSource;
   children?: readonly NpcPropLayer[];
+  /**
+   * Time this layer (and its `children`) by the NPC's `path` clock instead of
+   * the in-place one (owner request, 2026-10-01, Track D): for a part the
+   * design times against the NPC's walk, e.g. the Mullet's Tony showing his
+   * cue only while he stands at the pool table, or Ashley throwing her
+   * chicken only while she stands still. It then pauses with the walk while
+   * the NPC's dialog is open, so the two never drift apart.
+   */
+  pathClock?: boolean;
 }
 
 /**
