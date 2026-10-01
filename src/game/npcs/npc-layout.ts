@@ -69,15 +69,16 @@ export interface NpcBob {
 }
 
 /**
- * The draw scale by kind. Penguin-kind NPCs keep only this layout default:
- * they are being removed from the Rooms (only Players appear as Penguins,
- * PR #133), so #113 doesn't restyle them.
+ * The draw scale: the NPC's own `scale` when its Room design draws it at
+ * another one (Team Room 3), else its kind's. Penguin-kind NPCs keep only
+ * this layout default: they are being removed from the Rooms (only Players
+ * appear as Penguins, PR #133), so #113 doesn't restyle them.
  */
-export function npcScale(npc: Pick<NpcDefinition, 'kind'>): number {
-  return npc.kind === 'human' ? HUMAN_NPC_SCALE : PENGUIN_NPC_SCALE;
+export function npcScale(npc: Pick<NpcDefinition, 'kind' | 'scale'>): number {
+  return npc.scale ?? (npc.kind === 'human' ? HUMAN_NPC_SCALE : PENGUIN_NPC_SCALE);
 }
 
-export function npcLayout(npc: Pick<NpcDefinition, 'kind'>): NpcLayout {
+export function npcLayout(npc: Pick<NpcDefinition, 'kind' | 'scale'>): NpcLayout {
   const scale = npcScale(npc);
   const nameplateBottomY = -FIGURE_HEIGHT * scale - NAMEPLATE_GAP_ABOVE_FIGURE;
   const nameplateTopY = nameplateBottomY - NAMEPLATE_HEIGHT;

@@ -245,6 +245,12 @@ interface NpcDefinitionBase {
    * unless a designed motion (`npc-motions.ts`) replaces the bob.
    */
   still?: boolean;
+  /**
+   * The Room design's draw scale for this NPC, when it isn't its kind's
+   * default (`npc-layout.ts`): Team Room 3 draws its Humans at 0.58
+   * (`width="69.6"`), not 0.62 (owner request, 2026-09-30, Track D).
+   */
+  scale?: number;
 }
 
 /** A Human NPC (`design/build/humans.js`'s figures), rendered by `render-npc-svg.ts`. */
@@ -1390,6 +1396,8 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     idleLines: [],
     // Team Room 3's design draws its NPCs without any idle bob.
     still: true,
+    // Team Room 3 draws its Humans at 0.58, not 0.62 (`width="69.6"`).
+    scale: 0.58,
     dialog: LINE_DIALOG,
     figure: MILLIE_FIGURE,
   },
@@ -1407,6 +1415,8 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     // The Igloo Gear stall is the Roof Deck's; here she is just gaming.
     // Team Room 3's design draws its NPCs without any idle bob.
     still: true,
+    // Team Room 3 draws its Humans at 0.58, not 0.62 (`width="69.6"`).
+    scale: 0.58,
     dialog: LINE_DIALOG,
     // The Room design hands her an open laptop, which the Roof Deck's
     // `casey` doesn't carry (owner request, 2026-09-30, Track D).
@@ -1423,6 +1433,8 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     idleLines: staticLine('So, open to new roles?'),
     // Team Room 3's design draws its NPCs without any idle bob.
     still: true,
+    // Team Room 3 draws its Humans at 0.58, not 0.62 (`width="69.6"`).
+    scale: 0.58,
     dialog: LINE_DIALOG,
     // The Room design adds a headset, which Town Center's `sydney` doesn't
     // wear (owner request, 2026-09-30, Track D).

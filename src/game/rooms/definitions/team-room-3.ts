@@ -69,10 +69,36 @@ export const teamRoom3: RoomDefinition = {
   ],
   npcSlots: [
     // Each slot is the tile under the NPC's ground shadow: Casey gaming on
-    // the couch, Millie at the front-left desk, Sydney at her desk.
-    { npcId: 'casey-team-room-3', tile: { col: 1, row: 0 } },
-    { npcId: 'millie-team-room-3', tile: { col: 1, row: 4 } },
-    { npcId: 'sydney-team-room-3', tile: { col: 6, row: 4 } },
+    // the couch, Millie at the front-left desk, Sydney at her desk. Each
+    // `offset` moves the NPC from that tile's point to the design's own feet
+    // point (its figure `<svg>`'s x + 60 * 0.58, y + 120 * 0.58), so the
+    // furniture in `foregrounds` lines up with them (owner request,
+    // 2026-09-30, Track D): Casey (842, 394.8), Millie (615, 495.7), Sydney
+    // (899, 617.3).
+    { npcId: 'casey-team-room-3', tile: { col: 1, row: 0 }, offset: { x: -8, y: -3.2 } },
+    { npcId: 'millie-team-room-3', tile: { col: 1, row: 4 }, offset: { x: -35, y: -2.3 } },
+    { npcId: 'sydney-team-room-3', tile: { col: 6, row: 4 }, offset: { x: -1, y: -5.7 } },
     // "You" is the local Player's own Penguin, never a static NPC slot.
+  ],
+  // What the design draws after each NPC's figure, so they sit at their
+  // desks and in the couch instead of standing on top of them (owner
+  // request, 2026-09-30, Track D). Exported by `npm run export:room-art --
+  // team-room-3` (`FOREGROUND_LAYERS`).
+  foregrounds: [
+    {
+      key: 'room-team-room-3-front-millie-desk',
+      url: 'rooms/team-room-3-front-millie-desk.png',
+      overNpcId: 'millie-team-room-3',
+    },
+    {
+      key: 'room-team-room-3-front-casey-couch-arm',
+      url: 'rooms/team-room-3-front-casey-couch-arm.png',
+      overNpcId: 'casey-team-room-3',
+    },
+    {
+      key: 'room-team-room-3-front-sydney-desk',
+      url: 'rooms/team-room-3-front-sydney-desk.png',
+      overNpcId: 'sydney-team-room-3',
+    },
   ],
 };

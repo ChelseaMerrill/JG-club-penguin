@@ -57,6 +57,7 @@ import {
   screenToTile,
   SNOWBALL_LAYER,
   tileCornerToScreen,
+  npcSlotPoint,
   tileToScreen,
   TILE_HEIGHT,
   TILE_WIDTH,
@@ -170,6 +171,8 @@ const STAGE_BACKGROUND_COLOR = '#0e1013';
 // everything, including the procedural walls; doors sit above the floor but
 // below their own label.
 const IMAGE_BACKGROUND_DEPTH = -2;
+/** How far in front of its NPC a `RoomForeground` sorts: under 1, the gap to the next tile's depth. */
+const FOREGROUND_DEPTH_OFFSET = 0.5;
 const WALL_DEPTH = -1;
 const FLOOR_DEPTH = -1;
 const DOOR_DEPTH = 0;
@@ -683,6 +686,9 @@ export class RoomScene extends Scene {
     if (room.background.kind === 'image') {
       this.load.image(room.background.key, room.background.url);
     }
+    for (const layer of room.foregrounds ?? []) {
+      this.load.image(layer.key, layer.url);
+    }
     // #135 D7: the JG award logos, for award Furniture hung on the Igloo's
     // walls. Only a Room with Furniture slots can show them.
     if (room.furnitureSlots?.length) {
@@ -723,6 +729,7 @@ export class RoomScene extends Scene {
       gameEvents.on('npc:dialog-closed', ({ npcId }) => npcClickPause.dialogClosed(npcId)),
     ];
     this.drawNpcs(room);
+    this.drawForegrounds(room);
     this.spawnLocalPenguin(room);
 
     this.input.on('pointerdown', this.handlePointerDown);
@@ -1858,12 +1865,29 @@ export class RoomScene extends Scene {
     gameEvents.emit('npc:arrived', { npcId: guard.spec.npcId });
   }
 
+  /**
+   * The furniture the Room design draws in front of its NPCs (`RoomForeground`),
+   * each sorted just in front of its NPC's slot tile: the next tile's depth is
+   * at least 1 more, so anything standing further forward still draws over it.
+   */
+  private drawForegrounds(room: RoomDefinition): void {
+    for (const layer of room.foregrounds ?? []) {
+      const slot = room.npcSlots.find((candidate) => candidate.npcId === layer.overNpcId);
+      if (!slot || !this.textures.exists(layer.key)) continue;
+      this.add
+        .image(0, 0, layer.key)
+        .setOrigin(0, 0)
+        .setDisplaySize(GAME_WIDTH, GAME_HEIGHT)
+        .setDepth(depthForTile(slot.tile) + FOREGROUND_DEPTH_OFFSET);
+    }
+  }
+
   private drawNpcs(room: RoomDefinition): void {
     for (const slot of room.npcSlots) {
       const npc = getNpcDefinition(slot.npcId);
       if (!npc) continue;
 
-      const point = tileToScreen(slot.tile, room.grid.origin);
+      const point = npcSlotPoint(slot, room.grid.origin);
       const depth = depthForTile(slot.tile);
 
       const motion = getNpcMotion(npc.id);
