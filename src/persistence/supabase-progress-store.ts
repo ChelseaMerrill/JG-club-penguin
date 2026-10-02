@@ -9,6 +9,7 @@ import type { TypedEmitter } from '../contracts/emitter';
 import type { BadgeId, GameEventMap, MinigameId, MinigameStatsMap } from '../contracts/game-events';
 import type { Eyes, Hat, IdleEmote, Pattern, PenguinLook } from '../contracts/penguin';
 import { MINIGAME_RULES } from './minigame-rules';
+import { BADGE_CATALOG } from './badge-catalog';
 import { STAIR_TOP_FLOOR } from './stair-climb-rules';
 import {
   clampLeaderboardRows,
@@ -366,7 +367,10 @@ function toStairFlightResult(data: unknown): StairFlightResult {
     flightsLogged: raw.flightsLogged,
     tokensAwarded: raw.tokensAwarded,
     flightTokensToday: raw.flightTokensToday,
-    badgesEarned: raw.badgesEarned as BadgeId[],
+    // Only Badge ids the client knows, as a newer server could award more.
+    badgesEarned: (raw.badgesEarned as unknown[]).filter((id): id is BadgeId =>
+      BADGE_CATALOG.some((badge) => badge.id === id),
+    ),
     balance: raw.balance,
   };
 }

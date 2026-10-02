@@ -570,6 +570,7 @@ function endSession(): RoomChannel | null {
   stairClimb.reset();
   stairKeys.reset();
   gatedStairClimbPanel.hide();
+  stairClimbPanel.reset();
   questWidget.render(null);
   hud.overlays.close(QUESTS_OVERLAY_ID);
   return channel;

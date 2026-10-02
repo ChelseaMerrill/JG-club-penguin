@@ -143,6 +143,8 @@ export interface StairClimbPanel {
   hide(): void;
   /** Hides the hint for good, as the design does once a stair key is used. */
   dismissHint(): void;
+  /** Sign-out: hides both and brings the hint back for whoever signs in next. */
+  reset(): void;
   destroy(): void;
 }
 
@@ -274,6 +276,12 @@ export function createStairClimbPanel(root: HTMLElement): StairClimbPanel {
     dismissHint() {
       hintDismissed = true;
       hint.hidden = true;
+    },
+    reset() {
+      hintDismissed = false;
+      panel.hidden = true;
+      hint.hidden = true;
+      delete panel.dataset.state;
     },
     destroy() {
       panel.remove();

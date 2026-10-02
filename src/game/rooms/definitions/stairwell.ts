@@ -104,17 +104,27 @@ function stairwellRoomId(floor: number): RoomId {
   return `stairwell-${floor}` as RoomId;
 }
 
+/** One floor's doors, and the two its ↑ and ↓ keys use (S4-D10, UD-7). */
+interface FloorDoors {
+  doors: RoomDoor[];
+  up: RoomDoor;
+  down: RoomDoor;
+}
+
 /** The pill and stair doors one floor draws (S4-D4, S4-D11, UD-7). */
-function doorsFor(floor: number): RoomDoor[] {
+function doorsFor(floor: number): FloorDoors {
   const doors: RoomDoor[] = [];
+  let up: RoomDoor;
+  let down: RoomDoor;
   if (floor < 5) {
     const entryTile = DOWN_PILL_APPROACH[floor + 1]!;
-    doors.push({
+    up = {
       label: `FLOOR ${floor + 1}`,
       hotspot: upPill(floor),
       targetRoomId: stairwellRoomId(floor + 1),
       entryTile,
-    });
+    };
+    doors.push(up);
     doors.push({
       label: 'STAIRS',
       hotspot: UPPER_FLIGHT,
@@ -122,7 +132,7 @@ function doorsFor(floor: number): RoomDoor[] {
       entryTile,
     });
   } else {
-    doors.push({
+    up = {
       label: 'ROOF DECK',
       hotspot: UPPER_FLIGHT,
       targetRoomId: 'roof-deck',
@@ -130,7 +140,8 @@ function doorsFor(floor: number): RoomDoor[] {
       // spawn tile until #170 adds that pill and retargets this to its sill
       // (the #16 fix 4 precedent).
       entryTile: roofDeck.spawnTile,
-    });
+    };
+    doors.push(up);
     doors.push({
       label: 'JG HQ',
       hotspot: LANDING_DOOR,
@@ -139,24 +150,28 @@ function doorsFor(floor: number): RoomDoor[] {
     });
   }
   if (floor > 0) {
-    doors.push({
+    down = {
       label: floor === 1 ? 'LOBBY' : `FLOOR ${floor - 1}`,
       hotspot: downPill(floor),
       targetRoomId: stairwellRoomId(floor - 1),
       entryTile: UP_PILL_APPROACH,
-    });
+    };
   } else {
     // The Lobby (#169) isn't built yet, so this shows the coming-soon hint,
     // as holding ↓ here does (UD-7). #169 sets its target.
-    doors.push({
+    down = {
       label: 'LOBBY',
       hotspot: LANDING_DOOR,
       targetRoomId: null,
       entryTile: { col: 0, row: 0 },
-    });
+    };
   }
-  return doors;
+  doors.push(down);
+  return { doors, up, down };
 }
+
+/** Each floor's ↑ and ↓ key doors, recorded as `stairwellFloor` builds it. */
+const KEY_EXITS = new Map<RoomId, { up: RoomDoor; down: RoomDoor }>();
 
 /**
  * Each floor's three NPCs (S4-D8), on the tile under each figure's ground
@@ -182,6 +197,8 @@ interface StairwellFloorSpec {
 function stairwellFloor({ floor, subtitle, guest }: StairwellFloorSpec): RoomDefinition {
   const id = stairwellRoomId(floor);
   const npcSlots = npcSlotsFor(floor, guest);
+  const { doors, up, down } = doorsFor(floor);
+  KEY_EXITS.set(id, { up, down });
   return {
     id,
     // S4-D5: only floor 5 draws a banner; every floor shares its title shape.
@@ -193,7 +210,7 @@ function stairwellFloor({ floor, subtitle, guest }: StairwellFloorSpec): RoomDef
     // Where the design draws the local player's own "You" Penguin (its
     // shadow is at (665, 602.5)).
     spawnTile: { col: 3, row: 6 },
-    doors: doorsFor(floor),
+    doors,
     npcSlots,
   };
 }
@@ -261,11 +278,7 @@ export const STAIRWELL_DEFINITIONS: readonly RoomDefinition[] = [
  * `undefined` for any other Room.
  */
 export function stairwellExit(roomId: RoomId, direction: 'up' | 'down'): RoomDoor | undefined {
-  const index = STAIRWELL_DEFINITIONS.findIndex((room) => room.id === roomId);
-  if (index < 0) return undefined;
-  const doors = STAIRWELL_DEFINITIONS[index]!.doors;
-  if (direction === 'up') {
-    return doors.find((door) => door.label === (index < 5 ? `FLOOR ${index + 1}` : 'ROOF DECK'));
-  }
-  return doors.find((door) => door.label === (index > 1 ? `FLOOR ${index - 1}` : 'LOBBY'));
+  // The door objects themselves, not their labels: 'LOBBY' names both floor
+  // 1's ↓ pill and floor 0's landing door.
+  return KEY_EXITS.get(roomId)?.[direction];
 }

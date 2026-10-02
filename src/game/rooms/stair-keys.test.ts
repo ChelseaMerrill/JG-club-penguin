@@ -346,6 +346,9 @@ describe('isEditableElement', () => {
       expect(isEditableElement(element), element.tagName).toBe(true);
     }
     expect(isEditableElement(document.createElement('button'))).toBe(false);
+    const readOnly = document.createElement('div');
+    readOnly.setAttribute('contenteditable', 'false');
+    expect(isEditableElement(readOnly)).toBe(false);
     expect(isEditableElement(document.body)).toBe(false);
     expect(isEditableElement(null)).toBe(false);
   });

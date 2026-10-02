@@ -6,9 +6,10 @@ import { isStairwellRoom } from './stairwell';
 export const STAIR_HOLD_MS = 800;
 
 /**
- * The least time between two flights while a key stays held: the server's
- * own `too_soon` floor (S4-D10, SC9), mirrored so a held key never asks too
- * soon.
+ * The least time between two moves while a key stays held, mirroring the
+ * server's 2 s `too_soon` floor (S4-D10, SC9). It's measured from the last
+ * key move, not from when the server logged that flight, so a flight can
+ * still come back too soon; the climb tracker's retry does the rest.
  */
 export const STAIR_CHAIN_MIN_MS = 2000;
 
@@ -173,15 +174,17 @@ export function createStairKeys(deps: StairKeysDeps): StairKeysController {
   };
 }
 
-/** Whether `element` takes typed text: an input, textarea, select or contenteditable. */
+/**
+ * Whether `element` takes typed text: an input, textarea, select or
+ * contenteditable element (not `contenteditable="false"`).
+ */
 export function isEditableElement(element: Element | null): boolean {
   if (!element) return false;
   const tag = element.tagName.toLowerCase();
   if (tag === 'input' || tag === 'textarea' || tag === 'select') return true;
-  return (
-    (element as HTMLElement).isContentEditable === true ||
-    element.closest('[contenteditable]') !== null
-  );
+  if ((element as HTMLElement).isContentEditable === true) return true;
+  const host = element.closest('[contenteditable]');
+  return host !== null && host.getAttribute('contenteditable')?.toLowerCase() !== 'false';
 }
 
 /**

@@ -102,8 +102,9 @@
 -- (Eastern), and the defaults (0, false, 0) when there's no row. Raises
 -- not_authenticated (42501) for anon.
 --
--- SC14 Stair Master on: `update public.badges set available = true where id =
--- 'stair-master';` (#138 seeded it coming soon; its insert never touches
+-- SC14 Stair Master on:
+--   update public.badges set available = true where id = 'stair-master';
+-- (#138 seeded it coming soon; its insert never touches
 -- `available` on conflict, so rerunning #138 keeps it on). The client mirrors
 -- it in src/persistence/badge-catalog.ts (BADGE_CATALOG's entry is available,
 -- and 'stair-master' is in BADGE_AVAILABILITY_OVERRIDES).

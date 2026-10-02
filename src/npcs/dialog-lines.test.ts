@@ -149,6 +149,20 @@ describe('dialogLinePool', () => {
     }
   });
 
+  it("gives each Stairwell NPC only its own floor's lines: no line is shared across floors", () => {
+    const floorsByLine = new Map<string, Set<string>>();
+    for (const npc of Object.values(NPCS)) {
+      if (!/-stairwell-\d$/.test(npc.id)) continue;
+      expect(npc.roomId, npc.id).toBe(npc.id.replace(/^.*-(stairwell-\d)$/, '$1'));
+      for (const line of dialogLinePool(npc)) {
+        floorsByLine.set(line, (floorsByLine.get(line) ?? new Set()).add(npc.roomId));
+      }
+    }
+    for (const [line, floors] of floorsByLine) {
+      expect([...floors], line).toHaveLength(1);
+    }
+  });
+
   it("keeps each NPC's first dialog line as #36's single line", () => {
     for (const npc of Object.values(NPCS)) {
       expect(dialogLinePool(npc)[0], npc.id).toBe(npc.dialogLines[0]);

@@ -93,7 +93,7 @@ A short, timed activity launched from an NPC Interaction, such as Bug Squash in 
 A per-Minigame ranking of named Players' personal bests, shown by Penguin name; ties go to whoever reached the score first. Shown on the Minigame's done screen, all-time, top 10 plus the Player's own rank when it falls outside that.
 
 **Stairs Challenge**
-The floor 0-5 climb up the Stairwell. The server logs each flight climbed in order, paying 10 Tokens a flight up to 100 a day (Eastern time), and the first full climb earns the Stair Master Badge. A climb starts only when the Player enters the Stairwell on floor L from outside it (the Lobby or the Map); arriving on floor 5 from Town Center or the Roof Deck starts nothing, and nor does walking down to floor 0. Until the Lobby is built, a Player locked out of the Map by Security Training can't start one. Not a Minigame and not a Quest. _Avoid:_ Stairs Quest.
+The floor 0-5 climb up the Stairwell. The server logs each flight climbed in order, paying 10 Tokens a flight up to 100 a day (Eastern time), and the first full climb earns the Stair Master Badge. A climb starts only when the Player enters the Stairwell on floor 0 (floor L) from outside it (the Lobby or the Map); the Map's Stairwell tile also restarts one from any other Stairwell floor. Arriving on floor 5 from Town Center or the Roof Deck starts nothing, and nor does walking down to floor 0. Until the Lobby is built, a Player locked out of the Map by Security Training can't start one. Not a Minigame and not a Quest. _Avoid:_ Stairs Quest.
 
 **Quest**
 A tracked objective shown in the Quests panel and the HUD quest widget. Stretch for the prototype. "Task" is not part of this project's vocabulary.

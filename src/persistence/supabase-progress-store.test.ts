@@ -850,6 +850,22 @@ describe('createSupabaseProgressStore', () => {
       expect(events).toEqual(['tokens:200', 'badge:stair-master']);
     });
 
+    it('logStairFlight keeps only Badge ids the client knows', async () => {
+      const { client } = makeFakeClient({
+        logStairFlight: {
+          data: { ...FLIGHT_5, badgesEarned: ['stair-master', 'moon-walker'] },
+          error: null,
+        },
+      });
+      const { events, emitter } = recordEvents();
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID, emitter });
+
+      await expect(store.logStairFlight(5)).resolves.toMatchObject({
+        badgesEarned: ['stair-master'],
+      });
+      expect(events).toEqual(['tokens:200', 'badge:stair-master']);
+    });
+
     it('logStairFlight emits nothing for a flight that logged or paid nothing', async () => {
       const { client } = makeFakeClient();
       const { events, emitter } = recordEvents();

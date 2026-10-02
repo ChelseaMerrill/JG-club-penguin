@@ -254,6 +254,17 @@ describe('createStairClimbPanel', () => {
     expect(q('.stair-climb-hint').hidden).toBe(true);
   });
 
+  it('reset() (sign-out) hides both and brings a dismissed hint back', () => {
+    const { panel, q } = setup();
+    panel.show({ floor: 0, progress: PROGRESS(0), arrival: null, armed: false });
+    panel.dismissHint();
+    panel.reset();
+    expect(q('.stair-climb-panel').hidden).toBe(true);
+
+    panel.show({ floor: 0, progress: PROGRESS(0), arrival: null, armed: false });
+    expect(q('.stair-climb-hint').hidden).toBe(false);
+  });
+
   it('destroy() removes both elements', () => {
     const { panel } = setup();
     panel.destroy();
