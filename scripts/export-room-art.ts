@@ -70,7 +70,16 @@ type RoomId =
   | 'team-room-3'
   | 'team-room-4'
   | 'bathroom'
-  | 'the-mullet';
+  | 'the-mullet'
+  | 'stairwell-0'
+  | 'stairwell-1'
+  | 'stairwell-2'
+  | 'stairwell-3'
+  | 'stairwell-4'
+  | 'stairwell-5';
+
+/** #51 slice 4: one Room per Stairwell floor, each its own Stage of `Stairwell.dc.html`. */
+const STAIRWELL_FLOORS = [0, 1, 2, 3, 4, 5] as const;
 
 // Per-Room overrides of STAGE_SELECTOR (#51 D3), for a design file whose
 // first `data-screen-label` element isn't the Stage this Room exports (e.g.
@@ -81,7 +90,22 @@ const STAGE_SELECTORS: Partial<Record<RoomId, string>> = {
   // is text, not an element, so the default already matches just this one;
   // named explicitly so the exported Stage is unambiguous.
   'the-icebox': '[data-screen-label="THE ICEBOX (CONFERENCE)"]',
+  // #51 slice 4: `Stairwell.dc.html` draws all six floors, one Stage each.
+  ...Object.fromEntries(
+    STAIRWELL_FLOORS.map((floor) => [
+      `stairwell-${floor}`,
+      `[data-screen-label="STAIRWELL · FLOOR ${floor}"]`,
+    ]),
+  ),
 };
+
+// Rooms whose design file draws several Stages (#51 slice 4): every other
+// Stage is removed from the page before the hide rules run, so each rule
+// (whose text anchors and selectors assume one copy of each element on the
+// page) only ever sees this Room's own Stage.
+const ISOLATED_STAGES: ReadonlySet<RoomId> = new Set(
+  STAIRWELL_FLOORS.map((floor): RoomId => `stairwell-${floor}`),
+);
 
 // D1: Room -> design file mapping (see the #16 execution plan comment).
 const ROOM_FILES: Record<RoomId, string> = {
@@ -98,6 +122,13 @@ const ROOM_FILES: Record<RoomId, string> = {
   'team-room-4': 'Team Room 4.dc.html',
   bathroom: 'Room 13 Bathroom.dc.html', // #51 D1: the design calls it THE THAW ROOM.
   'the-mullet': 'The Mullet.dc.html', // #51 slice 3: THE MULLET (MEZZANINE).
+  // #51 slice 4: one file, six Stages (`STAGE_SELECTORS` picks each floor's).
+  'stairwell-0': 'Stairwell.dc.html',
+  'stairwell-1': 'Stairwell.dc.html',
+  'stairwell-2': 'Stairwell.dc.html',
+  'stairwell-3': 'Stairwell.dc.html',
+  'stairwell-4': 'Stairwell.dc.html',
+  'stairwell-5': 'Stairwell.dc.html',
 };
 
 // A hide rule targets one of three shapes the design markup uses for a live
@@ -160,6 +191,89 @@ type HideRule =
   // element up through ancestors until it finds the smallest one whose
   // combined text contains every companion string.
   | { kind: 'cluster'; anchor: string; companions: string[]; comment: string };
+
+/**
+ * One Stairwell floor's hide rules (#51 slice 4). The six Stages of
+ * `design/Stairwell.dc.html` share one layout: Dom (`domRun`), Jason
+ * (`jasonPace`) and the floor's guest (`mingle`) each wrap their shadow,
+ * figure, nameplate and `say` bubbles in one animated group, and the local
+ * player's "You" Penguin is one plain group with its own bubbles. The exit
+ * pills ("↑ FLOOR n", "↓ FLOOR n", the floor-5 and floor-0 "↙" pills), the
+ * floor numerals, the landing signs and "STAIRS CHALLENGE · SUBMIT" stay in
+ * the art: the pills are the Stairwell's doors (S4-D4), and SUBMIT is kept as
+ * decoration only (HD-3), frozen in its visible blink frame like the pills.
+ * The design's hint line sits above the Stages, outside every exported one.
+ */
+function stairwellRules(floor: (typeof STAIRWELL_FLOORS)[number]): HideRule[] {
+  const panel: HideRule =
+    floor === 5
+      ? {
+          kind: 'cluster',
+          anchor: 'STAIRS QUEST · COMPLETE',
+          companions: [
+            'STAIRS QUEST · COMPLETE',
+            '5 of 5 flights logged. +50 tokens. Stair Master badge unlocked.',
+          ],
+          comment: "The design's climb panel: rebuilt live as `src/ui/stair-climb-panel.ts`.",
+        }
+      : {
+          kind: 'cluster',
+          anchor: `QUEST · FLIGHT ${floor + 1} OF 5`,
+          companions: [
+            `QUEST · FLIGHT ${floor + 1} OF 5`,
+            `${floor} of 5 flights logged. Reward: 10 tokens per flight. All 5 = Stair Master badge.`,
+          ],
+          comment: "The design's climb panel: rebuilt live as `src/ui/stair-climb-panel.ts`.",
+        };
+  const banner: HideRule[] =
+    floor === 5
+      ? [
+          {
+            kind: 'cluster',
+            anchor: 'STAIRWELL B · 5 OF 5 · TOP FLOOR · JG HQ · RAIL SLIDING ENCOURAGED',
+            companions: [
+              'THE SLIDE · FLOOR 5',
+              'STAIRWELL B · 5 OF 5 · TOP FLOOR · JG HQ · RAIL SLIDING ENCOURAGED',
+            ],
+            comment: 'Room title/subtitle banner (HUD). Only floor 5 draws one.',
+          },
+        ]
+      : [];
+  return [
+    {
+      kind: 'animation',
+      names: ['domRun', 'jasonPace', 'mingle'],
+      comment:
+        "Dom's run, Jason's pacing and the floor's guest mingling: each group holds that character's shadow, figure, nameplate and both `say` bubbles.",
+    },
+    {
+      kind: 'animation',
+      names: ['pop'],
+      comment:
+        "Jason's pop-in at the right edge, with its bubble (floors 1-5; floor 0 draws none).",
+    },
+    {
+      kind: 'label-group',
+      texts: ['You'],
+      comment:
+        "The local player's Penguin: its shadow, figure, nameplate and two bubbles share one plain <g>.",
+    },
+    panel,
+    ...banner,
+    {
+      kind: 'cluster',
+      anchor: 'MENU',
+      companions: ['1,250', '12 ONLINE', 'MENU'],
+      comment: 'Top-right token/presence/menu HUD cluster.',
+    },
+    {
+      kind: 'cluster',
+      anchor: 'EMOTE',
+      companions: ['Say something…', 'EMOTE', 'SNOWBALL', 'QUESTS'],
+      comment: 'Bottom chat/action toolbar (HUD).',
+    },
+  ];
+}
 
 // LIVE_ELEMENT_RULES: one entry per Room, hand-derived by rendering each
 // design file and inspecting its DOM (see #16 execution plan, D2-D4).
@@ -1074,6 +1188,12 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
       comment: 'Bottom chat/action toolbar (HUD).',
     },
   ],
+  'stairwell-0': stairwellRules(0),
+  'stairwell-1': stairwellRules(1),
+  'stairwell-2': stairwellRules(2),
+  'stairwell-3': stairwellRules(3),
+  'stairwell-4': stairwellRules(4),
+  'stairwell-5': stairwellRules(5),
 };
 
 // Art fixes: geometry corrections applied to the rendered design before
@@ -1347,6 +1467,17 @@ function assertNoStrayArrowPolygons(roomId: string): void {
   }
 }
 
+// Runs in the browser context (page.evaluate), before the hide rules, for a
+// Room in ISOLATED_STAGES (#51 slice 4): removes every other Stage of the
+// design file from the page, failing if `stage` doesn't match exactly one.
+function removeOtherStages(stage: string): void {
+  const kept = document.querySelectorAll(stage);
+  if (kept.length !== 1) throw new Error(`expected one Stage for ${stage}, found ${kept.length}`);
+  document.querySelectorAll('[data-screen-label]').forEach((other) => {
+    if (other !== kept[0]) other.remove();
+  });
+}
+
 // Runs in the browser context (page.evaluate) against one Room's rules.
 function hideLiveElements(rules: HideRule[]): void {
   const CHROME_TAGS = new Set(['rect', 'polygon', 'svg', 'path', 'circle', 'ellipse', 'line']);
@@ -1618,6 +1749,9 @@ async function exportRoom(
   const rules = LIVE_ELEMENT_RULES[roomId];
   const { page, stage } = await openRoomStage(browser, port, roomId);
 
+  if (ISOLATED_STAGES.has(roomId)) {
+    await page.evaluate(removeOtherStages, STAGE_SELECTORS[roomId] ?? STAGE_SELECTOR);
+  }
   await page.evaluate(hideLiveElements, rules);
   await page.evaluate(applyArtFixes, ART_FIXES[roomId] ?? []);
   await page.evaluate(assertNoStrayArrowPolygons, roomId);
