@@ -138,7 +138,18 @@ describe('quest-giver data (#144 D5, Q17)', () => {
   it('marks exactly the one named appearance of each quest giver', () => {
     const givers = (Object.keys(NPCS) as NpcId[]).filter((id) => NPCS[id].questGiver).sort();
     expect(givers).toEqual(
-      ['ashley', 'dom-team-room-1', 'ian', 'jon', 'jory', 'michael', 'nicole', 'sydney'].sort(),
+      // Jon's and Sydney's moved to their remaining appearances when they left
+      // Town Center (owner request, 2026-10-02, Track D).
+      [
+        'ashley',
+        'dom-team-room-1',
+        'ian',
+        'jon-mullet',
+        'jory',
+        'michael',
+        'nicole',
+        'sydney-team-room-3',
+      ].sort(),
     );
   });
 
@@ -146,8 +157,8 @@ describe('quest-giver data (#144 D5, Q17)', () => {
     const withLine = (Object.keys(NPCS) as NpcId[]).filter(
       (id) => NPCS[id].questGiver?.nothingRightNowLine !== undefined,
     );
-    expect(withLine).toEqual(['jon']);
-    expect(NPCS.jon.questGiver?.nothingRightNowLine).toBe(
+    expect(withLine).toEqual(['jon-mullet']);
+    expect(NPCS['jon-mullet'].questGiver?.nothingRightNowLine).toBe(
       'Just enjoy the tour. Sunglasses stay on.',
     );
   });

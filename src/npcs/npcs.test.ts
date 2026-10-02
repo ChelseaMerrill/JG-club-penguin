@@ -51,14 +51,17 @@ describe('NPCS', () => {
     // Anthony too (#146): the Phishing Quiz places him at the door he guards,
     // one shared Room at a time, so no Room lists him. Ryan and Sam likewise
     // left the Dev Pit (owner request, 2026-09-30); Team Room 4 has its own.
-    // Steven left the Dev Pit too (owner request, 2026-10-02); the Characters
-    // sheet puts him in the Remote Lounge, which isn't built yet.
+    // Jon and Sydney left Town Center (owner request, 2026-10-02); the Mullet
+    // and Team Room 3 have their own. Steven left the Dev Pit too; the
+    // Characters sheet puts him in the Remote Lounge, which isn't built yet.
     // Millie, Jason and Darrin left the Icebox (owner request, 2026-10-02).
     const NO_LONGER_PLACED: NpcId[] = [
       'dom',
       'anthony',
       'ryan',
       'sam',
+      'jon',
+      'sydney',
       'steven',
       'millie-icebox',
       'jason',
