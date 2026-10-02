@@ -1,4 +1,13 @@
-import { Data, GameObjects, Scene, Scenes, type Input, type Time, type Tweens } from 'phaser';
+import {
+  Data,
+  GameObjects,
+  Scene,
+  Scenes,
+  Textures,
+  type Input,
+  type Time,
+  type Tweens,
+} from 'phaser';
 import {
   gameEvents,
   SPAWN_ROOM_ID,
@@ -28,6 +37,8 @@ import { createNpcSprite, prefersReducedMotion, type NpcSprite } from '../npcs/n
 import type { ChickenTarget } from '../npcs/chicken-toss';
 import { RoomChickenToss } from '../npcs/room-chicken-toss';
 import { RoomTankFish } from './room-tank-fish';
+import { PLANT_FOOT, PLANT_VIEWBOX, renderPlantSvg } from './plants';
+import { ensureSvgTexture } from '../svg-texture';
 import { RoomNpcMotions } from '../npcs/room-npc-motions';
 import {
   createPenguin,
@@ -176,6 +187,8 @@ const IMAGE_BACKGROUND_DEPTH = -2;
 const FOREGROUND_DEPTH_OFFSET = 0.5;
 /** Town Center's desk tank stands on the floor here: the bottom of its desk's front corner. */
 const TANK_FLOOR_POINT = { x: 1220, y: 505 };
+/** The potted plants' shared texture (`plants.ts`). */
+const PLANT_TEXTURE_KEY = 'room-plant';
 const WALL_DEPTH = -1;
 const FLOOR_DEPTH = -1;
 const DOOR_DEPTH = 0;
@@ -739,6 +752,7 @@ export class RoomScene extends Scene {
     this.drawNpcs(room);
     this.drawForegrounds(room);
     this.drawTankFish(room);
+    this.drawPlants(room);
     this.spawnLocalPenguin(room);
 
     this.input.on('pointerdown', this.handlePointerDown);
@@ -1888,6 +1902,32 @@ export class RoomScene extends Scene {
    * floor tile, so a Penguin in front of the desk covers it; its "feed me"
    * bubble sorts above everyone, as NPC bubbles do.
    */
+  /**
+   * The Room's potted plants (`plants.ts`), each standing on its own tile and
+   * sorted with it, as Penguins and NPCs are, so whoever is in front covers it.
+   */
+  private drawPlants(room: RoomDefinition): void {
+    if (!room.plants?.length) return;
+    ensureSvgTexture(this.textures, PLANT_TEXTURE_KEY, renderPlantSvg);
+    const images = room.plants.map((tile) => {
+      const point = tileToScreen(tile, room.grid.origin);
+      return this.add
+        .image(point.x, point.y, '__DEFAULT')
+        .setOrigin(PLANT_FOOT.x / PLANT_VIEWBOX.width, PLANT_FOOT.y / PLANT_VIEWBOX.height)
+        .setScale(0.5)
+        .setDepth(depthForTile(tile))
+        .setVisible(false);
+    });
+    const show = (): void => {
+      for (const image of images) {
+        if (!image.active) continue;
+        image.setTexture(PLANT_TEXTURE_KEY).setVisible(true);
+      }
+    };
+    if (this.textures.exists(PLANT_TEXTURE_KEY)) show();
+    else this.textures.once(Textures.Events.ADD_KEY + PLANT_TEXTURE_KEY, show);
+  }
+
   private drawTankFish(room: RoomDefinition): void {
     if (!room.tankFish) return;
     const depth = depthForTile(screenToTile(TANK_FLOOR_POINT, room.grid.origin));
