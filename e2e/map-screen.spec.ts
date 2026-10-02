@@ -129,9 +129,11 @@ test('Clicking Dev Pit on the Map loads it: leave before enter, its own spawnTil
   expect(errors).toEqual([]);
 });
 
-test('Clicking a disabled (COMING SOON) Room does nothing: the Map stays open, log unchanged (AC3)', async ({
-  page,
-}) => {
+// AC3 (a COMING SOON tile does nothing) is no longer an e2e case (#51 slice
+// 4, A5): the Stairwell built the last COMING SOON Room, so the real Map has
+// none left. `src/ui/map-screen.test.ts`'s mocked `99 · TEST ROOM` tile
+// covers the same click handler.
+test('every Map tile opens a Room now: none is COMING SOON (#51 slice 4)', async ({ page }) => {
   const errors = collectErrors(page);
 
   await page.goto('/?asPlayer&hud');
@@ -139,27 +141,8 @@ test('Clicking a disabled (COMING SOON) Room does nothing: the Map stays open, l
 
   await page.locator('.hud__button--map').click();
   await expect(page.locator('.map-screen')).toBeVisible();
-  const logBefore = (await debugInfo(page))?.roomEventLog;
-
-  // Whichever tile is still COMING SOON (03 THE ICEBOX and 15 THE MULLET
-  // were, until #51 built their Rooms; 12 THE SLIDE still is). Once #51's
-  // Stairwell lands none remain, and this needs a fixture tile.
-  const comingSoonTile = page.locator('.map-screen [aria-disabled="true"]').first();
-  await expect(comingSoonTile).toHaveAttribute('aria-disabled', 'true');
-  await expect(comingSoonTile.locator('.map-screen__pill')).toHaveText('COMING SOON');
-
-  // `aria-disabled="true"` makes Playwright's actionability check refuse a
-  // plain `.click()` (it treats the tile as disabled), but the tile is not
-  // natively `disabled` -- only inert (#33 D3) -- so `dispatchEvent` fires a
-  // real click event without going through that actionability gate,
-  // exercising the click handler's own no-op.
-  await comingSoonTile.dispatchEvent('click');
-
-  await expect(page.locator('.map-screen')).toBeVisible();
-  expect((await debugInfo(page))?.roomEventLog).toEqual(logBefore);
-  expect((await debugInfo(page))?.roomId).toBe('town-center');
-
-  await page.screenshot({ path: 'test-results/map-screen/coming-soon.png' });
+  await expect(page.locator('.map-screen [aria-disabled="true"]')).toHaveCount(0);
+  await page.screenshot({ path: 'test-results/map-screen/no-coming-soon.png' });
 
   expect(errors).toEqual([]);
 });

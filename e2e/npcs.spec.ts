@@ -77,6 +77,13 @@ for (const roomId of [
   'team-room-4',
   'bathroom',
   'the-mullet',
+  // #51 slice 4: the Stairwell's six floors.
+  'stairwell-0',
+  'stairwell-1',
+  'stairwell-2',
+  'stairwell-3',
+  'stairwell-4',
+  'stairwell-5',
 ] as const) {
   test(`npcs-${roomId}: NPCs show at their designed positions`, async ({ page }) => {
     const errors = await bootRoom(page, roomId);

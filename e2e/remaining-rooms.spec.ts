@@ -3,6 +3,12 @@ import type { RoomId } from '../src/contracts';
 import { bathroom } from '../src/game/rooms/definitions/bathroom';
 import { devPit } from '../src/game/rooms/definitions/dev-pit';
 import { officeHallway } from '../src/game/rooms/definitions/office-hallway';
+import { roofDeck } from '../src/game/rooms/definitions/roof-deck';
+import {
+  STAIRWELL_DEFINITIONS,
+  stairwell0,
+  stairwell5,
+} from '../src/game/rooms/definitions/stairwell';
 import { teamRoom1 } from '../src/game/rooms/definitions/team-room-1';
 import { teamRoom2 } from '../src/game/rooms/definitions/team-room-2';
 import { teamRoom3 } from '../src/game/rooms/definitions/team-room-3';
@@ -12,7 +18,9 @@ import { theMullet } from '../src/game/rooms/definitions/the-mullet';
 import { townCenter } from '../src/game/rooms/definitions/town-center';
 import type { RoomDefinition, RoomDoor } from '../src/game/rooms/room-definition';
 import { GAME_HEIGHT, GAME_WIDTH } from '../src/game/stage-size';
+import { waitForElevatorHidden } from './support/elevator';
 import type { RoomDebugInfo } from './support/room-debug-types';
+import { elevatorSeen, watchElevator } from './support/stairwell';
 
 // #51: every new Room is reachable by each of its enabled doors, both ways,
 // and by its Map tile. Imports each definition module directly rather than
@@ -270,3 +278,157 @@ for (const { number, room } of MAP_TILES) {
     expect(errors).toEqual([]);
   });
 }
+
+// #51 slice 4: the Stairwell's six floors, joined by their exit pills, with
+// Town Center's STAIRWELL door opening floor 5 (UD-2), floor 5's upper
+// flight leading to the Roof Deck (S4-D11) and Map tile 12 opening floor 0
+// (S4-D7). No stairs move ever shows the Elevator (S4-D6).
+const STAIRWELL_SHOTS = 'test-results/remaining-rooms';
+
+test("The Stairwell: Town Center's STAIRWELL door opens floor 5 on its JG HQ sill, and JG HQ leads back, with no Elevator", async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  const errors = collectErrors(page);
+
+  await page.goto('/?asPlayer');
+  await waitForBoot(page);
+  await watchElevator(page);
+
+  await walkThrough(page, door(townCenter, 'STAIRWELL'), 'stairwell-5');
+  await page.screenshot({ path: 'test-results/room-stairwell-5/from-town-center.png' });
+  await walkThrough(page, door(stairwell5, 'JG HQ'), 'town-center');
+  await page.screenshot({ path: 'test-results/room-town-center/from-stairwell-5.png' });
+
+  expect(await elevatorSeen(page)).toBe(false);
+  expect(errors).toEqual([]);
+});
+
+test("The Stairwell: floor 5's upper flight leads to the Roof Deck's spawn tile, with no Elevator", async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  const errors = collectErrors(page);
+
+  await page.goto('/?asPlayer');
+  await waitForBoot(page);
+  await changeRoom(page, 'stairwell-5');
+  await watchElevator(page);
+
+  await walkThrough(page, door(stairwell5, 'ROOF DECK'), 'roof-deck');
+  expect((await debugInfo(page))?.localPenguin?.tile).toEqual(roofDeck.spawnTile);
+  await page.screenshot({ path: 'test-results/room-roof-deck/from-stairwell-5.png' });
+
+  expect(await elevatorSeen(page)).toBe(false);
+  expect(errors).toEqual([]);
+});
+
+test('The Stairwell: up floor 0 to 5 and back down through every pill door, with no Elevator', async ({
+  page,
+}) => {
+  test.setTimeout(240_000);
+  const errors = collectErrors(page);
+
+  await page.goto('/?asPlayer');
+  await waitForBoot(page);
+  await changeRoom(page, 'stairwell-0');
+  await waitForElevatorHidden(page); // Town Center -> floor 0 crossed floors.
+  await watchElevator(page);
+  await page.screenshot({ path: `${STAIRWELL_SHOTS}/stairwell-0.png` });
+
+  for (let floor = 0; floor < 5; floor += 1) {
+    const room = STAIRWELL_DEFINITIONS[floor]!;
+    await walkThrough(page, door(room, `FLOOR ${floor + 1}`), `stairwell-${floor + 1}` as RoomId);
+    await page.screenshot({ path: `${STAIRWELL_SHOTS}/stairwell-${floor + 1}.png` });
+    await page.screenshot({
+      path: `test-results/room-stairwell-${floor + 1}/from-stairwell-${floor}.png`,
+    });
+  }
+  for (let floor = 5; floor > 0; floor -= 1) {
+    const room = STAIRWELL_DEFINITIONS[floor]!;
+    const label = floor === 1 ? 'LOBBY' : `FLOOR ${floor - 1}`;
+    await walkThrough(page, door(room, label), `stairwell-${floor - 1}` as RoomId);
+    await page.screenshot({
+      path: `test-results/room-stairwell-${floor - 1}/from-stairwell-${floor}.png`,
+    });
+  }
+
+  expect(await elevatorSeen(page)).toBe(false);
+  expect(errors).toEqual([]);
+});
+
+test('The Stairwell: Map tile 12 opens floor 0 from Town Center, by the Elevator to "FLOOR L"', async ({
+  page,
+}) => {
+  test.setTimeout(60_000);
+  const errors = collectErrors(page);
+
+  await page.goto('/?asPlayer&hud');
+  await waitForBoot(page);
+
+  await page.locator('.hud__button--map').click();
+  await expect(page.locator('.map-screen')).toBeVisible();
+  const tile = page.locator('[data-map-number="12"]');
+  await expect(tile).toHaveAttribute('data-map-room', 'stairwell-0');
+  await tile.click();
+
+  await expect(page.locator('.elevator-screen')).toBeVisible();
+  await expect(page.locator('.elevator-screen__heading')).toHaveText('WADDLING DOWN TO FLOOR L');
+  await page.screenshot({ path: 'test-results/room-stairwell-0/elevator-floor-l.png' });
+  await waitForElevatorHidden(page);
+  await expect
+    .poll(async () => (await debugInfo(page))?.roomId, { timeout: WALK_TIMEOUT })
+    .toBe('stairwell-0');
+  await expect
+    .poll(async () => (await debugInfo(page))?.localPenguin?.tile)
+    .toEqual(stairwell0.spawnTile);
+  await expect(page.locator('.hud__title')).toHaveText(stairwell0.title);
+  await page.screenshot({ path: 'test-results/room-stairwell-0/from-map.png' });
+
+  // YOU ARE HERE stays on tile 12 on every Stairwell floor (RT2-4).
+  await page.locator('.hud__button--map').click();
+  await expect(page.locator('[aria-current="location"]')).toHaveAttribute('data-map-number', '12');
+  await page.keyboard.press('Escape');
+
+  expect(errors).toEqual([]);
+});
+
+test("The Stairwell: floor 0's LOBBY door is coming soon, clicked or by holding ↓ (UD-7)", async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  const errors = collectErrors(page);
+
+  await page.goto('/?asPlayer');
+  await waitForBoot(page);
+  await changeRoom(page, 'stairwell-0');
+  await waitForElevatorHidden(page);
+
+  const lobby = door(stairwell0, 'LOBBY');
+  await clickStagePoint(page, {
+    x: lobby.hotspot.x + lobby.hotspot.width / 2,
+    y: lobby.hotspot.y + lobby.hotspot.height / 2,
+  });
+  await expect
+    .poll(async () => (await debugInfo(page))?.comingSoonHint, {
+      timeout: WALK_TIMEOUT,
+      intervals: [50],
+    })
+    .toBe('LOBBY');
+  await page.screenshot({ path: 'test-results/room-stairwell-0/lobby-coming-soon.png' });
+  await expect
+    .poll(async () => (await debugInfo(page))?.comingSoonHint, { timeout: 15_000 })
+    .toBeNull();
+
+  await page.keyboard.down('ArrowDown');
+  await expect
+    .poll(async () => (await debugInfo(page))?.comingSoonHint, {
+      timeout: WALK_TIMEOUT,
+      intervals: [50],
+    })
+    .toBe('LOBBY');
+  await page.keyboard.up('ArrowDown');
+  expect((await debugInfo(page))?.roomId).toBe('stairwell-0');
+
+  expect(errors).toEqual([]);
+});

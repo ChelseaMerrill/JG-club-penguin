@@ -128,6 +128,10 @@ import { createPhishingController } from './phishing/phishing-controller';
 import { createPhishingQuiz, PHISHING_QUIZ_OVERLAY_ID } from './phishing/phishing-quiz';
 import { createSecurityTrainingBanner } from './phishing/security-training-banner';
 import { exposePhishingTestHandle } from './phishing/dev-phishing-hook';
+import { stairwellExit } from './game/rooms/definitions/stairwell';
+import { createStairClimbTracker } from './game/rooms/stair-climb-tracker';
+import { createStairKeys, installStairKeys, isEditableElement } from './game/rooms/stair-keys';
+import { createStairClimbPanel } from './ui/stair-climb-panel';
 
 // Fail fast on a missing or malformed .env before anything boots.
 loadEnv();
@@ -269,7 +273,9 @@ const sceneReady = whenSceneReady(game).then((scene) => {
     scene: {
       showRoom: (roomId, entryTile, force) => scene.showRoom(roomId, entryTile, force),
       whenNextReady: () => scene.whenNextReady(),
-      onDoorReached: (handler) => scene.onDoorReached(handler),
+      // #51 slice 4 (RT2-7): a door's Room change is tagged as one.
+      onDoorReached: (handler) =>
+        scene.onDoorReached((door) => stairClimb.withSource('door', () => handler(door))),
       showComingSoonHint: (door) => scene.showComingSoonHint(door),
     },
     events: gameEvents,
@@ -546,6 +552,11 @@ function endSession(): RoomChannel | null {
   stopBadgeChecks = null;
   // #146: Anthony, the Map lock and the training banner go with it.
   phishing.stop();
+  // #51 slice 4 (N7): after the sign-out `room:leave` above, so the Stairs
+  // Challenge forgets the Room it recorded, along with any held stair key.
+  stairClimb.reset();
+  stairKeys.reset();
+  stairClimbPanel.hide();
   questWidget.render(null);
   hud.overlays.close(QUESTS_OVERLAY_ID);
   return channel;
@@ -774,7 +785,8 @@ createMapScreen(uiLayer, {
     // #146: leaving by the Map may be a bypass of Anthony; the server decides.
     const leaving = roomNavigator?.currentRoomId();
     if (leaving) void phishing.mapUsed(leaving);
-    void roomNavigator?.changeRoom(roomId);
+    // #51 slice 4: a Map arrival on Stairwell floor 0 starts a climb (S4-D7).
+    stairClimb.withSource('map', () => void roomNavigator?.changeRoom(roomId));
   },
   currentRoomId: () => roomNavigator?.currentRoomId() ?? null,
 });
@@ -818,6 +830,42 @@ if (e2eHooksEnabled) {
 // Built once at boot for the long-lived consumers below; every call forwards
 // to the signed-in Player's Supabase store (#34), or to the dev fallback.
 const progressStore = createActiveProgressStore(game.registry, () => devFallbackStore);
+
+// #51 slice 4: the Stairs Challenge. The climb panel shows on Stairwell
+// floors once each arrival's flight (or read) comes back; the tracker logs
+// the flights this visit climbs; the ↑/↓ keys climb on Stairwell floors only
+// (S4-D10), never while a text field has focus, a HUD overlay is open or a
+// transition is in flight.
+const stairClimbPanel = createStairClimbPanel(uiLayer);
+const stairClimb = createStairClimbTracker({
+  store: progressStore,
+  currentRoomId: () => roomNavigator?.currentRoomId() ?? null,
+  now: () => Date.now(),
+  setTimer: (callback, ms) => setTimeout(callback, ms),
+  onPanel: (_roomId, input) => stairClimbPanel.show(input),
+  onError: (err) => console.error('[main] Stairs Challenge call failed', err),
+});
+const stairKeys = createStairKeys({
+  currentRoomId: () => roomNavigator?.currentRoomId() ?? null,
+  exitFor: stairwellExit,
+  useDoor: (door) => stairClimb.withSource('keys', () => roomNavigator?.useDoor(door)),
+  isTransitioning: () => roomNavigator?.isTransitioning() ?? true,
+  overlayOpen: () => hud.overlays.current() !== null,
+  editableFocused: () => isEditableElement(document.activeElement),
+  now: () => Date.now(),
+  setTimer: (callback, ms) => setTimeout(callback, ms),
+  clearTimer: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>),
+  onMove: () => stairClimbPanel.dismissHint(),
+});
+installStairKeys(window, stairKeys);
+gameEvents.on('room:leave', ({ roomId }) => {
+  stairClimb.roomLeave(roomId);
+  stairClimbPanel.hide();
+});
+gameEvents.on('room:enter', ({ roomId }) => {
+  stairClimb.roomEnter(roomId);
+  stairKeys.roomReady();
+});
 
 // #146: the Phishing Quiz. The signed-in Player's calls go to the server's
 // RPCs; the dev/e2e hooks (no sign-in) use the in-memory fake server, on a
