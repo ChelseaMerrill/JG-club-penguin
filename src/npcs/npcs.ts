@@ -91,7 +91,10 @@ export type NpcId =
   | 'nick-brown'
   | 'frank-nardone'
   | 'chris-pence'
+  | 'aleksandr-molchagin'
   | 'rebecca-congi'
+  | 'bich-dudla'
+  | 'eva-trimboli'
   | 'abby-rivera'
   | 'adam-wilson-hwang'
   | 'bryan-sambrook';
@@ -260,13 +263,6 @@ interface NpcDefinitionBase {
    * unless a designed motion (`npc-motions.ts`) replaces the bob.
    */
   still?: boolean;
-  /**
-   * `true` for an NPC who watches the Player (`game/npcs/watch.ts`): it leans
-   * its whole figure toward the local Penguin as it moves (owner request,
-   * 2026-10-02, Track D: Team Room 2's Chris Pence, with his binoculars).
-   * Give it no designed motion, which would set the same figure transform.
-   */
-  watchesPlayer?: boolean;
   /**
    * The Room design's draw scale for this NPC, when it isn't its kind's
    * default (`npc-layout.ts`): Team Room 3 draws its Humans at 0.58
@@ -1327,7 +1323,8 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
   // The Characters sheet's new people in Team Room 2 (owner request,
   // 2026-10-02, Track D): name, title and line from each one's card, drawn
   // from the card itself. Chris's card hangs his binoculars on his chest;
-  // here he holds them up to his eyes, watching the Player.
+  // here he holds them up to his eyes and looks round the Room through them
+  // (`motions/team-room-2.ts`).
   'nick-brown': {
     id: 'nick-brown',
     name: 'Nick Brown',
@@ -1364,9 +1361,23 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     dialogLines: ['Chris P. Bacon'],
     idleLines: [{ text: 'Chris P. Bacon', periodS: 20, delayS: -17 }],
     still: true,
-    watchesPlayer: true,
     dialog: LINE_DIALOG,
-    figure: { card: 'chrisPenceBinoculars' },
+    figure: { card: 'chrisPenceArmsRaised' },
+  },
+  // New from the Characters sheet (owner request, 2026-10-02, Track D):
+  // name, title and line from his card, drawn from the card itself.
+  'aleksandr-molchagin': {
+    id: 'aleksandr-molchagin',
+    name: 'Aleksandr Molchagin',
+    title: 'Developer',
+    roomId: 'team-room-2',
+    kind: 'human',
+    tagName: 'Aleksandr Molchagin',
+    dialogLines: ['This is not cold. This is spring.'],
+    idleLines: [{ text: 'This is not cold. This is spring.', periodS: 20, delayS: -8 }],
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'aleksandrMolchagin' },
   },
   // New from the Characters sheet (owner request, 2026-10-02, Track D):
   // name, title and line from her card, drawn from the card itself.
@@ -1382,6 +1393,41 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     still: true,
     dialog: LINE_DIALOG,
     figure: { card: 'rebeccaCongi' },
+  },
+  // The Characters sheet's two QA Analysts, new in the Market (owner
+  // request, 2026-10-02, Track D): name, title and line from each one's
+  // card, drawn from the card itself. Bich waters the Market's potted
+  // plants and Eva walks the deck (`motions/roof-deck.ts`).
+  'bich-dudla': {
+    id: 'bich-dudla',
+    name: 'Bich Dudla',
+    title: 'QA Analyst',
+    roomId: 'roof-deck',
+    kind: 'human',
+    tagName: 'Bich Dudla',
+    // Her long line, at her slot, would cover Ann Marie's bubbles at her
+    // counter up and to the right; shifted left until it clears them.
+    bubbleOffsetX: -90,
+    dialogLines: ['I test the code. I water the plant. Both keep growing.'],
+    idleLines: [
+      { text: 'I test the code. I water the plant. Both keep growing.', periodS: 20, delayS: -3 },
+    ],
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'bichDudla' },
+  },
+  'eva-trimboli': {
+    id: 'eva-trimboli',
+    name: 'Eva Trimboli',
+    title: 'QA Analyst',
+    roomId: 'roof-deck',
+    kind: 'human',
+    tagName: 'Eva Trimboli',
+    dialogLines: ["It's not a bug until I say it's a bug."],
+    idleLines: [{ text: "It's not a bug until I say it's a bug.", periodS: 20, delayS: -13 }],
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'evaTrimboli' },
   },
   // The Characters sheet's new people in the Mullet (owner request,
   // 2026-10-02, Track D): name, title and line from each one's card, drawn

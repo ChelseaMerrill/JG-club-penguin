@@ -709,6 +709,19 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
       texts: ['You'],
       comment: "The local player's static figure and nameplate.",
     },
+    {
+      kind: 'selector',
+      selectors: [
+        'polygon[points="550,478 670,538 620,563 500,503"]',
+        'polygon[points="500,528 620,588 620,563 500,503"]',
+        'polygon[points="670,563 620,588 620,563 670,538"]',
+        'polygon[points="550,448 670,508 655,515.5 535,455.5"]',
+        'polygon[points="535,485.5 655,545.5 655,515.5 535,455.5"]',
+        'polygon[points="670,538 655,545.5 655,515.5 670,508"]',
+      ],
+      comment:
+        'The couch in front of the left desk, its seat and back boxes, removed from the Room (owner request, 2026-10-02, Track D).',
+    },
     // #132's two floor-arrow rules are gone: the 2026-09-27 design resync
     // removed both decals from `design/Team Room 2.dc.html` itself, so the
     // selectors matched nothing and failed the export (owner request,
@@ -1154,15 +1167,9 @@ const FOREGROUND_LAYERS: Partial<
         'polygon[points="560,464.5 595,482 582.5,488.3 547.5,470.8"]',
         'polygon[points="547.5,472.8 582.5,490.3 582.5,488.3 547.5,470.8"]',
         'polygon[points="595,484 582.5,490.3 582.5,488.3 595,482"]',
-        'polygon[points="550,478 670,538 620,563 500,503"]',
-        'polygon[points="500,528 620,588 620,563 500,503"]',
-        'polygon[points="670,563 620,588 620,563 670,538"]',
-        'polygon[points="550,448 670,508 655,515.5 535,455.5"]',
-        'polygon[points="535,485.5 655,545.5 655,515.5 535,455.5"]',
-        'polygon[points="670,538 655,545.5 655,515.5 670,508"]',
       ],
       comment:
-        'The left desk, its monitor and keyboard, drawn after its chair, and the couch drawn after that: Frank Nardone sits in the chair, behind both (owner request, 2026-10-02, Track D).',
+        'The left desk, its monitor and keyboard, drawn after its chair: Frank Nardone sits in the chair, behind the desk (owner request, 2026-10-02, Track D).',
     },
     {
       name: 'nick-desk',
@@ -1182,6 +1189,15 @@ const FOREGROUND_LAYERS: Partial<
       ],
       comment:
         'The front desk, its monitor and keyboard, drawn after its chair: Nick Brown sits in that chair, behind it (owner request, 2026-10-02, Track D).',
+    },
+    {
+      name: 'aleksandr-chair',
+      selectors: [
+        'polygon[points="1060,583 1090,598 1090,573 1060,558"]',
+        'polygon[points="1120,583 1090,598 1090,573 1120,558"]',
+      ],
+      comment:
+        "The right desk's chair seat's two front faces: Aleksandr Molchagin sits in that chair, turned round to face out of it, so they are drawn over his legs (owner request, 2026-10-02, Track D).",
     },
   ],
   'team-room-1': [

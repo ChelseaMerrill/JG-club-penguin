@@ -38,6 +38,8 @@ export interface NpcMotionDebugInfo {
    * relative to its feet: identity unless it has a `stage` motion.
    */
   body: { x: number; y: number; scaleX: number; scaleY: number; rotation: number };
+  /** The live rotation of its figure about its feet, in radians (+ turns right). */
+  figureRotation: number;
 }
 
 interface PropView {
@@ -147,6 +149,7 @@ export class RoomNpcMotions implements NpcPauseTarget {
           scaleY: body.scaleY,
           rotation: body.rotation,
         },
+        figureRotation: entry.actor.sprite.figure.rotation,
       };
     }
     return result;
