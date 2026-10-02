@@ -26,11 +26,14 @@ function domDesignPosition(elapsedMs: number) {
 }
 
 describe('Team Room 1 NPC motions (owner request, 2026-09-30)', () => {
-  it("registers a motion for both of this Room's NPCs, reachable through the registry", () => {
+  it("registers a motion for every one of this Room's NPCs, reachable through the registry", () => {
+    // Rebecca Congi joined (owner request, 2026-10-02): she sits and bobs.
     expect((Object.keys(TEAM_ROOM_1_MOTIONS) as NpcId[]).sort()).toEqual([
       'dom-team-room-1',
       'jethro-team-room-1',
+      'rebecca-congi',
     ]);
+    expect(TEAM_ROOM_1_MOTIONS['rebecca-congi']!.path).toBeUndefined();
     expect(getNpcMotion('dom-team-room-1')).toBe(TEAM_ROOM_1_MOTIONS['dom-team-room-1']);
     expect(getNpcMotion('jethro-team-room-1')).toBe(TEAM_ROOM_1_MOTIONS['jethro-team-room-1']);
   });

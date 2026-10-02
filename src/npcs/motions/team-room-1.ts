@@ -83,6 +83,17 @@ export const TEAM_ROOM_1_MOTIONS: Partial<Record<NpcId, NpcMotionSpec>> = {
     replaceFigureRestPose: true,
     props: JETHRO_CAMERA_PROPS,
   },
+  // Rebecca Congi (owner request, 2026-10-02, Track D) sits working at the
+  // left desk, so she only bobs, at her Characters card's own pace (`bob 2s`,
+  // translateY(-5px) on the card's 176 px-wide render: 3.41 figure units
+  // here, as the Dev Pit's and the Icebox's new people).
+  'rebecca-congi': {
+    figure: {
+      keyframes:
+        '@keyframes bobRebecca { 0%,100% { transform: translateY(0);} 50% { transform: translateY(-3.41px);} }',
+      animation: 'bobRebecca 2s ease-in-out infinite',
+    },
+  },
   // Dom runs a lap of the Room (`domrun`, on his outer `<div>`) on a fast
   // running `bob`. The design's `domrun` translates are absolute Stage
   // positions of that `<div>`'s top-left corner; its 0% frame,
