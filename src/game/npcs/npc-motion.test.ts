@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { NPCS, type NpcId } from '../../npcs/npcs';
-import { getNpcMotion } from '../../npcs/npc-motions';
+import { getNpcMotion, type NpcMotionSpec } from '../../npcs/npc-motions';
 import { depthForTile, tileToScreen } from '../rooms/iso';
 import { ROOM_DEFINITIONS } from '../rooms/registry';
 import { transformPoint } from './css-keyframes';
@@ -9,8 +9,28 @@ import { createNpcMotion, NpcClickPause } from './npc-motion';
 const ORIGIN = { x: 800, y: 250 }; // the standard Room grid origin
 const BRANDON_REST = tileToScreen({ col: 4, row: 6 }, ORIGIN); // (700, 525)
 
+/**
+ * The Roof Deck design's gallop for Brandon (`mkBrandonGallop` + `gallop`),
+ * kept here as the engine's sample motion since he left the Market (owner
+ * request, 2026-10-02, Track D): a loop of Stage-pixel stops plus an in-place
+ * figure rock around the feet.
+ */
+const BRANDON_GALLOP: NpcMotionSpec = {
+  path: {
+    keyframes:
+      '@keyframes mkBrandonGallop { 0% { transform: translate(0,0);} 20% { transform: translate(150px,75px);} 40% { transform: translate(250px,0);} 60% { transform: translate(50px,-100px);} 80% { transform: translate(-100px,-50px);} 100% { transform: translate(0,0);} }',
+    animation: 'mkBrandonGallop 26s ease-in-out infinite',
+  },
+  figure: {
+    keyframes:
+      '@keyframes gallop { 0%,100% { transform: translateY(0) rotate(-4deg);} 50% { transform: translateY(-9px) rotate(4deg);} }',
+    animation: 'gallop .45s ease-in-out infinite',
+    transformOrigin: '60px 120px',
+  },
+};
+
 function brandon() {
-  const motion = createNpcMotion(getNpcMotion('brandon'), BRANDON_REST, ORIGIN, {
+  const motion = createNpcMotion(BRANDON_GALLOP, BRANDON_REST, ORIGIN, {
     reducedMotion: false,
   });
   if (!motion) throw new Error('expected Brandon to have a motion');
@@ -217,7 +237,7 @@ describe('NPC motion (#113)', () => {
 
   it('does nothing under prefers-reduced-motion, or for an NPC with no designed motion', () => {
     expect(
-      createNpcMotion(getNpcMotion('brandon'), BRANDON_REST, ORIGIN, { reducedMotion: true }),
+      createNpcMotion(BRANDON_GALLOP, BRANDON_REST, ORIGIN, { reducedMotion: true }),
     ).toBeNull();
     expect(
       createNpcMotion(getNpcMotion('kevin'), BRANDON_REST, ORIGIN, { reducedMotion: false }),
@@ -228,8 +248,9 @@ describe('NPC motion (#113)', () => {
     const moving = (Object.keys(NPCS) as NpcId[]).filter(
       (id) => NPCS[id].roomId === 'roof-deck' && getNpcMotion(id),
     );
-    // #146: Anthony stands still at the door he guards, so he has none.
-    expect(moving.sort()).toEqual(['brandon', 'millie']);
+    // #146: Anthony stands still at the door he guards, so he has none, and
+    // Brandon and Millie left the Market (owner request, 2026-10-02).
+    expect(moving.sort()).toEqual([]);
   });
 
   it('compiles every motion in the registry, and only for known NPCs', () => {

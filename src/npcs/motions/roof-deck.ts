@@ -16,27 +16,6 @@ import type { NpcMotionSpec } from './types';
  * figure keeps its static `fishingRod` prop).
  */
 export const ROOF_DECK_MOTIONS: Partial<Record<NpcId, NpcMotionSpec>> = {
-  // Brandon gallops a loop around the deck on his hobby horse. The horse is
-  // his `npcs.ts` figure's own `hobbyhorse` prop, so `gallop` (on the whole
-  // figure, horse included, pivoting on the feet) rocks it with him.
-  brandon: {
-    path: {
-      keyframes:
-        '@keyframes mkBrandonGallop { 0% { transform: translate(0,0);} 20% { transform: translate(150px,75px);} 40% { transform: translate(250px,0);} 60% { transform: translate(50px,-100px);} 80% { transform: translate(-100px,-50px);} 100% { transform: translate(0,0);} }',
-      animation: 'mkBrandonGallop 26s ease-in-out infinite',
-    },
-    figure: {
-      keyframes:
-        '@keyframes gallop { 0%,100% { transform: translateY(0) rotate(-4deg);} 50% { transform: translateY(-9px) rotate(4deg);} }',
-      animation: 'gallop .45s ease-in-out infinite',
-      transformOrigin: '60px 120px',
-    },
-  },
-  millie: {
-    path: {
-      keyframes:
-        '@keyframes mkMillie { 0% { transform: translate(0,0);} 44.0%,56.0% { transform: translate(25.00000000000002px, 67.5px);} 100% { transform: translate(0,0);} }',
-      animation: 'mkMillie 20s ease-in-out infinite',
-    },
-  },
+  // Brandon's gallop and Millie's walk went with them: they left the Market
+  // (owner request, 2026-10-02, Track D).
 };

@@ -87,7 +87,8 @@ export type NpcId =
   | 'alex-nikolis'
   | 'dan-bedian'
   | 'paul-carnival'
-  | 'greg-westover';
+  | 'greg-westover'
+  | 'rebecca-congi';
 
 /**
  * A minigame-launching NPC's trigger dialog (#36 D4; round-1 review item 4
@@ -1310,6 +1311,21 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
   // 2026-10-02, Track D): name, title and line from each one's card, drawn
   // from the card itself (`card-figures.ts`); their motions play the card's
   // bob instead of #36's. Greg's card title is "TITLE TBD".
+  // New from the Characters sheet (owner request, 2026-10-02, Track D):
+  // name, title and line from her card, drawn from the card itself.
+  'rebecca-congi': {
+    id: 'rebecca-congi',
+    name: 'Rebecca Congi',
+    title: 'Developer',
+    roomId: 'team-room-1',
+    kind: 'human',
+    tagName: 'Rebecca Congi',
+    dialogLines: ["Green tests or it didn't happen."],
+    idleLines: [{ text: "Green tests or it didn't happen.", periodS: 18, delayS: -6 }],
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'rebeccaCongi' },
+  },
   'dan-bedian': {
     id: 'dan-bedian',
     name: 'Dan Bedian',
