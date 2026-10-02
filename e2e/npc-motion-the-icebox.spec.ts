@@ -17,8 +17,11 @@ const LONG_WALK_TIMEOUT = 15_000;
 const PROOF_ROOT = 'test-results/npc-motion-the-icebox';
 /** The centre of `RoomScene`'s click zone for a Human NPC, relative to its feet. */
 const HIT_ZONE_OFFSET_Y = npcLayout({ kind: 'human' }).hitArea.centerY;
-/** All five of this Room's NPCs roam a loop around their slot point. */
-const MOVING_NPCS = ['millie-icebox', 'nicole', 'jason', 'jethro', 'darrin-icebox'];
+/** Nicole and Jethro roam a loop around their slot point; Millie, Jason and
+ *  Darrin left the Icebox (owner request, 2026-10-02, Track D). */
+const MOVING_NPCS = ['nicole', 'jethro'];
+/** New from the Characters sheet: they sit at the conference table. */
+const SEATED_NPCS = ['dan-bedian', 'paul-carnival', 'greg-westover'];
 /**
  * Phaser clamps each frame's delta to 16.7ms for its first 120 frames (its
  * TimeStep `panicMax` cool-down), and NPC motions run on that game clock. On a
@@ -74,34 +77,40 @@ async function bootTheIcebox(page: Page): Promise<string[]> {
     document.querySelector<HTMLElement>('#ui .landing')!.hidden = true;
   });
   await expect
-    .poll(async () => (await debugInfo(page))?.npcs?.jason, { timeout: BOOT_TIMEOUT })
+    .poll(async () => (await debugInfo(page))?.npcs?.nicole, { timeout: BOOT_TIMEOUT })
     .not.toBeUndefined();
   await page.evaluate(() => document.fonts.ready);
   return errors;
 }
 
-test('every Icebox NPC roams its designed loop around its slot point', async ({ page }) => {
+test('Nicole and Jethro roam their loops; the three at the table stay seated', async ({ page }) => {
   test.slow();
   const dir = proofDir('npcs-move');
   const errors = await bootTheIcebox(page);
 
   for (const id of MOVING_NPCS) expect((await npc(page, id)).moving).toBe(true);
+  for (const id of SEATED_NPCS) {
+    const slot = theIcebox.npcSlots.find((s) => s.npcId === id)!;
+    const seat = npcSlotPoint(slot, theIcebox.grid.origin);
+    expect(await npc(page, id)).toMatchObject({ x: seat.x, y: seat.y, moving: false });
+  }
 
-  const start = await npc(page, 'jason');
+  const start = await npc(page, 'nicole');
   for (let shot = 1; shot <= 4; shot += 1) {
     await page.waitForTimeout(1_500);
     await page.screenshot({ path: `${dir}/t${shot * 1.5}s.png` });
   }
-  // jasRoam holds at his slot point for the first 12% of its 26s loop, then
-  // heads toward translate(100px, 65px): down and right. Poll on the game
-  // clock (see MOTION_TIMEOUT) for him to leave his slot point that way.
+  // nicRoam holds for the first 15% of its 26s loop, then heads toward
+  // translate(70px, -40px): right and up. Poll on the game clock (see
+  // MOTION_TIMEOUT) for her to leave her start that way.
   await expect
-    .poll(async () => (await npc(page, 'jason')).x - start.x, { timeout: MOTION_TIMEOUT })
+    .poll(async () => (await npc(page, 'nicole')).x - start.x, { timeout: MOTION_TIMEOUT })
     .toBeGreaterThan(1);
-  expect((await npc(page, 'jason')).y).toBeGreaterThan(start.y);
+  expect((await npc(page, 'nicole')).y).toBeLessThan(start.y);
 
-  // A close-up of each roaming NPC, to check its bubble/name tag stay put.
-  for (const id of MOVING_NPCS) {
+  // A close-up of each NPC, to check its bubble/name tag stay put and the
+  // table covers the three sitting at it.
+  for (const id of [...MOVING_NPCS, ...SEATED_NPCS]) {
     const pos = await npc(page, id);
     await page.screenshot({
       path: `${dir}/${id}-close-up.png`,
@@ -112,45 +121,45 @@ test('every Icebox NPC roams its designed loop around its slot point', async ({ 
   expect(errors).toEqual([]);
 });
 
-test('clicking a roaming Jason pauses him, opens his dialog, and closing it resumes his loop', async ({
+test('clicking a roaming Nicole pauses her, opens her dialog, and closing it resumes her loop', async ({
   page,
 }) => {
   test.slow();
   const dir = proofDir('click-pauses');
   const errors = await bootTheIcebox(page);
 
-  // Let him get going, then click his (moving) click target.
+  // Click her (moving) click target.
   await page.waitForTimeout(2_000);
-  const before = await npc(page, 'jason');
+  const before = await npc(page, 'nicole');
   await clickStagePoint(page, { x: before.x, y: before.y + HIT_ZONE_OFFSET_Y });
 
-  await expect.poll(async () => (await npc(page, 'jason')).paused).toBe(true);
-  const pausedAt = await npc(page, 'jason');
+  await expect.poll(async () => (await npc(page, 'nicole')).paused).toBe(true);
+  const pausedAt = await npc(page, 'nicole');
   expect(pausedAt.moving).toBe(false);
   expect(Math.hypot(pausedAt.x - before.x, pausedAt.y - before.y)).toBeLessThan(30);
 
   await expect
     .poll(async () => (await debugInfo(page))?.npcArrivedLog, { timeout: LONG_WALK_TIMEOUT })
-    .toContain('jason');
+    .toContain('nicole');
   const dialog = page.locator('.npc-dialog');
   await expect(dialog).toBeVisible();
-  await expect(dialog.locator('.npc-dialog__name')).toHaveText('Jason Jahnel');
+  await expect(dialog.locator('.npc-dialog__name')).toHaveText('Nicole Roberts');
 
   await page.waitForTimeout(1_000);
-  const stillPaused = await npc(page, 'jason');
+  const stillPaused = await npc(page, 'nicole');
   expect(stillPaused).toMatchObject({ x: pausedAt.x, y: pausedAt.y, paused: true });
   await page.screenshot({ path: `${dir}/paused-with-dialog.png` });
 
   await dialog.locator('.npc-dialog__close').click();
   await expect(dialog).toBeHidden();
-  await expect.poll(async () => (await npc(page, 'jason')).moving).toBe(true);
-  // jasRoam holds at each waypoint for a few seconds of its 26s loop: poll on
+  await expect.poll(async () => (await npc(page, 'nicole')).moving).toBe(true);
+  // nicRoam holds at each waypoint for a few seconds of its 26s loop: poll on
   // the game clock (see MOTION_TIMEOUT) rather than a fixed wait, in case the
   // pause landed inside one.
   await expect
     .poll(
       async () => {
-        const p = await npc(page, 'jason');
+        const p = await npc(page, 'nicole');
         return p.x !== pausedAt.x || p.y !== pausedAt.y;
       },
       { timeout: MOTION_TIMEOUT },

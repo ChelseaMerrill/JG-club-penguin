@@ -1,5 +1,6 @@
 import type { HexColor, RoomId, Tile } from '../../contracts';
 import type { Placement } from '../../persistence/progress-store';
+import type { TankFish } from './tank-fish';
 
 /**
  * A Room's art. `procedural` is drawn by `RoomScene` from `walkable` in the
@@ -182,4 +183,8 @@ export interface RoomDefinition {
   wallText?: readonly RoomWallText[];
   /** Furniture the design draws in front of its NPCs (see `RoomForeground`). */
   foregrounds?: readonly RoomForeground[];
+  /** The pet fish in the Room's desk tank, a decoration (`tank-fish.ts`): Town Center only. */
+  tankFish?: TankFish;
+  /** Potted plants on these floor tiles, a decoration (`plants.ts`); each tile must be unwalkable. */
+  plants?: readonly Tile[];
 }

@@ -6,7 +6,8 @@ import type { NpcMotionSpec } from './types';
  * The Icebox's NPC motions (#113), copied verbatim from `design/Room 03 The
  * Icebox.dc.html`'s `<style>` block and each NPC's `animation:` style.
  *
- * Each of this Room's five NPCs roams a loop (`…Roam`, on the outer group,
+ * Each of the design's five NPCs roams a loop (Nicole and Jethro are the two
+ * still here; the rest left, owner request, 2026-10-02, Track D) (`…Roam`, on the outer group,
  * translated Stage pixels off their slot point) while a shared `idle`
  * bob (`idle 1.1s ease-in-out infinite`, no delay, identical for all five)
  * plays on a wrapper directly around the figure `<svg>` the whole time they
@@ -38,27 +39,11 @@ const ICEBOX_IDLE_BOB = {
 };
 
 export const THE_ICEBOX_MOTIONS: Partial<Record<NpcId, NpcMotionSpec>> = {
-  'millie-icebox': {
-    path: {
-      keyframes:
-        '@keyframes milRoam { 0% { transform: translate(0px, 0px); } 10% { transform: translate(0px, 0px); } 30% { transform: translate(-140px, 68px); } 45% { transform: translate(-140px, 68px); } 65% { transform: translate(-80px, -10px); } 80% { transform: translate(-80px, -10px); } 100% { transform: translate(0px, 0px); } }',
-      animation: 'milRoam 26s ease-in-out infinite',
-    },
-    figure: ICEBOX_IDLE_BOB,
-  },
   nicole: {
     path: {
       keyframes:
         '@keyframes nicRoam { 0% { transform: translate(0px, -10px); } 15% { transform: translate(0px, -10px); } 35% { transform: translate(70px, -40px); } 50% { transform: translate(70px, -40px); } 70% { transform: translate(-70px, 10px); } 85% { transform: translate(-70px, 10px); } 100% { transform: translate(0px, -10px); } }',
       animation: 'nicRoam 26s ease-in-out infinite',
-    },
-    figure: ICEBOX_IDLE_BOB,
-  },
-  jason: {
-    path: {
-      keyframes:
-        '@keyframes jasRoam { 0% { transform: translate(0px, 0px); } 12% { transform: translate(0px, 0px); } 32% { transform: translate(100px, 65px); } 47% { transform: translate(100px, 65px); } 67% { transform: translate(-30px, 110px); } 82% { transform: translate(-30px, 110px); } 100% { transform: translate(0px, 0px); } }',
-      animation: 'jasRoam 26s ease-in-out infinite',
     },
     figure: ICEBOX_IDLE_BOB,
   },
@@ -79,12 +64,32 @@ export const THE_ICEBOX_MOTIONS: Partial<Record<NpcId, NpcMotionSpec>> = {
     replaceFigureRestPose: true,
     props: JETHRO_CAMERA_PROPS,
   },
-  'darrin-icebox': {
-    path: {
+  // Millie, Jason and Darrin left the Icebox (owner request, 2026-10-02,
+  // Track D), and their roams with them.
+  //
+  // The Characters sheet's three at the conference table (owner request,
+  // 2026-10-02, Track D) sit, so they only bob, each at his own card's pace
+  // (`bob`, translateY(-5px) on the card's 176 px-wide render: 3.41 figure
+  // units here, as the Dev Pit's new people).
+  'dan-bedian': {
+    figure: {
       keyframes:
-        '@keyframes darRoam { 0% { transform: translate(0px, 0px); } 10% { transform: translate(0px, 0px); } 30% { transform: translate(80px, -20px); } 45% { transform: translate(80px, -20px); } 65% { transform: translate(20px, 60px); } 80% { transform: translate(20px, 60px); } 100% { transform: translate(0px, 0px); } }',
-      animation: 'darRoam 26s ease-in-out infinite',
+        '@keyframes bobBedian { 0%,100% { transform: translateY(0);} 50% { transform: translateY(-3.41px);} }',
+      animation: 'bobBedian 2.5s ease-in-out infinite',
     },
-    figure: ICEBOX_IDLE_BOB,
+  },
+  'paul-carnival': {
+    figure: {
+      keyframes:
+        '@keyframes bobCarnival { 0%,100% { transform: translateY(0);} 50% { transform: translateY(-3.41px);} }',
+      animation: 'bobCarnival 2.3s ease-in-out infinite',
+    },
+  },
+  'greg-westover': {
+    figure: {
+      keyframes:
+        '@keyframes bobWestover { 0%,100% { transform: translateY(0);} 50% { transform: translateY(-3.41px);} }',
+      animation: 'bobWestover 2.1s ease-in-out infinite',
+    },
   },
 };

@@ -18,7 +18,8 @@ const LONG_WALK_TIMEOUT = 15_000;
 const PROOF_ROOT = 'test-results/npc-motion-town-center';
 /** The centre of `RoomScene`'s click zone for a Human NPC, relative to its feet. */
 const HIT_ZONE_OFFSET_Y = npcLayout({ kind: 'human' }).hitArea.centerY;
-const MOVING_NPCS = ['darrin', 'jon', 'sydney'];
+/** Jon and Sydney left Town Center (owner request, 2026-10-02, Track D). */
+const MOVING_NPCS = ['darrin'];
 
 test.use({ viewport: { width: 1600, height: 900 } });
 
@@ -72,9 +73,7 @@ async function bootTownCenter(page: Page): Promise<string[]> {
   return errors;
 }
 
-test('Town Center NPCs walk their designed paths; Darrin pumps his fists, Jon does his trick', async ({
-  page,
-}) => {
+test('Town Center NPCs walk their designed paths; Darrin pumps his fists', async ({ page }) => {
   const dir = proofDir('npcs-move');
   const errors = await bootTownCenter(page);
 
@@ -101,16 +100,16 @@ test('Town Center NPCs walk their designed paths; Darrin pumps his fists, Jon do
   expect(last.y).toBeGreaterThan(start.y);
   expect(new Set(seen.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`)).size).toBe(seen.length);
 
-  // Close-ups: Darrin mid-pump with his "hype" flourish, and Jon mid-trick.
+  // Close-ups: Darrin mid-pump with his "hype" flourish, and Ghostfish
+  // Killa in the desk tank.
   const darrin = await npc(page, 'darrin');
   await page.screenshot({
     path: `${dir}/darrin-pump-close-up.png`,
     clip: { x: darrin.x - 110, y: darrin.y - 170, width: 220, height: 210 },
   });
-  const jon = await npc(page, 'jon');
   await page.screenshot({
-    path: `${dir}/jon-trick-close-up.png`,
-    clip: { x: jon.x - 110, y: jon.y - 170, width: 220, height: 210 },
+    path: `${dir}/ghostfish-killa-close-up.png`,
+    clip: { x: 1140, y: 310, width: 180, height: 170 },
   });
 
   expect(errors).toEqual([]);

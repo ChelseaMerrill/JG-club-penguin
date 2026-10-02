@@ -111,8 +111,8 @@ describe('guardTile next to the Player', () => {
         Math.abs(tile.col - room.spawnTile.col),
         Math.abs(tile.row - room.spawnTile.row),
       );
-      // 3, not 2: the Dev Pit's spawn tile (6,1) is on Steven's walk, and
-      // every tile around it is on it too or next to a slot.
+      // 3, not 2: around the Dev Pit's spawn tile (6,1), every tile is next
+      // to a slot (the two Alexes at the back desks) or on a walk.
       expect(away, room.id).toBeLessThanOrEqual(3);
       for (const slot of room.npcSlots) {
         expect(isNextTo(tile, slot.tile), `${room.id}: ${slot.npcId}`).toBe(false);
@@ -152,8 +152,8 @@ describe('npcOccupiedTiles', () => {
     const key = (tile: { col: number; row: number }) => `${tile.col},${tile.row}`;
     const occupied = new Set(npcOccupiedTiles(room).map(key));
     for (const slot of room.npcSlots) expect(occupied.has(key(slot.tile)), slot.npcId).toBe(true);
-    // Steven's loop waypoints (7,0), (4,0) and (4,1), and a tile between them.
-    for (const tile of ['7,0', '4,0', '4,1', '5,0', '6,1'])
+    // Jesse Lucier's lap waypoints (10,8), (4,8) and (4,5), and tiles between them.
+    for (const tile of ['10,8', '4,8', '4,5', '7,8', '4,6', '7,5'])
       expect(occupied.has(tile), tile).toBe(true);
   });
 

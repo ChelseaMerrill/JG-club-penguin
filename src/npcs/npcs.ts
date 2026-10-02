@@ -80,6 +80,15 @@ export type NpcId =
   | 'jon-mullet'
   | 'brandon-mullet'
   | 'dom-mullet'
+  // New on the Characters sheet (owner request, 2026-10-02, Track D), each in
+  // one Room only. `jesse-lucier`, not `jesse`: that id is The Melt's Jesse.
+  | 'jesse-lucier'
+  | 'alex-kelly'
+  | 'alex-nikolis'
+  | 'dan-bedian'
+  | 'paul-carnival'
+  | 'greg-westover'
+  | 'rebecca-congi'
   // #51 slice 4: the Stairwell's 18 NPCs, by the same rule with each floor's
   // RoomId as the suffix (S4-D8): Dom and Jason on every floor, plus one
   // guest per floor. Every one of them is a repeat appearance.
@@ -863,7 +872,6 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     kind: 'human',
     tagName: 'Jon Keller',
     dialogLines: JON_LINES,
-    questGiver: { nothingRightNowLine: 'Just enjoy the tour. Sunglasses stay on.' },
     // `sayJon` shows the same line twice per 14 s cycle: 19%-32% and 61%-74%.
     idleLines: [
       { text: 'Wanna see a magic trick?', periodS: 14, delayS: 0, window: [0.19, 0.32] },
@@ -884,7 +892,6 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     // `design/Club JenGuin HUD Menus.dc.html`'s Town Center scene gives her
     // one more line; it's this appearance's own, not Team Room 3's.
     dialogLines: [...SYDNEY_LINES, 'lobby snowball fight?'],
-    questGiver: {},
     // `saySyd` (21%-33%) and `saySyd2` (60%-84%), 24 s, no delay.
     idleLines: [
       { text: 'Look what we won!', periodS: 24, delayS: 0, window: [0.21, 0.33] },
@@ -960,6 +967,49 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     // longer in this Room.
     dialog: BUG_SQUASH_DIALOG,
     figure: IAN_FIGURE,
+  },
+  // The Characters sheet's new Dev Pit people (owner request, 2026-10-02,
+  // Track D): name, title and line from each one's card, drawn from the card
+  // itself (`card-figures.ts`); their motions play the card's bob instead of
+  // #36's.
+  'jesse-lucier': {
+    id: 'jesse-lucier',
+    name: 'Jesse Lucier',
+    title: 'Director of Internal Applications',
+    roomId: 'dev-pit',
+    kind: 'human',
+    tagName: 'Jesse Lucier',
+    dialogLines: ['Ship it, then 50 burpees.'],
+    idleLines: [{ text: 'Ship it, then 50 burpees.', periodS: 20, delayS: -3 }],
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'jesseLucier' },
+  },
+  'alex-kelly': {
+    id: 'alex-kelly',
+    name: 'Alex Kelly',
+    title: 'Director of Service Delivery',
+    roomId: 'dev-pit',
+    kind: 'human',
+    tagName: 'Alex Kelly',
+    dialogLines: ['Hold on, let me ask Claude.'],
+    idleLines: [{ text: 'Hold on, let me ask Claude.', periodS: 20, delayS: -9 }],
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'alexKelly' },
+  },
+  'alex-nikolis': {
+    id: 'alex-nikolis',
+    name: 'Alex Nikolis',
+    title: 'Senior Software Engineer',
+    roomId: 'dev-pit',
+    kind: 'human',
+    tagName: 'Alex Nikolis',
+    dialogLines: ['Works on my machine.'],
+    idleLines: [{ text: 'Works on my machine.', periodS: 20, delayS: -15 }],
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'alexNikolis' },
   },
   steven: {
     id: 'steven',
@@ -1377,6 +1427,70 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     // Track D), so he carries one camera, not two.
     figure: { ...JETHRO_FIGURE, prop: undefined, cameraRaise: 'lowered' },
   },
+  // The Characters sheet's new people at the Icebox table (owner request,
+  // 2026-10-02, Track D): name, title and line from each one's card, drawn
+  // from the card itself (`card-figures.ts`); their motions play the card's
+  // bob instead of #36's. Greg's card title is "TITLE TBD".
+  // New from the Characters sheet (owner request, 2026-10-02, Track D):
+  // name, title and line from her card, drawn from the card itself.
+  'rebecca-congi': {
+    id: 'rebecca-congi',
+    name: 'Rebecca Congi',
+    title: 'Developer',
+    roomId: 'team-room-1',
+    kind: 'human',
+    tagName: 'Rebecca Congi',
+    dialogLines: ["Green tests or it didn't happen."],
+    idleLines: [{ text: "Green tests or it didn't happen.", periodS: 18, delayS: -6 }],
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'rebeccaCongi' },
+  },
+  'dan-bedian': {
+    id: 'dan-bedian',
+    name: 'Dan Bedian',
+    title: 'Leader of Kelmar',
+    roomId: 'the-icebox',
+    kind: 'human',
+    tagName: 'Dan Bedian',
+    dialogLines: ["This meeting's a 40-minute jam. Stay for the encore."],
+    idleLines: [
+      { text: "This meeting's a 40-minute jam. Stay for the encore.", periodS: 21, delayS: -5 },
+    ],
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'danBedian' },
+  },
+  'paul-carnival': {
+    id: 'paul-carnival',
+    name: 'Paul Carnival',
+    title: 'QA',
+    roomId: 'the-icebox',
+    kind: 'human',
+    tagName: 'Paul Carnival',
+    dialogLines: ['Found one. Steps to reproduce: exist.'],
+    idleLines: [{ text: 'Found one. Steps to reproduce: exist.', periodS: 21, delayS: -12 }],
+    // Clear of Dan's nameplate, one chair up-left of him at the table.
+    bubbleOffsetX: 140,
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'paulCarnival' },
+  },
+  'greg-westover': {
+    id: 'greg-westover',
+    name: 'Greg Westover',
+    title: null,
+    roomId: 'the-icebox',
+    kind: 'human',
+    tagName: 'Greg Westover',
+    dialogLines: ['Have you tried turning it off and on again?'],
+    idleLines: [{ text: 'Have you tried turning it off and on again?', periodS: 21, delayS: -19 }],
+    // Clear of Paul's nameplate, one chair up-left of him at the table.
+    bubbleOffsetX: 160,
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'gregWestover' },
+  },
   'darrin-icebox': {
     id: 'darrin-icebox',
     name: 'Darrin Jahnel',
@@ -1551,6 +1665,9 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     kind: 'human',
     tagName: 'Sydney',
     dialogLines: SYDNEY_LINES,
+    // Her quest-giver appearance now she has left Town Center (owner
+    // request, 2026-10-02, Track D).
+    questGiver: {},
     idleLines: staticLine('So, open to new roles?'),
     // Team Room 3's design draws its NPCs without any idle bob.
     still: true,
@@ -1742,6 +1859,9 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     kind: 'human',
     tagName: 'Jon',
     dialogLines: JON_LINES,
+    // His quest-giver appearance now he has left Town Center (owner request,
+    // 2026-10-02, Track D).
+    questGiver: { nothingRightNowLine: 'Just enjoy the tour. Sunglasses stay on.' },
     // At the ping-pong table, with no bubble.
     idleLines: [],
     // The design sways him side to side with the rally rather than bobbing.

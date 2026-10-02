@@ -19,18 +19,20 @@ import { createStandardRoomGrid } from '../grid';
 // (cols 8-10) from the rest of the Room -- `reachability.test.ts` catches
 // this. Left walkable as a documented exception rather than fabricating an
 // unverified mask change to widen that aisle. Casey's tile already sat
-// outside the walkable interior.
+// outside the walkable interior. Millie's (2,5) and Brandon's (4,6) are open
+// again (they left the Market, owner request, 2026-10-02, Track D); the
+// five potted plants' own tiles (`plants` below) are blocked instead.
 const WALKABLE: readonly (readonly boolean[])[] = [
   [false, false, false, false, false, false, false, false, false, false, false, true],
   [false, false, false, false, false, false, false, false, false, false, false, true],
-  [true, true, true, true, false, true, true, true, true, true, true, true],
+  [false, true, true, true, false, true, true, true, true, true, true, true],
+  [true, true, true, false, true, true, true, true, false, false, false, false],
   [true, true, true, true, true, true, true, true, false, false, false, false],
-  [true, true, true, true, true, true, true, true, false, false, false, false],
-  [true, true, false, true, true, true, true, false, true, false, false, false],
-  [false, false, true, true, false, true, true, true, true, true, true, true],
-  [true, true, true, true, true, true, true, true, true, true, true, true],
+  [true, true, true, true, true, true, true, false, true, false, false, false],
+  [false, false, true, true, true, true, true, true, true, true, true, true],
+  [true, false, true, true, true, true, true, true, true, true, true, false],
   [true, true, true, true, true, true, true, true, true, false, false, true],
-  [true, false, false, true, true, false, true, true, true, false, false, true],
+  [true, false, false, false, true, false, true, true, true, false, false, true],
 ];
 
 /**
@@ -110,15 +112,28 @@ export const roofDeck: RoomDefinition = {
     // rather than reduced to a single first name, unlike Darrin Jahnel/Sydney
     // Murauskas/Jon Keller's Firstname-Lastname pattern.
     { npcId: 'ann-marie', tile: { col: 4, row: 2 } },
-    { npcId: 'millie', tile: { col: 2, row: 5 } },
     { npcId: 'josh', tile: { col: 11, row: 2 } },
-    { npcId: 'brandon', tile: { col: 4, row: 6 } },
+    // Millie and Brandon left the Market so that each person appears in
+    // one Room only (owner request, 2026-10-02, Track D): Millie is in Team
+    // Room 3, Brandon in the Mullet.
     // Anthony has no slot here any more (#146): he guards one door of a
     // shared Room at a time, placed by the Phishing Quiz (`RoomScene.setGuard`).
     // Her ellipse inverts to col 12.2, one column past this Room's last
     // valid column (11); clamped to 11 — a judgment call reported on the
     // #16 execution plan.
     { npcId: 'casey', tile: { col: 11, row: 5 } },
+  ],
+  // Potted plants round the deck (owner request, 2026-10-02, Track D), on
+  // open floor clear of the counters, the Kitchen arrow, the Tokens machine
+  // and every NPC: by the back-left wall (0,2), in the open middle-left
+  // (3,3), on the left edge (1,7), the front edge (3,9) and the front-right
+  // corner (11,7).
+  plants: [
+    { col: 0, row: 2 },
+    { col: 3, row: 3 },
+    { col: 1, row: 7 },
+    { col: 3, row: 9 },
+    { col: 11, row: 7 },
   ],
   hotspots: [
     {

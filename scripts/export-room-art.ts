@@ -665,14 +665,10 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
       names: ['blink'],
       comment: "Blinking '↙ TOWN CENTER' room-exit nav pill (HUD).",
     },
-    {
-      kind: 'selector',
-      selectors: [
-        'polygon[points="395,467.5 330,500 395,532.5 420,520 385,502.5 445,502.5 445,482.5 400,495"]',
-      ],
-      comment:
-        "#132: an unlabelled floor-arrow decal by the left wall that isn't a working door -- the Icebox's only real exit (Town Center) is the labelled elevator, not this arrow.",
-    },
+    // #132's floor-arrow rule is gone: the 2026-09-27 design resync removed
+    // that decal from `design/Room 03 The Icebox.dc.html` itself, so the
+    // selector matched nothing and failed the export (owner request,
+    // 2026-10-02, Track D).
     {
       kind: 'cluster',
       anchor: '← MAP',
@@ -1227,6 +1223,116 @@ type ArtFix = {
 const FOREGROUND_LAYERS: Partial<
   Record<RoomId, Array<{ name: string; selectors: string[]; comment: string }>>
 > = {
+  'dev-pit': [
+    {
+      name: 'nikolis-desk',
+      selectors: [
+        'polygon[points="920,392.5 1030,447.5 980,472.5 870,417.5"]',
+        'polygon[points="870,465 980,520 980,472.5 870,417.5"]',
+        'polygon[points="1030,495 980,520 980,472.5 1030,447.5"]',
+        'polygon[points="920,386 1035,443.5 980,471 865,413.5"]',
+        'polygon[points="865,417.5 980,475 980,471 865,413.5"]',
+        'polygon[points="1035,447.5 980,475 980,471 1035,443.5"]',
+        'polygon[points="945,381 990,403.5 986,405.5 941,383"]',
+        'polygon[points="941,410.5 986,433 986,405.5 941,383"]',
+        'polygon[points="990,431 986,433 986,405.5 990,403.5"]',
+        'polygon[points="943.5,407.8 983.5,427.8 983.5,406.8 943.5,386.8"]',
+        'polygon[points="948.5,395.3 968,405 968,402.5 948.5,392.8"]',
+        'polygon[points="948.5,401.3 977,415.5 977,413 948.5,398.8"]',
+        'polygon[points="925,419 960,436.5 947.5,442.8 912.5,425.3"]',
+        'polygon[points="912.5,427.3 947.5,444.8 947.5,442.8 912.5,425.3"]',
+        'polygon[points="960,438.5 947.5,444.8 947.5,442.8 960,436.5"]',
+      ],
+      comment:
+        'Desk C (the back-left desk), its monitor and keyboard: Alex Nikolis sits behind it (owner request, 2026-10-02, Track D).',
+    },
+    {
+      name: 'kelly-desk',
+      selectors: [
+        'polygon[points="1070,467.5 1180,522.5 1130,547.5 1020,492.5"]',
+        'polygon[points="1020,540 1130,595 1130,547.5 1020,492.5"]',
+        'polygon[points="1180,570 1130,595 1130,547.5 1180,522.5"]',
+        'polygon[points="1070,461 1185,518.5 1130,546 1015,488.5"]',
+        'polygon[points="1015,492.5 1130,550 1130,546 1015,488.5"]',
+        'polygon[points="1185,522.5 1130,550 1130,546 1185,518.5"]',
+        'polygon[points="1095,456 1140,478.5 1136,480.5 1091,458"]',
+        'polygon[points="1091,485.5 1136,508 1136,480.5 1091,458"]',
+        'polygon[points="1140,506 1136,508 1136,480.5 1140,478.5"]',
+        'polygon[points="1093.5,482.8 1133.5,502.8 1133.5,481.8 1093.5,461.8"]',
+        'polygon[points="1098.5,470.3 1118,480 1118,477.5 1098.5,467.8"]',
+        'polygon[points="1098.5,476.3 1127,490.5 1127,488 1098.5,473.8"]',
+        'polygon[points="1075,494 1110,511.5 1097.5,517.8 1062.5,500.3"]',
+        'polygon[points="1062.5,502.3 1097.5,519.8 1097.5,517.8 1062.5,500.3"]',
+        'polygon[points="1110,513.5 1097.5,519.8 1097.5,517.8 1110,511.5"]',
+      ],
+      comment:
+        'Desk E (the back-right desk), its monitor and keyboard: Alex Kelly sits behind it (owner request, 2026-10-02, Track D).',
+    },
+  ],
+  'team-room-1': [
+    {
+      name: 'rebecca-desk',
+      selectors: [
+        'polygon[points="535,435 645,490 595,515 485,460"]',
+        'polygon[points="485,507.5 595,562.5 595,515 485,460"]',
+        'polygon[points="645,537.5 595,562.5 595,515 645,490"]',
+        'polygon[points="535,428.5 650,486 595,513.5 480,456"]',
+        'polygon[points="480,460 595,517.5 595,513.5 480,456"]',
+        'polygon[points="650,490 595,517.5 595,513.5 650,486"]',
+        'polygon[points="530,438.5 575,461 571,463 526,440.5"]',
+        'polygon[points="526,468 571,490.5 571,463 526,440.5"]',
+        'polygon[points="575,488.5 571,490.5 571,463 575,461"]',
+        'polygon[points="560,451.5 595,469 582.5,475.3 547.5,457.8"]',
+        'polygon[points="547.5,459.8 582.5,477.3 582.5,475.3 547.5,457.8"]',
+        'polygon[points="595,471 582.5,477.3 582.5,475.3 595,469"]',
+      ],
+      comment:
+        'The left desk, its monitor and keyboard, drawn after its chair: Rebecca Congi sits in that chair, behind it (owner request, 2026-10-02, Track D).',
+    },
+  ],
+  'the-icebox': [
+    {
+      name: 'conference-table',
+      selectors: [
+        'polygon[points="795,385 1045,510 945,560 695,435"]',
+        'polygon[points="695,477.5 945,602.5 945,560 695,435"]',
+        'polygon[points="1045,552.5 945,602.5 945,560 1045,510"]',
+        'polygon[points="795,369 1065,504 945,564 675,429"]',
+        'polygon[points="675,435 945,570 945,564 675,429"]',
+        'polygon[points="1065,510 945,570 945,564 1065,504"]',
+        'polygon[points="805,387 840,404.5 815,417 780,399.5"]',
+        'polygon[points="780,401.5 815,419 815,417 780,399.5"]',
+        'polygon[points="840,406.5 815,419 815,417 840,404.5"]',
+        'polygon[points="805,364.5 840,382 838,383 803,365.5"]',
+        'polygon[points="803,388 838,405.5 838,383 803,365.5"]',
+        'polygon[points="840,404.5 838,405.5 838,383 840,382"]',
+        'polygon[points="935,452 970,469.5 945,482 910,464.5"]',
+        'polygon[points="910,466.5 945,484 945,482 910,464.5"]',
+        'polygon[points="970,471.5 945,484 945,482 970,469.5"]',
+        'polygon[points="935,429.5 970,447 968,448 933,430.5"]',
+        'polygon[points="933,453 968,470.5 968,448 933,430.5"]',
+        'polygon[points="970,469.5 968,470.5 968,448 970,447"]',
+        'polygon[points="770,444.5 805,462 780,474.5 745,457"]',
+        'polygon[points="745,459 780,476.5 780,474.5 745,457"]',
+        'polygon[points="805,464 780,476.5 780,474.5 805,462"]',
+        'polygon[points="770,422 805,439.5 803,440.5 768,423"]',
+        'polygon[points="768,445.5 803,463 803,440.5 768,423"]',
+        'polygon[points="805,462 803,463 803,440.5 805,439.5"]',
+        'polygon[points="900,509.5 935,527 910,539.5 875,522"]',
+        'polygon[points="875,524 910,541.5 910,539.5 875,522"]',
+        'polygon[points="935,529 910,541.5 910,539.5 935,527"]',
+        'polygon[points="900,487 935,504.5 933,505.5 898,488"]',
+        'polygon[points="898,510.5 933,528 933,505.5 898,488"]',
+        'polygon[points="935,527 933,528 933,505.5 935,504.5"]',
+        'polygon[points="860,448.5 900,468.5 875,481 835,461"]',
+        'polygon[points="835,464 875,484 875,481 835,461"]',
+        'polygon[points="900,471.5 875,484 875,481 900,468.5"]',
+        'circle[cx="867.5"][cy="464.75"]',
+      ],
+      comment:
+        'The conference table, its four laptops and the speaker puck, drawn after the back row of chairs: Dan Bedian, Paul Carnival and Greg Westover sit in those chairs, behind it (owner request, 2026-10-02, Track D).',
+    },
+  ],
   'team-room-3': [
     {
       name: 'millie-desk',

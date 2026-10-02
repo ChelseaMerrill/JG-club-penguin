@@ -10,7 +10,6 @@ import { TOWN_CENTER_MOTIONS } from './town-center';
 // motion's own offsets/transforms, not where its Room slot happens to sit.
 const REST = { x: 0, y: 0 };
 const ORIGIN = { x: 0, y: 0 };
-const FEET = { x: -60, y: -120 }; // the figure's feet (60,120), expressed relative to the feet (i.e. the origin of a prop's own 120x130 viewBox, feet-relative)
 
 function motionFor(id: NpcId) {
   const motion = createNpcMotion(getNpcMotion(id), REST, ORIGIN, { reducedMotion: false });
@@ -19,8 +18,9 @@ function motionFor(id: NpcId) {
 }
 
 describe("Town Center's NPC motions (#113)", () => {
-  it('registers exactly the NPCs with a designed motion (Darrin, Jon, Jory, Sydney)', () => {
-    expect(Object.keys(TOWN_CENTER_MOTIONS).sort()).toEqual(['darrin', 'jon', 'jory', 'sydney']);
+  it('registers exactly the NPCs with a designed motion (Darrin, Jory)', () => {
+    // Jon and Sydney left Town Center (owner request, 2026-10-02, Track D).
+    expect(Object.keys(TOWN_CENTER_MOTIONS).sort()).toEqual(['darrin', 'jory']);
     for (const id of Object.keys(TOWN_CENTER_MOTIONS) as NpcId[]) {
       expect(NPCS[id].roomId).toBe('town-center');
     }
@@ -65,24 +65,6 @@ describe("Town Center's NPC motions (#113)", () => {
     expect(feet.y).toBeCloseTo(-44);
   });
 
-  it("follows walkJon's own path (exact at its 18% stop, 2.52s into 14s)", () => {
-    const motion = motionFor('jon');
-    motion.advance(2_520);
-    expect(motion.pose().point.x).toBeCloseTo(150);
-    expect(motion.pose().point.y).toBeCloseTo(75);
-  });
-
-  it('poses the trick wand at its 0%/17% stop (translate(96px,84px) rotate(-12deg) around 0,0)', () => {
-    const motion = motionFor('jon');
-    const [trick] = motion.pose().props;
-    // transform-origin defaults to 0,0 (unset in the design), so the wand's
-    // own local origin (0,0) is invariant under the rotate and lands exactly
-    // at the translate: (96,84), i.e. (36,-36) relative to the feet (60,120).
-    const localOrigin = transformPoint(trick.matrix, FEET);
-    expect(localOrigin.x).toBeCloseTo(36);
-    expect(localOrigin.y).toBeCloseTo(-36);
-  });
-
   it("bounces Jory's figure and nameplate as the design renders jump (#150, Stage origin)", () => {
     // Her design feet, and the Stage y of her feet and nameplate top sampled
     // from Chromium's own render of the design's `jump` group (#150 plan E1).
@@ -112,12 +94,5 @@ describe("Town Center's NPC motions (#113)", () => {
       expect(Math.abs(designFeet.y + feet.y - sample.feet)).toBeLessThan(0.05);
       expect(Math.abs(designFeet.y + plate.y - sample.nameplate)).toBeLessThan(0.05);
     }
-  });
-
-  it("follows walkSyd's own path (exact at its 19% stop, 4.56s into 24s)", () => {
-    const motion = motionFor('sydney');
-    motion.advance(4_560);
-    expect(motion.pose().point.x).toBeCloseTo(-150);
-    expect(motion.pose().point.y).toBeCloseTo(75);
   });
 });
