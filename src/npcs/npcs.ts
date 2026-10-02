@@ -79,7 +79,12 @@ export type NpcId =
   | 'tony'
   | 'jon-mullet'
   | 'brandon-mullet'
-  | 'dom-mullet';
+  | 'dom-mullet'
+  // New on the Characters sheet (owner request, 2026-10-02, Track D), each in
+  // one Room only. `jesse-lucier`, not `jesse`: that id is The Melt's Jesse.
+  | 'jesse-lucier'
+  | 'alex-kelly'
+  | 'alex-nikolis';
 
 /**
  * A minigame-launching NPC's trigger dialog (#36 D4; round-1 review item 4
@@ -840,6 +845,49 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     // longer in this Room.
     dialog: BUG_SQUASH_DIALOG,
     figure: IAN_FIGURE,
+  },
+  // The Characters sheet's new Dev Pit people (owner request, 2026-10-02,
+  // Track D): name, title and line from each one's card, drawn from the card
+  // itself (`card-figures.ts`); their motions play the card's bob instead of
+  // #36's.
+  'jesse-lucier': {
+    id: 'jesse-lucier',
+    name: 'Jesse Lucier',
+    title: 'Director of Internal Applications',
+    roomId: 'dev-pit',
+    kind: 'human',
+    tagName: 'Jesse Lucier',
+    dialogLines: ['Ship it, then 50 burpees.'],
+    idleLines: [{ text: 'Ship it, then 50 burpees.', periodS: 20, delayS: -3 }],
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'jesseLucier' },
+  },
+  'alex-kelly': {
+    id: 'alex-kelly',
+    name: 'Alex Kelly',
+    title: 'Director of Service Delivery',
+    roomId: 'dev-pit',
+    kind: 'human',
+    tagName: 'Alex Kelly',
+    dialogLines: ['Hold on, let me ask Claude.'],
+    idleLines: [{ text: 'Hold on, let me ask Claude.', periodS: 20, delayS: -9 }],
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'alexKelly' },
+  },
+  'alex-nikolis': {
+    id: 'alex-nikolis',
+    name: 'Alex Nikolis',
+    title: 'Senior Software Engineer',
+    roomId: 'dev-pit',
+    kind: 'human',
+    tagName: 'Alex Nikolis',
+    dialogLines: ['Works on my machine.'],
+    idleLines: [{ text: 'Works on my machine.', periodS: 20, delayS: -15 }],
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'alexNikolis' },
   },
   steven: {
     id: 'steven',

@@ -51,7 +51,9 @@ describe('NPCS', () => {
     // Anthony too (#146): the Phishing Quiz places him at the door he guards,
     // one shared Room at a time, so no Room lists him. Ryan and Sam likewise
     // left the Dev Pit (owner request, 2026-09-30); Team Room 4 has its own.
-    const NO_LONGER_PLACED: NpcId[] = ['dom', 'anthony', 'ryan', 'sam'];
+    // Steven left the Dev Pit too (owner request, 2026-10-02); the Characters
+    // sheet puts him in the Remote Lounge, which isn't built yet.
+    const NO_LONGER_PLACED: NpcId[] = ['dom', 'anthony', 'ryan', 'sam', 'steven'];
 
     for (const npc of Object.values(NPCS)) {
       if (NO_LONGER_PLACED.includes(npc.id)) continue;

@@ -23,7 +23,7 @@ import { doorApproachTile, npcInteractionTile } from '../movement/targets';
 import { getNpcMotion } from '../../npcs/npc-motions';
 import { getNpcDefinition } from '../../npcs/npcs';
 import { npcLayout } from '../npcs/npc-layout';
-import { NpcClickPause } from '../npcs/npc-motion';
+import { fractionalTile, NpcClickPause } from '../npcs/npc-motion';
 import { createNpcSprite, prefersReducedMotion, type NpcSprite } from '../npcs/npc-sprite';
 import type { ChickenTarget } from '../npcs/chicken-toss';
 import { RoomChickenToss } from '../npcs/room-chicken-toss';
@@ -1867,8 +1867,11 @@ export class RoomScene extends Scene {
 
   /**
    * The furniture the Room design draws in front of its NPCs (`RoomForeground`),
-   * each sorted just in front of its NPC's slot tile: the next tile's depth is
-   * at least 1 more, so anything standing further forward still draws over it.
+   * each sorted just in front of its NPC. A still NPC sorts by its slot tile;
+   * one with any motion sorts by the (fractional) tile under where it is drawn,
+   * which an `offset` can move forward, so this takes the larger of the two.
+   * The next whole tile's depth is at least 1 more, so anything standing
+   * further forward still draws over it.
    */
   private drawForegrounds(room: RoomDefinition): void {
     for (const layer of room.foregrounds ?? []) {
@@ -1878,7 +1881,12 @@ export class RoomScene extends Scene {
         .image(0, 0, layer.key)
         .setOrigin(0, 0)
         .setDisplaySize(GAME_WIDTH, GAME_HEIGHT)
-        .setDepth(depthForTile(slot.tile) + FOREGROUND_DEPTH_OFFSET);
+        .setDepth(
+          Math.max(
+            depthForTile(slot.tile),
+            depthForTile(fractionalTile(npcSlotPoint(slot, room.grid.origin), room.grid.origin)),
+          ) + FOREGROUND_DEPTH_OFFSET,
+        );
     }
   }
 

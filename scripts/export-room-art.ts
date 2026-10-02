@@ -1107,6 +1107,52 @@ type ArtFix = {
 const FOREGROUND_LAYERS: Partial<
   Record<RoomId, Array<{ name: string; selectors: string[]; comment: string }>>
 > = {
+  'dev-pit': [
+    {
+      name: 'nikolis-desk',
+      selectors: [
+        'polygon[points="920,392.5 1030,447.5 980,472.5 870,417.5"]',
+        'polygon[points="870,465 980,520 980,472.5 870,417.5"]',
+        'polygon[points="1030,495 980,520 980,472.5 1030,447.5"]',
+        'polygon[points="920,386 1035,443.5 980,471 865,413.5"]',
+        'polygon[points="865,417.5 980,475 980,471 865,413.5"]',
+        'polygon[points="1035,447.5 980,475 980,471 1035,443.5"]',
+        'polygon[points="945,381 990,403.5 986,405.5 941,383"]',
+        'polygon[points="941,410.5 986,433 986,405.5 941,383"]',
+        'polygon[points="990,431 986,433 986,405.5 990,403.5"]',
+        'polygon[points="943.5,407.8 983.5,427.8 983.5,406.8 943.5,386.8"]',
+        'polygon[points="948.5,395.3 968,405 968,402.5 948.5,392.8"]',
+        'polygon[points="948.5,401.3 977,415.5 977,413 948.5,398.8"]',
+        'polygon[points="925,419 960,436.5 947.5,442.8 912.5,425.3"]',
+        'polygon[points="912.5,427.3 947.5,444.8 947.5,442.8 912.5,425.3"]',
+        'polygon[points="960,438.5 947.5,444.8 947.5,442.8 960,436.5"]',
+      ],
+      comment:
+        'Desk C (the back-left desk), its monitor and keyboard: Alex Nikolis sits behind it (owner request, 2026-10-02, Track D).',
+    },
+    {
+      name: 'kelly-desk',
+      selectors: [
+        'polygon[points="1070,467.5 1180,522.5 1130,547.5 1020,492.5"]',
+        'polygon[points="1020,540 1130,595 1130,547.5 1020,492.5"]',
+        'polygon[points="1180,570 1130,595 1130,547.5 1180,522.5"]',
+        'polygon[points="1070,461 1185,518.5 1130,546 1015,488.5"]',
+        'polygon[points="1015,492.5 1130,550 1130,546 1015,488.5"]',
+        'polygon[points="1185,522.5 1130,550 1130,546 1185,518.5"]',
+        'polygon[points="1095,456 1140,478.5 1136,480.5 1091,458"]',
+        'polygon[points="1091,485.5 1136,508 1136,480.5 1091,458"]',
+        'polygon[points="1140,506 1136,508 1136,480.5 1140,478.5"]',
+        'polygon[points="1093.5,482.8 1133.5,502.8 1133.5,481.8 1093.5,461.8"]',
+        'polygon[points="1098.5,470.3 1118,480 1118,477.5 1098.5,467.8"]',
+        'polygon[points="1098.5,476.3 1127,490.5 1127,488 1098.5,473.8"]',
+        'polygon[points="1075,494 1110,511.5 1097.5,517.8 1062.5,500.3"]',
+        'polygon[points="1062.5,502.3 1097.5,519.8 1097.5,517.8 1062.5,500.3"]',
+        'polygon[points="1110,513.5 1097.5,519.8 1097.5,517.8 1110,511.5"]',
+      ],
+      comment:
+        'Desk E (the back-right desk), its monitor and keyboard: Alex Kelly sits behind it (owner request, 2026-10-02, Track D).',
+    },
+  ],
   'team-room-3': [
     {
       name: 'millie-desk',

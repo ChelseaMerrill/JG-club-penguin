@@ -17,14 +17,14 @@ const LONG_WALK_TIMEOUT = 15_000;
 const PROOF_ROOT = 'test-results/npc-motion-dev-pit';
 /** The centre of `RoomScene`'s click zone for a Human NPC, relative to its feet. */
 const HIT_ZONE_OFFSET_Y = npcLayout({ kind: 'human' }).hitArea.centerY;
-/** Ian and Steven walk authored loops (owner requests, 2026-09-25 and
- *  2026-09-30, Track D). Dom, Ryan and Sam were removed from this Room
- *  (the same requests). */
-const MOVING_NPCS = ['ian', 'steven'];
-/** Ashley stays at her slot; she throws her chicken instead. */
-const STILL_NPCS = ['ashley'];
+/** Ian and Jesse Lucier walk authored loops (owner requests, 2026-09-25 and
+ *  2026-10-02, Track D). */
+const MOVING_NPCS = ['ian', 'jesse-lucier'];
+/** Ashley stays at her slot (she throws her chicken instead); the two Alexes
+ *  sit working at the back desks. */
+const STILL_NPCS = ['ashley', 'alex-nikolis', 'alex-kelly'];
 /** No longer Dev Pit NPCs: no slot, and no `__roomDebug.npcs` entry. */
-const REMOVED_NPCS = ['dom', 'ryan', 'sam'];
+const REMOVED_NPCS = ['dom', 'ryan', 'sam', 'steven'];
 
 test.use({ viewport: { width: 1600, height: 900 } });
 
@@ -72,13 +72,15 @@ async function bootDevPit(page: Page): Promise<string[]> {
     document.querySelector<HTMLElement>('#ui .landing')!.hidden = true;
   });
   await expect
-    .poll(async () => (await debugInfo(page))?.npcs?.steven, { timeout: BOOT_TIMEOUT })
+    .poll(async () => (await debugInfo(page))?.npcs?.ian, { timeout: BOOT_TIMEOUT })
     .not.toBeUndefined();
   await page.evaluate(() => document.fonts.ready);
   return errors;
 }
 
-test('Dev Pit NPCs perform their motions: Ian and Steven walk', async ({ page }) => {
+test('Dev Pit NPCs perform their motions: Ian and Jesse walk, the Alexes sit at their desks', async ({
+  page,
+}) => {
   const dir = proofDir('npcs-move');
   const errors = await bootDevPit(page);
 
@@ -109,9 +111,9 @@ test('Dev Pit NPCs perform their motions: Ian and Steven walk', async ({ page })
   expect(new Set(seen.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`)).size).toBeGreaterThan(1);
   expect(last.x).not.toBeCloseTo(start.x);
 
-  // Close-ups: Ian and Steven mid-walk (Steven drawn as the Characters
-  // sheet's STEVEN ZGALJIC card).
-  for (const id of MOVING_NPCS) {
+  // Close-ups: Ian and Jesse mid-walk, and the Alexes at their desks (each
+  // new character drawn from their Characters sheet card).
+  for (const id of [...MOVING_NPCS, 'alex-nikolis', 'alex-kelly']) {
     const p = await npc(page, id);
     await page.screenshot({
       path: `${dir}/${id}-walk-close-up.png`,

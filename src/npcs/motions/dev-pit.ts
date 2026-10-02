@@ -2,8 +2,8 @@ import type { NpcId } from '../npcs';
 import type { NpcMotionSpec } from './types';
 
 /**
- * The Dev Pit's NPC motions (#113). Neither NPC left here moves in `design/Room
- * 02 Dev Pit.dc.html`: both walks are authored (owner requests, Track D).
+ * The Dev Pit's NPC motions (#113). No NPC here moves in `design/Room 02 Dev
+ * Pit.dc.html`: every motion is authored (owner requests, Track D).
  *
  * Left out, because they don't belong to an NPC: `say` (#36's bubbles),
  * `blink` (the "TALK · BUG SQUASH" HUD button), `doodle` (a whiteboard
@@ -24,26 +24,46 @@ import type { NpcMotionSpec } from './types';
  * their `NpcDefinition`s in `npcs.ts` are untouched.
  */
 export const DEV_PIT_MOTIONS: Partial<Record<NpcId, NpcMotionSpec>> = {
-  // Steven scribbled at his whiteboard in the Dev Pit design, but now looks
-  // as the Characters sheet draws him (arms down, no marker) and walks
-  // instead (owner request, 2026-09-30, Track D). Authored, not from the
-  // design: a loop along the back wall and around his (7,1) slot, over
-  // walkable tiles clear of every desk and every other NPC's slot. Waypoints:
-  // north to (7,0), west to (4,0), south to (4,1), then east home past the
-  // spawn tile (6,1) -- `translate()`s are `tileToScreen` deltas
+  // Steven left the Dev Pit (owner request, 2026-10-02, Track D), and his
+  // walk with him.
+  //
+  // The Characters sheet's new Dev Pit people (owner request, 2026-10-02,
+  // Track D). Each card bobs its figure (`bob`, translateY(-5px) on the
+  // card's 176 px-wide render, so 5 / (176 / 120) = 3.41 figure units here),
+  // at its own pace, verbatim; the rest is authored. Alex Nikolis and Alex
+  // Kelly sit working at the back desks, so they only bob.
+  'alex-nikolis': {
+    figure: {
+      keyframes:
+        '@keyframes bobNikolis { 0%,100% { transform: translateY(0);} 50% { transform: translateY(-3.41px);} }',
+      animation: 'bobNikolis 2.1s ease-in-out infinite',
+    },
+  },
+  'alex-kelly': {
+    figure: {
+      keyframes:
+        '@keyframes bobKelly { 0%,100% { transform: translateY(0);} 50% { transform: translateY(-3.41px);} }',
+      animation: 'bobKelly 1.8s ease-in-out infinite',
+    },
+  },
+  // Jesse Lucier ("Ship it, then 50 burpees.") jogs laps round the desks with
+  // his kettlebell: from his (10,5) slot south to (10,8), west along the
+  // front aisle to (4,8), north between desks B and D to (4,5), then east
+  // home behind the front desks, over walkable tiles clear of every desk,
+  // chair and other NPC's slot. `translate()`s are `tileToScreen` deltas
   // (`TILE_WIDTH`/`TILE_HEIGHT` 100/50) from his own tile, timed in
-  // proportion to each leg's length (1, 3, 1, 3 tiles). `figure` is the
-  // design's own generic `idle` bob, as Ian's.
-  steven: {
+  // proportion to each leg's length (3, 6, 3, 6 tiles), with a short pause
+  // at each corner; his card's own 1.5 s bob plays the whole time.
+  'jesse-lucier': {
     path: {
       keyframes:
-        '@keyframes stevenWalk { 0%,6% { transform: translate(0,0);} 14%,20% { transform: translate(50px,-25px);} 42%,48% { transform: translate(-100px,-100px);} 56%,62% { transform: translate(-150px,-75px);} 84%,100% { transform: translate(0,0);} }',
-      animation: 'stevenWalk 20s ease-in-out -3s infinite',
+        '@keyframes jesseLap { 0%,3% { transform: translate(0,0);} 17.5%,20.5% { transform: translate(-150px,75px);} 50%,53% { transform: translate(-450px,-75px);} 67.5%,70.5% { transform: translate(-300px,-150px);} 100% { transform: translate(0,0);} }',
+      animation: 'jesseLap 30s ease-in-out infinite',
     },
     figure: {
       keyframes:
-        '@keyframes idle { 0%,100% { transform: translateY(0);} 50% { transform: translateY(-3px);} }',
-      animation: 'idle 3s ease-in-out -1s infinite',
+        '@keyframes bobJesse { 0%,100% { transform: translateY(0);} 50% { transform: translateY(-3.41px);} }',
+      animation: 'bobJesse 1.5s ease-in-out infinite',
     },
   },
   // Ian has no motion in the design (his own figure group carries no

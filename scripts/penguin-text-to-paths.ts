@@ -114,7 +114,7 @@ const TEXT_SPECS: TextSpec<'haha' | 'jgLogo' | 'warWeek' | 'jgCap'>[] = [
 // bib (owner request, 2026-09-30, Track D), `design/Team Room 1.dc.html`'s
 // `<text x="60" y="86.5" text-anchor="middle" font-family="Anton, sans-serif"
 // font-size="9" fill="#161719">17</text>`.
-const NPC_TEXT_SPECS: TextSpec<'survivorTee' | 'freeBait' | 'runnerBib'>[] = [
+const NPC_TEXT_SPECS: TextSpec<'survivorTee' | 'freeBait' | 'runnerBib' | 'kettlebell24'>[] = [
   {
     key: 'survivorTee',
     text: 'SURVIVOR',
@@ -147,6 +147,21 @@ const NPC_TEXT_SPECS: TextSpec<'survivorTee' | 'freeBait' | 'runnerBib'>[] = [
     anchor: 'middle',
     letterSpacing: 0,
     fill: '#161719',
+  },
+  // The Characters sheet's JESSE LUCIER card: his kettlebell's weight,
+  // `<text x="92" y="116" text-anchor="middle" font-family="Anton,
+  // sans-serif" font-size="9" fill="#00BDFF">24</text>` (owner request,
+  // 2026-10-02, Track D).
+  {
+    key: 'kettlebell24',
+    text: '24',
+    fontPath: ANTON_PATH,
+    fontSize: 9,
+    x: 92,
+    y: 116,
+    anchor: 'middle',
+    letterSpacing: 0,
+    fill: '#00BDFF',
   },
 ];
 
