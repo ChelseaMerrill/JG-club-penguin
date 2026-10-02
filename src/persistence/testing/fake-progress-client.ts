@@ -91,6 +91,9 @@ export interface FakeResponses {
   questProgress?: FakeResult<unknown>;
   markDevPitVisited?: FakeResult<unknown>;
   completeQuest?: FakeResult<unknown>;
+  /** #51 slice 4 */
+  logStairFlight?: FakeResult<unknown>;
+  stairClimbProgress?: FakeResult<unknown>;
 }
 
 export type LoggedCall = [op: string, ...args: unknown[]];
@@ -164,6 +167,26 @@ export function makeFakeClient(responses: FakeResponses = {}): {
     responses.completeQuest ??
     ({
       data: { tokensAwarded: 0, balance: 100, alreadyCompleted: true, badgesEarned: [] },
+      error: null,
+    } satisfies FakeResult<unknown>);
+  const logStairFlight =
+    responses.logStairFlight ??
+    ({
+      data: {
+        logged: false,
+        reason: 'not_started',
+        flightsLogged: 0,
+        tokensAwarded: 0,
+        flightTokensToday: 0,
+        badgesEarned: [],
+        balance: 100,
+      },
+      error: null,
+    } satisfies FakeResult<unknown>);
+  const stairClimbProgress =
+    responses.stairClimbProgress ??
+    ({
+      data: { flightsLogged: 0, completed: false, flightTokensToday: 0 },
       error: null,
     } satisfies FakeResult<unknown>);
 
@@ -329,6 +352,12 @@ export function makeFakeClient(responses: FakeResponses = {}): {
       }
       if (fn === 'check_session_badges') {
         return Promise.resolve(checkSessionBadges);
+      }
+      if (fn === 'log_stair_flight') {
+        return Promise.resolve(logStairFlight);
+      }
+      if (fn === 'stair_climb_progress') {
+        return Promise.resolve(stairClimbProgress);
       }
       throw new Error(`unexpected rpc ${fn}`);
     },

@@ -69,6 +69,8 @@ function deferredStore(): { store: ProgressStore; resolve: (snapshot: ProgressSn
       markDevPitVisited: () => Promise.reject(new Error('unused in this test')),
       completeQuest: () => Promise.reject(new Error('unused in this test')),
       checkBadges: () => Promise.reject(new Error('unused in this test')),
+      logStairFlight: () => Promise.reject(new Error('unused in this test')),
+      getStairClimb: () => Promise.reject(new Error('unused in this test')),
     },
     resolve: resolveFn,
   };
@@ -87,6 +89,8 @@ function failingStore(): ProgressStore {
     markDevPitVisited: () => Promise.reject(new Error('unused in this test')),
     completeQuest: () => Promise.reject(new Error('unused in this test')),
     checkBadges: () => Promise.reject(new Error('unused in this test')),
+    logStairFlight: () => Promise.reject(new Error('unused in this test')),
+    getStairClimb: () => Promise.reject(new Error('unused in this test')),
   };
 }
 
@@ -263,6 +267,8 @@ describe('createProgressSession', () => {
         markDevPitVisited: () => Promise.reject(new Error('unused in this test')),
         completeQuest: () => Promise.reject(new Error('unused in this test')),
         checkBadges: () => Promise.reject(new Error('unused in this test')),
+        logStairFlight: () => Promise.reject(new Error('unused in this test')),
+        getStairClimb: () => Promise.reject(new Error('unused in this test')),
       };
       await session.start(PLAYER, store);
       const wrapped = registry.get(PROGRESS_STORE_KEY) as ProgressStore;
@@ -460,6 +466,35 @@ describe('createProgressSession', () => {
         expect(toasts).toEqual([]);
       });
 
+      it('Stair Master through logStairFlight(5), then a Session check (#51 slice 4)', async () => {
+        const registry = createFakeRegistry();
+        const session = createProgressSession({ registry, emitter: gameEvents });
+        const { panels, toasts } = wireAnnouncements();
+        let nowMs = NOON_EASTERN;
+        const controls = createInMemoryProgressStoreWithControls({
+          emitter: session.storeEmitter,
+          now: () => nowMs,
+        });
+        await session.start(PLAYER, controls.store);
+        cleanups.push(() => session.stop());
+        const wrapped = registry.get(PROGRESS_STORE_KEY) as ProgressStore;
+
+        await wrapped.logStairFlight(0);
+        for (let floor = 1; floor <= 5; floor += 1) {
+          nowMs += 3000;
+          await wrapped.logStairFlight(floor);
+        }
+        const snapshot = registry.get(PROGRESS_KEY) as ProgressSnapshot;
+        // 100 starting Tokens, five flights of 10 and Stair Master's +50.
+        expect(snapshot.tokens).toBe(200);
+        expect(snapshot.badges).toEqual(['stair-master']);
+
+        await wrapped.checkBadges();
+
+        expect(panels()).toEqual(['Badge unlocked: Stair Master']);
+        expect(toasts).toEqual([]);
+      });
+
       it('a Minigame Badge through recordRound, then a Session check', async () => {
         const { wrapped, panels, toasts } = await announceSetup();
 
@@ -556,6 +591,7 @@ describe('createProgressSession', () => {
           cleanups.push(gameEvents.on('tokens:changed', ({ balance }) => balances.push(balance)));
           const quest = gate<void>();
           const round = gate<void>();
+          const flight = gate<void>();
           const checks: Array<{ release: (value: BadgeCheckResult) => void }> = [];
           const { store: base } = deferredStore();
           const store: ProgressStore = {
@@ -584,6 +620,21 @@ describe('createProgressSession', () => {
                 badgesEarned: ['exterminator'],
               };
             },
+            // #51 slice 4: flight 5 of a first climb, +10 and Stair Master's +50.
+            logStairFlight: async () => {
+              await flight.promise;
+              session.storeEmitter.emit('tokens:changed', { balance: 260 });
+              session.storeEmitter.emit('badge:earned', { badgeId: 'stair-master' });
+              return {
+                logged: true,
+                reason: null,
+                flightsLogged: 5,
+                tokensAwarded: 10,
+                flightTokensToday: 50,
+                badgesEarned: ['stair-master'],
+                balance: 260,
+              };
+            },
             checkBadges: () => {
               const check = gate<BadgeCheckResult>();
               checks.push(check);
@@ -600,6 +651,7 @@ describe('createProgressSession', () => {
             wrapped,
             quest,
             round,
+            flight,
             checks,
             panels,
             toasts,
@@ -669,6 +721,22 @@ describe('createProgressSession', () => {
 
           expect(toasts).toEqual(['Badge unlocked: Exterminator']);
           expect(tokens()).toBe(275);
+        });
+
+        it('logStairFlight resolves inside a check: Stair Master shows once, and the check never writes back an older balance (#51 slice 4, RT2-9)', async () => {
+          const { wrapped, flight, checks, panels, balances, tokens } = await racingSetup();
+          // The check starts before the flight resolves and finishes after it.
+          const checking = wrapped.checkBadges();
+          const flying = wrapped.logStairFlight(5);
+
+          flight.release();
+          await flying;
+          checks[0].release({ badges: ['stair-master'], balance: 200 });
+          await checking;
+
+          expect(panels()).toEqual(['Badge unlocked: Stair Master']);
+          expect(tokens()).toBe(260);
+          expect(balances).toEqual([260]);
         });
 
         it('a check with no write overlapping it still updates the balance', async () => {

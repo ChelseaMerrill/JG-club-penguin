@@ -6,12 +6,12 @@ import {
   sampleCssOpacity,
   transformPoint,
 } from '../../game/npcs/css-keyframes';
-import { HUMAN_NPC_SCALE } from '../../game/npcs/npc-layout';
+import { npcScale } from '../../game/npcs/npc-layout';
 import { createNpcMotion } from '../../game/npcs/npc-motion';
 import { tileToScreen } from '../../game/rooms/iso';
 import { teamRoom1 } from '../../game/rooms/definitions/team-room-1';
 import { getNpcMotion } from '../npc-motions';
-import type { NpcId } from '../npcs';
+import { NPCS, type NpcId } from '../npcs';
 import { TEAM_ROOM_1_MOTIONS } from './team-room-1';
 
 const ORIGIN = teamRoom1.grid.origin;
@@ -88,7 +88,9 @@ describe('Team Room 1 NPC motions (owner request, 2026-09-30)', () => {
       // The feet-centre (60, 130) only lifts: straight up, 6 Stage px.
       const feet = transformPoint(matrix, { x: 60, y: 130 });
       expect(feet.x, id).toBeCloseTo(60);
-      expect((feet.y - 130) * HUMAN_NPC_SCALE, id).toBeCloseTo(-6, 1);
+      // Both are drawn at the Room design's 70/120, so 6 Stage px is 10.2857 figure px.
+      expect(npcScale(NPCS[id]), id).toBeCloseTo(70 / 120, 10);
+      expect((feet.y - 130) * npcScale(NPCS[id]), id).toBeCloseTo(-6, 1);
     }
   });
 

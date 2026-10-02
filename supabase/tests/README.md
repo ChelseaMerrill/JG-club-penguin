@@ -344,3 +344,49 @@ overload and the `authenticated`-only grant.
    `true`, including the final `ALL` row. It changes nothing (everything is
    rolled back, so no webhook fires) and prints only booleans, counts and
    error codes.
+
+## #51 Stair climb (gate H2)
+
+`51_stair_climb_proof.sql` proves `20260929000000_stair_climb.sql` (decisions
+SC1-SC17 in its header) against the same #9 H1 fixture Player, in
+`146_phishing_proof.sql`'s style. As postgres it checks that Stair Master is
+`available` in `public.badges`, that `player_stair_climbs` has RLS on with no
+policy and no client privilege, and where the America/New_York day falls at
+fixed instants (either side of midnight in daylight saving and standard time,
+and on the day it ends). As the fixture signed in: a fresh Player reads the
+defaults; a flight before any start is `not_started`; floor 0 starts a climb
+and pays nothing; a flight within 2 s is `too_soon`, a repeat
+`already_logged` and a skipped floor `out_of_order`, none of them writing
+anything; a valid flight pays 10, a tally of 95 pays 5, and a full tally
+still logs the flight and pays 0; a stale day resets the tally; the first
+full climb returns `badgesEarned: ["stair-master"]` with the +50 outside the
+tally, and a second returns `[]` and pays its flights only; floors outside
+0-5 are `invalid_floor`; the table, `stair_day`, `award_badge` and
+`award_badge_if_available` are closed to the fixture. As anon every function
+and the table are denied (`42501`). It also checks `security
+definer`/`search_path = ''`/one overload each and the `authenticated`-only
+grants. Between flights it moves the climb's `updated_at` back 3 s as
+postgres, because `now()` doesn't move inside one transaction.
+
+**Apply it before the #51 Stairwell PR merges or deploys** (#138's
+deploy-order rule), after every earlier migration. It needs #138's
+`20260927000000_badges.sql`: its first statement stops with
+`badge_award_missing`, `stair_master_badge_missing` or
+`badge_award_executable` if `award_badge` is missing, the Badge row is gone,
+or a client role may execute an award function, before anything changes.
+
+1. Local: covered automatically by `sql-stair-climb.test.ts`'s PGlite run in
+   `npm test` (not by `run-local.sh`), which also proves the rerun and runs
+   those three precondition failures. They're destructive, so they stay out
+   of the proof file.
+2. Real Supabase (gate H2): apply
+   `supabase/migrations/20260929000000_stair_climb.sql` in the SQL editor
+   first, then open `51_stair_climb_proof.sql`, replace every occurrence of
+   `00000000-0000-0000-0000-00000000f1f0` with the real #9 H1 fixture
+   Player's id, and run it. Expect every row's `pass` column to read `true`,
+   including the final `ALL` row. It changes nothing (everything is rolled
+   back, including the fixture's Stair Master, so it reruns after the
+   deployed smoke) and prints only booleans, counts, dates and Token amounts.
+3. Save the result table to
+   `test-results/51-stair-climb-proof-supabase/output.txt`, and paste the same
+   table on #51.

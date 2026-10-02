@@ -1,14 +1,61 @@
 import { expect, test, type Page } from '@playwright/test';
+import type { RoomId } from '../src/contracts';
+import { bathroom } from '../src/game/rooms/definitions/bathroom';
 import { devPit } from '../src/game/rooms/definitions/dev-pit';
 import { igloo } from '../src/game/rooms/definitions/igloo';
+import { officeHallway } from '../src/game/rooms/definitions/office-hallway';
 import { roofDeck } from '../src/game/rooms/definitions/roof-deck';
+import { STAIRWELL_DEFINITIONS } from '../src/game/rooms/definitions/stairwell';
+import { teamRoom1 } from '../src/game/rooms/definitions/team-room-1';
+import { teamRoom2 } from '../src/game/rooms/definitions/team-room-2';
+import { teamRoom3 } from '../src/game/rooms/definitions/team-room-3';
+import { teamRoom4 } from '../src/game/rooms/definitions/team-room-4';
+import { theIcebox } from '../src/game/rooms/definitions/the-icebox';
+import { theMelt } from '../src/game/rooms/definitions/the-melt';
+import { theMullet } from '../src/game/rooms/definitions/the-mullet';
 import { townCenter } from '../src/game/rooms/definitions/town-center';
+import type { RoomDefinition, RoomDoor } from '../src/game/rooms/room-definition';
 import { GAME_HEIGHT, GAME_WIDTH } from '../src/game/stage-size';
 import { waitForElevatorHidden } from './support/elevator';
 import type { RoomDebugInfo } from './support/room-debug-types';
 
 const BOOT_TIMEOUT = 15_000;
 const WALK_TIMEOUT = 15_000;
+
+// Every Room, in the registry's order, imported straight from each
+// definition module (as `prototype-rooms.spec.ts` does, and for the same
+// reason: the registry module reads `import.meta.env`, which Playwright
+// doesn't define).
+const ROOMS_IN_REGISTRY_ORDER: readonly RoomDefinition[] = [
+  townCenter,
+  devPit,
+  theMelt,
+  roofDeck,
+  igloo,
+  theIcebox,
+  officeHallway,
+  teamRoom1,
+  teamRoom2,
+  teamRoom3,
+  teamRoom4,
+  bathroom,
+  theMullet,
+  ...STAIRWELL_DEFINITIONS,
+];
+
+/**
+ * The first disabled door (`targetRoomId: null`) of any Room, in registry
+ * order (#51 slice 4, A5 as amended): Town Center has none left since the
+ * Stairwell enabled STAIRWELL, so the example moves on by itself as Rooms
+ * land (the Hallway's TEAM ROOM 5 today).
+ */
+function firstDisabledDoor(): { room: RoomDefinition; door: RoomDoor } {
+  for (const room of ROOMS_IN_REGISTRY_ORDER) {
+    const door = room.doors.find((candidate) => candidate.targetRoomId === null);
+    if (door) return { room, door };
+  }
+  throw new Error('no disabled door left: pick a new example');
+}
 
 /** Fails the test on any uncaught page error or console error. */
 function collectErrors(page: Page): string[] {
@@ -68,13 +115,18 @@ test('room transitions: doors, changeRoom, HUD, reload (#15)', async ({ page }) 
     .toEqual([{ type: 'room:enter', roomId: 'town-center' }]);
 
   // --- A disabled door (`targetRoomId: null`) shows the "coming soon" hint
-  // and leaves the Room unchanged. Whichever Town Center door is still
-  // disabled (THE ICEBOX was, until #51 built its Room; STAIRWELL still is).
-  // When #51's Stairwell slice enables Town Center's last disabled door,
-  // move this example to the Hallway's TEAM ROOM 5-9 doors, which stay
-  // disabled (no designs).
-  const disabledDoor = townCenter.doors.find((door) => door.targetRoomId === null);
-  if (!disabledDoor) throw new Error('expected town-center to have a disabled door');
+  // and leaves the Room unchanged: the first one in registry order (see
+  // `firstDisabledDoor`), entered by `__roomDebug.changeRoom` first when it
+  // isn't Town Center's.
+  const { room: disabledRoom, door: disabledDoor } = firstDisabledDoor();
+  const detour = disabledRoom.id !== 'town-center';
+  if (detour) {
+    await page.evaluate((id) => window.__roomDebug?.changeRoom?.(id), disabledRoom.id);
+    await expect
+      .poll(async () => (await debugInfo(page))?.roomId, { timeout: WALK_TIMEOUT })
+      .toBe(disabledRoom.id);
+    await waitForElevatorHidden(page);
+  }
   await clickStagePoint(page, doorCenter(disabledDoor));
   // Fast, fixed-interval polls: the default backoff (up to 1 s between
   // checks) could notice the hint up to a second late, eating most of its
@@ -89,7 +141,7 @@ test('room transitions: doors, changeRoom, HUD, reload (#15)', async ({ page }) 
     .poll(async () => (await debugInfo(page))?.comingSoonHint, { intervals: [50] })
     .toBe(disabledDoor.label);
   const hintSeenAt = Date.now();
-  expect((await debugInfo(page))?.roomId).toBe('town-center');
+  expect((await debugInfo(page))?.roomId).toBe(disabledRoom.id);
   await page.screenshot({ path: 'test-results/room-transitions/coming-soon-hint.png' });
 
   // DOOR_HINT_DURATION_MS (`RoomScene.ts`) is 2000ms: still shown partway
@@ -103,6 +155,13 @@ test('room transitions: doors, changeRoom, HUD, reload (#15)', async ({ page }) 
   await expect
     .poll(async () => (await debugInfo(page))?.comingSoonHint, { timeout: 15_000 })
     .toBeNull();
+  if (detour) {
+    await page.evaluate(() => window.__roomDebug?.changeRoom?.('town-center'));
+    await expect
+      .poll(async () => (await debugInfo(page))?.roomId, { timeout: WALK_TIMEOUT })
+      .toBe('town-center');
+    await waitForElevatorHidden(page);
+  }
 
   // --- The DEV PIT door walks the Penguin there, then loads Dev Pit at the
   // door's own entry tile (not Dev Pit's spawnTile).
@@ -168,10 +227,19 @@ test('room transitions: doors, changeRoom, HUD, reload (#15)', async ({ page }) 
   // equals the room the previous room:enter just landed in, and the very
   // first enter (Session start, `enterSpawnRoom`) has no preceding leave
   // (#26 D6). The disabled-door click above never changes Room, so it left
-  // no trace here.
+  // no trace here beyond the detour to and from its Room.
+  const detourLog: { type: 'room:enter' | 'room:leave'; roomId: RoomId }[] = detour
+    ? [
+        { type: 'room:leave', roomId: 'town-center' },
+        { type: 'room:enter', roomId: disabledRoom.id },
+        { type: 'room:leave', roomId: disabledRoom.id },
+        { type: 'room:enter', roomId: 'town-center' },
+      ]
+    : [];
   const log = (await debugInfo(page))?.roomEventLog;
   expect(log).toEqual([
     { type: 'room:enter', roomId: 'town-center' },
+    ...detourLog,
     { type: 'room:leave', roomId: 'town-center' },
     { type: 'room:enter', roomId: 'dev-pit' },
     { type: 'room:leave', roomId: 'dev-pit' },

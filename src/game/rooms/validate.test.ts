@@ -582,7 +582,8 @@ describe('ROOM_DEFINITIONS registry', () => {
     );
 
     expect(connections).toEqual({
-      'town-center': ['dev-pit', 'roof-deck', 'the-icebox'],
+      // #51 slice 4: STAIRWELL, Town Center's last disabled door, opens floor 5.
+      'town-center': ['dev-pit', 'roof-deck', 'stairwell-5', 'the-icebox'],
       'dev-pit': ['the-icebox', 'town-center'],
       'the-melt': ['roof-deck', 'town-center'],
       // #100: the Roof Deck's new KITCHEN floor-arrow door, its first exit.
@@ -598,7 +599,33 @@ describe('ROOM_DEFINITIONS registry', () => {
       bathroom: ['office-hallway'],
       // #51 slice 3: one-way doors out; nothing draws a door in (D5).
       'the-mullet': ['dev-pit', 'office-hallway'],
+      // #51 slice 4: each floor's ↑ pill and upper stair flight both climb a
+      // floor, and its ↓ pill descends one. Floor 0's LOBBY door waits for
+      // #169; floor 5's flight leads to the Roof Deck and its JG HQ door to
+      // Town Center.
+      'stairwell-0': ['stairwell-1', 'stairwell-1'],
+      'stairwell-1': ['stairwell-0', 'stairwell-2', 'stairwell-2'],
+      'stairwell-2': ['stairwell-1', 'stairwell-3', 'stairwell-3'],
+      'stairwell-3': ['stairwell-2', 'stairwell-4', 'stairwell-4'],
+      'stairwell-4': ['stairwell-3', 'stairwell-5', 'stairwell-5'],
+      'stairwell-5': ['roof-deck', 'stairwell-4', 'town-center'],
     });
+  });
+
+  it('keeps every Stairwell door and hotspot off the baked "STAIRS CHALLENGE · SUBMIT" sign (HD-3)', () => {
+    // The sign's own rect in design/Stairwell.dc.html, the same on every
+    // floor: decoration only, so nothing clickable may cover it.
+    const submit = { x: 517.5, y: 449, width: 205, height: 22 };
+    const overlaps = (a: typeof submit, b: typeof submit): boolean =>
+      a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+    for (const room of ROOM_DEFINITIONS.filter((each) => each.id.startsWith('stairwell-'))) {
+      for (const door of room.doors) {
+        expect(overlaps(door.hotspot, submit), `${room.id} / ${door.label}`).toBe(false);
+      }
+      for (const hotspot of room.hotspots ?? []) {
+        expect(overlaps(hotspot.rect, submit), `${room.id} / ${hotspot.id}`).toBe(false);
+      }
+    }
   });
 
   it.each(ROOM_DEFINITIONS.map((room) => [room.id, room]))(
@@ -670,6 +697,22 @@ describe('ROOM_DEFINITIONS registry', () => {
     expect(getRoomDefinition('the-mullet')).toMatchObject({
       title: 'THE MULLET',
       subtitle: 'MEZZANINE · MS. PAC-MAN · TV LOUNGE · POOL · PING PONG · END OF THE GAME',
+    });
+    // #51 slice 4 (S4-D5): only floor 5 draws a banner, minus "RAIL SLIDING
+    // ENCOURAGED" (the unbuilt Rail Rider); the other floors share its title.
+    expect(getRoomDefinition('stairwell-5')).toMatchObject({
+      title: 'THE SLIDE · FLOOR 5',
+      subtitle: 'STAIRWELL B · 5 OF 5 · TOP FLOOR · JG HQ',
+    });
+    for (const floor of [1, 2, 3, 4]) {
+      expect(getRoomDefinition(`stairwell-${floor}` as RoomId)).toMatchObject({
+        title: `THE SLIDE · FLOOR ${floor}`,
+        subtitle: `STAIRWELL · FLOOR ${floor}`,
+      });
+    }
+    expect(getRoomDefinition('stairwell-0')).toMatchObject({
+      title: 'THE SLIDE · FLOOR 0',
+      subtitle: 'LOBBY · STREET LEVEL',
     });
   });
 });

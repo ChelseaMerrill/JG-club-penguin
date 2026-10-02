@@ -39,6 +39,14 @@ export const ROOM_FLOORS: Record<RoomId, FloorId | null> = {
   bathroom: '5',
   // #51 slice 3: THE MULLET is the JG HQ floor's mezzanine.
   'the-mullet': '5',
+  // #51 slice 4: each Stairwell floor sits on its own floor of the building;
+  // its floor 0 is the lobby level.
+  'stairwell-0': 'L',
+  'stairwell-1': '1',
+  'stairwell-2': '2',
+  'stairwell-3': '3',
+  'stairwell-4': '4',
+  'stairwell-5': '5',
 };
 
 /** Whether `a` and `b` are both real (non-null) floors and differ -- the Elevator's own show condition (#52 D3). */

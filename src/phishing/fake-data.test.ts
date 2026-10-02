@@ -52,6 +52,16 @@ function seededQuestions() {
   }));
 }
 
+/**
+ * Enabled doors of the four shared Rooms that Anthony doesn't guard yet (#51
+ * slice 4, S4-D12, decided as U2 on 2026-09-29): Town Center's STAIRWELL
+ * door, which opens the Stairwell on floor 5. #170 chooses the final guarded
+ * doors from the new door network, so the migration's seed is left as it is.
+ * Until then, #146's P3 header ("every enabled door ... of the four shared
+ * prototype Rooms") is stale by exactly this door.
+ */
+const NOT_GUARDED_UNTIL_170: readonly string[] = ['town-center / STAIRWELL'];
+
 describe('guard posts', () => {
   it('match the migration seed, in position order', () => {
     const seeded = seededPosts();
@@ -80,7 +90,10 @@ describe('guard posts', () => {
           .map((door) => `${roomId} / ${door.label}`),
     );
     const seeded = seededPosts().map((post) => `${post.roomId} / ${post.doorLabel}`);
-    expect([...seeded].sort()).toEqual([...enabled].sort());
+    for (const exempt of NOT_GUARDED_UNTIL_170) expect(enabled).toContain(exempt);
+    expect([...seeded].sort()).toEqual(
+      enabled.filter((door) => !NOT_GUARDED_UNTIL_170.includes(door)).sort(),
+    );
   });
 
   it('never put two neighbouring windows in the same Room, including the wrap', () => {

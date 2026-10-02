@@ -23,6 +23,8 @@ export interface RoomNpcActor {
   /** Its invisible click target, kept `zoneOffsetY` above the feet. */
   zone: GameObjects.Zone;
   zoneOffsetY: number;
+  /** Its click target's x offset from the feet, when a nameplate shifted sideways widens it (#149). */
+  zoneOffsetX?: number;
   /** Its slot tile's Stage point, where it rests. */
   rest: ScreenPoint;
 }
@@ -167,7 +169,10 @@ export class RoomNpcMotions implements NpcPauseTarget {
     if (!motion) return;
     const pose = motion.pose();
     actor.sprite.setPoint(pose.point.x, pose.point.y, pose.depth);
-    actor.zone.setPosition(pose.point.x, pose.point.y + actor.zoneOffsetY);
+    actor.zone.setPosition(
+      pose.point.x + (actor.zoneOffsetX ?? 0),
+      pose.point.y + actor.zoneOffsetY,
+    );
     actor.zone.setDepth(pose.depth);
     if (pose.figure) applyAffine(actor.sprite.figure, pose.figure);
     // A Stage-level motion (#150) moves the figure and name tag together but

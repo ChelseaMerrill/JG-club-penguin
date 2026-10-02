@@ -33,6 +33,21 @@ describe('ROOM_FLOORS', () => {
   it('gives the Igloo no floor at all', () => {
     expect(ROOM_FLOORS.igloo).toBeNull();
   });
+
+  it('puts each Stairwell floor on its own floor, floor 0 on the lobby (#51 slice 4)', () => {
+    expect(
+      (
+        [
+          'stairwell-0',
+          'stairwell-1',
+          'stairwell-2',
+          'stairwell-3',
+          'stairwell-4',
+          'stairwell-5',
+        ] as const
+      ).map((id) => ROOM_FLOORS[id]),
+    ).toEqual(['L', '1', '2', '3', '4', '5']);
+  });
 });
 
 describe('FLOOR_ORDER', () => {

@@ -17,15 +17,16 @@ import type { NpcMotionSpec, NpcPropLayer } from './types';
 /**
  * The design's `bob` sits on a `<div>` around the figure's `<svg>`, so its
  * `translateY(-6px)` moves 6 Stage px. A `figure` track plays inside
- * `npc-sprite.ts`'s 0.62 scaled wrapper, in figure units, so it is 6 / 0.62
- * = 9.68 figure px here to move the same 6 Stage px (the Icebox's
- * `ICEBOX_IDLE_BOB` precedent). Its `transform-origin: 50% 100%` is the
+ * `npc-sprite.ts`'s scaled wrapper, in figure units, and Team Rooms 1 and 2
+ * draw their Humans at 70/120, so it is 6 / (70/120) = 10.2857 figure px here
+ * to move the same 6 Stage px (the Icebox's `ICEBOX_IDLE_BOB` precedent).
+ * Ian's Team Room 2 bob reuses it (`team-room-2.ts`). Its `transform-origin: 50% 100%` is the
  * bottom-centre of that 70x76 `<div>`, i.e. the figure viewBox's (60, 130).
  * The rotation is verbatim.
  */
-const BOB_KEYFRAMES =
-  '@keyframes bob { 0%,100% { transform: translateY(0) rotate(-2deg);} 50% { transform: translateY(-9.68px) rotate(2deg);} }';
-const BOB_ORIGIN = '60px 130px';
+export const BOB_KEYFRAMES =
+  '@keyframes bob { 0%,100% { transform: translateY(0) rotate(-2deg);} 50% { transform: translateY(-10.2857px) rotate(2deg);} }';
+export const BOB_ORIGIN = '60px 130px';
 
 /**
  * Jethro's camera raise from `design/Team Room 1.dc.html`, verbatim: every 4 s

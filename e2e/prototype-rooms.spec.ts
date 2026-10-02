@@ -5,6 +5,14 @@ import { devPit } from '../src/game/rooms/definitions/dev-pit';
 import { igloo } from '../src/game/rooms/definitions/igloo';
 import { officeHallway } from '../src/game/rooms/definitions/office-hallway';
 import { roofDeck } from '../src/game/rooms/definitions/roof-deck';
+import {
+  stairwell0,
+  stairwell1,
+  stairwell2,
+  stairwell3,
+  stairwell4,
+  stairwell5,
+} from '../src/game/rooms/definitions/stairwell';
 import { teamRoom1 } from '../src/game/rooms/definitions/team-room-1';
 import { teamRoom2 } from '../src/game/rooms/definitions/team-room-2';
 import { teamRoom3 } from '../src/game/rooms/definitions/team-room-3';
@@ -37,6 +45,12 @@ const ROOM_DEFINITIONS: Record<RoomId, RoomDefinition> = {
   'team-room-4': teamRoom4,
   bathroom,
   'the-mullet': theMullet,
+  'stairwell-0': stairwell0,
+  'stairwell-1': stairwell1,
+  'stairwell-2': stairwell2,
+  'stairwell-3': stairwell3,
+  'stairwell-4': stairwell4,
+  'stairwell-5': stairwell5,
 };
 
 /** Fails the test on any uncaught page error or console error. */

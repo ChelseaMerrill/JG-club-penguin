@@ -4,6 +4,14 @@ import { devPit } from './definitions/dev-pit';
 import { igloo } from './definitions/igloo';
 import { officeHallway } from './definitions/office-hallway';
 import { roofDeck } from './definitions/roof-deck';
+import {
+  stairwell0,
+  stairwell1,
+  stairwell2,
+  stairwell3,
+  stairwell4,
+  stairwell5,
+} from './definitions/stairwell';
 import { teamRoom1 } from './definitions/team-room-1';
 import { teamRoom2 } from './definitions/team-room-2';
 import { teamRoom3 } from './definitions/team-room-3';
@@ -30,6 +38,12 @@ export const ROOM_DEFINITIONS: readonly RoomDefinition[] = [
   teamRoom4,
   bathroom,
   theMullet,
+  stairwell0,
+  stairwell1,
+  stairwell2,
+  stairwell3,
+  stairwell4,
+  stairwell5,
 ];
 
 // Fails fast on a broken RoomDefinition in dev (`npm run dev`) and test

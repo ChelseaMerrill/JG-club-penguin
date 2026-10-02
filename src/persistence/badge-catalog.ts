@@ -99,7 +99,7 @@ export const BADGE_CATALOG: readonly (BadgeDefinition & { id: BadgeId })[] = [
     name: 'Stair Master',
     howToEarn: 'CLIMB THE STAIRWELL',
     sortOrder: 14,
-    available: false,
+    available: true,
   },
   {
     id: 'phish-fry',
@@ -122,6 +122,8 @@ export const BADGE_AVAILABILITY_OVERRIDES: ReadonlySet<BadgeId> = new Set<BadgeI
   'let-it-rip',
   // #146: 20260928020000_phishing_quiz.sql turns Phish Fry on.
   'phish-fry',
+  // #51 slice 4: 20260929000000_stair_climb.sql turns Stair Master on.
+  'stair-master',
 ]);
 
 /** The catalog row for `badgeId`, if there is one. */

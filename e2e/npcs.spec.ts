@@ -1,9 +1,15 @@
 import { expect, test, type Page } from '@playwright/test';
 import type { RoomId } from '../src/contracts';
+import { npcLayout } from '../src/game/npcs/npc-layout';
+import { officeHallway } from '../src/game/rooms/definitions/office-hallway';
 import { roofDeck } from '../src/game/rooms/definitions/roof-deck';
 import { teamRoom2 } from '../src/game/rooms/definitions/team-room-2';
+import { teamRoom3 } from '../src/game/rooms/definitions/team-room-3';
+import { teamRoom4 } from '../src/game/rooms/definitions/team-room-4';
 import { theMelt } from '../src/game/rooms/definitions/the-melt';
-import { tileToScreen } from '../src/game/rooms/iso';
+import { theMullet } from '../src/game/rooms/definitions/the-mullet';
+import { npcSlotPoint, tileToScreen } from '../src/game/rooms/iso';
+import { NPCS, type NpcId } from '../src/npcs/npcs';
 import { GAME_HEIGHT, GAME_WIDTH } from '../src/game/stage-size';
 import type { NpcMotionDebugInfo, RoomDebugInfo } from './support/room-debug-types';
 
@@ -77,6 +83,13 @@ for (const roomId of [
   'team-room-4',
   'bathroom',
   'the-mullet',
+  // #51 slice 4: the Stairwell's six floors.
+  'stairwell-0',
+  'stairwell-1',
+  'stairwell-2',
+  'stairwell-3',
+  'stairwell-4',
+  'stairwell-5',
 ] as const) {
   test(`npcs-${roomId}: NPCs show at their designed positions`, async ({ page }) => {
     const errors = await bootRoom(page, roomId);
@@ -166,6 +179,75 @@ test('Team Room 2: clicking Ian arrives, opens his dialog, and GRAB THE HAMMER o
   await expect(dialog).toBeHidden();
 
   await page.screenshot({ path: 'test-results/npcs-team-room-2/bug-squash-launched.png' });
+
+  expect(errors).toEqual([]);
+});
+
+/**
+ * #149: the Hallway's, Team Room 3's and Team Room 4's NPCs draw at their own
+ * scales (Millie's with a hand-placed nameplate and an exact slot `offset`), so a
+ * click at the middle of each one's own click area still has to arrive and open
+ * its dialog. Ian (Team Room 2) is covered above; Michael's Beystadium launch
+ * is `beystadium.spec.ts`; Jason's offset nameplate is covered below.
+ */
+const HAND_PLACED_CLICKS: {
+  room: RoomId;
+  definition: typeof officeHallway;
+  npcId: NpcId;
+  name: string;
+}[] = [
+  { room: 'office-hallway', definition: officeHallway, npcId: 'emily', name: 'Emily Smith' },
+  {
+    room: 'team-room-3',
+    definition: teamRoom3,
+    npcId: 'millie-team-room-3',
+    name: 'Millie Elliott',
+  },
+  { room: 'team-room-4', definition: teamRoom4, npcId: 'michael', name: 'Michael Prete' },
+];
+for (const { room, definition, npcId, name } of HAND_PLACED_CLICKS) {
+  test(`${room}: clicking ${name} arrives and opens the dialog (#149)`, async ({ page }) => {
+    const errors = await bootRoom(page, room);
+
+    const slot = definition.npcSlots.find((s) => s.npcId === npcId);
+    if (!slot) throw new Error(`expected ${room} to have a "${npcId}" NPC slot`);
+    const feet = npcSlotPoint(slot, definition.grid.origin);
+    await clickStagePoint(page, { x: feet.x, y: feet.y + npcLayout(NPCS[npcId]).hitArea.centerY });
+
+    await expect
+      .poll(async () => (await debugInfo(page))?.npcArrivedLog, { timeout: LONG_WALK_TIMEOUT })
+      .toContain(npcId);
+
+    const dialog = page.locator('.npc-dialog');
+    await expect(dialog).toBeVisible();
+    await expect(dialog.locator('.npc-dialog__name')).toHaveText(name);
+
+    expect(errors).toEqual([]);
+  });
+}
+
+/**
+ * #149: Jason's nameplate hangs 55.5 px left of him, off his figure, so it has
+ * to be part of his click area: clicking its middle opens his dialog.
+ */
+test("The Mullet: clicking Jason's offset nameplate opens his dialog (#149)", async ({ page }) => {
+  const errors = await bootRoom(page, 'the-mullet');
+
+  const slot = theMullet.npcSlots.find((s) => s.npcId === 'jason-mullet');
+  if (!slot) throw new Error('expected the-mullet to have a "jason-mullet" NPC slot');
+  const feet = npcSlotPoint(slot, theMullet.grid.origin);
+  const layout = npcLayout(NPCS['jason-mullet']);
+  await clickStagePoint(page, {
+    x: feet.x + layout.nameplateCenterX,
+    y: feet.y + (layout.nameplateTopY + layout.nameplateBottomY) / 2,
+  });
+
+  await expect
+    .poll(async () => (await debugInfo(page))?.npcArrivedLog, { timeout: LONG_WALK_TIMEOUT })
+    .toContain('jason-mullet');
+  const dialog = page.locator('.npc-dialog');
+  await expect(dialog).toBeVisible();
+  await expect(dialog.locator('.npc-dialog__name')).toHaveText('Jason Jahnel');
 
   expect(errors).toEqual([]);
 });

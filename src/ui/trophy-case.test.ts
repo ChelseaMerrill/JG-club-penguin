@@ -84,13 +84,14 @@ describe('orderBadgeTiles', () => {
       'interior-penguin',
       // #121: Let It Rip is earnable now, so it sorts with the locked ones.
       'let-it-rip',
+      // #51 slice 4: so is Stair Master.
+      'stair-master',
       // #146: so is Phish Fry.
       'phish-fry',
       'snowmageddon',
       'rail-rider',
       'hexle-parent',
       'mullet-mania',
-      'stair-master',
     ]);
   });
 });
@@ -197,7 +198,7 @@ describe('createTrophyCase', () => {
     expect(q('[aria-label="Page 1"]').getAttribute('aria-current')).toBe('page');
 
     next.click();
-    expect(tileIds()).toEqual(['hexle-parent', 'mullet-mania', 'stair-master']);
+    expect(tileIds()).toEqual(['rail-rider', 'hexle-parent', 'mullet-mania']);
     expect(q<HTMLButtonElement>('[aria-label="Next page"]').disabled).toBe(true);
     expect(q('[aria-label="Page 2"]').getAttribute('aria-current')).toBe('page');
 

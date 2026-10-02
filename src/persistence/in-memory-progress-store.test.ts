@@ -18,7 +18,7 @@ import {
  */
 function makeHarness(): Promise<ProgressStoreHarness> {
   let currentMs = Date.parse('2026-09-24T16:00:00.000Z');
-  const { store, grantTokens, holdBadge } = createInMemoryProgressStoreWithControls({
+  const { store, grantTokens, holdBadge, setStairTally } = createInMemoryProgressStoreWithControls({
     now: () => currentMs,
   });
   return Promise.resolve({
@@ -33,6 +33,10 @@ function makeHarness(): Promise<ProgressStoreHarness> {
     },
     holdBadge(badgeId: BadgeId): Promise<void> {
       holdBadge(badgeId);
+      return Promise.resolve();
+    },
+    setStairTally(tokensToday: number, tokensDay?: string): Promise<void> {
+      setStairTally(tokensToday, tokensDay);
       return Promise.resolve();
     },
   });
@@ -122,5 +126,69 @@ describe('createInMemoryProgressStore event emission', () => {
       store.recordRound('bug-squash', 520, { score: 520, squashed: 520, bestCombo: 0, escaped: 0 }),
     ).resolves.toBeDefined();
     await expect(store.purchase('beanbag')).resolves.toBeDefined();
+  });
+});
+
+describe('createInMemoryProgressStore Stairs Challenge clock (#51 slice 4)', () => {
+  it('resets the daily tally at 00:00 America/New_York, by its injected clock', async () => {
+    // 23:59:50 EDT on 2026-09-27.
+    let currentMs = Date.parse('2026-09-28T03:59:50.000Z');
+    const { store, setStairTally } = createInMemoryProgressStoreWithControls({
+      now: () => currentMs,
+    });
+    await store.logStairFlight(0);
+    setStairTally(95, '2026-09-27');
+
+    currentMs += 3000; // 23:59:53 EDT: the same day, so 5 more reach the cap.
+    expect(await store.logStairFlight(1)).toMatchObject({
+      tokensAwarded: 5,
+      flightTokensToday: 100,
+    });
+    currentMs += 3000; // 23:59:56 EDT: capped.
+    expect(await store.logStairFlight(2)).toMatchObject({
+      tokensAwarded: 0,
+      flightTokensToday: 100,
+    });
+
+    currentMs = Date.parse('2026-09-28T04:00:00.000Z'); // 00:00:00 EDT, the next day.
+    expect((await store.getStairClimb()).flightTokensToday).toBe(0);
+    expect(await store.logStairFlight(3)).toMatchObject({
+      logged: true,
+      tokensAwarded: 10,
+      flightTokensToday: 10,
+    });
+  });
+
+  it('emits the balance on a paid flight and badge:earned once, on the first full climb only', async () => {
+    const emitter = createEmitter<GameEventMap>();
+    const events: string[] = [];
+    emitter.on('tokens:changed', ({ balance }) => events.push(`tokens:${balance}`));
+    emitter.on('badge:earned', ({ badgeId }) => events.push(`badge:${badgeId}`));
+    let currentMs = Date.parse('2026-09-24T16:00:00.000Z');
+    const store = createInMemoryProgressStore({ emitter, now: () => currentMs });
+
+    for (let climb = 0; climb < 2; climb += 1) {
+      await store.logStairFlight(0);
+      for (let floor = 1; floor <= 5; floor += 1) {
+        currentMs += 3000;
+        await store.logStairFlight(floor);
+      }
+    }
+    // Nothing logged, nothing emitted.
+    await store.logStairFlight(5);
+
+    expect(events).toEqual([
+      'tokens:110',
+      'tokens:120',
+      'tokens:130',
+      'tokens:140',
+      'tokens:200',
+      'badge:stair-master',
+      'tokens:210',
+      'tokens:220',
+      'tokens:230',
+      'tokens:240',
+      'tokens:250',
+    ]);
   });
 });

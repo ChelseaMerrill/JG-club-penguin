@@ -88,7 +88,28 @@ export type NpcId =
   | 'dan-bedian'
   | 'paul-carnival'
   | 'greg-westover'
-  | 'rebecca-congi';
+  | 'rebecca-congi'
+  // #51 slice 4: the Stairwell's 18 NPCs, by the same rule with each floor's
+  // RoomId as the suffix (S4-D8): Dom and Jason on every floor, plus one
+  // guest per floor. Every one of them is a repeat appearance.
+  | 'dom-stairwell-0'
+  | 'dom-stairwell-1'
+  | 'dom-stairwell-2'
+  | 'dom-stairwell-3'
+  | 'dom-stairwell-4'
+  | 'dom-stairwell-5'
+  | 'jason-stairwell-0'
+  | 'jason-stairwell-1'
+  | 'jason-stairwell-2'
+  | 'jason-stairwell-3'
+  | 'jason-stairwell-4'
+  | 'jason-stairwell-5'
+  | 'anthony-stairwell-0'
+  | 'casey-stairwell-1'
+  | 'sydney-stairwell-2'
+  | 'tony-stairwell-3'
+  | 'jory-stairwell-4'
+  | 'ashley-stairwell-5';
 
 /**
  * A minigame-launching NPC's trigger dialog (#36 D4; round-1 review item 4
@@ -256,10 +277,25 @@ interface NpcDefinitionBase {
   still?: boolean;
   /**
    * The Room design's draw scale for this NPC, when it isn't its kind's
-   * default (`npc-layout.ts`): Team Room 3 draws its Humans at 0.58
-   * (`width="69.6"`), not 0.62 (owner request, 2026-09-30, Track D).
+   * default (`npc-layout.ts`): Team Rooms 1 and 2 draw theirs at 70/120,
+   * Team Room 3 and most of the Mullet at 0.58 (`width="69.6"`) and Team Room
+   * 4 (and the Mullet's Jason, Nicole and Ann Marie) at 0.5, not 0.62 (owner
+   * requests, 2026-09-30, Track D; #149).
    */
   scale?: number;
+  /**
+   * The nameplate pill's style (#149): `'light'` (`#F4F4F4`, a Human's
+   * default) or `'dark'` (`#161719`, a Penguin-kind NPC's default). The Team
+   * Rooms and the Mullet draw their Humans' with the dark one.
+   */
+  nameplate?: 'light' | 'dark';
+  /**
+   * A hand-placed nameplate's Stage-px nudge from its layout position (#149),
+   * where a Room design sets it off its figure's head. The speech bubble and
+   * click area move with its `y`; it is not an NPC position (that stays a
+   * Tile, plus any slot `offset`).
+   */
+  nameplateOffset?: { x?: number; y?: number };
 }
 
 /** A Human NPC (`design/build/humans.js`'s figures), rendered by `render-npc-svg.ts`. */
@@ -625,6 +661,21 @@ const BRANDON_FIGURE: HumanFigureSpec = {
 };
 
 /**
+ * Tony Mercadante's figure (`humans.js`'s `mercadante`: `slick` hair and a
+ * `henley` collar), shared by the Mullet's `tony` and the Stairwell's
+ * `tony-stairwell-3` (#51 slice 4).
+ */
+const TONY_FIGURE: HumanFigureSpec = {
+  style: 'slick',
+  hair: 'dark',
+  skin: 'light',
+  top: '#6B2237',
+  collar: 'henley',
+  beard: 'stubble',
+  teeth: true,
+};
+
+/**
  * Nicole Roberts's figure, shared by the Icebox (`nicole`) and the Mullet
  * (`nicole-mullet`) (#51 slice 3), from `humans.js`'s spec. The Icebox's
  * laptop-on-lap pose is that entry's own override.
@@ -705,6 +756,101 @@ const ANN_MARIE_LINES = ['That cap? Totally your color.', 'OK great :) now do it
 const BRANDON_LINES = ["Giddy up. Arcade's this way."] as const;
 const NICOLE_LINES = ["The client loved it. Next one's at 2."] as const;
 const JASON_LINES = ['Answer three and you may pass.'] as const;
+
+/** One Stairwell bubble: its text and its `say` animation's delay. */
+interface StairwellLine {
+  text: string;
+  delayS: number;
+}
+
+/**
+ * One Stairwell floor's NPC (#51 slice 4, S4-D8): its two `say` bubbles from
+ * that floor's Stage of `design/Stairwell.dc.html`, verbatim, on the
+ * design's own cycle (Dom 9 s, Jason 14 s, the guest 18 s, each with its two
+ * delays). The same two lines are its dialog lines, so each pool has two and
+ * needs no BA copy. Its figure is its person's shared constant; the design
+ * draws every Stairwell figure at 0.62 (`width="74.4"`), the Human default,
+ * so none sets `scale` (HD-5). The design's motions (Dom's run up the
+ * stairs, Jason's pacing, the guests' mingling) and Jason's pop-in are left
+ * to #149/#150.
+ */
+function stairwellNpc(
+  npc: Omit<HumanNpcDefinition, 'kind' | 'dialog' | 'dialogLines' | 'idleLines'> & {
+    periodS: number;
+    lines: readonly [StairwellLine, StairwellLine];
+  },
+): HumanNpcDefinition {
+  const { periodS, lines, ...rest } = npc;
+  return {
+    ...rest,
+    kind: 'human',
+    dialogLines: [lines[0].text, lines[1].text],
+    idleLines: lines.map(({ text, delayS }) => ({ text, periodS, delayS })),
+    dialog: LINE_DIALOG,
+  };
+}
+
+/**
+ * Dom on Stairwell floor `floor`, at the foot of the stairs. The design hops
+ * him as he runs the flight; with no motion ported, the default bob stands
+ * in for it.
+ */
+function stairwellDom(floor: number, first: string, second: string): HumanNpcDefinition {
+  return stairwellNpc({
+    id: `dom-stairwell-${floor}` as NpcId,
+    name: 'Dom Favata',
+    title: null,
+    roomId: `stairwell-${floor}` as RoomId,
+    tagName: 'Dom',
+    periodS: 9,
+    lines: [
+      { text: first, delayS: -1 },
+      { text: second, delayS: -5 },
+    ],
+    // humans.js's spec, laptop and all: the Stairwell's design doesn't put
+    // him in Team Room 1's and the Mullet's running kit.
+    figure: DOM_FIGURE,
+  });
+}
+
+/**
+ * Jason on Stairwell floor `floor`, by the stairs. The design draws him with
+ * no bob. His bubbles sit 3 px lower than the layout's default so the
+ * two-line ones clear Dom's nameplate just above, as the design's do (its
+ * bubbles start 14 px below Dom's nameplate; #113).
+ */
+function stairwellJason(floor: number, first: string, second: string): HumanNpcDefinition {
+  return stairwellNpc({
+    id: `jason-stairwell-${floor}` as NpcId,
+    name: 'Jason Jahnel',
+    title: 'COO',
+    roomId: `stairwell-${floor}` as RoomId,
+    tagName: 'Jason Jahnel',
+    periodS: 14,
+    lines: [
+      { text: first, delayS: -1 },
+      { text: second, delayS: -8 },
+    ],
+    still: true,
+    bubbleOffsetY: 3,
+    figure: JASON_FIGURE,
+  });
+}
+
+/** The 18 s cycle every Stairwell guest's two bubbles share, at -4 s and -13 s. */
+function guestLines(first: string, second: string): readonly [StairwellLine, StairwellLine] {
+  return [
+    { text: first, delayS: -4 },
+    { text: second, delayS: -13 },
+  ];
+}
+
+/**
+ * How the Mullet's design draws its Humans (#149): Jason, Nicole and Ann Marie
+ * at 0.5, everyone else but Tony at 0.58, all with dark nameplates.
+ */
+const MULLET_SMALL = { scale: 0.5, nameplate: 'dark' } as const;
+const MULLET_MEDIUM = { scale: 0.58, nameplate: 'dark' } as const;
 
 /**
  * `NPCS`: every prototype Room's NPC, keyed by `NpcId` (#36 D1). Names come
@@ -1459,6 +1605,10 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     idleLines: [
       { text: "Act natural. Camera's rolling.", periodS: 4, delayS: 0, window: [0.38, 0.76] },
     ],
+    // Team Rooms 1 and 2 draw their Humans at 70/120 (`width="70"`), and
+    // their nameplates dark (#149).
+    scale: 70 / 120,
+    nameplate: 'dark',
     dialog: LINE_DIALOG,
     // The Room design draws his hands and camera as its `jdown` group, after
     // his face (the resting pose of his camera raise, see
@@ -1479,6 +1629,10 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     idleLines: [
       { text: 'you gotta be faster than that', periodS: 6, delayS: 0, window: [0.39, 0.66] },
     ],
+    // Team Rooms 1 and 2 draw their Humans at 70/120 (`width="70"`), and
+    // their nameplates dark (#149).
+    scale: 70 / 120,
+    nameplate: 'dark',
     dialog: LINE_DIALOG,
     // The Room design dresses him in running kit for his lap of the Room.
     figure: DOM_RUNNER_FIGURE,
@@ -1496,6 +1650,10 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     // ENGINEERING" (#51 review fix 2): the trigger line and action/decline
     // labels are still Ian's own Bug Squash copy, shared via
     // `BUG_SQUASH_DIALOG`.
+    // Team Rooms 1 and 2 draw their Humans at 70/120 (`width="70"`), and
+    // their nameplates dark (#149).
+    scale: 70 / 120,
+    nameplate: 'dark',
     dialog: { ...BUG_SQUASH_DIALOG, subtitle: 'TEAM ROOM 2 · VP OF ENGINEERING' },
     figure: IAN_FIGURE,
   },
@@ -1513,6 +1671,9 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     still: true,
     // Team Room 3 draws its Humans at 0.58, not 0.62 (`width="69.6"`).
     scale: 0.58,
+    // Its nameplate is dark and sits higher than the layout puts it (#149).
+    nameplate: 'dark',
+    nameplateOffset: { y: -3 },
     dialog: LINE_DIALOG,
     figure: MILLIE_FIGURE,
   },
@@ -1532,6 +1693,9 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     still: true,
     // Team Room 3 draws its Humans at 0.58, not 0.62 (`width="69.6"`).
     scale: 0.58,
+    // Its nameplate is dark and sits lower than the layout puts it (#149).
+    nameplate: 'dark',
+    nameplateOffset: { y: 9 },
     dialog: LINE_DIALOG,
     // The Room design hands her an open laptop, which the Roof Deck's
     // `casey` doesn't carry (owner request, 2026-09-30, Track D).
@@ -1553,6 +1717,11 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     still: true,
     // Team Room 3 draws its Humans at 0.58, not 0.62 (`width="69.6"`).
     scale: 0.58,
+    // Its nameplate is dark and sits lower than the layout puts it (#149).
+    nameplate: 'dark',
+    nameplateOffset: { y: 7 },
+    // Its bubble sits 8 px higher (#149).
+    bubbleOffsetY: -8,
     dialog: LINE_DIALOG,
     // The Room design adds a headset, which Town Center's `sydney` doesn't
     // wear (owner request, 2026-09-30, Track D).
@@ -1571,6 +1740,12 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     // Team Room 4's design draws its NPCs without any idle bob.
     still: true,
     // #121: LET IT RIP launches Beystadium.
+    // Team Room 4 draws its Humans at 0.5 (`width="60"`), and their nameplates
+    // dark (#149).
+    scale: 0.5,
+    nameplate: 'dark',
+    // Its bubble sits 23 px higher (#149).
+    bubbleOffsetY: -23,
     dialog: BEYSTADIUM_DIALOG,
     figure: {
       style: 'shortDark',
@@ -1580,7 +1755,8 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       jacket: '#D9534F',
       collar: 'crew',
       glasses: 'rect',
-      beard: 'full',
+      // Stubble, as Team Room 4's design draws it (#149).
+      beard: 'stubble',
       teeth: true,
       prop: 'beyblade',
     },
@@ -1600,6 +1776,11 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     // No #36 idle bob: his Team Room 4 motion plays his Characters sheet
     // card's own `bob` instead (`src/npcs/motions/team-room-4.ts`).
     still: true,
+    // Team Room 4 draws its Humans at 0.5 (`width="60"`), and their nameplates
+    // dark (#149).
+    scale: 0.5,
+    nameplate: 'dark',
+    nameplateOffset: { y: -9.5 },
     dialog: LINE_DIALOG,
     figure: SAM_FIGURE,
   },
@@ -1618,6 +1799,10 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     // No #36 idle bob: his Team Room 4 motion plays his Characters sheet
     // card's own `bob` instead (`src/npcs/motions/team-room-4.ts`).
     still: true,
+    // Team Room 4 draws its Humans at 0.5 (`width="60"`), and their nameplates
+    // dark (#149).
+    scale: 0.5,
+    nameplate: 'dark',
     dialog: LINE_DIALOG,
     figure: RYAN_FIGURE,
   },
@@ -1642,9 +1827,14 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     idleLines: [],
     // The design jiggles him at the joystick rather than bobbing him.
     still: true,
+    ...MULLET_SMALL,
+    // Hand-placed, left of his head.
+    nameplateOffset: { x: -55.5, y: 15 },
     dialog: LINE_DIALOG,
-    // His hands go up to the controls while his Mullet motion plays (owner
-    // request, 2026-10-01, Track D); at rest they're at his sides as usual.
+    // His hands are up at the controls, where the design's animation starts
+    // them: drawn at rest (as under reduced motion), and by his Mullet
+    // motion's hand layers while it plays (owner requests, 2026-10-01 and
+    // 2026-10-02, Track D).
     figure: { ...JASON_FIGURE, arcadeHands: 'resting' },
   },
   'nicole-mullet': {
@@ -1659,6 +1849,8 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     // opacity `0;1;1;0;0` at `keyTimes` `0;0.05;0.35;0.4;1`, fully shown from
     // 5% to 35% (owner request, 2026-10-01, Track D; it was a static line).
     idleLines: [{ text: 'hehe', periodS: 3, delayS: 0, window: [0.05, 0.35] }],
+    ...MULLET_SMALL,
+    nameplateOffset: { y: -5 },
     dialog: LINE_DIALOG,
     figure: NICOLE_FIGURE,
   },
@@ -1672,6 +1864,8 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     dialogLines: ANN_MARIE_LINES,
     // As Nicole's laugh, half a cycle later (`begin="1.5s"`).
     idleLines: [{ text: 'haha', periodS: 3, delayS: -1.5, window: [0.05, 0.35] }],
+    ...MULLET_SMALL,
+    nameplateOffset: { y: -5 },
     dialog: LINE_DIALOG,
     figure: ANN_MARIE_FIGURE,
   },
@@ -1690,6 +1884,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     bubbleOffsetX: 20,
     // The design walks her a loop of the room rather than bobbing her.
     still: true,
+    ...MULLET_MEDIUM,
     dialog: LINE_DIALOG,
     figure: JORY_FIGURE,
   },
@@ -1709,8 +1904,12 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: 'Clucknelius coming at you!', periodS: 18, delayS: 0, window: [0.4111, 0.5333] },
       { text: 'Clucknelius coming at you!', periodS: 18, delayS: 0, window: [0.7056, 0.8278] },
     ],
+    ...MULLET_MEDIUM,
+    // Its bubble sits 7.6 px higher (#149).
+    bubbleOffsetY: -7.6,
     dialog: LINE_DIALOG,
-    figure: ASHLEY_FIGURE,
+    // The Mullet design gives her curly volume hair (#149).
+    figure: { ...ASHLEY_FIGURE, style: 'curlyVolume' },
   },
   tony: {
     id: 'tony',
@@ -1729,18 +1928,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     // bobbing him.
     still: true,
     dialog: LINE_DIALOG,
-    // humans.js's `mercadante` spec has `slick` hair and a `henley` collar,
-    // neither of which the renderer draws; the nearest it does are the short
-    // dark cut and a crew neck (#149 follow-up).
-    figure: {
-      style: 'shortDark',
-      hair: 'dark',
-      skin: 'light',
-      top: '#6B2237',
-      collar: 'crew',
-      beard: 'stubble',
-      teeth: true,
-    },
+    figure: TONY_FIGURE,
   },
   'jon-mullet': {
     id: 'jon-mullet',
@@ -1757,8 +1945,12 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     idleLines: [],
     // The design sways him side to side with the rally rather than bobbing.
     still: true,
+    ...MULLET_MEDIUM,
+    nameplateOffset: { y: 19 },
     dialog: LINE_DIALOG,
-    figure: JON_FIGURE,
+    // The paddle is drawn at rest, as under reduced motion; his swing layer
+    // replaces it while his motion plays (#149).
+    figure: { ...JON_FIGURE, paddle: 'right' },
   },
   'brandon-mullet': {
     id: 'brandon-mullet',
@@ -1772,8 +1964,10 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     // scope, so his Interaction is Dialogue.
     idleLines: [],
     still: true,
+    ...MULLET_MEDIUM,
+    nameplateOffset: { y: 19 },
     dialog: LINE_DIALOG,
-    figure: BRANDON_FIGURE,
+    figure: { ...BRANDON_FIGURE, paddle: 'left' },
   },
   'dom-mullet': {
     id: 'dom-mullet',
@@ -1792,11 +1986,116 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: 'Undefeated. I always win.', periodS: 9.4, delayS: 0, window: [0, 0.1] },
       { text: 'Undefeated. I always win.', periodS: 9.4, delayS: 0, window: [0.88, 1] },
     ],
+    ...MULLET_MEDIUM,
     dialog: LINE_DIALOG,
     // The Room design dresses him in running gear for his lap of the room,
     // which the renderer now draws (owner request, 2026-09-30, Track D).
     figure: DOM_RUNNER_FIGURE,
   },
+  // #51 slice 4: the Stairwell's NPCs (`stairwellNpc` above). Names and
+  // titles from design/Characters.dc.html (Dom, Ashley and Casey are on its
+  // TITLE TBD list); tags and lines verbatim from each floor's Stage.
+  'dom-stairwell-0': stairwellDom(0, 'Stairs challenge starts NOW.', 'Follow me!'),
+  'dom-stairwell-1': stairwellDom(1, 'Floor 1. Warm-up done.', 'See you at the top!'),
+  'dom-stairwell-2': stairwellDom(2, 'Floor 2. You got this.', 'My Fitbit is SCREAMING.'),
+  'dom-stairwell-3': stairwellDom(3, 'Halfway! Kind of!', 'Race you to the top.'),
+  'dom-stairwell-4': stairwellDom(4, 'Elevator is for quitters!', 'Legs feeling it yet?'),
+  'dom-stairwell-5': stairwellDom(5, 'Cardio is free!', 'Five floors. One legend.'),
+  'jason-stairwell-0': stairwellJason(
+    0,
+    'Elevator is broken. It is not. Take the stairs.',
+    'Five floors. I will be watching.',
+  ),
+  'jason-stairwell-1': stairwellJason(
+    1,
+    'Floor 1. That is one. Out of five.',
+    'Stairs Challenge. Or are you scared?',
+  ),
+  'jason-stairwell-2': stairwellJason(
+    2,
+    'Floor 2. My grandma climbs faster.',
+    'Log it or it did not happen.',
+  ),
+  'jason-stairwell-3': stairwellJason(
+    3,
+    'Halfway. Your Fitbit is embarrassed.',
+    'Dom has lapped you twice.',
+  ),
+  'jason-stairwell-4': stairwellJason(
+    4,
+    'Floor 4. Breathing hard already?',
+    'The elevator misses you.',
+  ),
+  'jason-stairwell-5': {
+    ...stairwellJason(5, 'Oh, you made it? Took a while.', 'Dom beat you by four minutes.'),
+    // The grid stands floor 5's guest, Ashley, a tile nearer him than the
+    // other floors' guests, where his bubbles would meet hers (the design
+    // already has them touching). Floated up until they clear (#113).
+    bubbleOffsetY: -10,
+  },
+  'anthony-stairwell-0': stairwellNpc({
+    id: 'anthony-stairwell-0',
+    name: 'Anthony Conway',
+    title: 'Director of IT',
+    roomId: 'stairwell-0',
+    tagName: 'Anthony',
+    periodS: 18,
+    lines: guestLines('Nobody phishes on the stairs.', 'Verify the floor number.'),
+    figure: ANTHONY_FIGURE,
+  }),
+  'casey-stairwell-1': stairwellNpc({
+    id: 'casey-stairwell-1',
+    name: 'Casey Snow',
+    title: null,
+    roomId: 'stairwell-1',
+    tagName: 'Casey',
+    periodS: 18,
+    lines: guestLines('Headphones on. Legs on.', 'Beat drops on floor 3.'),
+    figure: CASEY_FIGURE,
+  }),
+  'sydney-stairwell-2': stairwellNpc({
+    id: 'sydney-stairwell-2',
+    name: 'Sydney Murauskas',
+    title: 'Technical Recruiter',
+    roomId: 'stairwell-2',
+    tagName: 'Sydney',
+    periodS: 18,
+    lines: guestLines('Stairs build character.', 'Looking strong!'),
+    figure: SYDNEY_FIGURE,
+  }),
+  'tony-stairwell-3': stairwellNpc({
+    id: 'tony-stairwell-3',
+    name: 'Tony Mercadante',
+    title: 'Project Manager',
+    roomId: 'stairwell-3',
+    tagName: 'Tony',
+    periodS: 18,
+    lines: guestLines('Pool table is on 5. Motivation.', 'Two more. Easy.'),
+    figure: TONY_FIGURE,
+  }),
+  'jory-stairwell-4': stairwellNpc({
+    id: 'jory-stairwell-4',
+    name: 'Jory Hutchins',
+    title: 'Director of Career Development',
+    roomId: 'stairwell-4',
+    tagName: 'Jory',
+    periodS: 18,
+    lines: guestLines('Outwit. Outplay. Outclimb.', 'The tribe says: keep going.'),
+    figure: JORY_FIGURE,
+  }),
+  'ashley-stairwell-5': stairwellNpc({
+    id: 'ashley-stairwell-5',
+    name: 'Ashley Schuliger',
+    title: null,
+    roomId: 'stairwell-5',
+    tagName: 'Ashley',
+    periodS: 18,
+    lines: guestLines('Made it! Chicken did too.', 'Stretch. Then coffee.'),
+    // Shifted right until her bubbles clear Jason's nameplate (see his
+    // entry above; #113).
+    bubbleOffsetX: 20,
+    figure: ASHLEY_FIGURE,
+  }),
   // Jessie: the design draws her as a Penguin in the Bathroom, but only
   // Players appear as Penguins in the World (owner decision 2026-09-25; see
   // PR #133) -- dropped here and from the Bathroom's own npcSlots. Spelled

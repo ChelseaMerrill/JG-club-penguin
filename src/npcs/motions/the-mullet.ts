@@ -28,8 +28,8 @@ import type { NpcMotionSpec, NpcPropLayer } from './types';
  * Units: a translate on a group outside a figure's `<svg>` is in Stage px.
  * On the NPC's outer group it is a `path` (Stage px from the slot point);
  * moving just the figure, it is a `figure` track, inside `npc-sprite.ts`'s
- * 0.62 scaled wrapper, so divided by 0.62 to move the same Stage px (Team
- * Room 1's `bob` precedent); moving the figure and its nameplate but not
+ * scaled wrapper, so divided by the NPC's draw scale to move the same Stage px
+ * (Team Room 1's `bob` precedent); moving the figure and its nameplate but not
  * its feet off their spot, it is a `stage` track. Transforms inside a
  * figure's `<svg>` are figure viewBox units already, verbatim.
  *
@@ -42,8 +42,13 @@ import type { NpcMotionSpec, NpcPropLayer } from './types';
  * "You" Penguin is the local Player's own, never an NPC.
  */
 
-/** Stage px to figure units inside `npc-sprite.ts`'s scaled wrapper (Human NPCs draw at 0.62). */
-const TO_FIGURE = '1.612903';
+/**
+ * Stage px to figure units inside `npc-sprite.ts`'s scaled wrapper: 1 over the
+ * NPC's draw scale (`npcs.ts`: Jason, Nicole and Ann Marie draw at 0.5, Jory,
+ * Ashley, Jon, Brandon and Dom at 0.58, Tony at the Human default, 0.62).
+ */
+const TO_FIGURE_058 = (1 / 0.58).toFixed(6);
+const TO_FIGURE_062 = (1 / 0.62).toFixed(6);
 
 /**
  * The lap Dom and Jory both run: Dom's 12-corner `animateMotion` path, 9.4s,
@@ -97,7 +102,7 @@ const ASHLEY_HELD_CHICKEN =
  * about its own (0, 0) in Stage px), placed on the held chicken's body,
  * figure (20, 98), at Stage size: each throw leaves from Ashley's hand.
  */
-const ASHLEY_THROWN_CHICKEN = `<g transform="translate(20 98) scale(${TO_FIGURE})"><ellipse cx="0" cy="2" rx="8" ry="6.5" fill="#F2C12E" stroke="#0C4B5F" stroke-width="1.5"/><circle cx="5" cy="-6" r="4" fill="#F2C12E" stroke="#0C4B5F" stroke-width="1.5"/><polygon points="8.5,-6.5 13,-5 8.5,-3.5" fill="#E07A2F"/><path d="M3 -10 q1.5 -4 3 0" fill="#D63C3C"/></g>`;
+const ASHLEY_THROWN_CHICKEN = `<g transform="translate(20 98) scale(${TO_FIGURE_058})"><ellipse cx="0" cy="2" rx="8" ry="6.5" fill="#F2C12E" stroke="#0C4B5F" stroke-width="1.5"/><circle cx="5" cy="-6" r="4" fill="#F2C12E" stroke="#0C4B5F" stroke-width="1.5"/><polygon points="8.5,-6.5 13,-5 8.5,-3.5" fill="#E07A2F"/><path d="M3 -10 q1.5 -4 3 0" fill="#D63C3C"/></g>`;
 
 /**
  * One throw: the design's flying `<g>`, its discrete opacity (shown only in
@@ -132,11 +137,11 @@ function throwLayer(keyframes: string, name: string): NpcPropLayer {
  * Tony's cue, one of the design's two cue `<g>`s, verbatim: its lines are in
  * the same Stage px as his `<svg x="462.8" y="440.5">` (both inside his walk
  * group), so they're mapped into his figure's units with that `<svg>`'s own
- * placement and his 0.62 scale.
+ * placement and his 0.62 scale (Tony keeps the Human default).
  */
 function cue(lines: string, shiftX = 0): string {
   const shift = shiftX ? `translate(${shiftX} 0) ` : '';
-  return `<g transform="${shift}scale(${TO_FIGURE}) translate(-462.8 -440.5)">${lines}</g>`;
+  return `<g transform="${shift}scale(${TO_FIGURE_062}) translate(-462.8 -440.5)">${lines}</g>`;
 }
 
 export const THE_MULLET_MOTIONS: Partial<Record<NpcId, NpcMotionSpec>> = {
@@ -146,15 +151,15 @@ export const THE_MULLET_MOTIONS: Partial<Record<NpcId, NpcMotionSpec>> = {
   // (`10 -40;4 -42;14 -38;10 -40` over 0.4s) and his right mashing a button
   // (`0 -36;0 -40;0 -36;0 -36` over 0.25s), each an `animateTransform` on
   // its hand's own `<g>` inside his `<svg>`, verbatim. His arms don't move.
-  // The two hand layers replace his figure's resting hands
-  // (`arcadeHands: 'resting'`). Approximated: the design draws the hands
+  // The two hand layers replace his figure's hands raised at rest
+  // (`arcadeHands: 'resting'`, drawn too under reduced motion). Approximated: the design draws the hands
   // before his collar and head, so his raised left hand tucks under his
   // jaw's edge; a prop layer draws in front of the figure, so it overlaps
   // that edge by about a pixel.
   'jason-mullet': {
     figure: {
       keyframes:
-        '@keyframes jasonJiggle { 0%,100% { transform: translate(0,0);} 33.33% { transform: translate(1.29px,-0.81px);} 66.67% { transform: translate(-1.29px,0);} }',
+        '@keyframes jasonJiggle { 0%,100% { transform: translate(0,0);} 33.33% { transform: translate(1.6px,-1px);} 66.67% { transform: translate(-1.6px,0);} }',
       animation: 'jasonJiggle .5s linear infinite',
     },
     replaceFigureRestPose: true,
@@ -180,18 +185,19 @@ export const THE_MULLET_MOTIONS: Partial<Record<NpcId, NpcMotionSpec>> = {
   // Nicole and Ann Marie giggle on the couch: two quick 2.5 Stage px hops
   // (`values` `0 0;0 -2.5;0 0;0 -2.5;0 0;0 0` at `keyTimes`
   // `0;0.1;0.2;0.3;0.4;1` over 1.6s, on the group around each `<svg>`), Ann
-  // Marie's `begin="0.3s"` behind Nicole's. 2.5 / 0.62 = 4.03 figure units.
+  // Marie's `begin="0.3s"` behind Nicole's. They draw at 0.5, so 2.5 / 0.5 = 5
+  // figure units.
   'nicole-mullet': {
     figure: {
       keyframes:
-        '@keyframes coupleGiggle { 0%,20%,40%,100% { transform: translateY(0);} 10%,30% { transform: translateY(-4.03px);} }',
+        '@keyframes coupleGiggle { 0%,20%,40%,100% { transform: translateY(0);} 10%,30% { transform: translateY(-5px);} }',
       animation: 'coupleGiggle 1.6s linear infinite',
     },
   },
   'ann-marie-mullet': {
     figure: {
       keyframes:
-        '@keyframes coupleGiggle { 0%,20%,40%,100% { transform: translateY(0);} 10%,30% { transform: translateY(-4.03px);} }',
+        '@keyframes coupleGiggle { 0%,20%,40%,100% { transform: translateY(0);} 10%,30% { transform: translateY(-5px);} }',
       animation: 'coupleGiggle 1.6s linear -1.3s infinite',
     },
   },
@@ -217,11 +223,11 @@ export const THE_MULLET_MOTIONS: Partial<Record<NpcId, NpcMotionSpec>> = {
   // `0;0.0667;0.1278;0.4333;0.4944;0.7278;0.7889`) while a chicken spins
   // from her hand to Jon, to where the design stands the Player's Penguin
   // (570, 500), then to Brandon. Her slot `offset` puts her exactly where the
-  // design does, so each throw lands on its target to within about 2 px
-  // (her figure draws at 0.62 here, the design's at 0.58, so her hand sits
-  // that much further from her feet). Approximated: the design draws the
-  // flying chickens over every character; here they sort with Ashley, who
-  // stands in front of all three targets.
+  // design does and she draws at the design's 0.58, so each throw leaves
+  // from her hand's design position and lands on its target, give or take her
+  // 3 px bob at that moment. Approximated: the design draws the flying
+  // chickens over every character; here they sort with Ashley, who stands in
+  // front of all three targets.
   'ashley-mullet': {
     path: {
       keyframes:
@@ -247,17 +253,17 @@ export const THE_MULLET_MOTIONS: Partial<Record<NpcId, NpcMotionSpec>> = {
       },
       // At Jon: `M596.8 685.5 Q723.4 470 850 560`, `keyTimes` `0;0.0667;0.1111;1`.
       throwLayer(
-        '@keyframes ashleyThrowJon { 0%,6.66% { opacity:0; transform: translate(0,0);} 6.67% { opacity:1; transform: translate(0,0);} 6.95% { transform: translate(16.97px,-28.03px);} 7.23% { transform: translate(34.74px,-55.57px);} 7.5% { transform: translate(53.41px,-82.49px);} 7.78% { transform: translate(73.12px,-108.67px);} 8.06% { transform: translate(94.01px,-133.91px);} 8.34% { transform: translate(116.26px,-157.97px);} 8.61% { transform: translate(140.07px,-180.47px);} 8.89% { transform: translate(165.67px,-200.91px);} 9.17% { transform: translate(193.23px,-218.61px);} 9.45% { transform: translate(222.83px,-232.61px);} 9.72% { transform: translate(254.24px,-241.8px);} 10% { transform: translate(286.79px,-245.18px);} 10.28% { transform: translate(319.38px,-242.29px);} 10.56% { transform: translate(350.91px,-233.52px);} 10.83% { transform: translate(380.66px,-219.86px);} 11.11% { opacity:1; transform: translate(408.39px,-202.42px);} 11.12%,100% { opacity:0; transform: translate(408.39px,-202.42px);} }',
+        '@keyframes ashleyThrowJon { 0%,6.66% { opacity:0; transform: translate(0,0);} 6.67% { opacity:1; transform: translate(0,0);} 6.95% { transform: translate(18.14px,-29.96px);} 7.23% { transform: translate(37.14px,-59.4px);} 7.5% { transform: translate(57.09px,-88.18px);} 7.78% { transform: translate(78.16px,-116.16px);} 8.06% { transform: translate(100.49px,-143.15px);} 8.34% { transform: translate(124.28px,-168.86px);} 8.61% { transform: translate(149.73px,-192.92px);} 8.89% { transform: translate(177.1px,-214.77px);} 9.17% { transform: translate(206.56px,-233.69px);} 9.45% { transform: translate(238.2px,-248.65px);} 9.72% { transform: translate(271.77px,-258.48px);} 10% { transform: translate(306.57px,-262.09px);} 10.28% { transform: translate(341.41px,-259px);} 10.56% { transform: translate(375.11px,-249.62px);} 10.83% { transform: translate(406.91px,-235.02px);} 11.11% { opacity:1; transform: translate(436.55px,-216.38px);} 11.12%,100% { opacity:0; transform: translate(436.55px,-216.38px);} }',
         'ashleyThrowJon',
       ),
       // At the Player's Penguin: `M456.8 645.5 Q513.4 410 570 500`, `keyTimes` `0;0.4333;0.4778;1`.
       throwLayer(
-        '@keyframes ashleyThrowPenguin { 0%,43.32% { opacity:0; transform: translate(0,0);} 43.33% { opacity:1; transform: translate(0,0);} 43.61% { transform: translate(5.72px,-23.29px);} 43.89% { transform: translate(11.7px,-46.51px);} 44.16% { transform: translate(17.96px,-69.65px);} 44.44% { transform: translate(24.56px,-92.7px);} 44.72% { transform: translate(31.56px,-115.64px);} 45% { transform: translate(39.04px,-138.42px);} 45.28% { transform: translate(47.09px,-161.01px);} 45.56% { transform: translate(55.88px,-183.32px);} 45.83% { transform: translate(65.62px,-205.22px);} 46.11% { transform: translate(76.7px,-226.48px);} 46.39% { transform: translate(89.75px,-246.58px);} 46.67% { transform: translate(106.03px,-264.11px);} 46.95% { transform: translate(127.34px,-274.46px);} 47.22% { transform: translate(150.34px,-269.57px);} 47.5% { transform: translate(168.44px,-254.01px);} 47.78% { opacity:1; transform: translate(182.58px,-234.68px);} 47.79%,100% { opacity:0; transform: translate(182.58px,-234.68px);} }',
+        '@keyframes ashleyThrowPenguin { 0%,43.32% { opacity:0; transform: translate(0,0);} 43.33% { opacity:1; transform: translate(0,0);} 43.61% { transform: translate(6.11px,-24.9px);} 43.89% { transform: translate(12.51px,-49.72px);} 44.16% { transform: translate(19.2px,-74.45px);} 44.44% { transform: translate(26.25px,-99.09px);} 44.72% { transform: translate(33.74px,-123.62px);} 45% { transform: translate(41.73px,-147.97px);} 45.28% { transform: translate(50.34px,-172.11px);} 45.56% { transform: translate(59.73px,-195.96px);} 45.83% { transform: translate(70.15px,-219.37px);} 46.11% { transform: translate(81.99px,-242.1px);} 46.39% { transform: translate(95.94px,-263.59px);} 46.67% { transform: translate(113.34px,-282.32px);} 46.95% { transform: translate(136.12px,-293.39px);} 47.22% { transform: translate(160.71px,-288.16px);} 47.5% { transform: translate(180.06px,-271.53px);} 47.78% { opacity:1; transform: translate(195.17px,-250.86px);} 47.79%,100% { opacity:0; transform: translate(195.17px,-250.86px);} }',
         'ashleyThrowPenguin',
       ),
       // At Brandon: `M536.8 755.5 Q799.4 590 1062 680`, `keyTimes` `0;0.7278;0.7722;1`.
       throwLayer(
-        '@keyframes ashleyThrowBrandon { 0%,72.77% { opacity:0; transform: translate(0,0);} 72.78% { opacity:1; transform: translate(0,0);} 73.06% { transform: translate(47.49px,-28.63px);} 73.33% { transform: translate(96.12px,-55.27px);} 73.61% { transform: translate(145.88px,-79.72px);} 73.89% { transform: translate(196.76px,-101.77px);} 74.17% { transform: translate(248.69px,-121.21px);} 74.45% { transform: translate(301.58px,-137.84px);} 74.72% { transform: translate(355.34px,-151.43px);} 75% { transform: translate(409.8px,-161.83px);} 75.28% { transform: translate(464.79px,-168.86px);} 75.55% { transform: translate(520.12px,-172.44px);} 75.83% { transform: translate(575.57px,-172.49px);} 76.11% { transform: translate(630.9px,-169.03px);} 76.39% { transform: translate(685.91px,-162.1px);} 76.67% { transform: translate(740.39px,-151.81px);} 76.94% { transform: translate(794.17px,-138.3px);} 77.22% { opacity:1; transform: translate(847.1px,-121.77px);} 77.23%,100% { opacity:0; transform: translate(847.1px,-121.77px);} }',
+        '@keyframes ashleyThrowBrandon { 0%,72.77% { opacity:0; transform: translate(0,0);} 72.78% { opacity:1; transform: translate(0,0);} 73.06% { transform: translate(50.77px,-30.6px);} 73.33% { transform: translate(102.75px,-59.08px);} 73.61% { transform: translate(155.94px,-85.22px);} 73.89% { transform: translate(210.33px,-108.79px);} 74.17% { transform: translate(265.84px,-129.57px);} 74.45% { transform: translate(322.38px,-147.35px);} 74.72% { transform: translate(379.85px,-161.87px);} 75% { transform: translate(438.06px,-172.99px);} 75.28% { transform: translate(496.84px,-180.51px);} 75.55% { transform: translate(555.99px,-184.33px);} 75.83% { transform: translate(615.26px,-184.39px);} 76.11% { transform: translate(674.41px,-180.69px);} 76.39% { transform: translate(733.21px,-173.28px);} 76.67% { transform: translate(791.45px,-162.28px);} 76.94% { transform: translate(848.94px,-147.84px);} 77.22% { opacity:1; transform: translate(905.52px,-130.17px);} 77.23%,100% { opacity:0; transform: translate(905.52px,-130.17px);} }',
         'ashleyThrowBrandon',
       ),
     ],
@@ -340,6 +346,8 @@ export const THE_MULLET_MOTIONS: Partial<Record<NpcId, NpcMotionSpec>> = {
         '@keyframes jonSway { 0%,100% { transform: translate(0,0);} 33.33% { transform: translate(22px,-11px);} 66.67% { transform: translate(-6px,3px);} }',
       animation: 'jonSway 4.8s linear infinite',
     },
+    // The paddle layer is the moving version of his figure's resting `paddle`.
+    replaceFigureRestPose: true,
     props: [
       {
         svg: paddle(90),
@@ -356,10 +364,10 @@ export const THE_MULLET_MOTIONS: Partial<Record<NpcId, NpcMotionSpec>> = {
       // rallies, 4.8s) subtract his sway at that moment, in figure units: it
       // flies exactly the design's path over the baked table.
       {
-        svg: `<g transform="translate(60 120) scale(${TO_FIGURE}) translate(30 14)"><circle cx="0" cy="0" r="3.5" fill="#F4F4F4" stroke="#0C4B5F" stroke-width="1"/></g>`,
+        svg: `<g transform="translate(60 120) scale(${TO_FIGURE_058}) translate(30 14)"><circle cx="0" cy="0" r="3.5" fill="#F4F4F4" stroke="#0C4B5F" stroke-width="1"/></g>`,
         motion: {
           keyframes:
-            '@keyframes jonBall { 0% { transform: translate(0,0);} 2.08% { transform: translate(20.31px,-4.21px);} 4.17% { transform: translate(41.16px,-5.01px);} 6.25% { transform: translate(62.04px,-2.36px);} 8.33% { transform: translate(82.49px,3.48px);} 10.42% { transform: translate(102.18px,12.08px);} 12.5% { transform: translate(120.96px,22.96px);} 14.58% { transform: translate(138.79px,35.69px);} 16.67% { transform: translate(155.68px,49.88px);} 18.75% { transform: translate(171.71px,65.27px);} 20.83% { transform: translate(186.94px,81.61px);} 22.92% { transform: translate(201.46px,98.75px);} 25% { transform: translate(215.32px,116.53px);} 27.08% { transform: translate(197.02px,100.97px);} 29.17% { transform: translate(178.07px,86.05px);} 31.25% { transform: translate(158.4px,71.92px);} 33.33% { transform: translate(137.94px,58.76px);} 35.42% { transform: translate(121.65px,44.25px);} 37.5% { transform: translate(104.43px,31.23px);} 39.58% { transform: translate(86.26px,20.05px);} 41.67% { transform: translate(67.17px,11.15px);} 43.75% { transform: translate(47.32px,5px);} 45.83% { transform: translate(27.05px,2.05px);} 47.92% { transform: translate(6.8px,2.54px);} 50% { transform: translate(-12.9px,6.45px);} 52.08% { transform: translate(12.45px,-0.28px);} 54.17% { transform: translate(38.34px,-3.6px);} 56.25% { transform: translate(64.26px,-3.47px);} 58.33% { transform: translate(89.75px,-0.14px);} 60.42% { transform: translate(114.48px,5.93px);} 62.5% { transform: translate(138.3px,14.29px);} 64.58% { transform: translate(161.17px,24.5px);} 66.67% { transform: translate(183.1px,36.17px);} 68.75% { transform: translate(200.74px,50.75px);} 70.83% { transform: translate(217.59px,66.29px);} 72.92% { transform: translate(233.71px,82.62px);} 75% { transform: translate(249.19px,99.6px);} 77.08% { transform: translate(232.51px,83.22px);} 79.17% { transform: translate(215.17px,67.5px);} 81.25% { transform: translate(197.11px,52.57px);} 83.33% { transform: translate(178.26px,38.59px);} 85.42% { transform: translate(158.54px,25.81px);} 87.5% { transform: translate(137.9px,14.5px);} 89.58% { transform: translate(116.3px,5.03px);} 91.67% { transform: translate(93.78px,-2.16px);} 93.75% { transform: translate(70.51px,-6.59px);} 95.83% { transform: translate(46.81px,-7.83px);} 97.92% { transform: translate(23.13px,-5.62px);} 100% { transform: translate(0,0);} }',
+            '@keyframes jonBall { 0% { transform: translate(0,0);} 2.08% { transform: translate(21.71px,-4.5px);} 4.17% { transform: translate(44px,-5.36px);} 6.25% { transform: translate(66.32px,-2.52px);} 8.33% { transform: translate(88.18px,3.72px);} 10.42% { transform: translate(109.23px,12.91px);} 12.5% { transform: translate(129.3px,24.54px);} 14.58% { transform: translate(148.36px,38.15px);} 16.67% { transform: translate(166.42px,53.32px);} 18.75% { transform: translate(183.55px,69.77px);} 20.83% { transform: translate(199.83px,87.24px);} 22.92% { transform: translate(215.35px,105.56px);} 25% { transform: translate(230.17px,124.57px);} 27.08% { transform: translate(210.61px,107.93px);} 29.17% { transform: translate(190.35px,91.98px);} 31.25% { transform: translate(169.32px,76.88px);} 33.33% { transform: translate(147.45px,62.81px);} 35.42% { transform: translate(130.04px,47.3px);} 37.5% { transform: translate(111.63px,33.38px);} 39.58% { transform: translate(92.21px,21.43px);} 41.67% { transform: translate(71.8px,11.92px);} 43.75% { transform: translate(50.58px,5.34px);} 45.83% { transform: translate(28.92px,2.19px);} 47.92% { transform: translate(7.27px,2.72px);} 50% { transform: translate(-13.79px,6.89px);} 52.08% { transform: translate(13.31px,-0.3px);} 54.17% { transform: translate(40.98px,-3.85px);} 56.25% { transform: translate(68.69px,-3.71px);} 58.33% { transform: translate(95.94px,-0.15px);} 60.42% { transform: translate(122.38px,6.34px);} 62.5% { transform: translate(147.84px,15.28px);} 64.58% { transform: translate(172.29px,26.19px);} 66.67% { transform: translate(195.73px,38.66px);} 68.75% { transform: translate(214.58px,54.25px);} 70.83% { transform: translate(232.6px,70.86px);} 72.92% { transform: translate(249.83px,88.32px);} 75% { transform: translate(266.38px,106.47px);} 77.08% { transform: translate(248.55px,88.96px);} 79.17% { transform: translate(230.01px,72.16px);} 81.25% { transform: translate(210.7px,56.2px);} 83.33% { transform: translate(190.55px,41.25px);} 85.42% { transform: translate(169.47px,27.59px);} 87.5% { transform: translate(147.41px,15.5px);} 89.58% { transform: translate(124.32px,5.38px);} 91.67% { transform: translate(100.25px,-2.31px);} 93.75% { transform: translate(75.37px,-7.04px);} 95.83% { transform: translate(50.04px,-8.37px);} 97.92% { transform: translate(24.73px,-6.01px);} 100% { transform: translate(0,0);} }',
           animation: 'jonBall 4.8s linear infinite',
         },
       },
@@ -371,6 +379,8 @@ export const THE_MULLET_MOTIONS: Partial<Record<NpcId, NpcMotionSpec>> = {
         '@keyframes brandonSway { 0%,100% { transform: translate(0,0);} 33.33% { transform: translate(-18px,9px);} 66.67% { transform: translate(20px,-10px);} }',
       animation: 'brandonSway 4.8s linear -3.6s infinite',
     },
+    // The paddle layer is the moving version of his figure's resting `paddle`.
+    replaceFigureRestPose: true,
     props: [
       {
         svg: paddle(30),
@@ -384,7 +394,7 @@ export const THE_MULLET_MOTIONS: Partial<Record<NpcId, NpcMotionSpec>> = {
   },
   // Dom runs his lap of the Room (the 12-corner path, 9.4s, paced; his
   // bubble and nameplate with him) on a quick running bob (`0 0;0 -5;0 0`
-  // over 0.35s on his `<svg>`'s group: 5 / 0.62 = 8.06 figure units). His
+  // over 0.35s on his `<svg>`'s group: 5 / 0.58 = 8.62 figure units). His
   // slot `offset` puts him on the path's first point, (860, 478.26), so each
   // stop is the design's point minus that one.
   'dom-mullet': {
@@ -394,7 +404,7 @@ export const THE_MULLET_MOTIONS: Partial<Record<NpcId, NpcMotionSpec>> = {
     },
     figure: {
       keyframes:
-        '@keyframes domBob { 0%,100% { transform: translateY(0);} 50% { transform: translateY(-8.06px);} }',
+        '@keyframes domBob { 0%,100% { transform: translateY(0);} 50% { transform: translateY(-8.62px);} }',
       animation: 'domBob .35s linear infinite',
     },
   },

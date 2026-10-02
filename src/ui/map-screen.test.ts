@@ -131,6 +131,34 @@ describe('createMapScreen', () => {
     expect((other.querySelector('.map-screen__pill') as HTMLElement).hidden).toBe(true);
   });
 
+  it('shows YOU ARE HERE on tile 12 on every Stairwell floor (#51 slice 4, RT2-4)', () => {
+    for (const floor of [0, 1, 2, 3, 4, 5]) {
+      const { qa, q } = setup(`stairwell-${floor}` as RoomId);
+      openMap();
+
+      const current = qa('[aria-current="location"]');
+      expect(current, `floor ${floor}`).toHaveLength(1);
+      expect(current[0]).toBe(q('[data-map-number="12"]'));
+      expect((current[0]!.querySelector('.map-screen__pill') as HTMLElement).hidden).toBe(false);
+      currentMapScreen?.destroy();
+      document.body.innerHTML = '';
+    }
+  });
+
+  it('tile 12 only closes the Map on floor 0, and takes floors 1-5 to floor 0 (#51 slice 4)', () => {
+    const onFloor0 = setup('stairwell-0');
+    openMap();
+    onFloor0.q<HTMLButtonElement>('[data-map-number="12"]').click();
+    expect(onFloor0.changeRoom).not.toHaveBeenCalled();
+    currentMapScreen?.destroy();
+    document.body.innerHTML = '';
+
+    const onFloor3 = setup('stairwell-3');
+    openMap();
+    onFloor3.q<HTMLButtonElement>('[data-map-number="12"]').click();
+    expect(onFloor3.changeRoom).toHaveBeenCalledWith('stairwell-0');
+  });
+
   it('ESC closes the Map through the shared OverlayManager', () => {
     const { q } = setup();
     openMap();

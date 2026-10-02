@@ -18,6 +18,7 @@ import {
   type ProgressStore,
   type PurchaseResult,
   type RoundResult,
+  type StairFlightResult,
 } from './progress-store';
 
 /**
@@ -96,8 +97,8 @@ function wrapStore(
 ): { wrapper: ProgressStore; loadInitial(): Promise<ProgressSnapshot> } {
   let currentPlayer = initialPlayer;
   let pendingLoad: Promise<ProgressSnapshot> | null = null;
-  // #138: the Token-changing writes (recordRound, purchase, completeQuest)
-  // in flight, and how many have started. `checkBadges` uses them to skip its
+  // #138: the Token-changing writes (recordRound, purchase, completeQuest,
+  // and #51's logStairFlight) in flight, and how many have started. `checkBadges` uses them to skip its
   // balance when a write overlapped it, so an older balance never overwrites
   // a newer one.
   let tokenWritesInFlight = 0;
@@ -259,6 +260,27 @@ function wrapStore(
   }
 
   /**
+   * #51 slice 4 (RT2-9): a Stairs Challenge flight. A Token-changing write,
+   * so `checkBadges` never writes back a balance older than it. The store
+   * already announced any Badge (Stair Master) and the new balance; this
+   * only merges `badgesEarned` and the server's balance into the snapshot,
+   * so the next `checkBadges` diff doesn't announce Stair Master again.
+   */
+  async function logStairFlight(floor: number): Promise<StairFlightResult> {
+    const result = await tokenWrite(() => store.logStairFlight(floor));
+    if (!isCurrent()) return result;
+    const previous = currentSnapshot();
+    if (previous) {
+      setSnapshot({
+        ...previous,
+        tokens: result.balance,
+        badges: unionBadges(previous.badges, result.badgesEarned),
+      });
+    }
+    return result;
+  }
+
+  /**
    * #138 (D10): the Session Badge check. Badges the server awarded silently
    * (the Interior Penguin trigger, First Waddle, Night Owl) are announced
    * here, once each: every id the snapshot doesn't hold yet gets one
@@ -307,6 +329,8 @@ function wrapStore(
       markDevPitVisited: () => store.markDevPitVisited(),
       completeQuest,
       checkBadges,
+      logStairFlight,
+      getStairClimb: () => store.getStairClimb(),
     },
     loadInitial: loadAll,
   };
@@ -424,5 +448,7 @@ export function createActiveProgressStore(
     markDevPitVisited: async () => current().markDevPitVisited(),
     completeQuest: async (questId) => current().completeQuest(questId),
     checkBadges: async () => current().checkBadges(),
+    logStairFlight: async (floor) => current().logStairFlight(floor),
+    getStairClimb: async () => current().getStairClimb(),
   };
 }

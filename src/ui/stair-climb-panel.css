@@ -1,0 +1,108 @@
+/* The Stairwell's climb panel and hint (#51 slice 4, S4-D9), in Stage pixels,
+   where design/Stairwell.dc.html draws them. Both are read-only, so they
+   never take a canvas click. */
+#ui > .stair-climb-panel,
+#ui > .stair-climb-hint {
+  pointer-events: none;
+}
+
+.stair-climb-panel {
+  position: absolute;
+  left: 36px;
+  bottom: 166px;
+  width: 340px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  background: rgba(22, 23, 25, 0.9);
+  border: 2px solid var(--jg-secondary);
+}
+
+.stair-climb-panel[hidden],
+.stair-climb-hint[hidden] {
+  display: none;
+}
+
+/* The design's 12px/.2em header fits "QUEST · FLIGHT n OF 5"; the longer
+   "STAIRS CHALLENGE · FLIGHT n OF 5" (HD-7) needs it a touch tighter to stay
+   on one line beside its floor tag. */
+.stair-climb-panel__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font: 400 11px var(--font-display);
+  letter-spacing: 0.12em;
+  white-space: nowrap;
+  color: var(--jg-primary);
+}
+
+.stair-climb-panel__floor {
+  flex: none;
+  color: var(--jg-light);
+}
+
+.stair-climb-panel__lines {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stair-climb-panel__line {
+  font: 700 13px/1.35 var(--font-body);
+  color: var(--jg-light);
+}
+
+.stair-climb-panel__key {
+  color: var(--jg-primary);
+}
+
+.stair-climb-panel__count {
+  font: 700 12px/1.35 var(--font-body);
+  color: #b3b6c9;
+}
+
+.stair-climb-panel__bar {
+  height: 8px;
+  background: #0a0c0f;
+  border: 2px solid var(--jg-secondary);
+}
+
+.stair-climb-panel__bar[hidden] {
+  display: none;
+}
+
+.stair-climb-panel__bar-fill {
+  height: 100%;
+  background: repeating-linear-gradient(-45deg, var(--jg-primary) 0 8px, #33cbff 8px 16px);
+}
+
+/* The design's hint sits above its Stages; in the game it sits under the HUD
+   title, centred on the Stage. */
+.stair-climb-hint {
+  position: absolute;
+  top: 104px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 16px;
+  background: rgba(22, 23, 25, 0.9);
+  border: 2px solid var(--jg-primary);
+  font: 700 13px var(--font-body);
+  color: var(--jg-light);
+  white-space: nowrap;
+}
+
+.stair-climb-hint__key {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: none;
+  background: var(--jg-primary);
+  color: #161719;
+  font: 400 16px var(--font-display);
+}

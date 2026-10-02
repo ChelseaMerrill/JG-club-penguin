@@ -820,6 +820,137 @@ describe('createSupabaseProgressStore', () => {
     );
   });
 
+  describe('Stairs Challenge (#51 slice 4)', () => {
+    const FLIGHT_5 = {
+      logged: true,
+      reason: null,
+      flightsLogged: 5,
+      tokensAwarded: 10,
+      flightTokensToday: 50,
+      badgesEarned: ['stair-master'],
+      balance: 200,
+    };
+
+    function recordEvents() {
+      const events: string[] = [];
+      const emitter = createEmitter<GameEventMap>();
+      emitter.on('tokens:changed', ({ balance }) => events.push(`tokens:${balance}`));
+      emitter.on('badge:earned', ({ badgeId }) => events.push(`badge:${badgeId}`));
+      emitter.on('ui:toast', ({ message }) => events.push(`toast:${message}`));
+      return { events, emitter };
+    }
+
+    it('logStairFlight sends the floor, then emits the balance and one badge:earned per awarded Badge', async () => {
+      const { client, calls } = makeFakeClient({ logStairFlight: { data: FLIGHT_5, error: null } });
+      const { events, emitter } = recordEvents();
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID, emitter });
+
+      await expect(store.logStairFlight(5)).resolves.toEqual(FLIGHT_5);
+      expect(calls).toContainEqual(['rpc.log_stair_flight', { floor: 5 }]);
+      expect(events).toEqual(['tokens:200', 'badge:stair-master']);
+    });
+
+    it('logStairFlight keeps only Badge ids the client knows', async () => {
+      const { client } = makeFakeClient({
+        logStairFlight: {
+          data: { ...FLIGHT_5, badgesEarned: ['stair-master', 'moon-walker'] },
+          error: null,
+        },
+      });
+      const { events, emitter } = recordEvents();
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID, emitter });
+
+      await expect(store.logStairFlight(5)).resolves.toMatchObject({
+        badgesEarned: ['stair-master'],
+      });
+      expect(events).toEqual(['tokens:200', 'badge:stair-master']);
+    });
+
+    it('logStairFlight emits nothing for a flight that logged or paid nothing', async () => {
+      const { client } = makeFakeClient();
+      const { events, emitter } = recordEvents();
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID, emitter });
+
+      await expect(store.logStairFlight(1)).resolves.toMatchObject({
+        logged: false,
+        reason: 'not_started',
+        balance: 100,
+      });
+      expect(events).toEqual([]);
+    });
+
+    it('logStairFlight rejects a failure without a toast (RT2-9: it is not guarded)', async () => {
+      const { client } = makeFakeClient({
+        logStairFlight: { data: null, error: { message: 'Could not find the function' } },
+      });
+      const { events, emitter } = recordEvents();
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID, emitter });
+
+      await expect(store.logStairFlight(1)).rejects.toThrow('Could not find the function');
+      expect(events).toEqual([]);
+    });
+
+    it('logStairFlight maps invalid_floor, and rejects a fraction before any call', async () => {
+      const { client, calls } = makeFakeClient({
+        logStairFlight: { data: null, error: { message: 'invalid_floor' } },
+      });
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID });
+
+      await expect(store.logStairFlight(5)).rejects.toMatchObject({ code: 'invalid_floor' });
+      calls.length = 0;
+      await expect(store.logStairFlight(1.5)).rejects.toMatchObject({ code: 'invalid_floor' });
+      expect(calls).toEqual([]);
+    });
+
+    it.each([
+      ['no data', null],
+      ['no balance', { ...FLIGHT_5, balance: undefined }],
+      ['an unknown reason', { ...FLIGHT_5, logged: false, reason: 'maybe' }],
+      ['no badgesEarned array', { ...FLIGHT_5, badgesEarned: 'stair-master' }],
+    ])(
+      'logStairFlight rejects a malformed reply (%s) with invalid_response',
+      async (_label, data) => {
+        const { client } = makeFakeClient({ logStairFlight: { data, error: null } });
+        const { events, emitter } = recordEvents();
+        const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID, emitter });
+
+        await expect(store.logStairFlight(5)).rejects.toMatchObject({ code: 'invalid_response' });
+        expect(events).toEqual([]);
+      },
+    );
+
+    it('getStairClimb calls stair_climb_progress, maps it, and never toasts', async () => {
+      const { client, calls } = makeFakeClient({
+        stairClimbProgress: {
+          data: { flightsLogged: 3, completed: true, flightTokensToday: 30 },
+          error: null,
+        },
+      });
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID });
+
+      await expect(store.getStairClimb()).resolves.toEqual({
+        flightsLogged: 3,
+        completed: true,
+        flightTokensToday: 30,
+      });
+      expect(calls).toContainEqual(['rpc.stair_climb_progress', {}]);
+
+      const failing = makeFakeClient({
+        stairClimbProgress: { data: null, error: { message: 'not_authenticated' } },
+      });
+      const { events, emitter } = recordEvents();
+      const failingStore = createSupabaseProgressStore({
+        client: failing.client,
+        playerId: PLAYER_ID,
+        emitter,
+      });
+      await expect(failingStore.getStairClimb()).rejects.toMatchObject({
+        code: 'not_authenticated',
+      });
+      expect(events).toEqual([]);
+    });
+  });
+
   describe('Badges (#138)', () => {
     it('loadAll reads the badge catalog ordered by sort_order then id, and maps it', async () => {
       const { client, calls } = makeFakeClient({

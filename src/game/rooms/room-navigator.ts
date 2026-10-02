@@ -18,6 +18,7 @@ import {
 import { floorsDiffer, ROOM_FLOORS } from './floors';
 import { getRoomDefinition } from './registry';
 import type { RoomDoor } from './room-definition';
+import { isStairsMove } from './stairwell';
 
 /**
  * The scene-facing half of a Room change. `RoomScene` implements this
@@ -103,6 +104,15 @@ export interface RoomNavigator {
   leaveForSignOut(): void;
   /** The Room this navigator last entered (or is entering), or `null` before the first entry / after `leaveForSignOut`. */
   currentRoomId(): RoomId | null;
+  /**
+   * Uses `door` exactly as the local Penguin reaching it does, with no walk
+   * (#51 slice 4, RT2-5): `changeRoom` to its target at its `entryTile`, or
+   * its coming-soon hint when disabled. A no-op while inactive. The
+   * Stairwell's ↑/↓ keys use their floor's doors through this.
+   */
+  useDoor(door: RoomDoor): void;
+  /** Whether a transition's scene restart is still in flight (a new `changeRoom` would be dropped). */
+  isTransitioning(): boolean;
 }
 
 /** `entryTile ?? getRoomDefinition(roomId).spawnTile` (#15 D1). */
@@ -194,12 +204,15 @@ export function createRoomNavigator(deps: RoomNavigatorDeps): RoomNavigator {
     // stays anyway as the direct source of truth. The condition lives
     // directly in the `if` (rather than a separately-computed boolean
     // dereferenced with `!`) so TypeScript narrows `transitionScreen` and
-    // `leaving` on its own (#52 review standards nit).
+    // `leaving` on its own (#52 review standards nit). #51 slice 4 (S4-D6):
+    // a move by the stairs (between two Stairwell floors, or floor 5 and the
+    // Roof Deck) shows no Elevator, whichever way it was made.
     let showTransition = false;
     if (
       transitionScreen !== undefined &&
       leaving !== null &&
-      floorsDiffer(ROOM_FLOORS[leaving], ROOM_FLOORS[roomId])
+      floorsDiffer(ROOM_FLOORS[leaving], ROOM_FLOORS[roomId]) &&
+      !isStairsMove(leaving, roomId)
     ) {
       showTransition = true;
       transitionScreen.begin(leaving, roomId);
@@ -207,7 +220,7 @@ export function createRoomNavigator(deps: RoomNavigatorDeps): RoomNavigator {
     await enterRoom(roomId, entryTile, false, showTransition);
   }
 
-  scene.onDoorReached((door) => {
+  function useDoor(door: RoomDoor): void {
     // Doors do nothing while inactive (#15 review round 1 D2): before a
     // Session exists, `click-to-move`'s own always-on local movement
     // (`room-framework`/`click-to-move` specs boot with no Session at all)
@@ -218,10 +231,14 @@ export function createRoomNavigator(deps: RoomNavigatorDeps): RoomNavigator {
     } else {
       scene.showComingSoonHint(door);
     }
-  });
+  }
+
+  scene.onDoorReached(useDoor);
 
   return {
     changeRoom,
+    useDoor,
+    isTransitioning: () => transitionInFlight,
     async enterSpawnRoom(): Promise<void> {
       active = true;
       // #52 review MINOR: cancel any transitionScreen state first, so a

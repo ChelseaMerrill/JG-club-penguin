@@ -9,6 +9,8 @@ import type { TypedEmitter } from '../contracts/emitter';
 import type { BadgeId, GameEventMap, MinigameId, MinigameStatsMap } from '../contracts/game-events';
 import type { Eyes, Hat, IdleEmote, Pattern, PenguinLook } from '../contracts/penguin';
 import { MINIGAME_RULES } from './minigame-rules';
+import { BADGE_CATALOG } from './badge-catalog';
+import { STAIR_TOP_FLOOR } from './stair-climb-rules';
 import {
   clampLeaderboardRows,
   ProgressStoreError,
@@ -28,6 +30,9 @@ import {
   type ProgressStore,
   type PurchaseResult,
   type RoundResult,
+  type StairClimbProgress,
+  type StairFlightReason,
+  type StairFlightResult,
 } from './progress-store';
 
 /** The narrow error shape every PostgREST/RPC call in this file can return. */
@@ -218,7 +223,9 @@ export interface ProgressClient {
       | 'quest_progress'
       | 'mark_dev_pit_visited'
       | 'complete_quest'
-      | 'check_session_badges',
+      | 'check_session_badges'
+      | 'log_stair_flight'
+      | 'stair_climb_progress',
     args: Record<string, unknown>,
   ): PromiseLike<RpcResult>;
 }
@@ -321,7 +328,52 @@ const TOAST_MESSAGES: Record<ProgressErrorCode, string> = {
   unknown_quest: "That quest doesn't exist",
   quest_incomplete: "That quest isn't finished yet",
   invalid_response: "Couldn't read the server's reply",
+  invalid_floor: "That floor doesn't exist",
 };
+
+const STAIR_FLIGHT_REASONS: readonly StairFlightReason[] = [
+  'not_started',
+  'already_logged',
+  'out_of_order',
+  'too_soon',
+];
+
+function isWholeNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value);
+}
+
+/**
+ * `log_stair_flight`'s reply (SC12), checked field by field: a malformed one
+ * rejects with `invalid_response` rather than reading as a balance of 0,
+ * which the session wrapper would otherwise write into the snapshot and HUD.
+ */
+function toStairFlightResult(data: unknown): StairFlightResult {
+  const raw = (data ?? {}) as Partial<Record<keyof StairFlightResult, unknown>>;
+  const reason = raw.reason ?? null;
+  if (
+    typeof raw.logged !== 'boolean' ||
+    (reason !== null && !STAIR_FLIGHT_REASONS.includes(reason as StairFlightReason)) ||
+    !isWholeNumber(raw.flightsLogged) ||
+    !isWholeNumber(raw.tokensAwarded) ||
+    !isWholeNumber(raw.flightTokensToday) ||
+    !isWholeNumber(raw.balance) ||
+    !Array.isArray(raw.badgesEarned)
+  ) {
+    throw new ProgressStoreError('invalid_response');
+  }
+  return {
+    logged: raw.logged,
+    reason: reason as StairFlightReason | null,
+    flightsLogged: raw.flightsLogged,
+    tokensAwarded: raw.tokensAwarded,
+    flightTokensToday: raw.flightTokensToday,
+    // Only Badge ids the client knows, as a newer server could award more.
+    badgesEarned: (raw.badgesEarned as unknown[]).filter((id): id is BadgeId =>
+      BADGE_CATALOG.some((badge) => badge.id === id),
+    ),
+    balance: raw.balance,
+  };
+}
 
 /** Anything that isn't a typed `ProgressStoreError`: network failures, unrecognized errors. */
 const GENERIC_TOAST_MESSAGE = "Couldn't reach the server. Your progress wasn't saved.";
@@ -698,6 +750,52 @@ export function createSupabaseProgressStore(
     return { badges: result.badges, balance: result.balance };
   }
 
+  // #51 slice 4: deliberately not wrapped in `guarded()` (RT2-9). Every
+  // Stairwell arrival may call it, so an unapplied migration or a network
+  // blip would toast on every flight; the climb panel logs the failure and
+  // shows the design's lines without the count instead (S4-D9).
+  async function logStairFlight(floor: number): Promise<StairFlightResult> {
+    // The server rejects 0-5 itself; a fraction would otherwise fail its int
+    // cast with a code that doesn't say what's wrong.
+    if (!Number.isInteger(floor) || floor < 0 || floor > STAIR_TOP_FLOOR) {
+      throw new ProgressStoreError('invalid_floor');
+    }
+    const { data, error } = await client.rpc('log_stair_flight', { floor });
+    if (error) {
+      throw toProgressError(error);
+    }
+    const result = toStairFlightResult(data);
+    if (result.tokensAwarded > 0 || result.badgesEarned.length > 0) {
+      emitter?.emit('tokens:changed', { balance: result.balance });
+    }
+    // One announcement per Badge the flight awarded (Stair Master, once).
+    for (const badgeId of result.badgesEarned) {
+      emitter?.emit('badge:earned', { badgeId });
+    }
+    return result;
+  }
+
+  // #51 slice 4: a read, so no `guarded()` toast, like `questProgress`.
+  async function getStairClimb(): Promise<StairClimbProgress> {
+    const { data, error } = await client.rpc('stair_climb_progress', {});
+    if (error) {
+      throw toProgressError(error);
+    }
+    const raw = (data ?? {}) as Partial<Record<keyof StairClimbProgress, unknown>>;
+    if (
+      !isWholeNumber(raw.flightsLogged) ||
+      typeof raw.completed !== 'boolean' ||
+      !isWholeNumber(raw.flightTokensToday)
+    ) {
+      throw new ProgressStoreError('invalid_response');
+    }
+    return {
+      flightsLogged: raw.flightsLogged,
+      completed: raw.completed,
+      flightTokensToday: raw.flightTokensToday,
+    };
+  }
+
   return {
     loadAll,
     saveLook,
@@ -709,6 +807,8 @@ export function createSupabaseProgressStore(
     markDevPitVisited,
     completeQuest,
     checkBadges,
+    logStairFlight,
+    getStairClimb,
   };
 }
 
