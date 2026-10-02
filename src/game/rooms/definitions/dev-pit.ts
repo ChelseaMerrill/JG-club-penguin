@@ -23,11 +23,11 @@ const DOOR_HOTSPOT_SIZE = { width: 70, height: 165 };
 // open.
 const WALKABLE: readonly (readonly boolean[])[] = [
   [true, true, true, true, true, true, true, true, true, true, true, true],
-  [true, false, false, false, true, true, true, false, true, true, true, true],
+  [true, false, false, false, true, false, true, true, false, true, true, true],
   [true, false, false, false, false, false, false, true, false, false, true, true],
   [true, true, false, false, false, false, false, true, false, false, true, false],
   [true, true, true, true, true, true, false, true, true, false, true, true],
-  [true, false, false, true, true, true, true, true, true, true, true, true],
+  [true, false, false, true, true, true, true, true, true, true, false, true],
   [true, true, false, false, true, false, false, true, false, false, true, true],
   [true, true, true, false, true, true, false, true, true, false, true, true],
   [true, false, true, true, true, true, true, true, true, true, true, true],
@@ -79,7 +79,20 @@ export const devPit: RoomDefinition = {
     // review).
     { npcId: 'ashley', tile: { col: 1, row: 8 } },
     { npcId: 'ian', tile: { col: 1, row: 5 } },
-    { npcId: 'steven', tile: { col: 7, row: 1 } },
+    // Steven left the Dev Pit (owner request, 2026-10-02, Track D: the
+    // Characters sheet puts him in the Remote Lounge); his `NpcDefinition`
+    // stays, and his (7,1) is open again.
+    //
+    // New from the Characters sheet (owner request, 2026-10-02, Track D):
+    // Alex Nikolis and Alex Kelly sit at the back desks, working: each stands
+    // just inside his desk's back edge, beside its monitor, and the desk is
+    // drawn over him (`foregrounds` below), as Team Room 3's Millie sits at
+    // hers. `offset` moves each from his tile's point to that spot: Nikolis
+    // (1015, 460) at desk C, Kelly (1165, 535) at desk E. Jesse Lucier walks
+    // laps round the desks (`motions/dev-pit.ts`) from (10,5).
+    { npcId: 'alex-nikolis', tile: { col: 5, row: 1 }, offset: { x: 15, y: 35 } },
+    { npcId: 'alex-kelly', tile: { col: 8, row: 1 }, offset: { x: 15, y: 35 } },
+    { npcId: 'jesse-lucier', tile: { col: 10, row: 5 } },
     // Dom removed from the Dev Pit (owner request, 2026-09-25, Track D): his
     // `NpcDefinition` stays in `npcs.ts` (other tests still reference his
     // name/title/figure), but he no longer has a slot in any Room. (2,5) --
@@ -91,11 +104,25 @@ export const devPit: RoomDefinition = {
     // Track D): as with Dom, their `NpcDefinition`s stay in `npcs.ts` (Team
     // Room 4's own Ryan and Sam share their figures), but they no longer
     // have a slot here. Their former tiles, (5,1) and (9,1), are open again
-    // in `WALKABLE` above; Steven's walk crosses (5,1).
+    // in `WALKABLE` above (since taken by Alex Nikolis at (5,1)).
     // Matt is a Penguin (a Player), like "You", not an NPC -- see the export
     // script's `LIVE_ELEMENT_RULES['dev-pit']` labels-rule comment. Players
     // are never part of a static `RoomDefinition`; presence (#28) places
     // them live. Contrast Town Center's Jory Hutchins, a designed Human NPC
     // who has her own slot there (#137).
+  ],
+  // The back desks, drawn in front of the two Alexes sitting at them.
+  // Exported by `npm run export:room-art -- dev-pit` (`FOREGROUND_LAYERS`).
+  foregrounds: [
+    {
+      key: 'room-dev-pit-front-nikolis-desk',
+      url: 'rooms/dev-pit-front-nikolis-desk.png',
+      overNpcId: 'alex-nikolis',
+    },
+    {
+      key: 'room-dev-pit-front-kelly-desk',
+      url: 'rooms/dev-pit-front-kelly-desk.png',
+      overNpcId: 'alex-kelly',
+    },
   ],
 };

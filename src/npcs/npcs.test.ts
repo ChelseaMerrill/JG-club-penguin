@@ -3,7 +3,7 @@ import { estimateBubbleSize } from '../game/npcs/bubble-geometry';
 import { bubbleSchedule } from '../game/npcs/bubble-schedule';
 import { estimateNameplateWidth, npcLayout } from '../game/npcs/npc-layout';
 import { devPit } from '../game/rooms/definitions/dev-pit';
-import { tileToScreen } from '../game/rooms/iso';
+import { npcSlotPoint } from '../game/rooms/iso';
 import { ROOM_DEFINITIONS } from '../game/rooms/registry';
 import { getNpcDefinition, NPCS, type NpcBubbleLine, type NpcId } from './npcs';
 
@@ -52,8 +52,21 @@ describe('NPCS', () => {
     // one shared Room at a time, so no Room lists him. Ryan and Sam likewise
     // left the Dev Pit (owner request, 2026-09-30); Team Room 4 has its own.
     // Jon and Sydney left Town Center (owner request, 2026-10-02); the Mullet
-    // and Team Room 3 have their own.
-    const NO_LONGER_PLACED: NpcId[] = ['dom', 'anthony', 'ryan', 'sam', 'jon', 'sydney'];
+    // and Team Room 3 have their own. Steven left the Dev Pit too; the
+    // Characters sheet puts him in the Remote Lounge, which isn't built yet.
+    // Millie, Jason and Darrin left the Icebox (owner request, 2026-10-02).
+    const NO_LONGER_PLACED: NpcId[] = [
+      'dom',
+      'anthony',
+      'ryan',
+      'sam',
+      'jon',
+      'sydney',
+      'steven',
+      'millie-icebox',
+      'jason',
+      'darrin-icebox',
+    ];
 
     for (const npc of Object.values(NPCS)) {
       if (NO_LONGER_PLACED.includes(npc.id)) continue;
@@ -181,7 +194,8 @@ describe('NPCS', () => {
         const placed = room.npcSlots.flatMap((slot) => {
           const npc = getNpcDefinition(slot.npcId)!;
           if (npc.kind === 'penguin') return [];
-          return [{ npc, feet: tileToScreen(slot.tile, room.grid.origin) }];
+          // Where it is drawn: its tile's point plus any slot `offset`.
+          return [{ npc, feet: npcSlotPoint(slot, room.grid.origin) }];
         });
         const nameplates = placed.map(({ npc, feet }) => {
           const layout = npcLayout(npc);
@@ -235,11 +249,15 @@ describe('NPCS', () => {
           }
         }
       }
-      // Overlaps the Room design itself draws at rest, kept as designed. None
-      // now: the only one, Dev Pit's Steven's pills over the bottom of Ryan's
-      // nameplate, went when Ryan left the Dev Pit (owner request,
-      // 2026-09-30).
-      const drawnByTheDesign: string[] = [];
+      // Overlaps the Room design itself draws at rest, kept as designed: the
+      // Mullet's Dom and Jory stand where the design starts their lap (their
+      // slot `offset`s, #189), where Dom's bubble crosses Nicole's nameplate
+      // and Jory's crosses Brandon's. Both walk off it at once. (Dev Pit's old
+      // Steven-over-Ryan overlap went when Ryan left, 2026-09-30.)
+      const drawnByTheDesign: string[] = [
+        `the-mullet: dom-mullet "Undefeated. I always win." x nicole-mullet's nameplate "Nicole"`,
+        `the-mullet: jory-mullet "Tribe has spoken." x brandon-mullet's nameplate "Brandon"`,
+      ];
       expect(collisions.filter((collision) => !drawnByTheDesign.includes(collision))).toEqual([]);
       // Each allowed overlap still happens, so a stale entry can't linger.
       for (const allowed of drawnByTheDesign) expect(collisions).toContain(allowed);

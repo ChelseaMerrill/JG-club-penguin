@@ -14,10 +14,16 @@ const REST = { x: 600, y: 425 }; // Ian's own slot point (1,5)
 
 describe('Dev Pit NPC motions (#113)', () => {
   it('registers a motion for every Dev Pit NPC that moves, and no other', () => {
-    // Dom (2026-09-25) and Ryan and Sam (2026-09-30) removed (owner
-    // requests, Track D): no longer Dev Pit NPCs. Ian's and Steven's walks
-    // are authored (see `dev-pit.ts`'s comments), not from the design.
-    expect((Object.keys(DEV_PIT_MOTIONS) as NpcId[]).sort()).toEqual(['ian', 'steven']);
+    // Dom (2026-09-25), Ryan and Sam (2026-09-30) and Steven (2026-10-02)
+    // removed (owner requests, Track D): no longer Dev Pit NPCs. Every motion
+    // here is authored (see `dev-pit.ts`'s comments), not from the design;
+    // Ashley has none (she throws her chicken instead).
+    expect((Object.keys(DEV_PIT_MOTIONS) as NpcId[]).sort()).toEqual([
+      'alex-kelly',
+      'alex-nikolis',
+      'ian',
+      'jesse-lucier',
+    ]);
   });
 
   it('compiles every Dev Pit motion spec without throwing', () => {
@@ -42,19 +48,27 @@ describe('Dev Pit NPC motions (#113)', () => {
     expect(point.y).toBeCloseTo(-3);
   });
 
-  it("samples Steven's authored stevenWalk path in its 42%-48% hold at the (4,0) waypoint", () => {
-    const compiled = compileCssAnimation(DEV_PIT_MOTIONS.steven!.path!);
-    // 6s after load is 9s into the 20s loop (its delay is -3s): 45%.
-    const point = transformPoint(sampleCssAnimation(compiled, 6_000), { x: 0, y: 0 });
-    expect(point.x).toBeCloseTo(-100);
-    expect(point.y).toBeCloseTo(-100);
+  it("samples Jesse Lucier's authored jesseLap path in its 50%-53% hold at the (4,8) corner", () => {
+    const compiled = compileCssAnimation(DEV_PIT_MOTIONS['jesse-lucier']!.path!);
+    // 15.45 s into the 30 s loop: 51.5%.
+    const point = transformPoint(sampleCssAnimation(compiled, 15_450), { x: 0, y: 0 });
+    expect(point.x).toBeCloseTo(-450);
+    expect(point.y).toBeCloseTo(-75);
   });
 
-  it("walks Steven only over walkable tiles that aren't another NPC's slot", () => {
-    const home = devPit.npcSlots.find((slot) => slot.npcId === 'steven')!.tile;
-    // His waypoints, then every tile on the straight legs between them.
-    const loop = [home, { col: 7, row: 0 }, { col: 4, row: 0 }, { col: 4, row: 1 }, home];
-    const others = devPit.npcSlots.filter((slot) => slot.npcId !== 'steven');
+  it('bobs the two Alexes at their desks, and nothing else: they sit working', () => {
+    for (const id of ['alex-kelly', 'alex-nikolis'] as const) {
+      const spec = DEV_PIT_MOTIONS[id]!;
+      expect(spec.path, id).toBeUndefined();
+      expect(spec.figure, id).toBeDefined();
+    }
+  });
+
+  it("walks Jesse Lucier only over walkable tiles that aren't another NPC's slot", () => {
+    const home = devPit.npcSlots.find((slot) => slot.npcId === 'jesse-lucier')!.tile;
+    // His corners, then every tile on the straight legs between them.
+    const loop = [home, { col: 10, row: 8 }, { col: 4, row: 8 }, { col: 4, row: 5 }, home];
+    const others = devPit.npcSlots.filter((slot) => slot.npcId !== 'jesse-lucier');
     for (let leg = 0; leg < loop.length - 1; leg += 1) {
       const a = loop[leg]!;
       const b = loop[leg + 1]!;

@@ -4,6 +4,7 @@ import {
   PENGUIN_FRAME_PADDING_Y,
   PENGUIN_FRAME_WIDTH,
 } from '../penguin/render-svg';
+import { renderCardFigure, type CardFigureId } from './card-figures';
 import { NPC_TEXT_PATHS } from './text-paths';
 
 /**
@@ -112,6 +113,13 @@ export interface HumanFigureSpec {
    * `marker` still apply; every other option is ignored.
    */
   sheet?: 'samSchantz' | 'ryanShendler';
+  /**
+   * Draw this person as their `design/Characters.dc.html` card draws them,
+   * verbatim (`card-figures.ts`): for characters the sheet adds with no
+   * `humans.js` spec (owner requests, 2026-10-02, Track D). Every other
+   * option is ignored.
+   */
+  card?: CardFigureId;
   /** Town Center's three playing cards in Jon's right hand. */
   cards?: boolean;
   /** Dev Pit's raised arm holding a whiteboard marker (Ryan, Sam, Steven). */
@@ -345,6 +353,7 @@ function renderHumanFigure(spec: HumanFigureSpec, idPrefix: string): string {
   const sk = SKIN[spec.skin ?? 'light'];
   const hc = HAIR[spec.hair ?? 'dark'];
   const id = `npc-${idPrefix}`;
+  if (spec.card) return renderCardFigure(spec.card, `${id}t`);
   if (spec.sheet) {
     return renderSheetFigure(spec, id) + (spec.marker ? renderMarker(spec.marker) : '');
   }

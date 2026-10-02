@@ -112,7 +112,11 @@ function poseProp(prop: CompiledProp, clocks: MotionClocks): NpcPropPose {
  * The fractional tile whose centre is `point` (the inverse of
  * `tileToScreen`, unfloored), so an NPC between tiles sorts between them.
  */
-function fractionalTile(point: ScreenPoint, origin: GridOrigin): { col: number; row: number } {
+/** The (fractional) tile under a Stage point: what a moving NPC sorts by (`depthForTile` of it). */
+export function fractionalTile(
+  point: ScreenPoint,
+  origin: GridOrigin,
+): { col: number; row: number } {
   const colMinusRow = (point.x - origin.x) / (TILE_WIDTH / 2);
   const colPlusRow = (point.y - origin.y - TILE_HEIGHT / 2) / (TILE_HEIGHT / 2);
   return { col: (colPlusRow + colMinusRow) / 2, row: (colPlusRow - colMinusRow) / 2 };

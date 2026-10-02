@@ -17,6 +17,14 @@ const AWAITING_BA_LINE: readonly string[] = [
   // His "corner pocket" bubble is a fragment of his one line, so it's
   // omitted from his dialog (owner request, 2026-10-01, Track D).
   'tony',
+  // New on the Characters sheet with one card line each (owner request,
+  // 2026-10-02, Track D).
+  'jesse-lucier',
+  'alex-kelly',
+  'alex-nikolis',
+  'dan-bedian',
+  'paul-carnival',
+  'greg-westover',
 ];
 
 /**

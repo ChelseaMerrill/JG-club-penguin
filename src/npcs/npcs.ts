@@ -79,7 +79,15 @@ export type NpcId =
   | 'tony'
   | 'jon-mullet'
   | 'brandon-mullet'
-  | 'dom-mullet';
+  | 'dom-mullet'
+  // New on the Characters sheet (owner request, 2026-10-02, Track D), each in
+  // one Room only. `jesse-lucier`, not `jesse`: that id is The Melt's Jesse.
+  | 'jesse-lucier'
+  | 'alex-kelly'
+  | 'alex-nikolis'
+  | 'dan-bedian'
+  | 'paul-carnival'
+  | 'greg-westover';
 
 /**
  * A minigame-launching NPC's trigger dialog (#36 D4; round-1 review item 4
@@ -839,6 +847,49 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     dialog: BUG_SQUASH_DIALOG,
     figure: IAN_FIGURE,
   },
+  // The Characters sheet's new Dev Pit people (owner request, 2026-10-02,
+  // Track D): name, title and line from each one's card, drawn from the card
+  // itself (`card-figures.ts`); their motions play the card's bob instead of
+  // #36's.
+  'jesse-lucier': {
+    id: 'jesse-lucier',
+    name: 'Jesse Lucier',
+    title: 'Director of Internal Applications',
+    roomId: 'dev-pit',
+    kind: 'human',
+    tagName: 'Jesse Lucier',
+    dialogLines: ['Ship it, then 50 burpees.'],
+    idleLines: [{ text: 'Ship it, then 50 burpees.', periodS: 20, delayS: -3 }],
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'jesseLucier' },
+  },
+  'alex-kelly': {
+    id: 'alex-kelly',
+    name: 'Alex Kelly',
+    title: 'Director of Service Delivery',
+    roomId: 'dev-pit',
+    kind: 'human',
+    tagName: 'Alex Kelly',
+    dialogLines: ['Hold on, let me ask Claude.'],
+    idleLines: [{ text: 'Hold on, let me ask Claude.', periodS: 20, delayS: -9 }],
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'alexKelly' },
+  },
+  'alex-nikolis': {
+    id: 'alex-nikolis',
+    name: 'Alex Nikolis',
+    title: 'Senior Software Engineer',
+    roomId: 'dev-pit',
+    kind: 'human',
+    tagName: 'Alex Nikolis',
+    dialogLines: ['Works on my machine.'],
+    idleLines: [{ text: 'Works on my machine.', periodS: 20, delayS: -15 }],
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'alexNikolis' },
+  },
   steven: {
     id: 'steven',
     name: 'Steven Zgaljic',
@@ -1254,6 +1305,55 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     // of the Icebox design's chest camera rig (owner request, 2026-10-01,
     // Track D), so he carries one camera, not two.
     figure: { ...JETHRO_FIGURE, prop: undefined, cameraRaise: 'lowered' },
+  },
+  // The Characters sheet's new people at the Icebox table (owner request,
+  // 2026-10-02, Track D): name, title and line from each one's card, drawn
+  // from the card itself (`card-figures.ts`); their motions play the card's
+  // bob instead of #36's. Greg's card title is "TITLE TBD".
+  'dan-bedian': {
+    id: 'dan-bedian',
+    name: 'Dan Bedian',
+    title: 'Leader of Kelmar',
+    roomId: 'the-icebox',
+    kind: 'human',
+    tagName: 'Dan Bedian',
+    dialogLines: ["This meeting's a 40-minute jam. Stay for the encore."],
+    idleLines: [
+      { text: "This meeting's a 40-minute jam. Stay for the encore.", periodS: 21, delayS: -5 },
+    ],
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'danBedian' },
+  },
+  'paul-carnival': {
+    id: 'paul-carnival',
+    name: 'Paul Carnival',
+    title: 'QA',
+    roomId: 'the-icebox',
+    kind: 'human',
+    tagName: 'Paul Carnival',
+    dialogLines: ['Found one. Steps to reproduce: exist.'],
+    idleLines: [{ text: 'Found one. Steps to reproduce: exist.', periodS: 21, delayS: -12 }],
+    // Clear of Dan's nameplate, one chair up-left of him at the table.
+    bubbleOffsetX: 140,
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'paulCarnival' },
+  },
+  'greg-westover': {
+    id: 'greg-westover',
+    name: 'Greg Westover',
+    title: null,
+    roomId: 'the-icebox',
+    kind: 'human',
+    tagName: 'Greg Westover',
+    dialogLines: ['Have you tried turning it off and on again?'],
+    idleLines: [{ text: 'Have you tried turning it off and on again?', periodS: 21, delayS: -19 }],
+    // Clear of Paul's nameplate, one chair up-left of him at the table.
+    bubbleOffsetX: 160,
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'gregWestover' },
   },
   'darrin-icebox': {
     id: 'darrin-icebox',

@@ -16,27 +16,29 @@ const ORIGIN = { x: 800, y: 250 };
 const REST = { x: 840, y: 310 }; // Millie's own slot point in the design
 
 describe('The Icebox NPC motions (#113)', () => {
-  it("registers a motion for every one of this Room's five NPCs", () => {
+  it("registers a motion for every one of this Room's NPCs", () => {
+    // Millie, Jason and Darrin left (owner request, 2026-10-02, Track D); the
+    // three at the table only bob.
     expect((Object.keys(THE_ICEBOX_MOTIONS) as NpcId[]).sort()).toEqual([
-      'darrin-icebox',
-      'jason',
+      'dan-bedian',
+      'greg-westover',
       'jethro',
-      'millie-icebox',
       'nicole',
+      'paul-carnival',
     ]);
+  });
+
+  it('seats the three at the table: they bob in place, with no walk', () => {
+    for (const id of ['dan-bedian', 'paul-carnival', 'greg-westover'] as const) {
+      expect(THE_ICEBOX_MOTIONS[id]!.path, id).toBeUndefined();
+      expect(THE_ICEBOX_MOTIONS[id]!.figure, id).toBeDefined();
+    }
   });
 
   it('compiles every Icebox motion spec without throwing', () => {
     for (const spec of Object.values(THE_ICEBOX_MOTIONS)) {
       expect(() => createNpcMotion(spec, REST, ORIGIN, { reducedMotion: false })).not.toThrow();
     }
-  });
-
-  it("samples Millie's milRoam path at its 30% stop, 7.8s into the 26s loop", () => {
-    const compiled = compileCssAnimation(THE_ICEBOX_MOTIONS['millie-icebox']!.path!);
-    const point = transformPoint(sampleCssAnimation(compiled, 7_800), { x: 0, y: 0 });
-    expect(point.x).toBeCloseTo(-140);
-    expect(point.y).toBeCloseTo(68);
   });
 
   it("samples Jethro's jetRoam path at its 65% stop, 16.9s into the 26s loop", () => {
@@ -72,11 +74,12 @@ describe('The Icebox NPC motions (#113)', () => {
     expect(THE_ICEBOX_MOTIONS.jethro!.replaceFigureRestPose).toBe(true);
   });
 
-  it("bobs every NPC 3 Stage px at the shared roam-idle's 50% stop, .55s into the 1.1s loop", () => {
+  it("bobs the design's NPCs 3 Stage px at the shared roam-idle's 50% stop, .55s into the 1.1s loop", () => {
     // The design's `idle` (translateY(-3px)) wraps the figure's scaled `<svg>`
     // from outside, so it moves 3 Stage px; a `figure` track runs inside the
-    // 0.62 scaled wrapper instead.
-    for (const spec of Object.values(THE_ICEBOX_MOTIONS)) {
+    // 0.62 scaled wrapper instead. The three new at the table bob as their
+    // cards do instead.
+    for (const spec of [THE_ICEBOX_MOTIONS.nicole, THE_ICEBOX_MOTIONS.jethro]) {
       const compiled = compileCssAnimation(spec!.figure!);
       const point = transformPoint(sampleCssAnimation(compiled, 550), { x: 0, y: 0 });
       expect(point.x).toBeCloseTo(0);
