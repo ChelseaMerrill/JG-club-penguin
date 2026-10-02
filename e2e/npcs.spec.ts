@@ -1,9 +1,14 @@
 import { expect, test, type Page } from '@playwright/test';
 import type { RoomId } from '../src/contracts';
+import { npcLayout } from '../src/game/npcs/npc-layout';
+import { officeHallway } from '../src/game/rooms/definitions/office-hallway';
 import { roofDeck } from '../src/game/rooms/definitions/roof-deck';
 import { teamRoom2 } from '../src/game/rooms/definitions/team-room-2';
+import { teamRoom3 } from '../src/game/rooms/definitions/team-room-3';
+import { teamRoom4 } from '../src/game/rooms/definitions/team-room-4';
 import { theMelt } from '../src/game/rooms/definitions/the-melt';
-import { tileToScreen } from '../src/game/rooms/iso';
+import { npcSlotPoint, tileToScreen } from '../src/game/rooms/iso';
+import { NPCS, type NpcId } from '../src/npcs/npcs';
 import { GAME_HEIGHT, GAME_WIDTH } from '../src/game/stage-size';
 import type { NpcMotionDebugInfo, RoomDebugInfo } from './support/room-debug-types';
 
@@ -169,6 +174,49 @@ test('Team Room 2: clicking Ian arrives, opens his dialog, and GRAB THE HAMMER o
 
   expect(errors).toEqual([]);
 });
+
+/**
+ * #149: the Hallway's, Team Room 3's and Team Room 4's NPCs draw at their own
+ * scales, with hand-placed nameplates (and, in Team Room 3, an exact slot
+ * `offset`), so a click at the middle of each one's own click area still has to
+ * arrive and open its dialog. Ian (Team Room 2) is covered above; Michael's
+ * Beystadium launch is `beystadium.spec.ts`.
+ */
+const HAND_PLACED_CLICKS: {
+  room: RoomId;
+  definition: typeof officeHallway;
+  npcId: NpcId;
+  name: string;
+}[] = [
+  { room: 'office-hallway', definition: officeHallway, npcId: 'emily', name: 'Emily Smith' },
+  {
+    room: 'team-room-3',
+    definition: teamRoom3,
+    npcId: 'millie-team-room-3',
+    name: 'Millie Elliott',
+  },
+  { room: 'team-room-4', definition: teamRoom4, npcId: 'michael', name: 'Michael Prete' },
+];
+for (const { room, definition, npcId, name } of HAND_PLACED_CLICKS) {
+  test(`${room}: clicking ${name} arrives and opens the dialog (#149)`, async ({ page }) => {
+    const errors = await bootRoom(page, room);
+
+    const slot = definition.npcSlots.find((s) => s.npcId === npcId);
+    if (!slot) throw new Error(`expected ${room} to have a "${npcId}" NPC slot`);
+    const feet = npcSlotPoint(slot, definition.grid.origin);
+    await clickStagePoint(page, { x: feet.x, y: feet.y + npcLayout(NPCS[npcId]).hitArea.centerY });
+
+    await expect
+      .poll(async () => (await debugInfo(page))?.npcArrivedLog, { timeout: LONG_WALK_TIMEOUT })
+      .toContain(npcId);
+
+    const dialog = page.locator('.npc-dialog');
+    await expect(dialog).toBeVisible();
+    await expect(dialog.locator('.npc-dialog__name')).toHaveText(name);
+
+    expect(errors).toEqual([]);
+  });
+}
 
 /**
  * Clicking near Ian's head (not just his own tile centre) still opens his
