@@ -249,8 +249,9 @@ describe('NPC motion (#113)', () => {
       (id) => NPCS[id].roomId === 'roof-deck' && getNpcMotion(id),
     );
     // #146: Anthony stands still at the door he guards, so he has none, and
-    // Brandon and Millie left the Market (owner request, 2026-10-02).
-    expect(moving.sort()).toEqual([]);
+    // Brandon and Millie left the Market (owner request, 2026-10-02); Bich
+    // Dudla and Eva Trimboli walk it (owner request, 2026-10-02, Track D).
+    expect(moving.sort()).toEqual(['bich-dudla', 'eva-trimboli']);
   });
 
   it('compiles every motion in the registry, and only for known NPCs', () => {

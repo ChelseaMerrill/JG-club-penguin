@@ -92,6 +92,8 @@ export type NpcId =
   | 'frank-nardone'
   | 'chris-pence'
   | 'rebecca-congi'
+  | 'bich-dudla'
+  | 'eva-trimboli'
   | 'abby-rivera'
   | 'adam-wilson-hwang'
   | 'bryan-sambrook';
@@ -1382,6 +1384,41 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     still: true,
     dialog: LINE_DIALOG,
     figure: { card: 'rebeccaCongi' },
+  },
+  // The Characters sheet's two QA Analysts, new in the Market (owner
+  // request, 2026-10-02, Track D): name, title and line from each one's
+  // card, drawn from the card itself. Bich waters the Market's potted
+  // plants and Eva walks the deck (`motions/roof-deck.ts`).
+  'bich-dudla': {
+    id: 'bich-dudla',
+    name: 'Bich Dudla',
+    title: 'QA Analyst',
+    roomId: 'roof-deck',
+    kind: 'human',
+    tagName: 'Bich Dudla',
+    // Her long line, at her slot, would cover Ann Marie's bubbles at her
+    // counter up and to the right; shifted left until it clears them.
+    bubbleOffsetX: -90,
+    dialogLines: ['I test the code. I water the plant. Both keep growing.'],
+    idleLines: [
+      { text: 'I test the code. I water the plant. Both keep growing.', periodS: 20, delayS: -3 },
+    ],
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'bichDudla' },
+  },
+  'eva-trimboli': {
+    id: 'eva-trimboli',
+    name: 'Eva Trimboli',
+    title: 'QA Analyst',
+    roomId: 'roof-deck',
+    kind: 'human',
+    tagName: 'Eva Trimboli',
+    dialogLines: ["It's not a bug until I say it's a bug."],
+    idleLines: [{ text: "It's not a bug until I say it's a bug.", periodS: 20, delayS: -13 }],
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'evaTrimboli' },
   },
   // The Characters sheet's new people in the Mullet (owner request,
   // 2026-10-02, Track D): name, title and line from each one's card, drawn
