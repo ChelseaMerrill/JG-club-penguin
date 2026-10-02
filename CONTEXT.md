@@ -27,7 +27,7 @@ The screen where a Player creates and edits their Penguin look. It opens on firs
 The full multi-room office environment, modeled from the real JG office blueprint, spread over several floors. Composed of Rooms.
 
 **Room**
-One explorable, self-contained area of the World, drawn as an isometric scene that fills the Stage. Players move between Rooms through doors or the Map. Multiplayer Presence is scoped per-Room (who else is in *this* Room), not global. The prototype Rooms are Town Center (where every Session starts), Dev Pit, The Melt, Roof Deck and the Player's Igloo.
+One explorable, self-contained area of the World, drawn as an isometric scene that fills the Stage. Players move between Rooms through doors or the Map. Multiplayer Presence is scoped per-Room (who else is in *this* Room), not global. The prototype Rooms are Town Center (where every Session starts), Dev Pit, The Melt, Roof Deck and the Player's Igloo. #51 adds The Icebox, the Hallway, Team Rooms 1-4, the Bathroom, The Mullet and the Stairwell. The Stairwell is six Rooms, one per **Stairwell floor**: floor 0, the lobby level, up to floor 5, the JG HQ floor.
 
 **Igloo**
 The Player's own home Room. Only its owner is ever in it, so each Player's Igloo is a separate Room with its own Room channel. It holds the Player's Furniture and Trophy Case, and is reached from the HUD. Visiting other Players' Igloos is out of scope.
@@ -42,7 +42,7 @@ One cell of a Room's isometric grid (2:1, 100x50 pixels), addressed by column an
 Which way a Penguin is turned: left or right. The artwork is mirrored for the other direction. Baked lettering (HA HA, the JG LOGO/JG CAP "JG", WAR WEEK) is counter-mirrored before the mirror is applied, so it still reads correctly rather than backwards when the Penguin faces left (#147).
 
 **Map**
-The in-game map screen, opened from the HUD. Clicking a prototype Room on the Map takes the Penguin there; Rooms outside the prototype show as coming soon.
+The in-game map screen, opened from the HUD. Clicking a Room on the Map takes the Penguin there. Every tile opens a Room now, so none shows as coming soon. The Stairwell's tile opens it on floor 0 and shows YOU ARE HERE on every Stairwell floor.
 
 ### Screens and overlays
 
@@ -50,7 +50,7 @@ The in-game map screen, opened from the HUD. Clicking a prototype Room on the Ma
 The heads-up display drawn over every Room: the Room title, the Token balance, the chat field, and buttons for the Penguin Creator, the Map, the Igloo and the menu. The Emote, Snowball mode and Quest buttons appear only when their stretch work lands. It is part of the DOM overlay layer on the Stage, not the game canvas, and clicks on it never move the Penguin.
 
 **Elevator screen**
-The full-Stage overlay shown whenever a Room change crosses floors, reached through a door or the Map like any other Room change. It stays up for at least 1.2s and hides once the destination Room is ready. Town Center, Dev Pit and The Melt are floor 5; the Roof Deck is one floor up, R; the Igloo has no floor at all, so it never shows the Elevator.
+The full-Stage overlay shown whenever a Room change crosses floors, reached through a door or the Map like any other Room change. It stays up for at least 1.2s and hides once the destination Room is ready. Town Center, Dev Pit and The Melt are floor 5; the Roof Deck is one floor up, R; the Igloo has no floor at all, so it never shows the Elevator. Each Stairwell floor is its own floor, floor 0 on L. Moving between Stairwell floors, or by the stairs between floor 5 and the Roof Deck, never shows it; the Stairwell's Map tile from Town Center shows "WADDLING DOWN TO FLOOR L".
 
 **Landing page**
 The screen signed-out visitors see, with the logo and sign-in buttons (PLAY NOW and LOG IN, both Google sign-in). It covers the whole Stage and replaced the earlier login card.
@@ -92,6 +92,9 @@ A short, timed activity launched from an NPC Interaction, such as Bug Squash in 
 **Leaderboard**
 A per-Minigame ranking of named Players' personal bests, shown by Penguin name; ties go to whoever reached the score first. Shown on the Minigame's done screen, all-time, top 10 plus the Player's own rank when it falls outside that.
 
+**Stairs Challenge**
+The floor 0-5 climb up the Stairwell. The server logs each flight climbed in order, paying 10 Tokens a flight up to 100 a day (Eastern time), and the first full climb earns the Stair Master Badge. A climb starts only when the Player enters the Stairwell on floor L from outside it (the Lobby or the Map); arriving on floor 5 from Town Center or the Roof Deck starts nothing, and nor does walking down to floor 0. Until the Lobby is built, a Player locked out of the Map by Security Training can't start one. Not a Minigame and not a Quest. _Avoid:_ Stairs Quest.
+
 **Quest**
 A tracked objective shown in the Quests panel and the HUD quest widget. Stretch for the prototype. "Task" is not part of this project's vocabulary.
 
@@ -131,7 +134,7 @@ A named game from the designs that is out of scope for the prototype. The term i
 - **Quests are part of the vocabulary; they are stretch for the prototype.** Supersedes the earlier "No Quest/Task system in v1" decision (2026-09-24). "Task" stays out of the vocabulary.
 - **Presence is scoped per-Room, not global.** A Player only sees/hears other Penguins in their current Room.
 - **Every Session starts in Town Center**, after sign-in, a reload or a reconnect that starts a new Session.
-- **Click-to-move with pathfinding; no keyboard movement.** Clicking a Tile, an NPC or a door walks the Penguin there.
+- **Click-to-move with pathfinding; no keyboard movement, except on the Stairwell's floors, where holding ↑/↓ climbs or descends one flight.** Clicking a Tile, an NPC or a door walks the Penguin there. The stair keys never fire while a text field has focus or an overlay is open (amended by #51, HD-2).
 - **Isometric Rooms on a 1600x900 Stage, letterboxed, desktop only.** Small or touch-only screens see a "desktop only" notice instead of the game. Supersedes "2D top-down" and Tiled tilemaps.
 - **Chat and Presence are live only and never persisted.**
 - **The Penguin's name is not the Player's Google name.** The database stores no copy of the Player's Google identity beyond what Supabase Auth already holds.
