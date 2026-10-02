@@ -5,6 +5,12 @@ import { BADGE_CATALOG } from './badge-catalog';
 import { isNightOwlTime } from './badge-rules';
 import { isBlankLeaderboardName, isUnderLeaderboardCeiling } from './leaderboard-rules';
 import {
+  STAIR_FLIGHT_MIN_INTERVAL_MS,
+  STAIR_TOP_FLOOR,
+  stairDay,
+  stairFlightPay,
+} from './stair-climb-rules';
+import {
   BADGE_BONUS,
   IGLOO_GEAR_CATALOG,
   MINIGAME_RULES,
@@ -37,6 +43,8 @@ import {
   type ProgressStore,
   type PurchaseResult,
   type RoundResult,
+  type StairClimbProgress,
+  type StairFlightResult,
 } from './progress-store';
 
 function defaultLook(): PenguinLook {
@@ -72,6 +80,18 @@ interface PlayerState {
   devPitVisited: boolean;
   /** #46: Quests `completeQuest` has paid (`player_quest_completions`). */
   completedQuests: Set<string>;
+  /** #51 slice 4: the `player_stair_climbs` row, `null` before the first climb. */
+  stairClimb: StairClimbState | null;
+}
+
+/** #51 slice 4: the fake's mirror of one `player_stair_climbs` row. */
+interface StairClimbState {
+  floor: number;
+  updatedAtMs: number;
+  completedAtMs: number | null;
+  /** The America/New_York day (`YYYY-MM-DD`) `tokensToday` belongs to. */
+  tokensDay: string | null;
+  tokensToday: number;
 }
 
 /** One rival's Minigame best, for `InMemoryProgressStoreOptions.leaderboardRivals`. Test-only. */
@@ -110,6 +130,11 @@ export interface InMemoryProgressStoreTestControls {
   grantTokens(tokens: number): void;
   /** Awards `badgeId` with its +50, as `award_badge` would, without emitting anything. */
   holdBadge(badgeId: BadgeId): void;
+  /**
+   * Sets the climb's daily tally directly (#51 slice 4): `tokensToday`, and
+   * `tokensDay` when given. A no-op before the first climb.
+   */
+  setStairTally(tokensToday: number, tokensDay?: string): void;
 }
 
 /**
@@ -144,6 +169,7 @@ export function createInMemoryProgressStoreWithControls(
     slots: emptySlots(),
     devPitVisited: false,
     completedQuests: new Set(),
+    stairClimb: null,
   };
 
   async function loadAll(): Promise<ProgressSnapshot> {
@@ -478,6 +504,85 @@ export function createInMemoryProgressStoreWithControls(
     return { badges: sortedByTimeThenId(state.badges), balance: state.tokens };
   }
 
+  /** The tally `climb` holds for `today`: 0 once its day has passed (SC10/SC13). */
+  function tallyFor(climb: StairClimbState, today: string): number {
+    return climb.tokensDay === today ? climb.tokensToday : 0;
+  }
+
+  // #51 slice 4: mirrors `log_stair_flight` (SC8-SC12), with the injected
+  // clock standing in for the server's `now()`.
+  async function logStairFlight(floor: number): Promise<StairFlightResult> {
+    if (!Number.isInteger(floor) || floor < 0 || floor > STAIR_TOP_FLOOR) {
+      throw new ProgressStoreError('invalid_floor');
+    }
+    const nowMs = now();
+    const today = stairDay(new Date(nowMs));
+    const climb = state.stairClimb;
+    let reason: StairFlightResult['reason'] = null;
+    let pay = 0;
+    const badgesEarned: BadgeId[] = [];
+
+    if (floor === 0) {
+      state.stairClimb = {
+        floor: 0,
+        updatedAtMs: nowMs,
+        completedAtMs: climb?.completedAtMs ?? null,
+        tokensDay: climb?.tokensDay ?? null,
+        tokensToday: climb?.tokensToday ?? 0,
+      };
+    } else if (!climb) {
+      reason = 'not_started';
+    } else if (climb.floor >= floor) {
+      reason = 'already_logged';
+    } else if (climb.floor < floor - 1) {
+      reason = 'out_of_order';
+    } else if (nowMs - climb.updatedAtMs < STAIR_FLIGHT_MIN_INTERVAL_MS) {
+      reason = 'too_soon';
+    } else {
+      const tally = tallyFor(climb, today);
+      pay = stairFlightPay(tally);
+      const firstClimb = floor === STAIR_TOP_FLOOR && climb.completedAtMs === null;
+      state.stairClimb = {
+        floor,
+        updatedAtMs: nowMs,
+        completedAtMs:
+          floor === STAIR_TOP_FLOOR ? (climb.completedAtMs ?? nowMs) : climb.completedAtMs,
+        tokensDay: today,
+        tokensToday: tally + pay,
+      };
+      if (firstClimb && awardBadge('stair-master')) badgesEarned.push('stair-master');
+      state.tokens += pay;
+    }
+
+    if (pay > 0 || badgesEarned.length > 0) {
+      emitter?.emit('tokens:changed', { balance: state.tokens });
+    }
+    for (const badgeId of badgesEarned) {
+      emitter?.emit('badge:earned', { badgeId });
+    }
+    const current = state.stairClimb;
+    return {
+      logged: reason === null,
+      reason,
+      flightsLogged: current?.floor ?? 0,
+      tokensAwarded: pay,
+      flightTokensToday: current ? tallyFor(current, today) : 0,
+      badgesEarned,
+      balance: state.tokens,
+    };
+  }
+
+  // #51 slice 4: mirrors `stair_climb_progress` (SC13).
+  async function getStairClimb(): Promise<StairClimbProgress> {
+    const climb = state.stairClimb;
+    if (!climb) return { flightsLogged: 0, completed: false, flightTokensToday: 0 };
+    return {
+      flightsLogged: climb.floor,
+      completed: climb.completedAtMs !== null,
+      flightTokensToday: tallyFor(climb, stairDay(new Date(now()))),
+    };
+  }
+
   return {
     store: {
       loadAll,
@@ -490,6 +595,8 @@ export function createInMemoryProgressStoreWithControls(
       markDevPitVisited,
       completeQuest,
       checkBadges,
+      logStairFlight,
+      getStairClimb,
     },
     grantTokens(tokens: number): void {
       state.tokens += tokens;
@@ -499,6 +606,14 @@ export function createInMemoryProgressStoreWithControls(
         state.badges.set(badgeId, now());
         state.tokens += BADGE_BONUS;
       }
+    },
+    setStairTally(tokensToday: number, tokensDay?: string): void {
+      if (!state.stairClimb) return;
+      state.stairClimb = {
+        ...state.stairClimb,
+        tokensToday,
+        tokensDay: tokensDay ?? state.stairClimb.tokensDay,
+      };
     },
   };
 }

@@ -18,6 +18,13 @@ export interface ProgressStoreHarness {
    * whether it's currently 02:00-05:00 Eastern (#138 D16).
    */
   holdBadge(badgeId: BadgeId): Promise<void>;
+  /**
+   * Sets the climb's daily tally directly (#51 slice 4, RT2-10), as the
+   * postgres role would: `tokensToday`, and `tokensDay` (the
+   * America/New_York date it belongs to, `YYYY-MM-DD`) when given, else the
+   * day the tally already has. Needs a started climb.
+   */
+  setStairTally(tokensToday: number, tokensDay?: string): Promise<void>;
 }
 
 function sortById(items: readonly ShopItem[]): ShopItem[] {
@@ -960,6 +967,168 @@ export function describeProgressStoreContract(
           tokensAwarded: 150,
           alreadyCompleted: false,
         });
+      });
+    });
+
+    // #51 slice 4: the Stairs Challenge (SC8-SC13), the same rules in the
+    // in-memory fake and the migration. `advanceSeconds` moves the climb's
+    // last flight back, so the 2 s pacing rule doesn't need a real wait.
+    describe('Stairs Challenge (#51 slice 4)', () => {
+      /** Starts a climb on floor 0 and logs flights 1..`to`, 3 s apart. */
+      async function climb(harness: ProgressStoreHarness, to: number) {
+        await harness.store.logStairFlight(0);
+        let last;
+        for (let floor = 1; floor <= to; floor += 1) {
+          await harness.advanceSeconds(3);
+          last = await harness.store.logStairFlight(floor);
+        }
+        return last;
+      }
+
+      it('reads the defaults before any climb, and logs nothing before floor 0 starts one', async () => {
+        const { store } = await makeHarness();
+
+        expect(await store.getStairClimb()).toEqual({
+          flightsLogged: 0,
+          completed: false,
+          flightTokensToday: 0,
+        });
+        expect(await store.logStairFlight(1)).toEqual({
+          logged: false,
+          reason: 'not_started',
+          flightsLogged: 0,
+          tokensAwarded: 0,
+          flightTokensToday: 0,
+          badgesEarned: [],
+          balance: 100,
+        });
+        expect(await store.logStairFlight(0)).toMatchObject({
+          logged: true,
+          reason: null,
+          flightsLogged: 0,
+          tokensAwarded: 0,
+          balance: 100,
+        });
+      });
+
+      it('logs flights in order, 2 s apart: too soon, already logged and out of order write nothing', async () => {
+        const harness = await makeHarness();
+        const { store } = harness;
+        await store.logStairFlight(0);
+
+        await harness.advanceSeconds(1);
+        expect(await store.logStairFlight(1)).toMatchObject({
+          logged: false,
+          reason: 'too_soon',
+          flightsLogged: 0,
+          balance: 100,
+        });
+        // N5: the same flight, retried once the 2 s have passed, logs.
+        await harness.advanceSeconds(3);
+        expect(await store.logStairFlight(1)).toMatchObject({
+          logged: true,
+          reason: null,
+          flightsLogged: 1,
+          tokensAwarded: 10,
+          flightTokensToday: 10,
+          balance: 110,
+        });
+
+        await harness.advanceSeconds(3);
+        expect(await store.logStairFlight(1)).toMatchObject({
+          logged: false,
+          reason: 'already_logged',
+          flightsLogged: 1,
+        });
+        expect(await store.logStairFlight(3)).toMatchObject({
+          logged: false,
+          reason: 'out_of_order',
+          flightsLogged: 1,
+          balance: 110,
+        });
+        expect(await store.getStairClimb()).toEqual({
+          flightsLogged: 1,
+          completed: false,
+          flightTokensToday: 10,
+        });
+      });
+
+      it('pays 10 per flight up to 100 a day: with 95 earned a flight pays 5, at 100 it is logged and pays 0', async () => {
+        const harness = await makeHarness();
+        const { store } = harness;
+        await climb(harness, 1);
+        await harness.setStairTally(95);
+
+        await harness.advanceSeconds(3);
+        expect(await store.logStairFlight(2)).toMatchObject({
+          logged: true,
+          tokensAwarded: 5,
+          flightTokensToday: 100,
+          balance: 115,
+        });
+        await harness.advanceSeconds(3);
+        expect(await store.logStairFlight(3)).toMatchObject({
+          logged: true,
+          flightsLogged: 3,
+          tokensAwarded: 0,
+          flightTokensToday: 100,
+          balance: 115,
+        });
+      });
+
+      it('resets the tally on a new Eastern day: an earlier day of 100 reads as 0 and the next flight pays 10', async () => {
+        const harness = await makeHarness();
+        const { store } = harness;
+        await climb(harness, 1);
+        await harness.setStairTally(100, '2000-01-01');
+
+        expect((await store.getStairClimb()).flightTokensToday).toBe(0);
+        await harness.advanceSeconds(3);
+        expect(await store.logStairFlight(2)).toMatchObject({
+          logged: true,
+          tokensAwarded: 10,
+          flightTokensToday: 10,
+          balance: 120,
+        });
+      });
+
+      it('earns Stair Master and its +50 on the first full climb only; a second climb pays its flights', async () => {
+        const harness = await makeHarness();
+        const { store } = harness;
+
+        const first = await climb(harness, 5);
+        expect(first).toEqual({
+          logged: true,
+          reason: null,
+          flightsLogged: 5,
+          tokensAwarded: 10,
+          flightTokensToday: 50,
+          badgesEarned: ['stair-master'],
+          // 100 + 5 flights of 10 + Stair Master's +50 (not in tokensAwarded).
+          balance: 200,
+        });
+        expect(await store.getStairClimb()).toEqual({
+          flightsLogged: 5,
+          completed: true,
+          flightTokensToday: 50,
+        });
+        expect((await store.loadAll()).badges).toEqual(['stair-master']);
+
+        const second = await climb(harness, 5);
+        expect(second).toMatchObject({
+          logged: true,
+          tokensAwarded: 10,
+          flightTokensToday: 100,
+          badgesEarned: [],
+          balance: 250,
+        });
+        expect((await store.loadAll()).badges).toEqual(['stair-master']);
+      });
+
+      it.each([6, -1])('rejects floor %s as invalid_floor', async (floor) => {
+        const { store } = await makeHarness();
+
+        await expect(store.logStairFlight(floor)).rejects.toMatchObject({ code: 'invalid_floor' });
       });
     });
 

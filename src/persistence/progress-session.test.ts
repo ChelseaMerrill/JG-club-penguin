@@ -69,6 +69,8 @@ function deferredStore(): { store: ProgressStore; resolve: (snapshot: ProgressSn
       markDevPitVisited: () => Promise.reject(new Error('unused in this test')),
       completeQuest: () => Promise.reject(new Error('unused in this test')),
       checkBadges: () => Promise.reject(new Error('unused in this test')),
+      logStairFlight: () => Promise.reject(new Error('unused in this test')),
+      getStairClimb: () => Promise.reject(new Error('unused in this test')),
     },
     resolve: resolveFn,
   };
@@ -87,6 +89,8 @@ function failingStore(): ProgressStore {
     markDevPitVisited: () => Promise.reject(new Error('unused in this test')),
     completeQuest: () => Promise.reject(new Error('unused in this test')),
     checkBadges: () => Promise.reject(new Error('unused in this test')),
+    logStairFlight: () => Promise.reject(new Error('unused in this test')),
+    getStairClimb: () => Promise.reject(new Error('unused in this test')),
   };
 }
 
@@ -263,6 +267,8 @@ describe('createProgressSession', () => {
         markDevPitVisited: () => Promise.reject(new Error('unused in this test')),
         completeQuest: () => Promise.reject(new Error('unused in this test')),
         checkBadges: () => Promise.reject(new Error('unused in this test')),
+        logStairFlight: () => Promise.reject(new Error('unused in this test')),
+        getStairClimb: () => Promise.reject(new Error('unused in this test')),
       };
       await session.start(PLAYER, store);
       const wrapped = registry.get(PROGRESS_STORE_KEY) as ProgressStore;
@@ -457,6 +463,35 @@ describe('createProgressSession', () => {
         await wrapped.checkBadges();
 
         expect(panels()).toEqual(['Badge unlocked: Ship It']);
+        expect(toasts).toEqual([]);
+      });
+
+      it('Stair Master through logStairFlight(5), then a Session check (#51 slice 4)', async () => {
+        const registry = createFakeRegistry();
+        const session = createProgressSession({ registry, emitter: gameEvents });
+        const { panels, toasts } = wireAnnouncements();
+        let nowMs = NOON_EASTERN;
+        const controls = createInMemoryProgressStoreWithControls({
+          emitter: session.storeEmitter,
+          now: () => nowMs,
+        });
+        await session.start(PLAYER, controls.store);
+        cleanups.push(() => session.stop());
+        const wrapped = registry.get(PROGRESS_STORE_KEY) as ProgressStore;
+
+        await wrapped.logStairFlight(0);
+        for (let floor = 1; floor <= 5; floor += 1) {
+          nowMs += 3000;
+          await wrapped.logStairFlight(floor);
+        }
+        const snapshot = registry.get(PROGRESS_KEY) as ProgressSnapshot;
+        // 100 starting Tokens, five flights of 10 and Stair Master's +50.
+        expect(snapshot.tokens).toBe(200);
+        expect(snapshot.badges).toEqual(['stair-master']);
+
+        await wrapped.checkBadges();
+
+        expect(panels()).toEqual(['Badge unlocked: Stair Master']);
         expect(toasts).toEqual([]);
       });
 

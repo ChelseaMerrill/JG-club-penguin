@@ -31,6 +31,8 @@ import {
   type ProgressStore,
   type PurchaseResult,
   type RoundResult,
+  type StairClimbProgress,
+  type StairFlightResult,
 } from '../progress-store';
 import type { ProgressStoreHarness } from './progress-store.contract';
 
@@ -51,6 +53,7 @@ export const MIGRATIONS = [
   ['igloo-wall-slots', '20260927010000_igloo_wall_slots.sql'],
   ['beystadium', '20260928000000_beystadium.sql'],
   ['phishing-quiz', '20260928020000_phishing_quiz.sql'],
+  ['stair-climb', '20260929000000_stair_climb.sql'],
 ] as const;
 
 export type MigrationName = (typeof MIGRATIONS)[number][0];
@@ -393,6 +396,26 @@ function createSqlProgressStore(db: PGliteInterface, playerId: string): Progress
     });
   }
 
+  // #51 slice 4: the Stairs Challenge RPCs, as the Supabase store calls them.
+  async function logStairFlight(floor: number): Promise<StairFlightResult> {
+    return runAsPlayer(async (tx) => {
+      const res = await tx.query<{ result: StairFlightResult }>(
+        'select public.log_stair_flight($1) as result',
+        [floor],
+      );
+      return res.rows[0].result;
+    });
+  }
+
+  async function getStairClimb(): Promise<StairClimbProgress> {
+    return runAsPlayer(async (tx) => {
+      const res = await tx.query<{ result: StairClimbProgress }>(
+        'select public.stair_climb_progress() as result',
+      );
+      return res.rows[0].result;
+    });
+  }
+
   return {
     loadAll,
     saveLook,
@@ -404,6 +427,8 @@ function createSqlProgressStore(db: PGliteInterface, playerId: string): Progress
     markDevPitVisited,
     completeQuest,
     checkBadges,
+    logStairFlight,
+    getStairClimb,
   };
 }
 
@@ -455,6 +480,21 @@ export async function createPgliteProgressStoreHarness(): Promise<
         `update public.minigame_rounds set finished_at = now() - make_interval(secs => $1)
          where player_id = $2`,
         [seconds, playerId],
+      );
+      // #51 slice 4 (RT2-10): and the climb's last logged flight, for the
+      // 2 s pacing rule, the same way.
+      await db.query(
+        `update public.player_stair_climbs set updated_at = now() - make_interval(secs => $1)
+         where player_id = $2`,
+        [seconds, playerId],
+      );
+    },
+    async setStairTally(tokensToday: number, tokensDay?: string): Promise<void> {
+      await db.query(
+        `update public.player_stair_climbs
+         set tokens_today = $1, tokens_day = coalesce($2::date, tokens_day)
+         where player_id = $3`,
+        [tokensToday, tokensDay ?? null, playerId],
       );
     },
   };
