@@ -53,8 +53,13 @@ export interface StairClimbTracker {
  * - every store call goes through one FIFO queue, each waiting for the last
  *   one's final result, so flights reach the server in order;
  * - a `too_soon` flight is retried once, when the 2 s have passed, whatever
- *   floor the Player has reached by then;
- * - disarming and signing out drop every queued call.
+ *   floor the Player has reached by then, even past the Stairwell (a quick
+ *   ↑ from floor 5 to the Roof Deck never costs flight 5);
+ * - leaving the Stairwell drops only queued reads; signing out drops every
+ *   queued call;
+ * - a call that fails (an unapplied migration, a network blip) changes
+ *   nothing: the panel shows the design's climbing line without the count
+ *   (S4-D9), and only the server answering that a start didn't log disarms.
  * Every other Stairwell arrival reads the climb for the panel instead. Room
  * movement never waits on any of it.
  */
@@ -62,16 +67,21 @@ export function createStairClimbTracker(deps: StairClimbTrackerDeps): StairClimb
   let source: RoomChangeSource | null = null;
   let pending: { leaving: RoomId; source: RoomChangeSource } | null = null;
   let armed = false;
-  /** Bumped to drop every queued call (disarm, sign-out). */
+  /** Bumped to drop every queued call (sign-out). */
   let generation = 0;
+  /** Bumped to drop queued reads (leaving the Stairwell, sign-out). */
+  let readGeneration = 0;
+  /** This Stairwell visit, bumped on leaving it, so a visit's flights know their own start. */
+  let visit = 0;
+  /** A visit whose floor-0 start the server answered without logging. */
+  let rejectedVisit: number | null = null;
   let tail: Promise<void> = Promise.resolve();
   /** When the last flight the server logged came back, for the retry delay. */
   let lastLoggedAt: number | null = null;
 
-  function enqueue(job: (gen: number) => Promise<void>): void {
-    const gen = generation;
+  function enqueue(job: () => Promise<void>, isCurrent: () => boolean): void {
     tail = tail
-      .then(() => (gen === generation ? job(gen) : undefined))
+      .then(() => (isCurrent() ? job() : undefined))
       .catch((err: unknown) => deps.onError(err));
   }
 
@@ -87,47 +97,55 @@ export function createStairClimbTracker(deps: StairClimbTrackerDeps): StairClimb
     deps.onPanel(roomId, { floor, armed, ...input });
   }
 
-  async function readClimb(roomId: RoomId, gen: number): Promise<void> {
+  async function readClimb(roomId: RoomId, isCurrent: () => boolean): Promise<void> {
     let progress: StairClimbProgress | null = null;
     try {
       progress = await deps.store.getStairClimb();
     } catch (err) {
       deps.onError(err);
     }
-    if (gen === generation) render(roomId, { progress, arrival: null });
+    if (isCurrent()) render(roomId, { progress, arrival: null });
   }
 
-  async function logFlight(roomId: RoomId, floor: number, gen: number): Promise<void> {
-    // A floor-0 start that didn't log disarmed this visit after this flight
-    // was queued: read the climb for the panel instead.
-    if (floor > 0 && !armed) return readClimb(roomId, gen);
+  async function logFlight(
+    roomId: RoomId,
+    floor: number,
+    gen: number,
+    ofVisit: number,
+  ): Promise<void> {
+    const live = () => gen === generation;
+    // This visit's floor-0 start didn't log: read the climb for the panel instead.
+    if (floor > 0 && rejectedVisit === ofVisit) return readClimb(roomId, live);
     let result: StairFlightResult;
     try {
       result = await deps.store.logStairFlight(floor);
-      if (result.reason === 'too_soon' && gen === generation) {
+      if (result.reason === 'too_soon' && live()) {
         const since = lastLoggedAt ?? deps.now();
         await wait(
           Math.max(0, since + STAIR_FLIGHT_MIN_INTERVAL_MS - deps.now()) + STAIR_RETRY_MARGIN_MS,
         );
-        if (gen !== generation) return;
+        if (!live()) return;
         result = await deps.store.logStairFlight(floor);
       }
     } catch (err) {
       deps.onError(err);
-      if (gen !== generation) return;
-      if (floor === 0) armed = false;
-      render(roomId, { progress: null, arrival: null });
+      if (live()) render(roomId, { progress: null, arrival: null });
       return;
     }
-    if (gen !== generation) return;
+    if (!live()) return;
     if (result.logged) lastLoggedAt = deps.now();
-    if (floor === 0 && !result.logged) armed = false;
+    if (floor === 0 && !result.logged) {
+      rejectedVisit = ofVisit;
+      if (ofVisit === visit) armed = false;
+    }
     render(roomId, { progress: null, arrival: result });
   }
 
-  function disarm(): void {
+  /** Leaving the Stairwell: disarms and drops queued reads, but lets queued flights finish. */
+  function leaveStairwell(): void {
     armed = false;
-    generation += 1;
+    visit += 1;
+    readGeneration += 1;
   }
 
   return {
@@ -146,22 +164,30 @@ export function createStairClimbTracker(deps: StairClimbTrackerDeps): StairClimb
       const change = pending;
       pending = null;
       if (!isStairwellRoom(roomId)) {
-        disarm();
+        leaveStairwell();
         return;
       }
       const flight = flightFor(change?.leaving ?? null, roomId, change?.source ?? 'spawn');
       if (flight === 0) armed = true;
+      const gen = generation;
       if (flight !== null && (flight === 0 || armed)) {
-        enqueue((gen) => logFlight(roomId, flight, gen));
+        const ofVisit = visit;
+        enqueue(
+          () => logFlight(roomId, flight, gen, ofVisit),
+          () => gen === generation,
+        );
       } else {
-        enqueue((gen) => readClimb(roomId, gen));
+        const readGen = readGeneration;
+        const isCurrent = () => gen === generation && readGen === readGeneration;
+        enqueue(() => readClimb(roomId, isCurrent), isCurrent);
       }
     },
     reset() {
       source = null;
       pending = null;
       lastLoggedAt = null;
-      disarm();
+      leaveStairwell();
+      generation += 1;
     },
     isArmed: () => armed,
     idle: () => tail,

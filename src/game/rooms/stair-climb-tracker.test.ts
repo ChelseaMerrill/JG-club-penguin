@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { RoomId } from '../../contracts';
 import { createInMemoryProgressStoreWithControls } from '../../persistence/in-memory-progress-store';
 import type { StairFlightResult } from '../../persistence/progress-store';
-import type { StairPanelInput } from '../../ui/stair-climb-panel';
+import { stairPanelState, type StairPanelInput } from '../../ui/stair-climb-panel';
 import { createStairClimbTracker, type StairClimbTrackerDeps } from './stair-climb-tracker';
 import type { RoomChangeSource } from './stairwell';
 
@@ -212,7 +212,7 @@ describe('createStairClimbTracker (#51 slice 4)', () => {
     expect(h.panels.map((panel) => panel.roomId)).toEqual(['stairwell-0', 'stairwell-2']);
   });
 
-  it('drops a pending retry and every queued call when the Player leaves the Stairwell', async () => {
+  it("lets a flight's pending retry finish after the Player leaves the Stairwell, with no panel for it", async () => {
     const h = setup();
     h.move('stairwell-0', 'map');
     await vi.advanceTimersByTimeAsync(0);
@@ -222,7 +222,52 @@ describe('createStairClimbTracker (#51 slice 4)', () => {
     h.move('town-center', 'map');
     await settle(h);
 
-    expect(h.calls).toEqual(['log 0', 'log 1']);
+    expect(h.calls).toEqual(['log 0', 'log 1', 'log 1']);
+    expect((await h.store.getStairClimb()).flightsLogged).toBe(1);
+    expect(h.panels.map((panel) => panel.roomId)).toEqual(['stairwell-0']);
+  });
+
+  it('never loses flight 5 to a quick ↑ from floor 5 to the Roof Deck (Stair Master still earned)', async () => {
+    const h = setup();
+    h.move('stairwell-0', 'map');
+    for (const floor of [1, 2, 3, 4] as const) {
+      await settle(h);
+      h.move(`stairwell-${floor}`, 'keys');
+    }
+    await vi.advanceTimersByTimeAsync(0);
+    await h.tracker.idle();
+    // Flight 5 lands inside 2 s of flight 4, so it comes back too soon, and
+    // the Player is already on the Roof Deck when its retry is due.
+    h.move('stairwell-5', 'keys');
+    await vi.advanceTimersByTimeAsync(0);
+    h.move('roof-deck', 'keys');
+    await settle(h);
+
+    expect(h.calls.slice(-2)).toEqual(['log 5', 'log 5']);
+    expect(await h.store.getStairClimb()).toMatchObject({ flightsLogged: 5, completed: true });
+  });
+
+  it('drops a read still queued when the Player leaves the Stairwell', async () => {
+    const real = createInMemoryProgressStoreWithControls({ now: () => Date.now() }).store;
+    let releaseStart!: () => void;
+    const slowStart = new Promise<void>((resolve) => {
+      releaseStart = resolve;
+    });
+    const h = setup({
+      logStairFlight: async (floor) => {
+        if (floor === 0) await slowStart;
+        return real.logStairFlight(floor);
+      },
+      getStairClimb: () => real.getStairClimb(),
+    });
+    h.move('stairwell-0', 'map');
+    // Down to floor 0's walk-in: a descent reads, queued behind the start.
+    h.move('stairwell-1', null);
+    h.move('town-center', 'map');
+    releaseStart();
+    await settle(h);
+
+    expect(h.calls).toEqual(['log 0']);
   });
 
   it('forgets everything on reset (sign-out, N7)', async () => {
@@ -239,7 +284,7 @@ describe('createStairClimbTracker (#51 slice 4)', () => {
     expect(h.calls).toEqual(['log 0', 'read']);
   });
 
-  it('degrades on a failed call: the error is reported, the panel shows no count, a failed start disarms', async () => {
+  it("degrades on a failed call: the error is reported and the panel shows the design's climbing line without the count (S4-D9)", async () => {
     const store: StairClimbTrackerDeps['store'] = {
       logStairFlight: () => Promise.reject(new Error('Could not find the function')),
       getStairClimb: () => Promise.reject(new Error('Could not find the function')),
@@ -248,12 +293,47 @@ describe('createStairClimbTracker (#51 slice 4)', () => {
 
     h.move('stairwell-0', 'map');
     await settle(h);
-    expect(h.tracker.isArmed()).toBe(false);
-    expect(lastPanel(h)).toEqual({ floor: 0, armed: false, progress: null, arrival: null });
+    // A thrown start isn't the server saying no: the visit stays armed.
+    expect(h.tracker.isArmed()).toBe(true);
+    expect(lastPanel(h)).toEqual({ floor: 0, armed: true, progress: null, arrival: null });
+    expect(stairPanelState(lastPanel(h)!)).toMatchObject({
+      state: 'climbing',
+      heading: 'STAIRS CHALLENGE · FLIGHT 1 OF 5',
+      lines: [],
+    });
 
     h.move('stairwell-1', 'door');
     await settle(h);
     expect(h.errors).toHaveLength(2);
-    expect(lastPanel(h)).toEqual({ floor: 1, armed: false, progress: null, arrival: null });
+    expect(stairPanelState(lastPanel(h)!)).toMatchObject({
+      state: 'climbing',
+      heading: 'STAIRS CHALLENGE · FLIGHT 2 OF 5',
+      lines: [],
+    });
+  });
+
+  it('disarms only when the server answers that a start did not log', async () => {
+    const real = createInMemoryProgressStoreWithControls({ now: () => Date.now() }).store;
+    const h = setup({
+      logStairFlight: async (floor) =>
+        floor === 0
+          ? {
+              logged: false,
+              reason: 'not_started',
+              flightsLogged: 0,
+              tokensAwarded: 0,
+              flightTokensToday: 0,
+              badgesEarned: [],
+              balance: 100,
+            }
+          : real.logStairFlight(floor),
+      getStairClimb: () => real.getStairClimb(),
+    });
+    h.move('stairwell-0', 'map');
+    h.move('stairwell-1', 'door');
+    await settle(h);
+
+    expect(h.tracker.isArmed()).toBe(false);
+    expect(h.calls).toEqual(['log 0', 'read']);
   });
 });
