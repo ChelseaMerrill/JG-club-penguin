@@ -320,6 +320,14 @@ async function chipBackground(page: Page, floor: string): Promise<string> {
   }, floor);
 }
 
+/** Loads the faces the Elevator draws with (the fonts are lazy), resolving true once every one is in. */
+async function loadElevatorFonts(): Promise<boolean> {
+  const faces = ['400 22px "Anton"', '700 15px "Libre Franklin"', '44px "Bumbastika"'];
+  const loaded = await Promise.all(faces.map((face) => document.fonts.load(face)));
+  await document.fonts.ready;
+  return loaded.every((list) => list.length > 0);
+}
+
 async function bootAsPlayer(page: Page, query = '?asPlayer'): Promise<void> {
   await page.goto(`/${query}`);
   await waitForBoot(page);
@@ -548,6 +556,7 @@ test.describe('evidence (#163, local only, never committed)', () => {
     await rideFloors(page, 'L', '5');
     await freezeRideAt(page, MID_RIDE_MS);
     await expectStageSized(page);
+    await page.evaluate(loadElevatorFonts);
     const game = await page
       .locator('.elevator-screen')
       .screenshot({ path: `${EVIDENCE_DIR}/game-mid-ride-up-to-5.png` });
@@ -558,12 +567,7 @@ test.describe('evidence (#163, local only, never committed)', () => {
       await designPage.goto(pathToFileURL(path.resolve('design/Elevator.dc.html')).href);
       const label = designPage.locator('[data-screen-label="ELEVATOR (LOADING SCREEN)"]');
       await label.waitFor();
-      const fontsLoaded = await designPage.evaluate(async () => {
-        await document.fonts.ready;
-        return ['Anton', 'Libre Franklin'].every((family) =>
-          document.fonts.check(`16px "${family}"`),
-        );
-      });
+      const fontsLoaded = await designPage.evaluate(loadElevatorFonts);
       test.skip(
         !fontsLoaded,
         'BLOCKED: the design page needs Anton and Libre Franklin from Google Fonts (network blocked?)',
