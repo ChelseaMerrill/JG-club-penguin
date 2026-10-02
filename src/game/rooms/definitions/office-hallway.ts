@@ -26,7 +26,8 @@ const FLOOR_MARKER_SIZE = { width: 97, height: 44 };
 // toward TOWN CENTER, the cyan runner and the TEAM ROOM 7-9 markers are
 // flat floor art and stay walkable. Every NPC's own tile (see `npcSlots`
 // below) is additionally blocked so a Penguin can't walk through them (#16
-// fix 5): Emily Smith (4,3) and Anthony Conway (5,3). Emily's and Anthony's
+// fix 5): Emily Smith (4,3). Anthony Conway's (5,3) is open again (he left
+// the Hallway, owner request, 2026-10-02, Track D). Emily's and Anthony's
 // raw nearest-tile picks, (3,3) and (6,3), each sat under (or, for Emily,
 // overlapping) the TEAM ROOM 7/8 floor markers' own hit rects; both are
 // moved one tile toward each other instead, confirmed against `iso.ts`'s
@@ -42,7 +43,7 @@ const WALKABLE: readonly (readonly boolean[])[] = [
   [true, true, true, true, true, true, true, true, true, true, true, true, false, true, true],
   [true, true, true, true, true, true, true, true, true, true, true, true, true, true, true],
   [true, true, true, true, true, true, true, true, true, true, true, true, true, true, true],
-  [true, true, true, true, false, false, true, true, true, true, true, true, true, true, true],
+  [true, true, true, true, false, true, true, true, true, true, true, true, true, true, true],
 ];
 
 /**
@@ -151,7 +152,10 @@ export const officeHallway: RoomDefinition = {
     // own hit rects, so each is moved one tile toward the other's own door
     // instead -- see the `WALKABLE` comment above (#51 review fix 5).
     { npcId: 'emily', tile: { col: 4, row: 3 } },
-    { npcId: 'anthony-hallway', tile: { col: 5, row: 3 } },
+    // Anthony Conway left the Hallway so that he appears in one Room only
+    // (owner request, 2026-10-02, Track D): he guards a door as the Phishing
+    // Quiz's `anthony` (#146). Emily now walks laps of the corridor instead
+    // of standing still (`motions/office-hallway.ts`).
     // "You" is the local Player's own Penguin, never a static NPC slot.
   ],
 };

@@ -1513,7 +1513,9 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     // A near-duplicate of her dialog line; it stays a bubble in the Room.
     dialogOmit: ['Joining JG?'],
     idleLines: staticLine('Joining JG?'),
-    // The Hallway design draws her without any idle bob.
+    // The Hallway design draws her without any idle bob; she walks laps of
+    // the corridor instead (`motions/office-hallway.ts`, owner request,
+    // 2026-10-02, Track D), whose motion brings its own bob.
     still: true,
     dialog: LINE_DIALOG,
     figure: {
