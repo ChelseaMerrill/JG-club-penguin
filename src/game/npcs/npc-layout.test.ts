@@ -95,10 +95,21 @@ describe('npcLayout with a per-NPC scale and nameplate offset (#149)', () => {
     expect(sam.nameplateCenterX).toBe(0);
   });
 
-  it("shifts the nameplate sideways without moving the click area (Jason's -55.5)", () => {
-    const jason = npcLayout({ kind: 'human', scale: 0.5, nameplateOffset: { x: -55.5, y: 15 } });
+  it("widens the click area to take in a nameplate shifted sideways (Jason's -55.5)", () => {
+    const jason = npcLayout(NPCS['jason-mullet']);
     expect(jason.nameplateCenterX).toBe(-55.5);
-    expect(jason.hitArea.centerX).toBe(0);
+    // The bounding box of the plain 48-wide area (-24..24) and "Jason"'s
+    // nameplate (59.5 wide, -85.25..-25.75), from its top (-70) to feet + 5.
+    const { hitArea } = jason;
+    expect(hitArea.centerX - hitArea.width / 2).toBeCloseTo(-85.25, 5);
+    expect(hitArea.centerX + hitArea.width / 2).toBeCloseTo(24, 5);
+    expect(hitArea.centerY - hitArea.height / 2).toBeCloseTo(-70, 5);
+    expect(hitArea.centerY + hitArea.height / 2).toBeCloseTo(5, 5);
+    // With no offset x the area stays the plain 48 wide, centred on the feet.
+    expect(npcLayout({ kind: 'human', scale: 0.5 }).hitArea).toMatchObject({
+      centerX: 0,
+      width: 48,
+    });
   });
 
   it("keeps the click area over the figure when the nameplate is nudged down (Jon's 19 px, and further)", () => {

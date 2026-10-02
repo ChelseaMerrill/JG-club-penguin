@@ -279,8 +279,8 @@ describe('NPCS', () => {
             npcId: npc.id,
             tagName: npc.tagName,
             rect: {
-              left: feet.x - width / 2,
-              right: feet.x + width / 2,
+              left: feet.x + layout.nameplateCenterX - width / 2,
+              right: feet.x + layout.nameplateCenterX + width / 2,
               top: feet.y + layout.nameplateTopY,
               bottom: feet.y + layout.nameplateBottomY,
             },

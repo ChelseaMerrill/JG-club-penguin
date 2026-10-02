@@ -256,8 +256,10 @@ interface NpcDefinitionBase {
   still?: boolean;
   /**
    * The Room design's draw scale for this NPC, when it isn't its kind's
-   * default (`npc-layout.ts`): Team Room 3 draws its Humans at 0.58
-   * (`width="69.6"`), not 0.62 (owner request, 2026-09-30, Track D).
+   * default (`npc-layout.ts`): Team Rooms 1 and 2 draw theirs at 70/120,
+   * Team Room 3 and most of the Mullet at 0.58 (`width="69.6"`) and Team Room
+   * 4 (and the Mullet's Jason, Nicole and Ann Marie) at 0.5, not 0.62 (owner
+   * requests, 2026-09-30, Track D; #149).
    */
   scale?: number;
   /**
@@ -732,6 +734,13 @@ const ANN_MARIE_LINES = ['That cap? Totally your color.', 'OK great :) now do it
 const BRANDON_LINES = ["Giddy up. Arcade's this way."] as const;
 const NICOLE_LINES = ["The client loved it. Next one's at 2."] as const;
 const JASON_LINES = ['Answer three and you may pass.'] as const;
+
+/**
+ * How the Mullet's design draws its Humans (#149): Jason, Nicole and Ann Marie
+ * at 0.5, everyone else but Tony at 0.58, all with dark nameplates.
+ */
+const MULLET_SMALL = { scale: 0.5, nameplate: 'dark' } as const;
+const MULLET_MEDIUM = { scale: 0.58, nameplate: 'dark' } as const;
 
 /**
  * `NPCS`: every prototype Room's NPC, keyed by `NpcId` (#36 D1). Names come
@@ -1708,9 +1717,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     idleLines: [],
     // The design jiggles him at the joystick rather than bobbing him.
     still: true,
-    // The Mullet draws Jason, Nicole and Ann Marie at 0.5, and their nameplates dark (#149).
-    scale: 0.5,
-    nameplate: 'dark',
+    ...MULLET_SMALL,
     // Hand-placed, left of his head.
     nameplateOffset: { x: -55.5, y: 15 },
     dialog: LINE_DIALOG,
@@ -1732,9 +1739,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     // opacity `0;1;1;0;0` at `keyTimes` `0;0.05;0.35;0.4;1`, fully shown from
     // 5% to 35% (owner request, 2026-10-01, Track D; it was a static line).
     idleLines: [{ text: 'hehe', periodS: 3, delayS: 0, window: [0.05, 0.35] }],
-    // The Mullet draws Jason, Nicole and Ann Marie at 0.5, and their nameplates dark (#149).
-    scale: 0.5,
-    nameplate: 'dark',
+    ...MULLET_SMALL,
     nameplateOffset: { y: -5 },
     dialog: LINE_DIALOG,
     figure: NICOLE_FIGURE,
@@ -1749,9 +1754,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     dialogLines: ANN_MARIE_LINES,
     // As Nicole's laugh, half a cycle later (`begin="1.5s"`).
     idleLines: [{ text: 'haha', periodS: 3, delayS: -1.5, window: [0.05, 0.35] }],
-    // The Mullet draws Jason, Nicole and Ann Marie at 0.5, and their nameplates dark (#149).
-    scale: 0.5,
-    nameplate: 'dark',
+    ...MULLET_SMALL,
     nameplateOffset: { y: -5 },
     dialog: LINE_DIALOG,
     figure: ANN_MARIE_FIGURE,
@@ -1771,9 +1774,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     bubbleOffsetX: 20,
     // The design walks her a loop of the room rather than bobbing her.
     still: true,
-    // The Mullet draws everyone else but Tony at 0.58, and their nameplates dark (#149).
-    scale: 0.58,
-    nameplate: 'dark',
+    ...MULLET_MEDIUM,
     dialog: LINE_DIALOG,
     figure: JORY_FIGURE,
   },
@@ -1793,9 +1794,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: 'Clucknelius coming at you!', periodS: 18, delayS: 0, window: [0.4111, 0.5333] },
       { text: 'Clucknelius coming at you!', periodS: 18, delayS: 0, window: [0.7056, 0.8278] },
     ],
-    // The Mullet draws everyone else but Tony at 0.58, and their nameplates dark (#149).
-    scale: 0.58,
-    nameplate: 'dark',
+    ...MULLET_MEDIUM,
     // Its bubble sits 7.6 px higher (#149).
     bubbleOffsetY: -7.6,
     dialog: LINE_DIALOG,
@@ -1836,9 +1835,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     idleLines: [],
     // The design sways him side to side with the rally rather than bobbing.
     still: true,
-    // The Mullet draws everyone else but Tony at 0.58, and their nameplates dark (#149).
-    scale: 0.58,
-    nameplate: 'dark',
+    ...MULLET_MEDIUM,
     nameplateOffset: { y: 19 },
     dialog: LINE_DIALOG,
     // The paddle is drawn at rest, as under reduced motion; his swing layer
@@ -1857,9 +1854,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     // scope, so his Interaction is Dialogue.
     idleLines: [],
     still: true,
-    // The Mullet draws everyone else but Tony at 0.58, and their nameplates dark (#149).
-    scale: 0.58,
-    nameplate: 'dark',
+    ...MULLET_MEDIUM,
     nameplateOffset: { y: 19 },
     dialog: LINE_DIALOG,
     figure: { ...BRANDON_FIGURE, paddle: 'left' },
@@ -1881,9 +1876,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: 'Undefeated. I always win.', periodS: 9.4, delayS: 0, window: [0, 0.1] },
       { text: 'Undefeated. I always win.', periodS: 9.4, delayS: 0, window: [0.88, 1] },
     ],
-    // The Mullet draws everyone else but Tony at 0.58, and their nameplates dark (#149).
-    scale: 0.58,
-    nameplate: 'dark',
+    ...MULLET_MEDIUM,
     dialog: LINE_DIALOG,
     // The Room design dresses him in running gear for his lap of the room,
     // which the renderer now draws (owner request, 2026-09-30, Track D).

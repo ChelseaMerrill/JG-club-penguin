@@ -7,6 +7,7 @@ import { teamRoom2 } from '../src/game/rooms/definitions/team-room-2';
 import { teamRoom3 } from '../src/game/rooms/definitions/team-room-3';
 import { teamRoom4 } from '../src/game/rooms/definitions/team-room-4';
 import { theMelt } from '../src/game/rooms/definitions/the-melt';
+import { theMullet } from '../src/game/rooms/definitions/the-mullet';
 import { npcSlotPoint, tileToScreen } from '../src/game/rooms/iso';
 import { NPCS, type NpcId } from '../src/npcs/npcs';
 import { GAME_HEIGHT, GAME_WIDTH } from '../src/game/stage-size';
@@ -177,10 +178,10 @@ test('Team Room 2: clicking Ian arrives, opens his dialog, and GRAB THE HAMMER o
 
 /**
  * #149: the Hallway's, Team Room 3's and Team Room 4's NPCs draw at their own
- * scales, with hand-placed nameplates (and, in Team Room 3, an exact slot
- * `offset`), so a click at the middle of each one's own click area still has to
- * arrive and open its dialog. Ian (Team Room 2) is covered above; Michael's
- * Beystadium launch is `beystadium.spec.ts`.
+ * scales (Millie's with a hand-placed nameplate and an exact slot `offset`), so a
+ * click at the middle of each one's own click area still has to arrive and open
+ * its dialog. Ian (Team Room 2) is covered above; Michael's Beystadium launch
+ * is `beystadium.spec.ts`; Jason's offset nameplate is covered below.
  */
 const HAND_PLACED_CLICKS: {
   room: RoomId;
@@ -217,6 +218,32 @@ for (const { room, definition, npcId, name } of HAND_PLACED_CLICKS) {
     expect(errors).toEqual([]);
   });
 }
+
+/**
+ * #149: Jason's nameplate hangs 55.5 px left of him, off his figure, so it has
+ * to be part of his click area: clicking its middle opens his dialog.
+ */
+test("The Mullet: clicking Jason's offset nameplate opens his dialog (#149)", async ({ page }) => {
+  const errors = await bootRoom(page, 'the-mullet');
+
+  const slot = theMullet.npcSlots.find((s) => s.npcId === 'jason-mullet');
+  if (!slot) throw new Error('expected the-mullet to have a "jason-mullet" NPC slot');
+  const feet = npcSlotPoint(slot, theMullet.grid.origin);
+  const layout = npcLayout(NPCS['jason-mullet']);
+  await clickStagePoint(page, {
+    x: feet.x + layout.nameplateCenterX,
+    y: feet.y + (layout.nameplateTopY + layout.nameplateBottomY) / 2,
+  });
+
+  await expect
+    .poll(async () => (await debugInfo(page))?.npcArrivedLog, { timeout: LONG_WALK_TIMEOUT })
+    .toContain('jason-mullet');
+  const dialog = page.locator('.npc-dialog');
+  await expect(dialog).toBeVisible();
+  await expect(dialog.locator('.npc-dialog__name')).toHaveText('Jason Jahnel');
+
+  expect(errors).toEqual([]);
+});
 
 /**
  * Clicking near Ian's head (not just his own tile centre) still opens his

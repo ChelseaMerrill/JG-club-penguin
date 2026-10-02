@@ -224,9 +224,10 @@ export const THE_MULLET_MOTIONS: Partial<Record<NpcId, NpcMotionSpec>> = {
   // from her hand to Jon, to where the design stands the Player's Penguin
   // (570, 500), then to Brandon. Her slot `offset` puts her exactly where the
   // design does and she draws at the design's 0.58, so each throw leaves
-  // from her hand's design position and lands on its target. Approximated: the design draws the
-  // flying chickens over every character; here they sort with Ashley, who
-  // stands in front of all three targets.
+  // from her hand's design position and lands on its target, give or take her
+  // 3 px bob at that moment. Approximated: the design draws the flying
+  // chickens over every character; here they sort with Ashley, who stands in
+  // front of all three targets.
   'ashley-mullet': {
     path: {
       keyframes:

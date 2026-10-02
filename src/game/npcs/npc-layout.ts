@@ -15,7 +15,11 @@ import type { NpcDefinition } from '../../npcs/npcs';
  * nameplate `y="337.4"`, bubble bottom `333.4`).
  */
 
-/** Every Room design draws Human NPCs at 0.62 (`width="74.4"`). */
+/**
+ * Most Room designs draw Human NPCs at 0.62 (`width="74.4"`); an NPC's own
+ * `scale` overrides it where its Room draws it smaller (Team Rooms 1-4, the
+ * Mullet).
+ */
 export const HUMAN_NPC_SCALE = 0.62;
 /** Every Room design draws Penguin NPCs at 0.58 (`width="69.6"`). */
 export const PENGUIN_NPC_SCALE = 0.58;
@@ -81,7 +85,7 @@ export function npcScale(npc: Pick<NpcDefinition, 'kind' | 'scale'>): number {
 }
 
 export function npcLayout(
-  npc: Pick<NpcDefinition, 'kind' | 'scale' | 'nameplateOffset'>,
+  npc: Pick<NpcDefinition, 'kind' | 'scale' | 'nameplateOffset'> & { tagName?: string },
 ): NpcLayout {
   const scale = npcScale(npc);
   // A hand-placed nameplate (#149) moves the nameplate, and the bubble and
@@ -95,6 +99,15 @@ export function npcLayout(
   // below the figure's own top.
   const hitTopY = Math.min(nameplateTopY, -FIGURE_HEIGHT * scale);
   const hitHeight = HIT_AREA_BELOW_FEET - hitTopY;
+  // A nameplate pushed sideways off the figure (Jason's) stays clickable: the
+  // area is then the bounding box of the figure's area and the nameplate.
+  let hitLeft = -HIT_AREA_WIDTH / 2;
+  let hitRight = HIT_AREA_WIDTH / 2;
+  if (nameplateCenterX !== 0) {
+    const half = estimateNameplateWidth(npc.tagName ?? '') / 2;
+    hitLeft = Math.min(hitLeft, nameplateCenterX - half);
+    hitRight = Math.max(hitRight, nameplateCenterX + half);
+  }
   return {
     scale,
     nameplateCenterX,
@@ -102,9 +115,9 @@ export function npcLayout(
     nameplateBottomY,
     bubbleBottomY: nameplateTopY - BUBBLE_GAP_ABOVE_NAMEPLATE,
     hitArea: {
-      centerX: 0,
+      centerX: (hitLeft + hitRight) / 2,
       centerY: hitTopY + hitHeight / 2,
-      width: HIT_AREA_WIDTH,
+      width: hitRight - hitLeft,
       height: hitHeight,
     },
   };
