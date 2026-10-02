@@ -551,14 +551,10 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
       names: ['blink'],
       comment: "Blinking '↙ TOWN CENTER' room-exit nav pill (HUD).",
     },
-    {
-      kind: 'selector',
-      selectors: [
-        'polygon[points="395,467.5 330,500 395,532.5 420,520 385,502.5 445,502.5 445,482.5 400,495"]',
-      ],
-      comment:
-        "#132: an unlabelled floor-arrow decal by the left wall that isn't a working door -- the Icebox's only real exit (Town Center) is the labelled elevator, not this arrow.",
-    },
+    // #132's floor-arrow rule is gone: the 2026-09-27 design resync removed
+    // that decal from `design/Room 03 The Icebox.dc.html` itself, so the
+    // selector matched nothing and failed the export (owner request,
+    // 2026-10-02, Track D).
     {
       kind: 'cluster',
       anchor: '← MAP',
@@ -1151,6 +1147,49 @@ const FOREGROUND_LAYERS: Partial<
       ],
       comment:
         'Desk E (the back-right desk), its monitor and keyboard: Alex Kelly sits behind it (owner request, 2026-10-02, Track D).',
+    },
+  ],
+  'the-icebox': [
+    {
+      name: 'conference-table',
+      selectors: [
+        'polygon[points="795,385 1045,510 945,560 695,435"]',
+        'polygon[points="695,477.5 945,602.5 945,560 695,435"]',
+        'polygon[points="1045,552.5 945,602.5 945,560 1045,510"]',
+        'polygon[points="795,369 1065,504 945,564 675,429"]',
+        'polygon[points="675,435 945,570 945,564 675,429"]',
+        'polygon[points="1065,510 945,570 945,564 1065,504"]',
+        'polygon[points="805,387 840,404.5 815,417 780,399.5"]',
+        'polygon[points="780,401.5 815,419 815,417 780,399.5"]',
+        'polygon[points="840,406.5 815,419 815,417 840,404.5"]',
+        'polygon[points="805,364.5 840,382 838,383 803,365.5"]',
+        'polygon[points="803,388 838,405.5 838,383 803,365.5"]',
+        'polygon[points="840,404.5 838,405.5 838,383 840,382"]',
+        'polygon[points="935,452 970,469.5 945,482 910,464.5"]',
+        'polygon[points="910,466.5 945,484 945,482 910,464.5"]',
+        'polygon[points="970,471.5 945,484 945,482 970,469.5"]',
+        'polygon[points="935,429.5 970,447 968,448 933,430.5"]',
+        'polygon[points="933,453 968,470.5 968,448 933,430.5"]',
+        'polygon[points="970,469.5 968,470.5 968,448 970,447"]',
+        'polygon[points="770,444.5 805,462 780,474.5 745,457"]',
+        'polygon[points="745,459 780,476.5 780,474.5 745,457"]',
+        'polygon[points="805,464 780,476.5 780,474.5 805,462"]',
+        'polygon[points="770,422 805,439.5 803,440.5 768,423"]',
+        'polygon[points="768,445.5 803,463 803,440.5 768,423"]',
+        'polygon[points="805,462 803,463 803,440.5 805,439.5"]',
+        'polygon[points="900,509.5 935,527 910,539.5 875,522"]',
+        'polygon[points="875,524 910,541.5 910,539.5 875,522"]',
+        'polygon[points="935,529 910,541.5 910,539.5 935,527"]',
+        'polygon[points="900,487 935,504.5 933,505.5 898,488"]',
+        'polygon[points="898,510.5 933,528 933,505.5 898,488"]',
+        'polygon[points="935,527 933,528 933,505.5 935,504.5"]',
+        'polygon[points="860,448.5 900,468.5 875,481 835,461"]',
+        'polygon[points="835,464 875,484 875,481 835,461"]',
+        'polygon[points="900,471.5 875,484 875,481 900,468.5"]',
+        'circle[cx="867.5"][cy="464.75"]',
+      ],
+      comment:
+        'The conference table, its four laptops and the speaker puck, drawn after the back row of chairs: Dan Bedian, Paul Carnival and Greg Westover sit in those chairs, behind it (owner request, 2026-10-02, Track D).',
     },
   ],
   'team-room-3': [

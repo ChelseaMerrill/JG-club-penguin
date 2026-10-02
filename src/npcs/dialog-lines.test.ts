@@ -22,6 +22,9 @@ const AWAITING_BA_LINE: readonly string[] = [
   'jesse-lucier',
   'alex-kelly',
   'alex-nikolis',
+  'dan-bedian',
+  'paul-carnival',
+  'greg-westover',
 ];
 
 /**
