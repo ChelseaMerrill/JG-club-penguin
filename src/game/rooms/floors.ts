@@ -73,6 +73,7 @@ export function rideDurationMs(from: FloorId, to: FloorId, msPerFloor = MS_PER_F
 export function floorsBetween(from: FloorId, to: FloorId): FloorId[] {
   const fromIndex = FLOOR_ORDER.indexOf(from);
   const toIndex = FLOOR_ORDER.indexOf(to);
+  if (fromIndex === toIndex) return [];
   const step = toIndex > fromIndex ? 1 : -1;
   const between: FloorId[] = [];
   for (let i = fromIndex + step; i !== toIndex && i >= 0 && i < FLOOR_ORDER.length; i += step) {

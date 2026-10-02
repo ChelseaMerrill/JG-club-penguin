@@ -50,7 +50,7 @@ The in-game map screen, opened from the HUD. Clicking a prototype Room on the Ma
 The heads-up display drawn over every Room: the Room title, the Token balance, the chat field, and buttons for the Penguin Creator, the Map, the Igloo and the menu. The Emote, Snowball mode and Quest buttons appear only when their stretch work lands. It is part of the DOM overlay layer on the Stage, not the game canvas, and clicks on it never move the Penguin.
 
 **Elevator screen**
-The full-Stage overlay shown whenever a Room change crosses floors, reached through a door or the Map like any other Room change. A ride lasts 1.2s for each floor crossed (5 to R 1.2s, L to 5 6s, L to R 7.2s); the screen hides at the later of the ride's end and the destination Room being ready. Town Center, Dev Pit and The Melt are floor 5; the Roof Deck is one floor up, R; the Igloo has no floor at all, so it never shows the Elevator.
+The full-Stage overlay shown whenever a Room change crosses floors, reached through a door or the Map like any other Room change. A ride lasts 1.2s for each floor crossed (5 to R 1.2s, L to 5 6s, L to R 7.2s); the screen hides at the later of the ride's end and the destination Room being ready (at most 10s). Town Center, Dev Pit and The Melt are floor 5; the Roof Deck is one floor up, R; the Igloo has no floor at all, so it never shows the Elevator.
 
 **Landing page**
 The screen signed-out visitors see, with the logo and sign-in buttons (PLAY NOW and LOG IN, both Google sign-in). It covers the whole Stage and replaced the earlier login card.

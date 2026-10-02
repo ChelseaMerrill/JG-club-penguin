@@ -354,7 +354,7 @@ test.describe('ride length (#163)', () => {
     expect(errors).toEqual([]);
   });
 
-  test('the real Town Center -> Roof Deck door ride still lasts 1.2s, not longer', async ({
+  test('a Town Center -> Roof Deck changeRoom ride still lasts 1.2s, not longer', async ({
     page,
   }) => {
     test.setTimeout(60_000);
