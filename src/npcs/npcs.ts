@@ -277,10 +277,25 @@ interface NpcDefinitionBase {
   still?: boolean;
   /**
    * The Room design's draw scale for this NPC, when it isn't its kind's
-   * default (`npc-layout.ts`): Team Room 3 draws its Humans at 0.58
-   * (`width="69.6"`), not 0.62 (owner request, 2026-09-30, Track D).
+   * default (`npc-layout.ts`): Team Rooms 1 and 2 draw theirs at 70/120,
+   * Team Room 3 and most of the Mullet at 0.58 (`width="69.6"`) and Team Room
+   * 4 (and the Mullet's Jason, Nicole and Ann Marie) at 0.5, not 0.62 (owner
+   * requests, 2026-09-30, Track D; #149).
    */
   scale?: number;
+  /**
+   * The nameplate pill's style (#149): `'light'` (`#F4F4F4`, a Human's
+   * default) or `'dark'` (`#161719`, a Penguin-kind NPC's default). The Team
+   * Rooms and the Mullet draw their Humans' with the dark one.
+   */
+  nameplate?: 'light' | 'dark';
+  /**
+   * A hand-placed nameplate's Stage-px nudge from its layout position (#149),
+   * where a Room design sets it off its figure's head. The speech bubble and
+   * click area move with its `y`; it is not an NPC position (that stays a
+   * Tile, plus any slot `offset`).
+   */
+  nameplateOffset?: { x?: number; y?: number };
 }
 
 /** A Human NPC (`design/build/humans.js`'s figures), rendered by `render-npc-svg.ts`. */
@@ -646,6 +661,21 @@ const BRANDON_FIGURE: HumanFigureSpec = {
 };
 
 /**
+ * Tony Mercadante's figure (`humans.js`'s `mercadante`: `slick` hair and a
+ * `henley` collar), shared by the Mullet's `tony` and the Stairwell's
+ * `tony-stairwell-3` (#51 slice 4).
+ */
+const TONY_FIGURE: HumanFigureSpec = {
+  style: 'slick',
+  hair: 'dark',
+  skin: 'light',
+  top: '#6B2237',
+  collar: 'henley',
+  beard: 'stubble',
+  teeth: true,
+};
+
+/**
  * Nicole Roberts's figure, shared by the Icebox (`nicole`) and the Mullet
  * (`nicole-mullet`) (#51 slice 3), from `humans.js`'s spec. The Icebox's
  * laptop-on-lap pose is that entry's own override.
@@ -673,23 +703,6 @@ const JASON_FIGURE: HumanFigureSpec = {
   pattern2: '#8FB5D8',
   collar: 'button',
   glasses: 'thin',
-  teeth: true,
-};
-
-/**
- * Tony Mercadante's figure, shared by the Mullet (`tony`) and the Stairwell
- * (`tony-stairwell-3`) (#51 slice 4), from `humans.js`'s `mercadante`. That
- * spec has `slick` hair and a `henley` collar, neither of which the renderer
- * draws; the nearest it does are the short dark cut and a crew neck (#149
- * follow-up).
- */
-const TONY_FIGURE: HumanFigureSpec = {
-  style: 'shortDark',
-  hair: 'dark',
-  skin: 'light',
-  top: '#6B2237',
-  collar: 'crew',
-  beard: 'stubble',
   teeth: true,
 };
 
@@ -831,6 +844,13 @@ function guestLines(first: string, second: string): readonly [StairwellLine, Sta
     { text: second, delayS: -13 },
   ];
 }
+
+/**
+ * How the Mullet's design draws its Humans (#149): Jason, Nicole and Ann Marie
+ * at 0.5, everyone else but Tony at 0.58, all with dark nameplates.
+ */
+const MULLET_SMALL = { scale: 0.5, nameplate: 'dark' } as const;
+const MULLET_MEDIUM = { scale: 0.58, nameplate: 'dark' } as const;
 
 /**
  * `NPCS`: every prototype Room's NPC, keyed by `NpcId` (#36 D1). Names come
@@ -1585,6 +1605,10 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     idleLines: [
       { text: "Act natural. Camera's rolling.", periodS: 4, delayS: 0, window: [0.38, 0.76] },
     ],
+    // Team Rooms 1 and 2 draw their Humans at 70/120 (`width="70"`), and
+    // their nameplates dark (#149).
+    scale: 70 / 120,
+    nameplate: 'dark',
     dialog: LINE_DIALOG,
     // The Room design draws his hands and camera as its `jdown` group, after
     // his face (the resting pose of his camera raise, see
@@ -1605,6 +1629,10 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     idleLines: [
       { text: 'you gotta be faster than that', periodS: 6, delayS: 0, window: [0.39, 0.66] },
     ],
+    // Team Rooms 1 and 2 draw their Humans at 70/120 (`width="70"`), and
+    // their nameplates dark (#149).
+    scale: 70 / 120,
+    nameplate: 'dark',
     dialog: LINE_DIALOG,
     // The Room design dresses him in running kit for his lap of the Room.
     figure: DOM_RUNNER_FIGURE,
@@ -1622,6 +1650,10 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     // ENGINEERING" (#51 review fix 2): the trigger line and action/decline
     // labels are still Ian's own Bug Squash copy, shared via
     // `BUG_SQUASH_DIALOG`.
+    // Team Rooms 1 and 2 draw their Humans at 70/120 (`width="70"`), and
+    // their nameplates dark (#149).
+    scale: 70 / 120,
+    nameplate: 'dark',
     dialog: { ...BUG_SQUASH_DIALOG, subtitle: 'TEAM ROOM 2 · VP OF ENGINEERING' },
     figure: IAN_FIGURE,
   },
@@ -1639,6 +1671,9 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     still: true,
     // Team Room 3 draws its Humans at 0.58, not 0.62 (`width="69.6"`).
     scale: 0.58,
+    // Its nameplate is dark and sits higher than the layout puts it (#149).
+    nameplate: 'dark',
+    nameplateOffset: { y: -3 },
     dialog: LINE_DIALOG,
     figure: MILLIE_FIGURE,
   },
@@ -1658,6 +1693,9 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     still: true,
     // Team Room 3 draws its Humans at 0.58, not 0.62 (`width="69.6"`).
     scale: 0.58,
+    // Its nameplate is dark and sits lower than the layout puts it (#149).
+    nameplate: 'dark',
+    nameplateOffset: { y: 9 },
     dialog: LINE_DIALOG,
     // The Room design hands her an open laptop, which the Roof Deck's
     // `casey` doesn't carry (owner request, 2026-09-30, Track D).
@@ -1679,6 +1717,11 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     still: true,
     // Team Room 3 draws its Humans at 0.58, not 0.62 (`width="69.6"`).
     scale: 0.58,
+    // Its nameplate is dark and sits lower than the layout puts it (#149).
+    nameplate: 'dark',
+    nameplateOffset: { y: 7 },
+    // Its bubble sits 8 px higher (#149).
+    bubbleOffsetY: -8,
     dialog: LINE_DIALOG,
     // The Room design adds a headset, which Town Center's `sydney` doesn't
     // wear (owner request, 2026-09-30, Track D).
@@ -1697,6 +1740,12 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     // Team Room 4's design draws its NPCs without any idle bob.
     still: true,
     // #121: LET IT RIP launches Beystadium.
+    // Team Room 4 draws its Humans at 0.5 (`width="60"`), and their nameplates
+    // dark (#149).
+    scale: 0.5,
+    nameplate: 'dark',
+    // Its bubble sits 23 px higher (#149).
+    bubbleOffsetY: -23,
     dialog: BEYSTADIUM_DIALOG,
     figure: {
       style: 'shortDark',
@@ -1706,7 +1755,8 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       jacket: '#D9534F',
       collar: 'crew',
       glasses: 'rect',
-      beard: 'full',
+      // Stubble, as Team Room 4's design draws it (#149).
+      beard: 'stubble',
       teeth: true,
       prop: 'beyblade',
     },
@@ -1726,6 +1776,11 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     // No #36 idle bob: his Team Room 4 motion plays his Characters sheet
     // card's own `bob` instead (`src/npcs/motions/team-room-4.ts`).
     still: true,
+    // Team Room 4 draws its Humans at 0.5 (`width="60"`), and their nameplates
+    // dark (#149).
+    scale: 0.5,
+    nameplate: 'dark',
+    nameplateOffset: { y: -9.5 },
     dialog: LINE_DIALOG,
     figure: SAM_FIGURE,
   },
@@ -1744,6 +1799,10 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     // No #36 idle bob: his Team Room 4 motion plays his Characters sheet
     // card's own `bob` instead (`src/npcs/motions/team-room-4.ts`).
     still: true,
+    // Team Room 4 draws its Humans at 0.5 (`width="60"`), and their nameplates
+    // dark (#149).
+    scale: 0.5,
+    nameplate: 'dark',
     dialog: LINE_DIALOG,
     figure: RYAN_FIGURE,
   },
@@ -1768,9 +1827,14 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     idleLines: [],
     // The design jiggles him at the joystick rather than bobbing him.
     still: true,
+    ...MULLET_SMALL,
+    // Hand-placed, left of his head.
+    nameplateOffset: { x: -55.5, y: 15 },
     dialog: LINE_DIALOG,
-    // His hands go up to the controls while his Mullet motion plays (owner
-    // request, 2026-10-01, Track D); at rest they're at his sides as usual.
+    // His hands are up at the controls, where the design's animation starts
+    // them: drawn at rest (as under reduced motion), and by his Mullet
+    // motion's hand layers while it plays (owner requests, 2026-10-01 and
+    // 2026-10-02, Track D).
     figure: { ...JASON_FIGURE, arcadeHands: 'resting' },
   },
   'nicole-mullet': {
@@ -1785,6 +1849,8 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     // opacity `0;1;1;0;0` at `keyTimes` `0;0.05;0.35;0.4;1`, fully shown from
     // 5% to 35% (owner request, 2026-10-01, Track D; it was a static line).
     idleLines: [{ text: 'hehe', periodS: 3, delayS: 0, window: [0.05, 0.35] }],
+    ...MULLET_SMALL,
+    nameplateOffset: { y: -5 },
     dialog: LINE_DIALOG,
     figure: NICOLE_FIGURE,
   },
@@ -1798,6 +1864,8 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     dialogLines: ANN_MARIE_LINES,
     // As Nicole's laugh, half a cycle later (`begin="1.5s"`).
     idleLines: [{ text: 'haha', periodS: 3, delayS: -1.5, window: [0.05, 0.35] }],
+    ...MULLET_SMALL,
+    nameplateOffset: { y: -5 },
     dialog: LINE_DIALOG,
     figure: ANN_MARIE_FIGURE,
   },
@@ -1816,6 +1884,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     bubbleOffsetX: 20,
     // The design walks her a loop of the room rather than bobbing her.
     still: true,
+    ...MULLET_MEDIUM,
     dialog: LINE_DIALOG,
     figure: JORY_FIGURE,
   },
@@ -1835,8 +1904,12 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: 'Clucknelius coming at you!', periodS: 18, delayS: 0, window: [0.4111, 0.5333] },
       { text: 'Clucknelius coming at you!', periodS: 18, delayS: 0, window: [0.7056, 0.8278] },
     ],
+    ...MULLET_MEDIUM,
+    // Its bubble sits 7.6 px higher (#149).
+    bubbleOffsetY: -7.6,
     dialog: LINE_DIALOG,
-    figure: ASHLEY_FIGURE,
+    // The Mullet design gives her curly volume hair (#149).
+    figure: { ...ASHLEY_FIGURE, style: 'curlyVolume' },
   },
   tony: {
     id: 'tony',
@@ -1872,8 +1945,12 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     idleLines: [],
     // The design sways him side to side with the rally rather than bobbing.
     still: true,
+    ...MULLET_MEDIUM,
+    nameplateOffset: { y: 19 },
     dialog: LINE_DIALOG,
-    figure: JON_FIGURE,
+    // The paddle is drawn at rest, as under reduced motion; his swing layer
+    // replaces it while his motion plays (#149).
+    figure: { ...JON_FIGURE, paddle: 'right' },
   },
   'brandon-mullet': {
     id: 'brandon-mullet',
@@ -1887,8 +1964,10 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     // scope, so his Interaction is Dialogue.
     idleLines: [],
     still: true,
+    ...MULLET_MEDIUM,
+    nameplateOffset: { y: 19 },
     dialog: LINE_DIALOG,
-    figure: BRANDON_FIGURE,
+    figure: { ...BRANDON_FIGURE, paddle: 'left' },
   },
   'dom-mullet': {
     id: 'dom-mullet',
@@ -1907,6 +1986,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: 'Undefeated. I always win.', periodS: 9.4, delayS: 0, window: [0, 0.1] },
       { text: 'Undefeated. I always win.', periodS: 9.4, delayS: 0, window: [0.88, 1] },
     ],
+    ...MULLET_MEDIUM,
     dialog: LINE_DIALOG,
     // The Room design dresses him in running gear for his lap of the room,
     // which the renderer now draws (owner request, 2026-09-30, Track D).

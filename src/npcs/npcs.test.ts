@@ -175,6 +175,78 @@ describe('NPCS', () => {
     }
   });
 
+  it("draws the Team Rooms' and the Mullet's Humans as their Room designs do (#149)", () => {
+    // Dark nameplates: every Team Room and Mullet NPC except Tony.
+    const dark = Object.values(NPCS)
+      .filter((npc) => npc.nameplate === 'dark')
+      .map((npc) => npc.id)
+      .sort();
+    expect(dark).toEqual(
+      [
+        'jethro-team-room-1',
+        'dom-team-room-1',
+        'ian-team-room-2',
+        'millie-team-room-3',
+        'casey-team-room-3',
+        'sydney-team-room-3',
+        'michael',
+        'sam-team-room-4',
+        'ryan-team-room-4',
+        'jason-mullet',
+        'nicole-mullet',
+        'ann-marie-mullet',
+        'jory-mullet',
+        'ashley-mullet',
+        'jon-mullet',
+        'brandon-mullet',
+        'dom-mullet',
+      ].sort(),
+    );
+    expect(NPCS.tony.nameplate).toBeUndefined();
+
+    const scales: [NpcId, number][] = [
+      ['jethro-team-room-1', 70 / 120],
+      ['dom-team-room-1', 70 / 120],
+      ['ian-team-room-2', 70 / 120],
+      ['michael', 0.5],
+      ['sam-team-room-4', 0.5],
+      ['ryan-team-room-4', 0.5],
+      ['jason-mullet', 0.5],
+      ['nicole-mullet', 0.5],
+      ['ann-marie-mullet', 0.5],
+      ['jory-mullet', 0.58],
+      ['ashley-mullet', 0.58],
+      ['jon-mullet', 0.58],
+      ['brandon-mullet', 0.58],
+      ['dom-mullet', 0.58],
+    ];
+    for (const [id, scale] of scales) expect(NPCS[id].scale, id).toBeCloseTo(scale, 10);
+    expect(NPCS.tony.scale).toBeUndefined();
+
+    const offsets: [NpcId, { x?: number; y?: number }][] = [
+      ['millie-team-room-3', { y: -3 }],
+      ['casey-team-room-3', { y: 9 }],
+      ['sydney-team-room-3', { y: 7 }],
+      ['sam-team-room-4', { y: -9.5 }],
+      ['jason-mullet', { x: -55.5, y: 15 }],
+      ['jon-mullet', { y: 19 }],
+      ['brandon-mullet', { y: 19 }],
+      ['nicole-mullet', { y: -5 }],
+      ['ann-marie-mullet', { y: -5 }],
+    ];
+    for (const [id, offset] of offsets) expect(NPCS[id].nameplateOffset, id).toEqual(offset);
+
+    expect(NPCS['sydney-team-room-3'].bubbleOffsetY).toBe(-8);
+    expect(NPCS.michael.bubbleOffsetY).toBe(-23);
+    expect(NPCS['ashley-mullet'].bubbleOffsetY).toBe(-7.6);
+
+    const michael = NPCS.michael;
+    const tony = NPCS.tony;
+    if (michael.kind !== 'human' || tony.kind !== 'human') throw new Error('expected Humans');
+    expect(michael.figure.beard).toBe('stubble');
+    expect(tony.figure).toMatchObject({ style: 'slick', collar: 'henley' });
+  });
+
   it(
     "never shows an NPC's bubble over another NPC's bubble or nameplate while every NPC " +
       'stands at its rest slot: any two lines whose visible windows overlap in time have ' +
@@ -207,8 +279,8 @@ describe('NPCS', () => {
             npcId: npc.id,
             tagName: npc.tagName,
             rect: {
-              left: feet.x - width / 2,
-              right: feet.x + width / 2,
+              left: feet.x + layout.nameplateCenterX - width / 2,
+              right: feet.x + layout.nameplateCenterX + width / 2,
               top: feet.y + layout.nameplateTopY,
               bottom: feet.y + layout.nameplateBottomY,
             },
@@ -253,16 +325,16 @@ describe('NPCS', () => {
         }
       }
       // Overlaps the Room design itself draws at rest, kept as designed: the
-      // Mullet's Dom and Jory stand where the design starts their lap (their
-      // slot `offset`s, #189), where Dom's bubble crosses Nicole's nameplate
-      // and Jory's crosses Brandon's. Both walk off it at once. (Dev Pit's old
-      // Steven-over-Ryan overlap went when Ryan left, 2026-09-30.)
+      // Mullet's Jory stands where the design starts her lap (her slot
+      // `offset`, #189), where her bubble crosses Brandon's nameplate. She
+      // walks off it at once. (Dev Pit's old Steven-over-Ryan overlap went
+      // when Ryan left, 2026-09-30; the Mullet's Dom-over-Nicole one went when
+      // the Mullet's NPCs took their design scales and nameplate offsets, #149.)
       // The Stairwell's floor-2 and floor-4 guests too (#51 slice 4):
       // design/Stairwell.dc.html draws Sydney's "Stairs build character." at
       // x 670.6 and Jory's two bubbles at x 669.2 and 665.4, each over the
       // right end of Jason's nameplate (x 564-676, y 487.4-507.4).
       const drawnByTheDesign: string[] = [
-        `the-mullet: dom-mullet "Undefeated. I always win." x nicole-mullet's nameplate "Nicole"`,
         `the-mullet: jory-mullet "Tribe has spoken." x brandon-mullet's nameplate "Brandon"`,
         `stairwell-2: sydney-stairwell-2 "Stairs build character." x jason-stairwell-2's nameplate "Jason Jahnel"`,
         `stairwell-4: jory-stairwell-4 "Outwit. Outplay. Outclimb." x jason-stairwell-4's nameplate "Jason Jahnel"`,
@@ -672,8 +744,6 @@ describe('NPCS', () => {
       // #51 slice 3: the Mullet.
       ['ann-marie-mullet', 'ann-marie'],
       ['jory-mullet', 'jory'],
-      ['ashley-mullet', 'ashley'],
-      ['brandon-mullet', 'brandon'],
       // Both Dom's running-kit appearances (owner request, 2026-09-30).
       ['dom-mullet', 'dom-team-room-1'],
     ];
@@ -698,7 +768,11 @@ describe('NPCS', () => {
       ['sam', 'sam-team-room-4', { marker: expect.anything() }],
       // Town Center's Jon holds playing cards and the Icebox's Nicole has a
       // laptop on her lap; the Mullet's design draws neither (#51 slice 3).
-      ['jon', 'jon-mullet', { cards: true }],
+      // The Mullet's Jon and Brandon hold a ping-pong paddle at rest (#149).
+      ['jon', 'jon-mullet', { cards: true, paddle: undefined }],
+      ['brandon-mullet', 'brandon', { paddle: 'left' }],
+      // The Mullet's design draws Ashley's hair as curly volume (#149).
+      ['ashley-mullet', 'ashley', { style: 'curlyVolume' }],
       ['nicole', 'nicole-mullet', { seated: 'laptop' }],
       // Team Room 3's Casey holds an open laptop and its Sydney wears a
       // headset; the Roof Deck's and Town Center's designs draw neither.
