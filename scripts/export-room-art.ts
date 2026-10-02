@@ -709,21 +709,10 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
       texts: ['You'],
       comment: "The local player's static figure and nameplate.",
     },
-    {
-      kind: 'selector',
-      selectors: [
-        'polygon[points="675,605.5 705,620.5 670,638 680,643 625,645.5 630,618 640,623"]',
-      ],
-      comment:
-        "First of two non-working floor arrow decals in this Room (#132): this Room's only working exit is the 'HALLWAY ↓' HUD nav pill below, not this floor paint.",
-    },
-    {
-      kind: 'selector',
-      selectors: [
-        'polygon[points="890,713 920,728 885,745.5 895,750.5 840,753 845,725.5 855,730.5"]',
-      ],
-      comment: 'Second non-working floor arrow decal in this Room (#132), same reasoning as above.',
-    },
+    // #132's two floor-arrow rules are gone: the 2026-09-27 design resync
+    // removed both decals from `design/Team Room 2.dc.html` itself, so the
+    // selectors matched nothing and failed the export (owner request,
+    // 2026-10-02, Track D).
     {
       kind: 'animation',
       names: ['blink'],
@@ -1147,6 +1136,52 @@ const FOREGROUND_LAYERS: Partial<
       ],
       comment:
         'Desk E (the back-right desk), its monitor and keyboard: Alex Kelly sits behind it (owner request, 2026-10-02, Track D).',
+    },
+  ],
+  'team-room-2': [
+    {
+      name: 'frank-desk',
+      selectors: [
+        'polygon[points="535,448 645,503 595,528 485,473"]',
+        'polygon[points="485,520.5 595,575.5 595,528 485,473"]',
+        'polygon[points="645,550.5 595,575.5 595,528 645,503"]',
+        'polygon[points="535,441.5 650,499 595,526.5 480,469"]',
+        'polygon[points="480,473 595,530.5 595,526.5 480,469"]',
+        'polygon[points="650,503 595,530.5 595,526.5 650,499"]',
+        'polygon[points="530,451.5 575,474 571,476 526,453.5"]',
+        'polygon[points="526,481 571,503.5 571,476 526,453.5"]',
+        'polygon[points="575,501.5 571,503.5 571,476 575,474"]',
+        'polygon[points="560,464.5 595,482 582.5,488.3 547.5,470.8"]',
+        'polygon[points="547.5,472.8 582.5,490.3 582.5,488.3 547.5,470.8"]',
+        'polygon[points="595,484 582.5,490.3 582.5,488.3 595,482"]',
+        'polygon[points="550,478 670,538 620,563 500,503"]',
+        'polygon[points="500,528 620,588 620,563 500,503"]',
+        'polygon[points="670,563 620,588 620,563 670,538"]',
+        'polygon[points="550,448 670,508 655,515.5 535,455.5"]',
+        'polygon[points="535,485.5 655,545.5 655,515.5 535,455.5"]',
+        'polygon[points="670,538 655,545.5 655,515.5 670,508"]',
+      ],
+      comment:
+        'The left desk, its monitor and keyboard, drawn after its chair, and the couch drawn after that: Frank Nardone sits in the chair, behind both (owner request, 2026-10-02, Track D).',
+    },
+    {
+      name: 'nick-desk',
+      selectors: [
+        'polygon[points="845,603 955,658 905,683 795,628"]',
+        'polygon[points="795,675.5 905,730.5 905,683 795,628"]',
+        'polygon[points="955,705.5 905,730.5 905,683 955,658"]',
+        'polygon[points="845,596.5 960,654 905,681.5 790,624"]',
+        'polygon[points="790,628 905,685.5 905,681.5 790,624"]',
+        'polygon[points="960,658 905,685.5 905,681.5 960,654"]',
+        'polygon[points="840,606.5 885,629 881,631 836,608.5"]',
+        'polygon[points="836,636 881,658.5 881,631 836,608.5"]',
+        'polygon[points="885,656.5 881,658.5 881,631 885,629"]',
+        'polygon[points="870,619.5 905,637 892.5,643.3 857.5,625.8"]',
+        'polygon[points="857.5,627.8 892.5,645.3 892.5,643.3 857.5,625.8"]',
+        'polygon[points="905,639 892.5,645.3 892.5,643.3 905,637"]',
+      ],
+      comment:
+        'The front desk, its monitor and keyboard, drawn after its chair: Nick Brown sits in that chair, behind it (owner request, 2026-10-02, Track D).',
     },
   ],
   'team-room-1': [

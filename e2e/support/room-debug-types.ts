@@ -87,6 +87,8 @@ export interface RoomDebugInfo {
   guard?: { npcId: string; tile: Tile; doorLabel: string | null; blocking: boolean } | null;
   /** Ashley's chicken toss in the Dev Pit, or `null` without one (other Rooms, reduced motion). */
   chickenToss?: { tosses: number; lastTargetId: string | null; flying: boolean } | null;
+  /** Each NPC watching the Player by npcId: its current lean, in radians (+ leans right). */
+  watching?: Record<string, number>;
 }
 
 /** One NPC's motion state (#113). */
