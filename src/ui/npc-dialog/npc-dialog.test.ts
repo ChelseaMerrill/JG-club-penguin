@@ -461,7 +461,8 @@ describe('createNpcDialog quest givers (#144)', () => {
 
   it('shows "Got any work for me?" for Jon, after his line, and not for Steven', () => {
     const { root } = setup();
-    gameEvents.emit('npc:arrived', { npcId: 'jon' });
+    // The Mullet's Jon: his quest-giver appearance since he left Town Center.
+    gameEvents.emit('npc:arrived', { npcId: 'jon-mullet' });
     const button = questButton(root);
     expect(button?.textContent).toBe('Got any work for me?');
     expect(lineText(root)).toBe('Welcome to JG. Sunglasses stay on.');
@@ -475,7 +476,7 @@ describe('createNpcDialog quest givers (#144)', () => {
 
   it("answers Jon's click with his nothing-right-now line and keeps the dialog open", () => {
     const { root } = setup();
-    gameEvents.emit('npc:arrived', { npcId: 'jon' });
+    gameEvents.emit('npc:arrived', { npcId: 'jon-mullet' });
     questButton(root)!.click();
     expect(lineText(root)).toBe('Just enjoy the tour. Sunglasses stay on.');
     expect(panel(root).hidden).toBe(false);
@@ -483,7 +484,14 @@ describe('createNpcDialog quest givers (#144)', () => {
 
   it('shows no button for a quest giver still waiting on BA copy and a Quest', () => {
     const { root } = setup();
-    for (const npcId of ['ashley', 'sydney', 'jory', 'nicole', 'michael', 'ian'] as const) {
+    for (const npcId of [
+      'ashley',
+      'sydney-team-room-3',
+      'jory',
+      'nicole',
+      'michael',
+      'ian',
+    ] as const) {
       gameEvents.emit('npc:arrived', { npcId });
       expect(questButton(root), npcId).toBeNull();
       overlays!.close(NPC_DIALOG_OVERLAY_ID);
@@ -493,7 +501,7 @@ describe('createNpcDialog quest givers (#144)', () => {
   it('shows no button on the appearances a Quest does not name (Q17)', () => {
     const quests: NpcDialogQuests = { status: () => mainQuestStatus({}), canStart: () => true };
     const { root } = setup({ quests });
-    for (const npcId of ['sydney-team-room-3', 'ian-team-room-2', 'steven'] as const) {
+    for (const npcId of ['sydney', 'ian-team-room-2', 'steven'] as const) {
       gameEvents.emit('npc:arrived', { npcId });
       expect(questButton(root), npcId).toBeNull();
       overlays!.close(NPC_DIALOG_OVERLAY_ID);

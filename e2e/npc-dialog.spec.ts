@@ -3,7 +3,6 @@ import { expect, test, type Page } from '@playwright/test';
 import type { RoomId } from '../src/contracts';
 import { npcLayout } from '../src/game/npcs/npc-layout';
 import { devPit } from '../src/game/rooms/definitions/dev-pit';
-import { townCenter } from '../src/game/rooms/definitions/town-center';
 import { npcSlotPoint } from '../src/game/rooms/iso';
 import type { RoomDefinition } from '../src/game/rooms/room-definition';
 import { GAME_HEIGHT, GAME_WIDTH } from '../src/game/stage-size';
@@ -102,12 +101,19 @@ test("Dev Pit: Ashley's dialog shows a different line each time it opens", async
   expect(errors).toEqual([]);
 });
 
-test('Town Center: Jon offers "Got any work for me?" and answers with his nothing-right-now line', async ({
+test('The Mullet: Jon offers "Got any work for me?" and answers with his nothing-right-now line', async ({
   page,
 }) => {
-  const errors = await bootRoom(page, 'town-center');
-
-  await openDialog(page, townCenter, 'jon');
+  // His quest-giver appearance since he left Town Center (owner request,
+  // 2026-10-02, Track D). He sways with the ping-pong rally there, so this
+  // clicks where he is now rather than his slot point.
+  const errors = await bootRoom(page, 'the-mullet');
+  const jon = (await debugInfo(page))?.npcs?.['jon-mullet'];
+  if (!jon) throw new Error('no jon-mullet in the Mullet');
+  await clickStagePoint(page, { x: jon.x, y: jon.y + HIT_ZONE_OFFSET_Y });
+  const dialog = page.locator('.npc-dialog');
+  await expect(dialog).toBeVisible({ timeout: LONG_WALK_TIMEOUT });
+  await expect(dialog.locator('.npc-dialog__name')).toHaveText('Jon Keller');
   const offer = page.getByRole('button', { name: 'Got any work for me?' });
   await expect(offer).toBeVisible();
   await offer.click();

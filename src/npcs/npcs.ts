@@ -743,7 +743,6 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     kind: 'human',
     tagName: 'Jon Keller',
     dialogLines: JON_LINES,
-    questGiver: { nothingRightNowLine: 'Just enjoy the tour. Sunglasses stay on.' },
     // `sayJon` shows the same line twice per 14 s cycle: 19%-32% and 61%-74%.
     idleLines: [
       { text: 'Wanna see a magic trick?', periodS: 14, delayS: 0, window: [0.19, 0.32] },
@@ -764,7 +763,6 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     // `design/Club JenGuin HUD Menus.dc.html`'s Town Center scene gives her
     // one more line; it's this appearance's own, not Team Room 3's.
     dialogLines: [...SYDNEY_LINES, 'lobby snowball fight?'],
-    questGiver: {},
     // `saySyd` (21%-33%) and `saySyd2` (60%-84%), 24 s, no delay.
     idleLines: [
       { text: 'Look what we won!', periodS: 24, delayS: 0, window: [0.21, 0.33] },
@@ -1431,6 +1429,9 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     kind: 'human',
     tagName: 'Sydney',
     dialogLines: SYDNEY_LINES,
+    // Her quest-giver appearance now she has left Town Center (owner
+    // request, 2026-10-02, Track D).
+    questGiver: {},
     idleLines: staticLine('So, open to new roles?'),
     // Team Room 3's design draws its NPCs without any idle bob.
     still: true,
@@ -1633,6 +1634,9 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     kind: 'human',
     tagName: 'Jon',
     dialogLines: JON_LINES,
+    // His quest-giver appearance now he has left Town Center (owner request,
+    // 2026-10-02, Track D).
+    questGiver: { nothingRightNowLine: 'Just enjoy the tour. Sunglasses stay on.' },
     // At the ping-pong table, with no bubble.
     idleLines: [],
     // The design sways him side to side with the rally rather than bobbing.
