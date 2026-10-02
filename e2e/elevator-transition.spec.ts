@@ -1,13 +1,18 @@
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 import { expect, test, type Page } from '@playwright/test';
+import { DEFAULT_LOOK } from '../src/contracts';
+import { penguinLookHash } from '../src/game/penguin/look-hash';
 import { townCenter } from '../src/game/rooms/definitions/town-center';
 import { GAME_HEIGHT, GAME_WIDTH } from '../src/game/stage-size';
+import { freezeRideAt, rideFloors, waitForElevatorHidden } from './support/elevator';
 import type { RoomDebugInfo } from './support/room-debug-types';
 
 const BOOT_TIMEOUT = 15_000;
 const WALK_TIMEOUT = 15_000;
 /**
- * The Elevator's own real `minDurationMs` (1200ms, `elevator-screen.ts`)
- * minus generous CI-jitter slack -- not a fixed wait, just the threshold the
+ * The Elevator's own real ride length for one floor crossed (1200ms,
+ * `MS_PER_FLOOR` in `floors.ts`) minus generous CI-jitter slack -- not a fixed wait, just the threshold the
  * observed show->hide duration must clear (#52 AC).
  */
 const MIN_ELEVATOR_DURATION_MS = 1150;
@@ -135,7 +140,7 @@ test('Elevator shows crossing Town Center -> Roof Deck via the door, hides once 
   // start a second transition. Checked and clicked in a single `evaluate`
   // round-trip (rather than a separate assertion followed by a separate
   // `page.mouse.click`), so there's no gap in which the overlay's own
-  // `minDurationMs` could elapse between confirming the click point resolves
+  // ride length could elapse between confirming the click point resolves
   // to the overlay and actually clicking it -- both happen in the same
   // browser-side tick, at the point the door itself sits at.
   const canvasBox = await page.locator('#game canvas').boundingBox();
@@ -194,7 +199,7 @@ test('the progress bar fills gradually over the ride rather than showing full in
   await page.evaluate(() => window.__roomDebug?.changeRoom?.('roof-deck'));
   await expect(page.locator('.elevator-screen')).toBeVisible({ timeout: WALK_TIMEOUT });
 
-  // ~300ms into the 1.2s minimum ride: the bar must still be filling, not
+  // ~300ms into the 1.2s ride: the bar must still be filling, not
   // already full (the MAJOR bug: a `width` transition never runs while the
   // overlay is `display: none`, so it used to jump straight to 100%).
   await page.waitForTimeout(300);
@@ -202,7 +207,7 @@ test('the progress bar fills gradually over the ride rather than showing full in
   expect(midRide.barWidth).toBeLessThan(midRide.trackWidth * 0.75);
   await page.screenshot({ path: 'test-results/elevator-transition/mid-ride.png' });
 
-  // ~1150ms in, near the end of the 1.2s minimum: the bar is (near) full.
+  // ~1150ms in, near the end of the 1.2s ride: the bar is (near) full.
   await page.waitForTimeout(850);
   const nearEnd = await progressBarMetrics(page);
   expect(nearEnd.barWidth).toBeGreaterThanOrEqual(nearEnd.trackWidth * 0.95);
@@ -286,4 +291,332 @@ test('the Igloo never shows the Elevator (Town Center -> Igloo) (#52)', async ({
   await expect(page.locator('.elevator-screen')).toBeHidden();
 
   expect(errors).toEqual([]);
+});
+
+// ---------------------------------------------------------------------------
+// #163: the design's scenery, the ride length and the one-clock ride display.
+// ---------------------------------------------------------------------------
+
+/** 1618x918 gives the Stage its exact 1600x900 (the ring sits outside it), so evidence is 1:1 with the design. */
+const STAGE_VIEWPORT = { width: GAME_WIDTH + 18, height: GAME_HEIGHT + 18 };
+const EVIDENCE_DIR = 'test-results/elevator-transition';
+/** The design's own mid-ride sample: 3.84s into L -> 5 (`PASSING FLOOR 3 ... 64%`). */
+const MID_RIDE_MS = 3840;
+
+/** The `.elevator-screen`'s box must be the Stage's own 1600x900 for 1:1 evidence. */
+async function expectStageSized(page: Page): Promise<void> {
+  const box = await page.locator('.elevator-screen').boundingBox();
+  expect(Math.round(box?.width ?? 0)).toBe(GAME_WIDTH);
+  expect(Math.round(box?.height ?? 0)).toBe(GAME_HEIGHT);
+}
+
+async function chipBackground(page: Page, floor: string): Promise<string> {
+  return page.evaluate((id) => {
+    const chip = [...document.querySelectorAll<HTMLElement>('.elevator-screen__floor')].find(
+      (node) => node.textContent === id,
+    );
+    if (!chip) throw new Error(`floor chip ${id} not found`);
+    return getComputedStyle(chip).backgroundColor;
+  }, floor);
+}
+
+async function bootAsPlayer(page: Page, query = '?asPlayer'): Promise<void> {
+  await page.goto(`/${query}`);
+  await waitForBoot(page);
+  await expect.poll(async () => (await debugInfo(page))?.roomId).toBe('town-center');
+}
+
+test.describe('ride length (#163)', () => {
+  test('an L -> 5 ride lasts about 6s (1.2s for each of five floors)', async ({ page }) => {
+    test.setTimeout(60_000);
+    const errors = collectErrors(page);
+
+    await bootAsPlayer(page);
+    await installElevatorObserver(page);
+    await rideFloors(page, 'L', '5');
+    await expect(page.locator('.elevator-screen')).toBeVisible();
+    await waitForElevatorHidden(page);
+
+    const log = await elevatorLog(page);
+    expect(log.map((entry) => entry.type)).toEqual(['show', 'hide']);
+    const duration = log[1]!.at - log[0]!.at;
+    expect(duration).toBeGreaterThanOrEqual(5950);
+    expect(duration).toBeLessThan(9000);
+
+    expect(errors).toEqual([]);
+  });
+
+  test('the real Town Center -> Roof Deck door ride still lasts 1.2s, not longer', async ({
+    page,
+  }) => {
+    test.setTimeout(60_000);
+    const errors = collectErrors(page);
+
+    await bootAsPlayer(page);
+    await installElevatorObserver(page);
+    await page.evaluate(() => window.__roomDebug?.changeRoom?.('roof-deck'));
+    await waitForElevatorHidden(page);
+
+    const log = await elevatorLog(page);
+    expect(log.map((entry) => entry.type)).toEqual(['show', 'hide']);
+    const duration = log[1]!.at - log[0]!.at;
+    expect(duration).toBeGreaterThanOrEqual(MIN_ELEVATOR_DURATION_MS);
+    expect(duration).toBeLessThan(3000);
+
+    expect(errors).toEqual([]);
+  });
+});
+
+test.describe('the ride display (#163)', () => {
+  test.use({ viewport: STAGE_VIEWPORT });
+
+  test('floors 1-4 flash in turn as the car passes them (L -> 5)', async ({ page }) => {
+    test.setTimeout(60_000);
+    const errors = collectErrors(page);
+
+    await bootAsPlayer(page);
+    await rideFloors(page, 'L', '5');
+    await expect(page.locator('.elevator-screen')).toBeVisible();
+
+    for (let k = 0; k < 4; k++) {
+      await freezeRideAt(page, k * 1200 + 660);
+      for (let floor = 1; floor <= 4; floor++) {
+        expect(await chipBackground(page, String(floor))).toBe(
+          floor === k + 1 ? 'rgb(242, 193, 46)' : 'rgba(0, 0, 0, 0)',
+        );
+      }
+    }
+
+    expect(errors).toEqual([]);
+  });
+
+  test('the indicator, status and bar read one clock mid-ride (the design sample, 3.84s)', async ({
+    page,
+  }) => {
+    test.setTimeout(60_000);
+    const errors = collectErrors(page);
+
+    await bootAsPlayer(page);
+    await rideFloors(page, 'L', '5');
+    await freezeRideAt(page, MID_RIDE_MS);
+
+    const screen = page.locator('.elevator-screen');
+    await expect(screen.locator('.elevator-screen__going')).toHaveText('GOING UP');
+    await expect(screen.locator('.elevator-screen__arrow')).toHaveText('▲ 3');
+    await expect(screen.locator('.elevator-screen__next')).toHaveText('NEXT · 5');
+    await expect(screen.locator('.elevator-screen__status')).toHaveText(
+      'PASSING FLOOR 3 · POLISHING THE ICE… 64%',
+    );
+    const { barWidth, trackWidth } = await progressBarMetrics(page);
+    expect(Math.abs((barWidth / trackWidth) * 100 - 64)).toBeLessThanOrEqual(1.5);
+    await expect(screen.locator('.elevator-screen__hex--lit')).toHaveText('3');
+
+    await freezeRideAt(page, 6000);
+    await expect(screen.locator('.elevator-screen__arrow')).toHaveText('▲ 5');
+    await expect(screen.locator('.elevator-screen__status')).toHaveText(
+      'PASSING FLOOR 5 · POLISHING THE ICE… 100%',
+    );
+    const end = await progressBarMetrics(page);
+    expect(end.barWidth).toBeGreaterThanOrEqual(end.trackWidth * 0.99);
+    await page.screenshot({ path: `${EVIDENCE_DIR}/arrival.png` });
+
+    expect(errors).toEqual([]);
+  });
+
+  test('going down reverses the arrow, the GOING text and the shaft lights (real Roof Deck -> The Melt)', async ({
+    page,
+  }) => {
+    test.setTimeout(60_000);
+    const errors = collectErrors(page);
+
+    await bootAsPlayer(page);
+    const shaftDirection = (): Promise<string> =>
+      page.evaluate(
+        () =>
+          getComputedStyle(document.querySelector('.elevator-screen__shaft-lights')!)
+            .animationDirection,
+      );
+
+    await page.evaluate(() => window.__roomDebug?.changeRoom?.('roof-deck'));
+    await expect(page.locator('.elevator-screen')).toBeVisible();
+    await expect(page.locator('.elevator-screen__going')).toHaveText('GOING UP');
+    expect(await shaftDirection()).toBe('normal');
+    await waitForElevatorHidden(page);
+
+    await page.evaluate(() => window.__roomDebug?.changeRoom?.('the-melt'));
+    await expect(page.locator('.elevator-screen')).toBeVisible();
+    await expect(page.locator('.elevator-screen__going')).toHaveText('GOING DOWN');
+    await expect(page.locator('.elevator-screen__arrow')).toHaveText('▼ R');
+    expect(await shaftDirection()).toBe('reverse');
+    await page.screenshot({ path: `${EVIDENCE_DIR}/going-down.png` });
+    await waitForElevatorHidden(page);
+
+    expect(errors).toEqual([]);
+  });
+
+  test('the Penguin shows the Player Look and Penguin Creator name, never "You" (?asPlayer=Pebble)', async ({
+    page,
+  }) => {
+    test.setTimeout(60_000);
+    const errors = collectErrors(page);
+
+    await bootAsPlayer(page, '?asPlayer=Pebble');
+    await rideFloors(page, 'L', '5');
+    await freezeRideAt(page, MID_RIDE_MS);
+
+    const screen = page.locator('.elevator-screen');
+    await expect(screen.locator('.elevator-screen__name-tag')).toHaveText('Pebble');
+    await expect(screen.getByText('You', { exact: true })).toHaveCount(0);
+    await expect(screen.locator('.elevator-screen__penguin-art')).toHaveAttribute(
+      'data-look-hash',
+      penguinLookHash({ ...DEFAULT_LOOK, name: 'Pebble' }),
+    );
+    await screen.locator('.elevator-screen__penguin').screenshot({
+      path: `${EVIDENCE_DIR}/name-tag.png`,
+    });
+
+    expect(errors).toEqual([]);
+  });
+
+  test('a bare ?asPlayer Penguin is unnamed, so no tag shows', async ({ page }) => {
+    const errors = collectErrors(page);
+
+    await bootAsPlayer(page);
+    await rideFloors(page, 'L', '5');
+    await freezeRideAt(page, MID_RIDE_MS);
+
+    await expect(page.locator('.elevator-screen__name-tag')).toBeHidden();
+
+    expect(errors).toEqual([]);
+  });
+
+  test('reduced motion shows the arrival state at once, with no animations, for the full ride', async ({
+    page,
+  }) => {
+    test.setTimeout(60_000);
+    const errors = collectErrors(page);
+
+    await page.emulateMedia({ reducedMotion: 'reduce' });
+    await bootAsPlayer(page, '?asPlayer=Pebble');
+    await page.evaluate(() => {
+      (window as Window & { __rideStart?: number }).__rideStart = performance.now();
+    });
+    await rideFloors(page, 'L', '5');
+
+    const screen = page.locator('.elevator-screen');
+    await expect(screen).toBeVisible();
+    await expect(screen.locator('.elevator-screen__arrow')).toHaveText('▲ 5');
+    await expect(screen.locator('.elevator-screen__status')).toHaveText(
+      'PASSING FLOOR 5 · POLISHING THE ICE… 100%',
+    );
+    const { barWidth, trackWidth } = await progressBarMetrics(page);
+    expect(barWidth).toBeGreaterThanOrEqual(trackWidth * 0.99);
+    expect(
+      await page.evaluate(
+        () => document.querySelector('.elevator-screen')!.getAnimations({ subtree: true }).length,
+      ),
+    ).toBe(0);
+    await page.screenshot({ path: `${EVIDENCE_DIR}/reduced-motion.png` });
+
+    // The ride's length is unchanged: still up at ~5s, gone by ~6.5s.
+    await page.waitForFunction(
+      () => performance.now() - (window as Window & { __rideStart?: number }).__rideStart! > 5000,
+    );
+    await expect(screen).toBeVisible();
+    await expect(screen).toBeHidden({ timeout: 3000 });
+    const elapsed = await page.evaluate(
+      () => performance.now() - (window as Window & { __rideStart?: number }).__rideStart!,
+    );
+    expect(elapsed).toBeLessThan(8000);
+
+    expect(errors).toEqual([]);
+  });
+});
+
+test.describe('evidence (#163, local only, never committed)', () => {
+  test.use({ viewport: STAGE_VIEWPORT });
+
+  test('side by side with the design, mid-ride going up to 5 (3.84s)', async ({
+    browser,
+    page,
+  }) => {
+    test.setTimeout(90_000);
+    const errors = collectErrors(page);
+
+    // The game, frozen at the design's own sample instant.
+    await bootAsPlayer(page, '?asPlayer=Pebble');
+    await rideFloors(page, 'L', '5');
+    await freezeRideAt(page, MID_RIDE_MS);
+    await expectStageSized(page);
+    const game = await page
+      .locator('.elevator-screen')
+      .screenshot({ path: `${EVIDENCE_DIR}/game-mid-ride-up-to-5.png` });
+
+    // The design file, with every animation seeked to the same instant.
+    const designPage = await browser.newPage({ viewport: STAGE_VIEWPORT });
+    try {
+      await designPage.goto(pathToFileURL(path.resolve('design/Elevator.dc.html')).href);
+      const label = designPage.locator('[data-screen-label="ELEVATOR (LOADING SCREEN)"]');
+      await label.waitFor();
+      const fontsLoaded = await designPage.evaluate(async () => {
+        await document.fonts.ready;
+        return ['Anton', 'Libre Franklin'].every((family) =>
+          document.fonts.check(`16px "${family}"`),
+        );
+      });
+      test.skip(
+        !fontsLoaded,
+        'BLOCKED: the design page needs Anton and Libre Franklin from Google Fonts (network blocked?)',
+      );
+      await designPage.evaluate((ms) => {
+        for (const animation of document.getAnimations()) {
+          animation.pause();
+          animation.currentTime = ms;
+        }
+      }, MID_RIDE_MS);
+      const design = await label.screenshot({
+        path: `${EVIDENCE_DIR}/design-mid-ride-up-to-5.png`,
+      });
+
+      const composer = await browser.newPage({
+        viewport: { width: GAME_WIDTH * 2, height: GAME_HEIGHT },
+      });
+      try {
+        const src = (buffer: Buffer): string =>
+          `data:image/png;base64,${buffer.toString('base64')}`;
+        await composer.setContent(
+          `<body style="margin:0;background:#000;display:flex"><img src="${src(design)}" width="1600" height="900"><img src="${src(game)}" width="1600" height="900"></body>`,
+        );
+        await composer.screenshot({ path: `${EVIDENCE_DIR}/side-by-side-mid-ride-up-to-5.png` });
+      } finally {
+        await composer.close();
+      }
+    } finally {
+      await designPage.close();
+    }
+
+    expect(errors).toEqual([]);
+  });
+
+  test('records a multi-floor ride there and back (video)', async ({ browser }, testInfo) => {
+    test.setTimeout(90_000);
+    const context = await browser.newContext({
+      viewport: STAGE_VIEWPORT,
+      recordVideo: { dir: testInfo.outputPath('video'), size: STAGE_VIEWPORT },
+    });
+    const page = await context.newPage();
+    const video = page.video();
+    try {
+      await bootAsPlayer(page, '?asPlayer=Pebble');
+      await rideFloors(page, 'L', '5');
+      await expect(page.locator('.elevator-screen')).toBeVisible();
+      await waitForElevatorHidden(page);
+      await rideFloors(page, '5', 'L');
+      await expect(page.locator('.elevator-screen')).toBeVisible();
+      await waitForElevatorHidden(page);
+    } finally {
+      await context.close();
+    }
+    await video?.saveAs(`${EVIDENCE_DIR}/ride-l-to-5-and-back.webm`);
+  });
 });
