@@ -21,6 +21,16 @@ describe('npcScale', () => {
     expect(npcScale({ kind: 'penguin' })).toBe(0.58);
   });
 
+  it("uses an NPC's own scale where its Room design draws it at another size (#149)", () => {
+    expect(npcScale({ kind: 'human', scale: 0.5 })).toBe(0.5);
+    expect(npcScale(NPCS['jethro-team-room-1'])).toBeCloseTo(70 / 120, 10);
+    expect(npcScale(NPCS.michael)).toBe(0.5);
+    expect(npcScale(NPCS['jason-mullet'])).toBe(0.5);
+    expect(npcScale(NPCS['jon-mullet'])).toBe(0.58);
+    // Tony keeps the Human default.
+    expect(npcScale(NPCS.tony)).toBe(0.62);
+  });
+
   it("uses an NPC's own scale when its Room design draws it at another (Team Room 3's 0.58)", () => {
     expect(npcScale({ kind: 'human', scale: 0.58 })).toBe(0.58);
     expect(npcScale(NPCS['millie-team-room-3'])).toBe(0.58);
@@ -55,6 +65,61 @@ describe('npcLayout', () => {
     const bottom = hitArea.centerY + hitArea.height / 2;
     expect(-70).toBeGreaterThan(top);
     expect(-70).toBeLessThan(bottom);
+  });
+});
+
+// #149: the Team Rooms and the Mullet draw Humans smaller. Nameplate tops are
+// -(120 * scale) - 25, as in the audit's baked markup: Team Rooms 1-2's
+// 70/120 = 0.5833 (`width="70"`) gives -95, Team Room 3 and the Mullet's 0.58
+// gives -94.6 and Team Room 4's 0.5 gives -85.
+describe('npcLayout with a per-NPC scale and nameplate offset (#149)', () => {
+  it('scales the nameplate, bubble and click area with the NPC', () => {
+    expect(npcLayout({ kind: 'human', scale: 70 / 120 }).nameplateTopY).toBeCloseTo(-95, 5);
+    expect(npcLayout({ kind: 'human', scale: 0.58 }).nameplateTopY).toBeCloseTo(-94.6, 5);
+    const small = npcLayout({ kind: 'human', scale: 0.5 });
+    expect(small.scale).toBe(0.5);
+    expect(small.nameplateTopY).toBeCloseTo(-85, 5);
+    expect(small.nameplateBottomY).toBeCloseTo(-65, 5);
+    expect(small.bubbleBottomY).toBeCloseTo(-89, 5);
+    expect(small.hitArea.centerY - small.hitArea.height / 2).toBeCloseTo(-85, 5);
+  });
+
+  it('moves the nameplate, the bubble and the click area with a nameplate offset', () => {
+    const base = npcLayout({ kind: 'human', scale: 0.5 });
+    // Sam's nameplate is 9.5 px higher than the layout position.
+    const sam = npcLayout({ kind: 'human', scale: 0.5, nameplateOffset: { y: -9.5 } });
+    expect(sam.nameplateTopY).toBeCloseTo(base.nameplateTopY - 9.5, 5);
+    expect(sam.nameplateBottomY).toBeCloseTo(base.nameplateBottomY - 9.5, 5);
+    expect(sam.bubbleBottomY).toBeCloseTo(base.bubbleBottomY - 9.5, 5);
+    expect(sam.hitArea.centerY - sam.hitArea.height / 2).toBeCloseTo(sam.nameplateTopY, 5);
+    expect(sam.nameplateCenterX).toBe(0);
+  });
+
+  it("shifts the nameplate sideways without moving the click area (Jason's -55.5)", () => {
+    const jason = npcLayout({ kind: 'human', scale: 0.5, nameplateOffset: { x: -55.5, y: 15 } });
+    expect(jason.nameplateCenterX).toBe(-55.5);
+    expect(jason.hitArea.centerX).toBe(0);
+  });
+
+  it("keeps the click area over the figure when the nameplate is nudged down (Jon's 19 px, and further)", () => {
+    // A 19 px nudge leaves the nameplate top (-75.6) above the figure top
+    // (120 * 0.58 = 69.6 px up), so it still bounds the area.
+    const jon = npcLayout({ kind: 'human', scale: 0.58, nameplateOffset: { y: 19 } });
+    expect(jon.nameplateTopY).toBeCloseTo(-75.6, 5);
+    expect(jon.hitArea.centerY - jon.hitArea.height / 2).toBeCloseTo(-75.6, 5);
+    expect(jon.hitArea.centerY + jon.hitArea.height / 2).toBeCloseTo(5, 5);
+    // A nudge past the figure's top leaves the figure's own top to bound it.
+    const low = npcLayout({ kind: 'human', scale: 0.58, nameplateOffset: { y: 60 } });
+    expect(low.hitArea.centerY - low.hitArea.height / 2).toBeCloseTo(-69.6, 5);
+  });
+
+  it("places each NPC's nameplate where its Room design does (feet-relative, from the audit)", () => {
+    // Design nameplate tops relative to the feet: Millie -97.7, Casey -85.6.
+    expect(npcLayout(NPCS['millie-team-room-3']).nameplateTopY).toBeCloseTo(-97.6, 1);
+    expect(npcLayout(NPCS['casey-team-room-3']).nameplateTopY).toBeCloseTo(-85.6, 1);
+    expect(npcLayout(NPCS['sam-team-room-4']).nameplateTopY).toBeCloseTo(-94.5, 1);
+    expect(npcLayout(NPCS['jon-mullet']).nameplateTopY).toBeCloseTo(-75.6, 1);
+    expect(npcLayout(NPCS['jason-mullet']).nameplateCenterX).toBe(-55.5);
   });
 });
 

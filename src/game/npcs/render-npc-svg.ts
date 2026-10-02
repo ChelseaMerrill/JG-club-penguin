@@ -13,10 +13,11 @@ import { NPC_TEXT_PATHS } from './text-paths';
  * roster (`src/npcs/npcs.ts`) actually uses, not every option `humans.js`
  * supports: #51 ported the `buzz` hairstyle, the `plaid` pattern and the
  * `camera` and `beyblade` props as its Rooms needed them, and #113 the
- * `survivor` hat/tee (Jory). The `curlyShort`/`slick` hairstyles, the
- * `henley` collar, the `yarn`/`basketball`/`survivor` props and the horse
- * `mount` composite are still never used by any Human NPC here, so they're
- * left unported; adding one later is a direct copy from `humans.js`.
+ * `survivor` hat/tee (Jory), and #149 the `slick` hairstyle and `henley`
+ * collar (Tony). The `curlyShort` hairstyle, the `yarn`/`basketball`/
+ * `survivor` props and the horse `mount` composite are still never used by
+ * any Human NPC here, so they're left unported; adding one later is a direct
+ * copy from `humans.js`.
  *
  * #113 also adds options that aren't in `humans.js` at all: the variations
  * a Room design draws for its own NPCs (Dev Pit's and Team Room 2's dotted
@@ -41,7 +42,11 @@ export interface HumanFigureSpec {
     | 'highBun'
     | 'bald'
     /** Chelsea's hair in the Kitchen design: wavy, textured and long. */
-    | 'texturedLong';
+    | 'texturedLong'
+    /** `humans.js`'s slick, combed-back hair with a highlight (Tony). */
+    | 'slick'
+    /** The Mullet's own curly volume hair for Ashley: scalloped outline, curl marks, fringe curls. */
+    | 'curlyVolume';
   /** `grey`: the Characters sheet's Steven (not in `humans.js`). */
   hair?: 'auburn' | 'ash' | 'caramel' | 'dark' | 'brown' | 'blond' | 'lblond' | 'sandy' | 'grey';
   skin?: 'light' | 'fair' | 'med';
@@ -58,7 +63,7 @@ export interface HumanFigureSpec {
   pattern?: 'stripes' | 'plaid' | 'dots';
   pattern2?: string;
   sleeveless?: boolean;
-  collar?: 'button' | 'polo' | 'zip' | 'crew' | 'shirtLight';
+  collar?: 'button' | 'polo' | 'zip' | 'crew' | 'shirtLight' | 'henley';
   necklace?: boolean;
   /** An earring colour; drawn only when given. */
   earrings?: string;
@@ -151,11 +156,19 @@ export interface HumanFigureSpec {
    * The Mullet's Jason at the Ms. Pac-Man (owner request, 2026-10-01, Track
    * D): `design/The Mullet.dc.html` raises both his hands to the controls and
    * works them with SMIL (an `animateTransform` on each hand's `<g>`), leaving
-   * his arms where they are. `'resting'` draws his hands at his sides, as
-   * every figure's (his look under reduced motion); `'playing'` leaves both
+   * his arms where they are. `'resting'` draws both hands raised where the
+   * SMIL translates put them at t=0, (10, -40) for the left and (0, -36) for
+   * the right (his look under reduced motion, #149); `'playing'` leaves both
    * to his motion's hand layers (`src/npcs/motions/the-mullet.ts`).
    */
   arcadeHands?: 'resting' | 'playing';
+  /**
+   * The Mullet's ping-pong paddle in Jon's right (`'right'`) or Brandon's left
+   * (`'left'`) hand, at rest: the design swings it with a SMIL `rotate`, which
+   * starts at 0 (#149). A rest pose, so it shows under reduced motion;
+   * `replaceFigureRestPose` omits it for the motion's own paddle layer.
+   */
+  paddle?: 'right' | 'left';
   /**
    * Team Room 3's Sydney: a black headset with a mic boom, drawn over her
    * hair and held prop, verbatim from `design/Team Room 3.dc.html`.
@@ -392,6 +405,13 @@ function renderHumanFigure(spec: HumanFigureSpec, idPrefix: string): string {
       `<path d="M33 52 q3 3 1 6 M31 70 q3 3 1 6 M87 52 q-3 3 -1 6 M89 70 q-3 3 -1 6" fill="none" stroke="#F6E2B0" stroke-width="1.4" stroke-linecap="round"></path>`;
   }
 
+  if (spec.style === 'curlyVolume') {
+    o +=
+      `<path d="M32 28 Q18 32 25 42 Q14 50 23 58 Q12 66 21 74 Q11 82 21 90 Q14 99 28 102 L92 102 Q106 99 99 90 Q109 82 99 74 Q108 66 97 58 Q106 50 95 42 Q102 32 88 28 Z" fill="${hc}" stroke="${OUTLINE}" stroke-width="2.5"></path>` +
+      `<path d="M28 46 q-5 3 -1 7 q4 2 5 -2 M26 62 q-5 3 -1 7 q4 2 5 -2 M25 78 q-5 3 -1 7 q4 2 5 -2 M27 93 q-4 3 0 6 M92 46 q5 3 1 7 q-4 2 -5 -2 M94 62 q5 3 1 7 q-4 2 -5 -2 M95 78 q5 3 1 7 q-4 2 -5 -2 M93 93 q4 3 0 6" fill="none" stroke="#3a2818" stroke-width="1.6" stroke-linecap="round"></path>` +
+      `<path d="M33 52 q3 3 1 6 M31 70 q3 3 1 6 M87 52 q-3 3 -1 6 M89 70 q-3 3 -1 6" fill="none" stroke="#8a6440" stroke-width="1.4" stroke-linecap="round"></path>`;
+  }
+
   // Legs + shoes (Team Room 1's runner: bare legs, socks and sneakers).
   if (spec.runner) {
     o +=
@@ -484,7 +504,13 @@ function renderHumanFigure(spec: HumanFigureSpec, idPrefix: string): string {
   if (spec.runner) {
     o += `<rect x="24" y="86" width="12" height="5" fill="#00BDFF" stroke="${OUTLINE}" stroke-width="1.5"></rect>`;
   }
-  if (!spec.cameraRaise && spec.arcadeHands !== 'playing') {
+  if (spec.arcadeHands === 'resting') {
+    // Jason's hands raised on the Ms. Pac-Man's controls, where the design's
+    // SMIL translates put them at t=0 (it draws them before the collar and head).
+    o +=
+      `<g transform="translate(10 -40)"><circle cx="30" cy="101" r="5.5" fill="${sk}" stroke="${OUTLINE}" stroke-width="2"></circle></g>` +
+      `<g transform="translate(0 -36)"><circle cx="90" cy="101" r="5.5" fill="${sk}" stroke="${OUTLINE}" stroke-width="2"></circle></g>`;
+  } else if (!spec.cameraRaise && spec.arcadeHands !== 'playing') {
     o +=
       `<circle cx="30" cy="101" r="5.5" fill="${sk}" stroke="${OUTLINE}" stroke-width="2"></circle>` +
       `<circle cx="90" cy="101" r="5.5" fill="${sk}" stroke="${OUTLINE}" stroke-width="2"></circle>`;
@@ -502,6 +528,9 @@ function renderHumanFigure(spec: HumanFigureSpec, idPrefix: string): string {
   }
   if (spec.collar === 'crew') {
     o += `<path d="M50 66 Q60 74 70 66" fill="none" stroke="${OUTLINE}" stroke-width="2"></path>`;
+  }
+  if (spec.collar === 'henley') {
+    o += `<path d="M60 66 V82" stroke="${OUTLINE}" stroke-width="1.5"></path><circle cx="60" cy="72" r="1.5" fill="${OUTLINE}"></circle><circle cx="60" cy="78" r="1.5" fill="${OUTLINE}"></circle>`;
   }
   if (spec.collar === 'shirtLight') {
     o += `<path d="M48 66 L60 80 L72 66 L66 62 L60 72 L54 62 Z" fill="#BFD6EE" stroke="${OUTLINE}" stroke-width="1.5"></path>`;
@@ -542,6 +571,15 @@ function renderHumanFigure(spec: HumanFigureSpec, idPrefix: string): string {
   }
   if (style === 'curlyLong') {
     o += `<path d="M34 40 C30 16 50 8 62 12 C76 12 90 18 86 40 C82 30 74 24 60 26 C48 26 40 30 34 40 Z" fill="${hc}" stroke="${OUTLINE}" stroke-width="2.5"></path><circle cx="40" cy="26" r="6" fill="${hc}"></circle><circle cx="80" cy="26" r="6" fill="${hc}"></circle>`;
+  }
+  if (style === 'slick') {
+    o += `<path d="M35 34 C34 14 50 6 66 10 C82 12 88 20 85 34 C80 26 40 24 35 34 Z" fill="${hc}" stroke="${OUTLINE}" stroke-width="2.5"></path><path d="M40 22 Q60 12 82 20" fill="none" stroke="#F4F4F4" stroke-width="1.5" opacity=".35"></path>`;
+  }
+  if (style === 'curlyVolume') {
+    o +=
+      `<path d="M33 42 C30 18 48 9 60 11 C74 10 90 18 87 42 Q86 33 80 33 Q77 25 70 28 Q64 22 58 27 Q50 22 46 30 Q38 29 33 42 Z" fill="${hc}" stroke="${OUTLINE}" stroke-width="2.5"></path>` +
+      `<path d="M42 20 q4 -3 7 0 q2 3 -1 5 M60 15 q4 -3 7 0 q2 3 -1 5 M74 20 q4 -2 6 1 q1 3 -2 4" fill="none" stroke="#3a2818" stroke-width="1.6" stroke-linecap="round"></path>` +
+      `<path d="M50 17 q3 -2 5 1 M68 17 q3 -1 4 2" fill="none" stroke="#8a6440" stroke-width="1.4" stroke-linecap="round"></path>`;
   }
   if (style === 'texturedLong') {
     o += `<path d="M33 42 C30 18 48 9 60 11 C74 10 90 18 87 42 Q86 33 80 33 Q77 25 70 28 Q64 22 58 27 Q50 22 46 30 Q38 29 33 42 Z" fill="${hc}" stroke="${OUTLINE}" stroke-width="2.5"></path>`;
@@ -755,6 +793,14 @@ function renderHumanFigure(spec: HumanFigureSpec, idPrefix: string): string {
       `<circle cx="97" cy="91" r="6" fill="#0a3d4d" stroke="#00BDFF" stroke-width="2"></circle>` +
       `<circle cx="97" cy="91" r="2.5" fill="#00BDFF"></circle>` +
       `<rect x="104" y="85" width="3" height="3" fill="#D63C3C"></rect>`;
+  }
+  // The Mullet's ping-pong paddles (#149), at rest: the design's `<g>` swings
+  // one about the grip with a SMIL `rotate`, which starts at 0.
+  if (spec.paddle === 'right') {
+    o += `<g><rect x="87.5" y="88" width="5" height="14" rx="2" fill="#8B5A2B" stroke="${OUTLINE}" stroke-width="1.5"></rect><circle cx="90" cy="76" r="14" fill="#D9534F" stroke="${OUTLINE}" stroke-width="2"></circle></g>`;
+  }
+  if (spec.paddle === 'left') {
+    o += `<g><rect x="27.5" y="88" width="5" height="14" rx="2" fill="#8B5A2B" stroke="${OUTLINE}" stroke-width="1.5"></rect><circle cx="30" cy="76" r="14" fill="#D9534F" stroke="${OUTLINE}" stroke-width="2"></circle></g>`;
   }
   if (spec.cards) {
     o +=

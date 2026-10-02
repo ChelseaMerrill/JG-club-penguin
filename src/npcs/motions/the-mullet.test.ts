@@ -97,11 +97,13 @@ describe("The Mullet's NPC motions (owner request, 2026-10-01)", () => {
     // A third of the right hand's 0.25s press: `0 -40`.
     motion.advance(250 / 3);
     expect(offsetOf(motion.pose().props[1].matrix).y).toBeCloseTo(-40);
-    // A third of the 0.5s jiggle: 0.8 Stage px right, 0.5 up.
+    // A third of the 0.5s jiggle: 0.8 Stage px right, 0.5 up, at his 0.5 scale.
     motion.advance(250 / 3);
     const jiggle = offsetOf(motion.pose().figure);
-    expect(jiggle.x * 0.62).toBeCloseTo(0.8, 1);
-    expect(jiggle.y * 0.62).toBeCloseTo(-0.5, 1);
+    const scale = npcScale(NPCS['jason-mullet']);
+    expect(scale).toBe(0.5);
+    expect(jiggle.x * scale).toBeCloseTo(0.8, 1);
+    expect(jiggle.y * scale).toBeCloseTo(-0.5, 1);
     expect(motion.pose().point).toEqual(slotPoint('jason-mullet'));
   });
 
@@ -110,10 +112,13 @@ describe("The Mullet's NPC motions (owner request, 2026-10-01)", () => {
     const annMarie = motionFor('ann-marie-mullet');
     nicole.advance(160);
     annMarie.advance(160);
-    expect(offsetOf(nicole.pose().figure).y * 0.62).toBeCloseTo(-2.5, 1);
+    // Both draw at 0.5.
+    expect(npcScale(NPCS['nicole-mullet'])).toBe(0.5);
+    expect(npcScale(NPCS['ann-marie-mullet'])).toBe(0.5);
+    expect(offsetOf(nicole.pose().figure).y * 0.5).toBeCloseTo(-2.5, 1);
     expect(offsetOf(annMarie.pose().figure).y).toBeCloseTo(0);
     annMarie.advance(300);
-    expect(offsetOf(annMarie.pose().figure).y * 0.62).toBeCloseTo(-2.5, 1);
+    expect(offsetOf(annMarie.pose().figure).y * 0.5).toBeCloseTo(-2.5, 1);
   });
 
   it("runs Dom's lap from his slot, through each corner of the design's path at its share of the length", () => {
@@ -166,6 +171,7 @@ describe("The Mullet's NPC motions (owner request, 2026-10-01)", () => {
     // The cue's tip, design (505, 496) in his group: figure units of his
     // `<svg x="462.8" y="440.5">` at 0.62.
     const tip = { x: (505 - 462.8) / 0.62 - 115, y: (496 - 440.5) / 0.62 };
+    expect(npcScale(NPCS.tony)).toBe(0.62);
     const rest = stagePointOf('tony', motion, multiply(near.matrix, near.children[0].matrix), tip);
     expectNear(rest, { x: 505 - 30, y: 496 - 81 }, 0.2);
     // 40% of the 1.6s stroke: drawn back by (12, 1.4).
@@ -201,9 +207,9 @@ describe("The Mullet's NPC motions (owner request, 2026-10-01)", () => {
     expect(motion.pose().props.map((layer) => layer.alpha)).toEqual([1, 0, 0, 0]);
 
     for (const [throwIndex, landsAtMs, target, stop] of [
-      [1, 1_998.8, { x: 850, y: 560 }, { x: 0, y: 0 }],
-      [2, 8_599.4, { x: 570, y: 500 }, { x: -140, y: -40 }],
-      [3, 13_898.6, { x: 1062, y: 680 }, { x: -60, y: 70 }],
+      [1, 1_999.7, { x: 850, y: 560 }, { x: 0, y: 0 }],
+      [2, 8_600.3, { x: 570, y: 500 }, { x: -140, y: -40 }],
+      [3, 13_899.5, { x: 1062, y: 680 }, { x: -60, y: 70 }],
     ] as const) {
       const at = createNpcMotion(
         getNpcMotion('ashley-mullet'),
@@ -226,8 +232,11 @@ describe("The Mullet's NPC motions (owner request, 2026-10-01)", () => {
         multiply(flight.matrix, flight.children[0].matrix),
         chickenCentre,
       );
-      // Within her 0.62-vs-0.58 hand offset and her 3 px bob.
-      expectNear(landed, target, 6);
+      // She draws at the design's 0.58, so each throw leaves from the
+      // design's hand position and lands on the design's target. Her 3 px
+      // bob is a `stage` track `stagePointOf` includes, so take it back out.
+      const bob = pose.stage ? offsetOf(pose.stage) : { x: 0, y: 0 };
+      expectNear(landed, { x: target.x + bob.x, y: target.y + bob.y }, 0.1);
     }
   });
 
@@ -236,7 +245,9 @@ describe("The Mullet's NPC motions (owner request, 2026-10-01)", () => {
     const ballIndex = THE_MULLET_MOTIONS['jon-mullet']!.props!.findIndex((layer) =>
       layer.svg.includes('r="3.5"'),
     );
-    const ballCentre = { x: 60 + 30 / 0.62, y: 120 + 14 / 0.62 };
+    // Jon draws at 0.58, so the ball's (30, 14) Stage px from his feet is 1 / 0.58 of that in figure units.
+    expect(npcScale(NPCS['jon-mullet'])).toBe(0.58);
+    const ballCentre = { x: 60 + 30 / 0.58, y: 120 + 14 / 0.58 };
     const ball = () =>
       stagePointOf('jon-mullet', jon, jon.pose().props[ballIndex].matrix, ballCentre);
     expectNear(ball(), { x: 880, y: 612 }, 0.05);

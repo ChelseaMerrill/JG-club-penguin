@@ -56,6 +56,8 @@ export interface NpcHitArea {
 
 export interface NpcLayout {
   scale: number;
+  /** The nameplate's centre x, relative to the feet (0 unless `nameplateOffset.x` nudges it). */
+  nameplateCenterX: number;
   nameplateTopY: number;
   nameplateBottomY: number;
   /** Where the bubble's pill ends (its tail points down from here). */
@@ -78,19 +80,30 @@ export function npcScale(npc: Pick<NpcDefinition, 'kind' | 'scale'>): number {
   return npc.scale ?? (npc.kind === 'human' ? HUMAN_NPC_SCALE : PENGUIN_NPC_SCALE);
 }
 
-export function npcLayout(npc: Pick<NpcDefinition, 'kind' | 'scale'>): NpcLayout {
+export function npcLayout(
+  npc: Pick<NpcDefinition, 'kind' | 'scale' | 'nameplateOffset'>,
+): NpcLayout {
   const scale = npcScale(npc);
-  const nameplateBottomY = -FIGURE_HEIGHT * scale - NAMEPLATE_GAP_ABOVE_FIGURE;
+  // A hand-placed nameplate (#149) moves the nameplate, and the bubble and
+  // click area with it; it is a nudge from the layout position, not an NPC
+  // position (that stays a Tile, plus any slot `offset`).
+  const nameplateCenterX = npc.nameplateOffset?.x ?? 0;
+  const nameplateBottomY =
+    -FIGURE_HEIGHT * scale - NAMEPLATE_GAP_ABOVE_FIGURE + (npc.nameplateOffset?.y ?? 0);
   const nameplateTopY = nameplateBottomY - NAMEPLATE_HEIGHT;
-  const hitHeight = HIT_AREA_BELOW_FEET - nameplateTopY;
+  // A nameplate nudged down over the head mustn't shrink the click area
+  // below the figure's own top.
+  const hitTopY = Math.min(nameplateTopY, -FIGURE_HEIGHT * scale);
+  const hitHeight = HIT_AREA_BELOW_FEET - hitTopY;
   return {
     scale,
+    nameplateCenterX,
     nameplateTopY,
     nameplateBottomY,
     bubbleBottomY: nameplateTopY - BUBBLE_GAP_ABOVE_NAMEPLATE,
     hitArea: {
       centerX: 0,
-      centerY: nameplateTopY + hitHeight / 2,
+      centerY: hitTopY + hitHeight / 2,
       width: HIT_AREA_WIDTH,
       height: hitHeight,
     },

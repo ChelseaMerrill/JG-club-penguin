@@ -84,6 +84,23 @@ describe('ensureNpcTexture: one of each prop while an NPC moves (#137 with PR #1
     expect(movingFigureSvg('ashley')).toContain(chicken);
   });
 
+  it("draws the Mullet's paddles and Jason's raised hands at rest, once only while their motions play (#149)", () => {
+    const paddle = '<rect x="87.5" y="88" width="5" height="14" rx="2" fill="#8B5A2B"';
+    const brandonPaddle = '<rect x="27.5" y="88" width="5" height="14" rx="2" fill="#8B5A2B"';
+    const raisedHand = '<g transform="translate(10 -40)"><circle cx="30" cy="101"';
+    // At rest (and under reduced motion, which plays no motion) all three show.
+    expect(stillFigureSvg('jon-mullet')).toContain(paddle);
+    expect(stillFigureSvg('brandon-mullet')).toContain(brandonPaddle);
+    expect(stillFigureSvg('jason-mullet')).toContain(raisedHand);
+    // While the motion plays, each belongs to its layer instead.
+    expect(movingFigureSvg('jon-mullet')).not.toContain(paddle);
+    expect(movingFigureSvg('brandon-mullet')).not.toContain(brandonPaddle);
+    expect(movingFigureSvg('jason-mullet')).not.toContain(raisedHand);
+    expect(movingFigureSvg('jason-mullet')).not.toContain('<circle cx="30" cy="101"');
+    // Jon's other look is kept.
+    expect(movingFigureSvg('jon-mullet')).toContain(JON_SCARF);
+  });
+
   it("hands Team Room 1's Jethro's hands and camera to his `jdown`/`jup` layers while they play", () => {
     const hand = '<circle cx="30" cy="101"';
     const camera = '<rect x="84" y="82" width="26" height="18"';
