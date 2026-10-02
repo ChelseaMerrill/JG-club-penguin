@@ -28,6 +28,7 @@ const AWAITING_BA_LINE: readonly string[] = [
   'nick-brown',
   'frank-nardone',
   'chris-pence',
+  'aleksandr-molchagin',
   'rebecca-congi',
 ];
 

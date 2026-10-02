@@ -19,21 +19,26 @@ const DOOR_HOTSPOT_SIZE = { width: 70, height: 165 };
 //     (2,0), (1,1); (6,0), (7,0), (8,0), (7,1); (7,5), (8,5), (6-8,6). Their
 //     chairs (e.g. cols 7.3-7.9, rows 1.5-2.1) fall inside those tiles;
 //   - the couch in front of the front-left desk, cols 0.6-3.0, rows
-//     5.6-6.6 -> (0-2,5-6);
+//     5.6-6.6, is gone (owner request, 2026-10-02, Track D: hidden from the
+//     baked art by `scripts/export-room-art.ts`). The desk alone still
+//     blocks (0-2,6) and (0,5), (1,5); only (2,5), which it covers 0.2 of,
+//     opens again;
 //   - the crit table, cols 3-6, rows 3.2-4.8 -> (3-5,3-4);
 //   - the ottoman, cols 3.6-4.6, rows 6.4-7.4, which clips four tiles but
 //     covers a quarter of only one -> (4,6).
 // The front desk's edge on (6,5) stays walkable: it is the only way between
 // the front of the room, where the design's "You" stands, and the rest.
 // The floor arrows and the dashed cable are flat floor art. Every NPC's own
-// tile (see `npcSlots` below) is additionally blocked (#16 fix 5): Ian (5,1).
+// tile (see `npcSlots` below) is additionally blocked (#16 fix 5): Chris
+// (0,2), Aleksandr (7,1, already the right desk's chair); Frank's (0,4) and
+// Nick's (7,4) stand open, their figures drawn off them into their desks.
 const WALKABLE: readonly (readonly boolean[])[] = [
   [false, false, false, true, true, true, false, false, false],
   [true, false, true, true, true, true, true, false, true],
   [false, true, true, true, true, true, true, true, true],
   [true, true, true, false, false, false, true, true, true],
   [false, true, true, false, false, false, true, false, true],
-  [false, false, false, true, true, true, true, false, false],
+  [false, false, true, true, true, true, true, false, false],
   [false, false, false, true, false, true, false, false, false],
   [true, true, true, true, true, true, true, true, true],
 ];
@@ -80,18 +85,22 @@ export const teamRoom2: RoomDefinition = {
     // is behind them, each just into his desk from the chair's seat (the
     // design centres the left desk's at (615, 485.5) and the front desk's at
     // (925, 640.5)), with the desk drawn over him (`foregrounds` below):
-    // Frank at (615, 508), behind the left desk and the couch in front of
-    // it, Nick at (925, 663). Chris Pence stands at the back by the left wall,
-    // (0,2), just left of the back desk, facing into the Room with the
-    // Player on either side of him, watching them through his binoculars
-    // (`watchesPlayer`).
+    // Frank at (615, 508), behind the left desk, Nick at (925, 663). Chris
+    // Pence stands at the back by the left wall, (0,2), just left of the back
+    // desk, facing into the Room and looking round it through his
+    // binoculars (his motion). Aleksandr Molchagin sits in the right desk's
+    // chair, which stands in front of the desk: the figures only face the
+    // viewer, so he sits turned round in it, the desk behind him, at
+    // (1090, 573), the seat's two front faces drawn over his legs
+    // (`foregrounds`).
     { npcId: 'frank-nardone', tile: { col: 0, row: 4 }, offset: { x: 15, y: 35 } },
     { npcId: 'nick-brown', tile: { col: 7, row: 4 }, offset: { x: -25, y: 15 } },
     { npcId: 'chris-pence', tile: { col: 0, row: 2 } },
+    { npcId: 'aleksandr-molchagin', tile: { col: 7, row: 1 }, offset: { x: -10, y: 0 } },
     // "You" is the local Player's own Penguin, never a static NPC slot.
   ],
-  // The two desks (and the couch in front of the left one), drawn in front of
-  // the two sitting at them. Exported by `npm run export:room-art --
+  // The two desks, drawn in front of the two sitting at them, and the right
+  // desk's chair seat in front of Aleksandr. Exported by `npm run export:room-art --
   // team-room-2` (`FOREGROUND_LAYERS`).
   foregrounds: [
     {
@@ -103,6 +112,11 @@ export const teamRoom2: RoomDefinition = {
       key: 'room-team-room-2-front-nick-desk',
       url: 'rooms/team-room-2-front-nick-desk.png',
       overNpcId: 'nick-brown',
+    },
+    {
+      key: 'room-team-room-2-front-aleksandr-chair',
+      url: 'rooms/team-room-2-front-aleksandr-chair.png',
+      overNpcId: 'aleksandr-molchagin',
     },
   ],
 };
