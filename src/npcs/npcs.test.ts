@@ -72,6 +72,15 @@ describe('NPCS', () => {
       // Casey and Millie left Team Room 3 (owner request, 2026-10-02).
       'casey-team-room-3',
       'millie-team-room-3',
+      // Anthony left the Hallway (owner request, 2026-10-02).
+      'anthony-hallway',
+      // Six left the Mullet (owner request, 2026-10-02).
+      'ashley-mullet',
+      'jory-mullet',
+      'dom-mullet',
+      'jason-mullet',
+      'nicole-mullet',
+      'ann-marie-mullet',
       // Ian left Team Room 2 (owner request, 2026-10-02).
       'ian-team-room-2',
     ];
@@ -257,18 +266,11 @@ describe('NPCS', () => {
           }
         }
       }
-      // Overlaps the Room design itself draws at rest, kept as designed: the
-      // Mullet's Dom and Jory stand where the design starts their lap (their
-      // slot `offset`s, #189), where Dom's bubble crosses Nicole's nameplate
-      // and Jory's crosses Brandon's. Both walk off it at once. (Dev Pit's old
-      // Steven-over-Ryan overlap went when Ryan left, 2026-09-30.)
-      const drawnByTheDesign: string[] = [
-        `the-mullet: dom-mullet "Undefeated. I always win." x nicole-mullet's nameplate "Nicole"`,
-        `the-mullet: jory-mullet "Tribe has spoken." x brandon-mullet's nameplate "Brandon"`,
-      ];
-      expect(collisions.filter((collision) => !drawnByTheDesign.includes(collision))).toEqual([]);
-      // Each allowed overlap still happens, so a stale entry can't linger.
-      for (const allowed of drawnByTheDesign) expect(collisions).toContain(allowed);
+      // The Mullet's two design-drawn overlaps (Dom over Nicole, Jory over
+      // Brandon) went when Dom, Nicole and Jory left (owner request,
+      // 2026-10-02); Dev Pit's Steven-over-Ryan went when Ryan left
+      // (2026-09-30).
+      expect(collisions).toEqual([]);
     },
   );
 

@@ -92,7 +92,12 @@ export type NpcId =
   | 'frank-nardone'
   | 'chris-pence'
   | 'aleksandr-molchagin'
-  | 'rebecca-congi';
+  | 'rebecca-congi'
+  | 'bich-dudla'
+  | 'eva-trimboli'
+  | 'abby-rivera'
+  | 'adam-wilson-hwang'
+  | 'bryan-sambrook';
 
 /**
  * A minigame-launching NPC's trigger dialog (#36 D4; round-1 review item 4
@@ -1389,6 +1394,83 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     dialog: LINE_DIALOG,
     figure: { card: 'rebeccaCongi' },
   },
+  // The Characters sheet's two QA Analysts, new in the Market (owner
+  // request, 2026-10-02, Track D): name, title and line from each one's
+  // card, drawn from the card itself. Bich waters the Market's potted
+  // plants and Eva walks the deck (`motions/roof-deck.ts`).
+  'bich-dudla': {
+    id: 'bich-dudla',
+    name: 'Bich Dudla',
+    title: 'QA Analyst',
+    roomId: 'roof-deck',
+    kind: 'human',
+    tagName: 'Bich Dudla',
+    // Her long line, at her slot, would cover Ann Marie's bubbles at her
+    // counter up and to the right; shifted left until it clears them.
+    bubbleOffsetX: -90,
+    dialogLines: ['I test the code. I water the plant. Both keep growing.'],
+    idleLines: [
+      { text: 'I test the code. I water the plant. Both keep growing.', periodS: 20, delayS: -3 },
+    ],
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'bichDudla' },
+  },
+  'eva-trimboli': {
+    id: 'eva-trimboli',
+    name: 'Eva Trimboli',
+    title: 'QA Analyst',
+    roomId: 'roof-deck',
+    kind: 'human',
+    tagName: 'Eva Trimboli',
+    dialogLines: ["It's not a bug until I say it's a bug."],
+    idleLines: [{ text: "It's not a bug until I say it's a bug.", periodS: 20, delayS: -13 }],
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'evaTrimboli' },
+  },
+  // The Characters sheet's new people in the Mullet (owner request,
+  // 2026-10-02, Track D): name, title and line from each one's card, drawn
+  // from the card itself. Abby paints the wall; Adam and Bryan walk laps.
+  'abby-rivera': {
+    id: 'abby-rivera',
+    name: 'Abby Rivera',
+    title: 'UI/UX',
+    roomId: 'the-mullet',
+    kind: 'human',
+    tagName: 'Abby Rivera',
+    dialogLines: ["Hold still, I'm sketching you."],
+    idleLines: [{ text: "Hold still, I'm sketching you.", periodS: 20, delayS: -3 }],
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'abbyRiveraPainting' },
+  },
+  'adam-wilson-hwang': {
+    id: 'adam-wilson-hwang',
+    name: 'Adam Wilson-Hwang',
+    title: 'Tech Lead',
+    roomId: 'the-mullet',
+    kind: 'human',
+    tagName: 'Adam Wilson-Hwang',
+    dialogLines: ["That's a three-pointer. Minimum."],
+    idleLines: [{ text: "That's a three-pointer. Minimum.", periodS: 20, delayS: -9 }],
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'adamWilsonHwang' },
+  },
+  'bryan-sambrook': {
+    id: 'bryan-sambrook',
+    name: 'Bryan Sambrook',
+    title: 'Principal Software Engineer',
+    roomId: 'the-mullet',
+    kind: 'human',
+    tagName: 'Bryan Sambrook',
+    dialogLines: ['Seen this bug before. Back in 2009.'],
+    idleLines: [{ text: 'Seen this bug before. Back in 2009.', periodS: 20, delayS: -15 }],
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'bryanSambrook' },
+  },
   'dan-bedian': {
     id: 'dan-bedian',
     name: 'Dan Bedian',
@@ -1477,7 +1559,9 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     // A near-duplicate of her dialog line; it stays a bubble in the Room.
     dialogOmit: ['Joining JG?'],
     idleLines: staticLine('Joining JG?'),
-    // The Hallway design draws her without any idle bob.
+    // The Hallway design draws her without any idle bob; she walks laps of
+    // the corridor instead (`motions/office-hallway.ts`, owner request,
+    // 2026-10-02, Track D), whose motion brings its own bob.
     still: true,
     dialog: LINE_DIALOG,
     figure: {
