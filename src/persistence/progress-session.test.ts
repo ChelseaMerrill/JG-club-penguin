@@ -591,6 +591,7 @@ describe('createProgressSession', () => {
           cleanups.push(gameEvents.on('tokens:changed', ({ balance }) => balances.push(balance)));
           const quest = gate<void>();
           const round = gate<void>();
+          const flight = gate<void>();
           const checks: Array<{ release: (value: BadgeCheckResult) => void }> = [];
           const { store: base } = deferredStore();
           const store: ProgressStore = {
@@ -619,6 +620,21 @@ describe('createProgressSession', () => {
                 badgesEarned: ['exterminator'],
               };
             },
+            // #51 slice 4: flight 5 of a first climb, +10 and Stair Master's +50.
+            logStairFlight: async () => {
+              await flight.promise;
+              session.storeEmitter.emit('tokens:changed', { balance: 260 });
+              session.storeEmitter.emit('badge:earned', { badgeId: 'stair-master' });
+              return {
+                logged: true,
+                reason: null,
+                flightsLogged: 5,
+                tokensAwarded: 10,
+                flightTokensToday: 50,
+                badgesEarned: ['stair-master'],
+                balance: 260,
+              };
+            },
             checkBadges: () => {
               const check = gate<BadgeCheckResult>();
               checks.push(check);
@@ -635,6 +651,7 @@ describe('createProgressSession', () => {
             wrapped,
             quest,
             round,
+            flight,
             checks,
             panels,
             toasts,
@@ -704,6 +721,22 @@ describe('createProgressSession', () => {
 
           expect(toasts).toEqual(['Badge unlocked: Exterminator']);
           expect(tokens()).toBe(275);
+        });
+
+        it('logStairFlight resolves inside a check: Stair Master shows once, and the check never writes back an older balance (#51 slice 4, RT2-9)', async () => {
+          const { wrapped, flight, checks, panels, balances, tokens } = await racingSetup();
+          // The check starts before the flight resolves and finishes after it.
+          const checking = wrapped.checkBadges();
+          const flying = wrapped.logStairFlight(5);
+
+          flight.release();
+          await flying;
+          checks[0].release({ badges: ['stair-master'], balance: 200 });
+          await checking;
+
+          expect(panels()).toEqual(['Badge unlocked: Stair Master']);
+          expect(tokens()).toBe(260);
+          expect(balances).toEqual([260]);
         });
 
         it('a check with no write overlapping it still updates the balance', async () => {
