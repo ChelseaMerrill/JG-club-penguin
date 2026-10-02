@@ -63,6 +63,8 @@ export interface ElevatorScreen {
   ready(): void;
   /** Hides immediately and cancels any pending ride-end hide. */
   cancel(): void;
+  /** Whether the overlay is up: it can outlast the Room becoming ready by the rest of the ride. */
+  isShowing(): boolean;
 }
 
 /**
@@ -397,7 +399,7 @@ export function createElevatorScreen(
     }
     overlay.classList.toggle(
       'elevator-screen--down',
-      source !== null && destination !== null && direction(source, destination) === 'down',
+      ride !== null && direction(ride.from, ride.to) === 'down',
     );
     applyFloors(source, destination);
     applyLook();
@@ -445,7 +447,12 @@ export function createElevatorScreen(
     cancel() {
       hide();
     },
+    isShowing() {
+      return !overlay.hidden;
+    },
     previewRide(from, to) {
+      // A fresh ride: `hide()` drops any animations `freezeAt` paused (#163 review).
+      hide();
       startRide(from, to);
       screen.ready();
     },

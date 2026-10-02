@@ -331,6 +331,7 @@ describe('createElevatorScreen', () => {
       const lit = document.querySelectorAll('.elevator-screen__hex--lit');
       expect(lit).toHaveLength(1);
       expect(lit[0]!.textContent).toBe('3');
+      expect(q('.elevator-screen__progress-bar')!.style.width).toMatch(/^(63|64|65)(\.\d+)?%$/);
     });
 
     it('ends on the destination at 100%', () => {
@@ -375,8 +376,12 @@ describe('createElevatorScreen', () => {
           'PASSING FLOOR 5 · POLISHING THE ICE… 100%',
         );
         expect(q('.elevator-screen__progress-bar')!.style.width).toBe('100%');
+        // No rAF loop: a frame later it still shows the arrival state, not the ride's start.
+        vi.advanceTimersByTime(100);
+        expect(q('.elevator-screen__arrow')!.textContent).toBe('▲ 5');
+        expect(q('.elevator-screen__status')!.textContent).toMatch(/100%$/);
         // The ride's length is unchanged.
-        vi.advanceTimersByTime(5999);
+        vi.advanceTimersByTime(5899);
         expect(q('.elevator-screen')!.hidden).toBe(false);
         vi.advanceTimersByTime(1);
         expect(q('.elevator-screen')!.hidden).toBe(true);

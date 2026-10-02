@@ -128,5 +128,6 @@ describe('ride length (#163)', () => {
     expect(floorsBetween('L', '5')).toEqual(['1', '2', '3', '4']);
     expect(floorsBetween('R', 'L')).toEqual(['5', '4', '3', '2', '1']);
     expect(floorsBetween('5', 'R')).toEqual([]);
+    expect(floorsBetween('5', '5')).toEqual([]);
   });
 });

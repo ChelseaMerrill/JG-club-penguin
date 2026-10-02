@@ -1,6 +1,7 @@
 import {
   direction,
   FLOOR_ORDER,
+  floorsCrossed,
   MS_PER_FLOOR,
   rideDurationMs,
   type FloorId,
@@ -30,7 +31,7 @@ export function rideStateAt(
 ): RideState {
   const dir = direction(from, to);
   const duration = rideDurationMs(from, to, msPerFloor);
-  const crossed = duration / msPerFloor;
+  const crossed = floorsCrossed(from, to);
   const steps = Math.min(Math.floor(Math.max(elapsedMs, 0) / msPerFloor), crossed);
   const fromIndex = FLOOR_ORDER.indexOf(from);
   const passingFloor = FLOOR_ORDER[fromIndex + (dir === 'up' ? steps : -steps)]!;
