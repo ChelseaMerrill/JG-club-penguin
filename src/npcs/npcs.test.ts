@@ -72,6 +72,8 @@ describe('NPCS', () => {
       // Casey and Millie left Team Room 3 (owner request, 2026-10-02).
       'casey-team-room-3',
       'millie-team-room-3',
+      // Anthony left the Hallway (owner request, 2026-10-02).
+      'anthony-hallway',
     ];
 
     for (const npc of Object.values(NPCS)) {
