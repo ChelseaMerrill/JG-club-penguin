@@ -11,7 +11,6 @@ import { getNpcDefinition, NPCS, type NpcDefinition } from './npcs';
  */
 const AWAITING_BA_LINE: readonly string[] = [
   'emily',
-  'jason-mullet',
   'jon-mullet',
   'brandon-mullet',
   // His "corner pocket" bubble is a fragment of his one line, so it's
@@ -29,6 +28,9 @@ const AWAITING_BA_LINE: readonly string[] = [
   'frank-nardone',
   'chris-pence',
   'rebecca-congi',
+  'abby-rivera',
+  'adam-wilson-hwang',
+  'bryan-sambrook',
 ];
 
 /**

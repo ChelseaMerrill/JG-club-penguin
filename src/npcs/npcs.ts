@@ -91,7 +91,10 @@ export type NpcId =
   | 'nick-brown'
   | 'frank-nardone'
   | 'chris-pence'
-  | 'rebecca-congi';
+  | 'rebecca-congi'
+  | 'abby-rivera'
+  | 'adam-wilson-hwang'
+  | 'bryan-sambrook';
 
 /**
  * A minigame-launching NPC's trigger dialog (#36 D4; round-1 review item 4
@@ -1379,6 +1382,48 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     still: true,
     dialog: LINE_DIALOG,
     figure: { card: 'rebeccaCongi' },
+  },
+  // The Characters sheet's new people in the Mullet (owner request,
+  // 2026-10-02, Track D): name, title and line from each one's card, drawn
+  // from the card itself. Abby paints the wall; Adam and Bryan walk laps.
+  'abby-rivera': {
+    id: 'abby-rivera',
+    name: 'Abby Rivera',
+    title: 'UI/UX',
+    roomId: 'the-mullet',
+    kind: 'human',
+    tagName: 'Abby Rivera',
+    dialogLines: ["Hold still, I'm sketching you."],
+    idleLines: [{ text: "Hold still, I'm sketching you.", periodS: 20, delayS: -3 }],
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'abbyRiveraPainting' },
+  },
+  'adam-wilson-hwang': {
+    id: 'adam-wilson-hwang',
+    name: 'Adam Wilson-Hwang',
+    title: 'Tech Lead',
+    roomId: 'the-mullet',
+    kind: 'human',
+    tagName: 'Adam Wilson-Hwang',
+    dialogLines: ["That's a three-pointer. Minimum."],
+    idleLines: [{ text: "That's a three-pointer. Minimum.", periodS: 20, delayS: -9 }],
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'adamWilsonHwang' },
+  },
+  'bryan-sambrook': {
+    id: 'bryan-sambrook',
+    name: 'Bryan Sambrook',
+    title: 'Principal Software Engineer',
+    roomId: 'the-mullet',
+    kind: 'human',
+    tagName: 'Bryan Sambrook',
+    dialogLines: ['Seen this bug before. Back in 2009.'],
+    idleLines: [{ text: 'Seen this bug before. Back in 2009.', periodS: 20, delayS: -15 }],
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'bryanSambrook' },
   },
   'dan-bedian': {
     id: 'dan-bedian',
