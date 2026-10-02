@@ -1,5 +1,6 @@
 import type { NpcId } from './npcs';
 import { DEV_PIT_MOTIONS } from './motions/dev-pit';
+import { OFFICE_HALLWAY_MOTIONS } from './motions/office-hallway';
 import { ROOF_DECK_MOTIONS } from './motions/roof-deck';
 import { TEAM_ROOM_1_MOTIONS } from './motions/team-room-1';
 import { TEAM_ROOM_2_MOTIONS } from './motions/team-room-2';
@@ -21,6 +22,7 @@ export type { NpcMotionSpec, NpcPropLayer } from './motions/types';
 const NPC_MOTIONS: Partial<Record<NpcId, NpcMotionSpec>> = {
   ...TOWN_CENTER_MOTIONS,
   ...DEV_PIT_MOTIONS,
+  ...OFFICE_HALLWAY_MOTIONS,
   ...THE_MELT_MOTIONS,
   ...ROOF_DECK_MOTIONS,
   ...THE_ICEBOX_MOTIONS,
