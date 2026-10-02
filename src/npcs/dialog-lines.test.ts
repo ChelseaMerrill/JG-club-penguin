@@ -29,6 +29,8 @@ const AWAITING_BA_LINE: readonly string[] = [
   'frank-nardone',
   'chris-pence',
   'rebecca-congi',
+  'bich-dudla',
+  'eva-trimboli',
 ];
 
 /**
