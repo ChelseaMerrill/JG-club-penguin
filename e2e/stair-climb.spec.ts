@@ -141,12 +141,17 @@ test('the Stairs Challenge: only a floor-L start counts, 10 a flight, Stair Mast
   // LOBBY door needs a fresh press), logging nothing; ↑ back to floor 1
   // still logs nothing: this visit never started on floor L.
   await holdUntil(page, 'ArrowDown', 'stairwell-0', 60_000);
+  // The panel only shows (with a state) once this floor's own call is back.
+  await expect(panel(page)).toBeVisible();
   await expect(panel(page)).toHaveAttribute('data-state', 'not-started');
+  await page.waitForTimeout(3000);
   await expect(tokens(page)).toHaveText('0');
   await shot(page, 'keys-descended-to-floor-0');
   await holdUntil(page, 'ArrowUp', 'stairwell-1');
+  await expect(panel(page)).toBeVisible();
   await expect(panel(page)).toHaveAttribute('data-state', 'not-started');
   await expect(heading(page)).toHaveText('STAIRS CHALLENGE');
+  await page.waitForTimeout(3000);
   await expect(tokens(page)).toHaveText('0');
   await shot(page, 'panel-not-started');
 
@@ -238,6 +243,7 @@ test("a climb left half-done can't be finished from floor 5 down (RT2-1)", async
   await walkThrough(page, door(stairwell4, 'FLOOR 3'));
   await walkThrough(page, door(stairwell3, 'FLOOR 2'));
   await walkThrough(page, door(stairwell2, 'FLOOR 3'));
+  await expect(panel(page)).toBeVisible();
   await expect(panel(page)).toHaveAttribute('data-state', 'not-started');
   await page.waitForTimeout(3000);
   await expect(tokens(page)).toHaveText('120');

@@ -267,6 +267,9 @@ export function createStairClimbPanel(root: HTMLElement): StairClimbPanel {
     hide() {
       panel.hidden = true;
       hint.hidden = true;
+      // No stale state survives a hide (review m3): the next floor's state
+      // appears only with its own result.
+      delete panel.dataset.state;
     },
     dismissHint() {
       hintDismissed = true;

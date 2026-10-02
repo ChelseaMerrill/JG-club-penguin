@@ -245,6 +245,7 @@ describe('createStairClimbPanel', () => {
     panel.show({ floor: 0, progress: PROGRESS(0), arrival: null, armed: false });
     panel.hide();
     expect(q('.stair-climb-panel').hidden).toBe(true);
+    expect(q('.stair-climb-panel').dataset.state).toBeUndefined();
     expect(q('.stair-climb-hint').hidden).toBe(true);
 
     panel.dismissHint();
