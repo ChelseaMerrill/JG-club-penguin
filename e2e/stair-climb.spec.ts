@@ -286,3 +286,39 @@ test('the stair keys do nothing with the chat field focused or the Map open', as
 
   expect(errors).toEqual([]);
 });
+
+test('no stair key climbs, and no climb panel shows, under the Elevator (#163 review)', async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  const errors = collectErrors(page);
+
+  await page.goto('/?asPlayer&hud');
+  await waitForBoot(page);
+
+  // Tile 12 from Town Center rides 5 -> L, and ↑ goes down at once.
+  await page.locator('.hud__button--map').click();
+  await expect(page.locator('.map-screen')).toBeVisible();
+  await page.locator('[data-map-number="12"]').click();
+  const elevator = page.locator('.elevator-screen');
+  await expect(elevator).toBeVisible();
+  await page.keyboard.down('ArrowUp');
+  try {
+    // The Room is ready long before the ride ends: until it does, the
+    // Player stays on floor 0 and the panel stays hidden.
+    await roomIs(page, 'stairwell-0');
+    while (await elevator.isVisible()) {
+      expect((await debugInfo(page))?.roomId).toBe('stairwell-0');
+      await expect(panel(page)).toBeHidden();
+      await page.waitForTimeout(250);
+    }
+    await shot(page, 'keys-after-elevator');
+    // Once it hides, the panel shows and the held ↑ climbs.
+    await expect(panel(page)).toBeVisible();
+    await roomIs(page, 'stairwell-1', FLIGHT_TIMEOUT);
+  } finally {
+    await page.keyboard.up('ArrowUp');
+  }
+
+  expect(errors).toEqual([]);
+});

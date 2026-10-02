@@ -146,6 +146,60 @@ export interface StairClimbPanel {
   destroy(): void;
 }
 
+/** How often a held-back panel checks whether it may show yet. */
+export const STAIR_PANEL_BLOCKED_POLL_MS = 100;
+
+export interface StairPanelGateDeps {
+  /** Whether the panel must wait: the Elevator is still showing (#163 review). */
+  isBlocked(): boolean;
+  setTimer(callback: () => void, ms: number): unknown;
+  clearTimer(handle: unknown): void;
+}
+
+/**
+ * `panel`, held back while `isBlocked()` (#51 slice 4, #163 review): a
+ * `show` that arrives while the Elevator is still up waits, polling every
+ * `STAIR_PANEL_BLOCKED_POLL_MS`, and shows the latest input once it has
+ * hidden. `hide` drops anything waiting.
+ */
+export function gateStairPanel(
+  panel: Pick<StairClimbPanel, 'show' | 'hide'>,
+  deps: StairPanelGateDeps,
+): Pick<StairClimbPanel, 'show' | 'hide'> {
+  let waiting: StairPanelInput | null = null;
+  let timer: unknown = null;
+
+  function stopWaiting(): void {
+    if (timer !== null) deps.clearTimer(timer);
+    timer = null;
+    waiting = null;
+  }
+
+  function check(): void {
+    timer = null;
+    if (waiting === null) return;
+    if (deps.isBlocked()) {
+      timer = deps.setTimer(check, STAIR_PANEL_BLOCKED_POLL_MS);
+      return;
+    }
+    const input = waiting;
+    waiting = null;
+    panel.show(input);
+  }
+
+  return {
+    show(input) {
+      stopWaiting();
+      waiting = input;
+      check();
+    },
+    hide() {
+      stopWaiting();
+      panel.hide();
+    },
+  };
+}
+
 function el(tag: string, className: string, text?: string): HTMLElement {
   const node = document.createElement(tag);
   node.className = className;

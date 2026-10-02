@@ -132,7 +132,7 @@ import { exposePhishingTestHandle } from './phishing/dev-phishing-hook';
 import { stairwellExit } from './game/rooms/definitions/stairwell';
 import { createStairClimbTracker } from './game/rooms/stair-climb-tracker';
 import { createStairKeys, installStairKeys, isEditableElement } from './game/rooms/stair-keys';
-import { createStairClimbPanel } from './ui/stair-climb-panel';
+import { createStairClimbPanel, gateStairPanel } from './ui/stair-climb-panel';
 
 // Fail fast on a missing or malformed .env before anything boots.
 loadEnv();
@@ -569,7 +569,7 @@ function endSession(): RoomChannel | null {
   // Challenge forgets the Room it recorded, along with any held stair key.
   stairClimb.reset();
   stairKeys.reset();
-  stairClimbPanel.hide();
+  gatedStairClimbPanel.hide();
   questWidget.render(null);
   hud.overlays.close(QUESTS_OVERLAY_ID);
   return channel;
@@ -852,19 +852,28 @@ const progressStore = createActiveProgressStore(game.registry, () => devFallback
 // (S4-D10), never while a text field has focus, a HUD overlay is open or a
 // transition is in flight.
 const stairClimbPanel = createStairClimbPanel(uiLayer);
+// Held back while the Elevator is still up (#163 review): its ride can
+// outlast the Room becoming ready (6 s from Town Center to floor 0).
+const gatedStairClimbPanel = gateStairPanel(stairClimbPanel, {
+  isBlocked: () => elevatorScreen.isShowing(),
+  setTimer: (callback, ms) => setTimeout(callback, ms),
+  clearTimer: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>),
+});
 const stairClimb = createStairClimbTracker({
   store: progressStore,
   currentRoomId: () => roomNavigator?.currentRoomId() ?? null,
   now: () => Date.now(),
   setTimer: (callback, ms) => setTimeout(callback, ms),
-  onPanel: (_roomId, input) => stairClimbPanel.show(input),
+  onPanel: (_roomId, input) => gatedStairClimbPanel.show(input),
   onError: (err) => console.error('[main] Stairs Challenge call failed', err),
 });
 const stairKeys = createStairKeys({
   currentRoomId: () => roomNavigator?.currentRoomId() ?? null,
   exitFor: stairwellExit,
   useDoor: (door) => stairClimb.withSource('keys', () => roomNavigator?.useDoor(door)),
-  isTransitioning: () => roomNavigator?.isTransitioning() ?? true,
+  // The navigator's transition ends when the Room is ready; the Elevator can
+  // stay up for the rest of its ride (#163), and no key climbs under it.
+  isTransitioning: () => (roomNavigator?.isTransitioning() ?? true) || elevatorScreen.isShowing(),
   overlayOpen: () => hud.overlays.current() !== null,
   editableFocused: () => isEditableElement(document.activeElement),
   now: () => Date.now(),
@@ -875,7 +884,7 @@ const stairKeys = createStairKeys({
 installStairKeys(window, stairKeys);
 gameEvents.on('room:leave', ({ roomId }) => {
   stairClimb.roomLeave(roomId);
-  stairClimbPanel.hide();
+  gatedStairClimbPanel.hide();
 });
 gameEvents.on('room:enter', ({ roomId }) => {
   stairClimb.roomEnter(roomId);

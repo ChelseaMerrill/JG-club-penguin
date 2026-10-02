@@ -9,6 +9,7 @@ import {
   isEditableElement,
   STAIR_CHAIN_MIN_MS,
   STAIR_HOLD_MS,
+  STAIR_TRANSITION_POLL_MS,
   type StairKeyEvent,
   type StairKeysController,
 } from './stair-keys';
@@ -254,8 +255,36 @@ describe('createStairKeys (#51 slice 4, S4-D10)', () => {
     expect(h.used).toEqual([]);
 
     h.arrive('stairwell-2');
-    vi.advanceTimersByTime(0);
+    vi.advanceTimersByTime(STAIR_TRANSITION_POLL_MS);
     expect(labels(h.used)).toEqual(['FLOOR 3']);
+  });
+
+  it('stays put under the Elevator after the floor is ready, then climbs once it hides (#163 review)', () => {
+    // The Map's ride to floor 0: the Room is ready, the Elevator still up.
+    const h = setup('stairwell-0');
+    let elevatorShowing = true;
+    const keys = createStairKeys({
+      currentRoomId: () => h.room.id,
+      exitFor: (roomId, direction) => stairwellExit(roomId, direction),
+      useDoor: (door) => {
+        h.used.push(door);
+        h.room.id = door.targetRoomId;
+      },
+      isTransitioning: () => elevatorShowing,
+      overlayOpen: () => false,
+      editableFocused: () => false,
+      now: () => Date.now(),
+      setTimer: (callback, ms) => setTimeout(callback, ms),
+      clearTimer: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>),
+    });
+    keys.roomReady();
+    keys.keydown(key('ArrowUp'));
+    vi.advanceTimersByTime(6000);
+    expect(h.used).toEqual([]);
+
+    elevatorShowing = false;
+    vi.advanceTimersByTime(STAIR_TRANSITION_POLL_MS);
+    expect(labels(h.used)).toEqual(['FLOOR 1']);
   });
 
   it('cancels a hold on blur, so a stuck key never climbs', () => {

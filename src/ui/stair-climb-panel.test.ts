@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
-import { beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { StairClimbProgress, StairFlightResult } from '../persistence/progress-store';
 import {
   createStairClimbPanel,
+  gateStairPanel,
+  STAIR_PANEL_BLOCKED_POLL_MS,
   STAIR_PANEL_COPY,
   stairPanelState,
   type StairPanelInput,
@@ -256,5 +258,65 @@ describe('createStairClimbPanel', () => {
     panel.destroy();
     expect(document.querySelector('.stair-climb-panel')).toBeNull();
     expect(document.querySelector('.stair-climb-hint')).toBeNull();
+  });
+});
+
+describe('gateStairPanel (#163 review)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function setup(blocked: { value: boolean }) {
+    const shown: StairPanelInput[] = [];
+    let hidden = 0;
+    const gate = gateStairPanel(
+      { show: (input) => shown.push(input), hide: () => (hidden += 1) },
+      {
+        isBlocked: () => blocked.value,
+        setTimer: (callback, ms) => setTimeout(callback, ms),
+        clearTimer: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>),
+      },
+    );
+    return { gate, shown, hiddenCount: () => hidden };
+  }
+
+  const AT = (floor: number): StairPanelInput => ({
+    floor,
+    progress: PROGRESS(floor),
+    arrival: null,
+    armed: false,
+  });
+
+  it('shows straight away when the Elevator is down', () => {
+    const { gate, shown } = setup({ value: false });
+    gate.show(AT(2));
+    expect(shown).toEqual([AT(2)]);
+  });
+
+  it('waits while the Elevator is up, then shows the latest input once it hides', () => {
+    const blocked = { value: true };
+    const { gate, shown } = setup(blocked);
+    gate.show(AT(0));
+    gate.show(AT(1));
+    vi.advanceTimersByTime(6000);
+    expect(shown).toEqual([]);
+
+    blocked.value = false;
+    vi.advanceTimersByTime(STAIR_PANEL_BLOCKED_POLL_MS);
+    expect(shown).toEqual([AT(1)]);
+  });
+
+  it('drops a waiting input on hide', () => {
+    const blocked = { value: true };
+    const { gate, shown, hiddenCount } = setup(blocked);
+    gate.show(AT(0));
+    gate.hide();
+    blocked.value = false;
+    vi.advanceTimersByTime(1000);
+    expect(shown).toEqual([]);
+    expect(hiddenCount()).toBe(1);
   });
 });

@@ -12,6 +12,13 @@ export const STAIR_HOLD_MS = 800;
  */
 export const STAIR_CHAIN_MIN_MS = 2000;
 
+/**
+ * How often a hold that came due mid-transition checks again. The Elevator
+ * can stay up for the rest of its ride after the Room is ready (#163), so a
+ * hold can't simply wait for the next `room:enter`.
+ */
+export const STAIR_TRANSITION_POLL_MS = 100;
+
 /** A keyboard event, narrowed to what the controller reads. */
 export interface StairKeyEvent {
   key: string;
@@ -28,7 +35,7 @@ export interface StairKeysDeps {
    * `main.ts` tags the Room change it makes with the 'keys' source.
    */
   useDoor(door: RoomDoor): void;
-  /** Whether a Room transition is still in flight. */
+  /** Whether a Room transition is still in flight, or the Elevator still showing. */
   isTransitioning(): boolean;
   /** Whether any HUD overlay is open (`hud.overlays.current() !== null`, RT2-6). */
   overlayOpen(): boolean;
@@ -121,7 +128,7 @@ export function createStairKeys(deps: StairKeysDeps): StairKeysController {
       return;
     }
     if (deps.isTransitioning()) {
-      awaitingRoom = true;
+      schedule(STAIR_TRANSITION_POLL_MS);
       return;
     }
     const door = deps.exitFor(roomId, held);
