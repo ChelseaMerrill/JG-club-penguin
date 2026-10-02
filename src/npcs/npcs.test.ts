@@ -534,6 +534,107 @@ describe('NPCS', () => {
     }
   });
 
+  it("gives the Stairwell's 18 NPCs the sheet's names/titles and each floor's own nameplates and lines (#51 slice 4)", () => {
+    // Names/titles from design/Characters.dc.html (Dom, Ashley and Casey are
+    // on its TITLE TBD list); tags and lines verbatim from each floor's Stage
+    // of design/Stairwell.dc.html, on its own `say` cycle: Dom 9 s (-1 s,
+    // -5 s), Jason 14 s (-1 s, -8 s) and the guest 18 s (-4 s, -13 s). Each
+    // NPC's two bubbles are its two dialog lines (S4-D8).
+    const floors: [string, string][][] = [
+      [
+        ['Stairs challenge starts NOW.', 'Follow me!'],
+        ['Elevator is broken. It is not. Take the stairs.', 'Five floors. I will be watching.'],
+        ['Nobody phishes on the stairs.', 'Verify the floor number.'],
+      ],
+      [
+        ['Floor 1. Warm-up done.', 'See you at the top!'],
+        ['Floor 1. That is one. Out of five.', 'Stairs Challenge. Or are you scared?'],
+        ['Headphones on. Legs on.', 'Beat drops on floor 3.'],
+      ],
+      [
+        ['Floor 2. You got this.', 'My Fitbit is SCREAMING.'],
+        ['Floor 2. My grandma climbs faster.', 'Log it or it did not happen.'],
+        ['Stairs build character.', 'Looking strong!'],
+      ],
+      [
+        ['Halfway! Kind of!', 'Race you to the top.'],
+        ['Halfway. Your Fitbit is embarrassed.', 'Dom has lapped you twice.'],
+        ['Pool table is on 5. Motivation.', 'Two more. Easy.'],
+      ],
+      [
+        ['Elevator is for quitters!', 'Legs feeling it yet?'],
+        ['Floor 4. Breathing hard already?', 'The elevator misses you.'],
+        ['Outwit. Outplay. Outclimb.', 'The tribe says: keep going.'],
+      ],
+      [
+        ['Cardio is free!', 'Five floors. One legend.'],
+        ['Oh, you made it? Took a while.', 'Dom beat you by four minutes.'],
+        ['Made it! Chicken did too.', 'Stretch. Then coffee.'],
+      ],
+    ].map((floor) => floor.map((pair) => pair as [string, string]));
+    const guests: [NpcId, string, string, string | null, NpcId][] = [
+      ['anthony-stairwell-0', 'Anthony', 'Anthony Conway', 'Director of IT', 'anthony-hallway'],
+      ['casey-stairwell-1', 'Casey', 'Casey Snow', null, 'casey'],
+      ['sydney-stairwell-2', 'Sydney', 'Sydney Murauskas', 'Technical Recruiter', 'sydney'],
+      ['tony-stairwell-3', 'Tony', 'Tony Mercadante', 'Project Manager', 'tony'],
+      ['jory-stairwell-4', 'Jory', 'Jory Hutchins', 'Director of Career Development', 'jory'],
+      ['ashley-stairwell-5', 'Ashley', 'Ashley Schuliger', null, 'ashley'],
+    ];
+    const lines = (
+      [first, second]: [string, string],
+      periodS: number,
+      delays: [number, number],
+    ) => ({
+      dialogLines: [first, second],
+      idleLines: [
+        { text: first, periodS, delayS: delays[0] },
+        { text: second, periodS, delayS: delays[1] },
+      ],
+    });
+    const figureOf = (id: NpcId) => {
+      const npc = NPCS[id];
+      if (npc.kind !== 'human') throw new Error(`expected ${id} to be a Human NPC`);
+      return npc.figure;
+    };
+
+    floors.forEach(([dom, jason, guest], floor) => {
+      const roomId = `stairwell-${floor}`;
+      const domId = `dom-stairwell-${floor}` as NpcId;
+      const jasonId = `jason-stairwell-${floor}` as NpcId;
+      const [guestId, guestTag, guestName, guestTitle, guestElsewhere] = guests[floor]!;
+      const common = { kind: 'human', roomId, dialog: { kind: 'line' } };
+      expect(NPCS[domId], domId).toMatchObject({
+        ...common,
+        name: 'Dom Favata',
+        title: null,
+        tagName: 'Dom',
+        ...lines(dom, 9, [-1, -5]),
+      });
+      expect(NPCS[jasonId], jasonId).toMatchObject({
+        ...common,
+        name: 'Jason Jahnel',
+        title: 'COO',
+        tagName: 'Jason Jahnel',
+        still: true,
+        ...lines(jason, 14, [-1, -8]),
+      });
+      expect(NPCS[guestId], guestId).toMatchObject({
+        ...common,
+        name: guestName,
+        title: guestTitle,
+        tagName: guestTag,
+        ...lines(guest, 18, [-4, -13]),
+      });
+      // Each is drawn as the same person elsewhere is (the slice-2 rule):
+      // humans.js's Dom, not the running kit Team Room 1 and the Mullet add.
+      expect(figureOf(domId)).toBe(figureOf('dom'));
+      expect(figureOf(jasonId)).toBe(figureOf('jason'));
+      expect(figureOf(guestId)).toBe(figureOf(guestElsewhere));
+      // The design draws every Stairwell figure at the Human default, 0.62.
+      for (const id of [domId, jasonId, guestId]) expect(NPCS[id].scale, id).toBeUndefined();
+    });
+  });
+
   it("draws each repeat appearance with the same figure and dialog line as the person's first Room (#51)", () => {
     const repeats: [NpcId, NpcId][] = [
       ['ian-team-room-2', 'ian'],

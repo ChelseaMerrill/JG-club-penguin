@@ -20,8 +20,9 @@ const AWAITING_BA_LINE: readonly string[] = [
 ];
 
 /**
- * Every speech-bubble line in `design/Stairwell.dc.html`. #144 leaves them
- * out (Q16); #51's Stairwell slice adds them with those NPCs' appearances.
+ * Every speech-bubble line in `design/Stairwell.dc.html`. #144 left them out
+ * (Q16); #51's Stairwell slice adds them, each only to its own floor's NPC.
+ * The "You" Penguin's lines are the local Player's, so no NPC has those.
  */
 const STAIRWELL_LINES: readonly string[] = [
   'Almost.',
@@ -129,10 +130,12 @@ describe('dialogLinePool', () => {
     ]);
   });
 
-  it('includes no Stairwell line in any pool (Q16)', () => {
+  it("includes Stairwell lines only in the Stairwell NPCs' pools (Q16, #51 slice 4)", () => {
     for (const npc of Object.values(NPCS)) {
+      const onTheStairs = /-stairwell-\d$/.test(npc.id);
       for (const line of dialogLinePool(npc)) {
-        expect(STAIRWELL_LINES, `${npc.id}: "${line}"`).not.toContain(line);
+        if (onTheStairs) expect(STAIRWELL_LINES, `${npc.id}: "${line}"`).toContain(line);
+        else expect(STAIRWELL_LINES, `${npc.id}: "${line}"`).not.toContain(line);
       }
     }
   });

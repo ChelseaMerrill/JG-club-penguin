@@ -2,6 +2,7 @@ import type { HexColor } from '../../../contracts';
 import type { RoomDefinition, RoomHotspot, RoomWallText } from '../room-definition';
 import { createStandardRoomGrid } from '../grid';
 import { roofDeck } from './roof-deck';
+import { STAIRWELL_JG_HQ_SILL } from './stairwell';
 
 // The standard 12x10 grid every one of the five prototype Rooms shares
 // (#16 D2, `grid.ts`'s `createStandardRoomGrid`).
@@ -224,8 +225,10 @@ export const townCenter: RoomDefinition = {
     {
       label: 'STAIRWELL',
       hotspot: { x: 610, y: 180, ...DOOR_HOTSPOT_SIZE },
-      targetRoomId: null,
-      entryTile: { col: 0, row: 0 },
+      // #51 slice 4: the Stairwell opens on floor 5, the JG HQ floor (UD-2),
+      // on the sill inside its JG HQ door, which leads back here.
+      targetRoomId: 'stairwell-5',
+      entryTile: STAIRWELL_JG_HQ_SILL,
     },
     {
       label: 'ELEVATOR · ROOF DECK',

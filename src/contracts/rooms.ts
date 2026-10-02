@@ -15,6 +15,13 @@ export const ROOM_IDS = [
   'team-room-4',
   'bathroom',
   'the-mullet',
+  // #51 slice 4: one Room per Stairwell floor, floor 0 (the lobby level) to 5.
+  'stairwell-0',
+  'stairwell-1',
+  'stairwell-2',
+  'stairwell-3',
+  'stairwell-4',
+  'stairwell-5',
 ] as const;
 
 /**

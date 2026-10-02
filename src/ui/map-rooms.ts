@@ -1,5 +1,6 @@
 import { type RoomId } from '../contracts';
 import { hasRoomDefinition } from '../game/rooms/registry';
+import { isStairwellRoom } from '../game/rooms/stairwell';
 
 /**
  * One card from `design/Club JenGuin Map.dc.html`'s "JG HQ MAP" grid,
@@ -73,7 +74,14 @@ export const MAP_ROOMS: readonly MapRoomTile[] = [
     subtitle: 'TEAM ROOMS 1–9',
     roomId: 'office-hallway',
   },
-  { number: '12', label: '12 · THE SLIDE', subtitle: 'STAIRWELL · 5 FLIGHTS', roomId: null },
+  // #51 slice 4: the Stairwell's floor 0, where the Stairs Challenge starts
+  // (S4-D7). Its other floors share this tile (`mapTileRoomId`).
+  {
+    number: '12',
+    label: '12 · THE SLIDE',
+    subtitle: 'STAIRWELL · 5 FLIGHTS',
+    roomId: 'stairwell-0',
+  },
   { number: '13', label: '13 · THE THAW ROOM', subtitle: 'BATHROOM (JOKE)', roomId: 'bathroom' },
   {
     number: '15',
@@ -90,4 +98,13 @@ export const MAP_ROOMS: readonly MapRoomTile[] = [
  */
 export function isMapTileClickable(tile: MapRoomTile): boolean {
   return tile.roomId !== null && hasRoomDefinition(tile.roomId);
+}
+
+/**
+ * The Room whose tile stands for `roomId` on the Map (#51 slice 4, RT2-4):
+ * the Room itself, except that every Stairwell floor is tile 12's floor 0,
+ * so the Map shows YOU ARE HERE on tile 12 on every Stairwell floor.
+ */
+export function mapTileRoomId(roomId: RoomId): RoomId {
+  return isStairwellRoom(roomId) ? 'stairwell-0' : roomId;
 }

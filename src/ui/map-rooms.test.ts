@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { ROOM_DEFINITIONS } from '../game/rooms/registry';
-import { isMapTileClickable, MAP_ROOMS, type MapRoomTile } from './map-rooms';
+import { isMapTileClickable, MAP_ROOMS, mapTileRoomId, type MapRoomTile } from './map-rooms';
 
 /**
  * A made-up COMING SOON tile (#51): the real Map loses its `roomId: null`
@@ -45,6 +45,14 @@ describe('MAP_ROOMS', () => {
     expect(kitchen?.label).toBe('04 · THE KITCHEN');
     expect(kitchen?.roomId).toBe('the-melt');
 
+    // #51 slice 4: tile 12 opens the Stairwell on floor 0 (S4-D7).
+    const slide = MAP_ROOMS.find((tile) => tile.number === '12');
+    expect(slide).toMatchObject({
+      label: '12 · THE SLIDE',
+      subtitle: 'STAIRWELL · 5 FLIGHTS',
+      roomId: 'stairwell-0',
+    });
+
     const mullet = MAP_ROOMS.find((tile) => tile.number === '15');
     expect(mullet?.label).toBe('15 · THE MULLET');
     expect(mullet?.subtitle).toBe('MEZZANINE · AFTER-PARTY');
@@ -64,6 +72,14 @@ describe('MAP_ROOMS', () => {
 
   it('gives every registered RoomDefinition exactly one clickable Map tile', () => {
     for (const room of ROOM_DEFINITIONS) {
+      // #51 slice 4 (RT2-4): the Stairwell's floors 1-5 have no tile of
+      // their own; tile 12 opens floor 0 and stands for all six
+      // (`mapTileRoomId`).
+      if (/^stairwell-[1-5]$/.test(room.id)) {
+        expect(MAP_ROOMS.some((tile) => tile.roomId === room.id)).toBe(false);
+        expect(mapTileRoomId(room.id)).toBe('stairwell-0');
+        continue;
+      }
       const matches = MAP_ROOMS.filter((tile) => tile.roomId === room.id);
       expect(matches).toHaveLength(1);
       expect(isMapTileClickable(matches[0]!)).toBe(true);
