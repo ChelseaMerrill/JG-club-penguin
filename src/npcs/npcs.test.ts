@@ -66,6 +66,9 @@ describe('NPCS', () => {
       'millie-icebox',
       'jason',
       'darrin-icebox',
+      // Millie and Brandon left the Market (owner request, 2026-10-02).
+      'millie',
+      'brandon',
     ];
 
     for (const npc of Object.values(NPCS)) {

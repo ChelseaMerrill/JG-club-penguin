@@ -185,4 +185,6 @@ export interface RoomDefinition {
   foregrounds?: readonly RoomForeground[];
   /** The pet fish in the Room's desk tank, a decoration (`tank-fish.ts`): Town Center only. */
   tankFish?: TankFish;
+  /** Potted plants on these floor tiles, a decoration (`plants.ts`); each tile must be unwalkable. */
+  plants?: readonly Tile[];
 }
