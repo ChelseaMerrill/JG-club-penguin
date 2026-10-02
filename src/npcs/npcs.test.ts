@@ -66,6 +66,12 @@ describe('NPCS', () => {
       'millie-icebox',
       'jason',
       'darrin-icebox',
+      // Millie and Brandon left the Market (owner request, 2026-10-02).
+      'millie',
+      'brandon',
+      // Casey and Millie left Team Room 3 (owner request, 2026-10-02).
+      'casey-team-room-3',
+      'millie-team-room-3',
       // Ian left Team Room 2 (owner request, 2026-10-02).
       'ian-team-room-2',
     ];

@@ -90,7 +90,8 @@ export type NpcId =
   | 'greg-westover'
   | 'nick-brown'
   | 'frank-nardone'
-  | 'chris-pence';
+  | 'chris-pence'
+  | 'rebecca-congi';
 
 /**
  * A minigame-launching NPC's trigger dialog (#36 D4; round-1 review item 4
@@ -1363,6 +1364,21 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     watchesPlayer: true,
     dialog: LINE_DIALOG,
     figure: { card: 'chrisPenceBinoculars' },
+  },
+  // New from the Characters sheet (owner request, 2026-10-02, Track D):
+  // name, title and line from her card, drawn from the card itself.
+  'rebecca-congi': {
+    id: 'rebecca-congi',
+    name: 'Rebecca Congi',
+    title: 'Developer',
+    roomId: 'team-room-1',
+    kind: 'human',
+    tagName: 'Rebecca Congi',
+    dialogLines: ["Green tests or it didn't happen."],
+    idleLines: [{ text: "Green tests or it didn't happen.", periodS: 18, delayS: -6 }],
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'rebeccaCongi' },
   },
   'dan-bedian': {
     id: 'dan-bedian',

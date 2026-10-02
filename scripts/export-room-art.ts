@@ -1184,6 +1184,27 @@ const FOREGROUND_LAYERS: Partial<
         'The front desk, its monitor and keyboard, drawn after its chair: Nick Brown sits in that chair, behind it (owner request, 2026-10-02, Track D).',
     },
   ],
+  'team-room-1': [
+    {
+      name: 'rebecca-desk',
+      selectors: [
+        'polygon[points="535,435 645,490 595,515 485,460"]',
+        'polygon[points="485,507.5 595,562.5 595,515 485,460"]',
+        'polygon[points="645,537.5 595,562.5 595,515 645,490"]',
+        'polygon[points="535,428.5 650,486 595,513.5 480,456"]',
+        'polygon[points="480,460 595,517.5 595,513.5 480,456"]',
+        'polygon[points="650,490 595,517.5 595,513.5 650,486"]',
+        'polygon[points="530,438.5 575,461 571,463 526,440.5"]',
+        'polygon[points="526,468 571,490.5 571,463 526,440.5"]',
+        'polygon[points="575,488.5 571,490.5 571,463 575,461"]',
+        'polygon[points="560,451.5 595,469 582.5,475.3 547.5,457.8"]',
+        'polygon[points="547.5,459.8 582.5,477.3 582.5,475.3 547.5,457.8"]',
+        'polygon[points="595,471 582.5,477.3 582.5,475.3 595,469"]',
+      ],
+      comment:
+        'The left desk, its monitor and keyboard, drawn after its chair: Rebecca Congi sits in that chair, behind it (owner request, 2026-10-02, Track D).',
+    },
+  ],
   'the-icebox': [
     {
       name: 'conference-table',
@@ -1228,35 +1249,6 @@ const FOREGROUND_LAYERS: Partial<
     },
   ],
   'team-room-3': [
-    {
-      name: 'millie-desk',
-      selectors: [
-        'polygon[points="535,448 645,503 595,528 485,473"]',
-        'polygon[points="485,520.5 595,575.5 595,528 485,473"]',
-        'polygon[points="645,550.5 595,575.5 595,528 645,503"]',
-        'polygon[points="535,441.5 650,499 595,526.5 480,469"]',
-        'polygon[points="480,473 595,530.5 595,526.5 480,469"]',
-        'polygon[points="650,503 595,530.5 595,526.5 650,499"]',
-        'polygon[points="530,451.5 575,474 571,476 526,453.5"]',
-        'polygon[points="526,481 571,503.5 571,476 526,453.5"]',
-        'polygon[points="575,501.5 571,503.5 571,476 575,474"]',
-        'polygon[points="560,464.5 595,482 582.5,488.3 547.5,470.8"]',
-        'polygon[points="547.5,472.8 582.5,490.3 582.5,488.3 547.5,470.8"]',
-        'polygon[points="595,484 582.5,490.3 582.5,488.3 595,482"]',
-      ],
-      comment:
-        "Millie's desk, its monitor and keyboard, drawn after her figure: she sits behind it, hidden from the waist down.",
-    },
-    {
-      name: 'casey-couch-arm',
-      selectors: [
-        'polygon[points="868,402 882,409 882,425 868,418"]',
-        'polygon[points="932,384 882,409 882,425 932,400"]',
-        'polygon[points="918,377 932,384 882,409 868,402"]',
-      ],
-      comment:
-        "The couch's right arm, drawn after Casey's figure: she sits in the couch, beside it.",
-    },
     {
       name: 'sydney-desk',
       selectors: [
