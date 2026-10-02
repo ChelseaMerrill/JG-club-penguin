@@ -26,13 +26,13 @@ const DOOR_HOTSPOT_SIZE = { width: 70, height: 165 };
 // Everything stacked on those (monitors, keyboards, the cube) is covered by
 // them. The floor arrow and the dashed cable are flat floor art. Every NPC's
 // own tile (see `npcSlots` below) is additionally blocked (#16 fix 5): Dom
-// (4,0) and Jethro (7,2).
+// (4,0), Jethro (7,2) and Rebecca (0,4).
 const WALKABLE: readonly (readonly boolean[])[] = [
   [false, false, false, false, false, true, true, false, false, false],
   [true, false, true, false, true, true, true, false, false, true],
   [true, true, true, true, true, true, true, false, true, true],
   [true, true, true, true, false, false, true, true, true, true],
-  [true, true, true, true, false, false, true, true, true, true],
+  [false, true, true, true, false, false, true, true, true, true],
   [false, false, true, true, true, true, true, true, false, false],
   [false, false, false, true, true, true, true, false, false, false],
   [true, true, true, true, true, true, true, true, true, true],
@@ -74,6 +74,21 @@ export const teamRoom1: RoomDefinition = {
     // his shadow.
     { npcId: 'dom-team-room-1', tile: { col: 4, row: 0 } },
     { npcId: 'jethro-team-room-1', tile: { col: 7, row: 2 } },
+    // Rebecca Congi, new from the Characters sheet (owner request,
+    // 2026-10-02, Track D), sits working at the left desk: in its chair,
+    // behind the desk at its right end, beside the monitor, whose seat the
+    // design centres at (615, 472.5). She stands 22.5 px into the desk from
+    // it, (615, 495), and the desk is drawn over her (`foregrounds` below).
+    { npcId: 'rebecca-congi', tile: { col: 0, row: 4 }, offset: { x: 15, y: 35 } },
     // "You" is the local Player's own Penguin, never a static NPC slot.
+  ],
+  // The left desk, drawn in front of Rebecca sitting at it. Exported by `npm
+  // run export:room-art -- team-room-1` (`FOREGROUND_LAYERS`).
+  foregrounds: [
+    {
+      key: 'room-team-room-1-front-rebecca-desk',
+      url: 'rooms/team-room-1-front-rebecca-desk.png',
+      overNpcId: 'rebecca-congi',
+    },
   ],
 };

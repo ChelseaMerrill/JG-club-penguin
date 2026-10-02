@@ -1149,6 +1149,27 @@ const FOREGROUND_LAYERS: Partial<
         'Desk E (the back-right desk), its monitor and keyboard: Alex Kelly sits behind it (owner request, 2026-10-02, Track D).',
     },
   ],
+  'team-room-1': [
+    {
+      name: 'rebecca-desk',
+      selectors: [
+        'polygon[points="535,435 645,490 595,515 485,460"]',
+        'polygon[points="485,507.5 595,562.5 595,515 485,460"]',
+        'polygon[points="645,537.5 595,562.5 595,515 645,490"]',
+        'polygon[points="535,428.5 650,486 595,513.5 480,456"]',
+        'polygon[points="480,460 595,517.5 595,513.5 480,456"]',
+        'polygon[points="650,490 595,517.5 595,513.5 650,486"]',
+        'polygon[points="530,438.5 575,461 571,463 526,440.5"]',
+        'polygon[points="526,468 571,490.5 571,463 526,440.5"]',
+        'polygon[points="575,488.5 571,490.5 571,463 575,461"]',
+        'polygon[points="560,451.5 595,469 582.5,475.3 547.5,457.8"]',
+        'polygon[points="547.5,459.8 582.5,477.3 582.5,475.3 547.5,457.8"]',
+        'polygon[points="595,471 582.5,477.3 582.5,475.3 595,469"]',
+      ],
+      comment:
+        'The left desk, its monitor and keyboard, drawn after its chair: Rebecca Congi sits in that chair, behind it (owner request, 2026-10-02, Track D).',
+    },
+  ],
   'the-icebox': [
     {
       name: 'conference-table',
