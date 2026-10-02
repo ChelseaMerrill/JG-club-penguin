@@ -800,7 +800,12 @@ function stairwellDom(floor: number, first: string, second: string): HumanNpcDef
   });
 }
 
-/** Jason on Stairwell floor `floor`, by the stairs. The design draws him with no bob. */
+/**
+ * Jason on Stairwell floor `floor`, by the stairs. The design draws him with
+ * no bob. His bubbles sit 3 px lower than the layout's default so the
+ * two-line ones clear Dom's nameplate just above, as the design's do (its
+ * bubbles start 14 px below Dom's nameplate; #113).
+ */
 function stairwellJason(floor: number, first: string, second: string): HumanNpcDefinition {
   return stairwellNpc({
     id: `jason-stairwell-${floor}` as NpcId,
@@ -814,6 +819,7 @@ function stairwellJason(floor: number, first: string, second: string): HumanNpcD
       { text: second, delayS: -8 },
     ],
     still: true,
+    bubbleOffsetY: 3,
     figure: JASON_FIGURE,
   });
 }

@@ -257,9 +257,16 @@ describe('NPCS', () => {
       // slot `offset`s, #189), where Dom's bubble crosses Nicole's nameplate
       // and Jory's crosses Brandon's. Both walk off it at once. (Dev Pit's old
       // Steven-over-Ryan overlap went when Ryan left, 2026-09-30.)
+      // The Stairwell's floor-2 and floor-4 guests too (#51 slice 4):
+      // design/Stairwell.dc.html draws Sydney's "Stairs build character." at
+      // x 670.6 and Jory's two bubbles at x 669.2 and 665.4, each over the
+      // right end of Jason's nameplate (x 564-676, y 487.4-507.4).
       const drawnByTheDesign: string[] = [
         `the-mullet: dom-mullet "Undefeated. I always win." x nicole-mullet's nameplate "Nicole"`,
         `the-mullet: jory-mullet "Tribe has spoken." x brandon-mullet's nameplate "Brandon"`,
+        `stairwell-2: sydney-stairwell-2 "Stairs build character." x jason-stairwell-2's nameplate "Jason Jahnel"`,
+        `stairwell-4: jory-stairwell-4 "Outwit. Outplay. Outclimb." x jason-stairwell-4's nameplate "Jason Jahnel"`,
+        `stairwell-4: jory-stairwell-4 "The tribe says: keep going." x jason-stairwell-4's nameplate "Jason Jahnel"`,
       ];
       expect(collisions.filter((collision) => !drawnByTheDesign.includes(collision))).toEqual([]);
       // Each allowed overlap still happens, so a stale entry can't linger.
