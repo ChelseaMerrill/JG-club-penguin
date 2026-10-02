@@ -55,3 +55,28 @@ export function direction(from: FloorId, to: FloorId): 'up' | 'down' {
 export function floorLabel(floor: FloorId): string {
   return floor === 'R' ? 'THE ROOF' : `FLOOR ${floor}`;
 }
+
+/** How long the Elevator ride takes per floor crossed: 1.2s (#163). */
+export const MS_PER_FLOOR = 1200;
+
+/** How many floors a ride from `from` to `to` crosses: the absolute `FLOOR_ORDER` distance (#163). */
+export function floorsCrossed(from: FloorId, to: FloorId): number {
+  return Math.abs(FLOOR_ORDER.indexOf(to) - FLOOR_ORDER.indexOf(from));
+}
+
+/** The ride's length: `msPerFloor` for each floor crossed (5 to R 1.2s, L to 5 6s, L to R 7.2s; #163). */
+export function rideDurationMs(from: FloorId, to: FloorId, msPerFloor = MS_PER_FLOOR): number {
+  return floorsCrossed(from, to) * msPerFloor;
+}
+
+/** The floors strictly between `from` and `to`, in travel order (#163). */
+export function floorsBetween(from: FloorId, to: FloorId): FloorId[] {
+  const fromIndex = FLOOR_ORDER.indexOf(from);
+  const toIndex = FLOOR_ORDER.indexOf(to);
+  const step = toIndex > fromIndex ? 1 : -1;
+  const between: FloorId[] = [];
+  for (let i = fromIndex + step; i !== toIndex && i >= 0 && i < FLOOR_ORDER.length; i += step) {
+    between.push(FLOOR_ORDER[i]!);
+  }
+  return between;
+}

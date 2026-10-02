@@ -3,8 +3,12 @@ import { ROOM_IDS } from '../../contracts';
 import {
   direction,
   floorLabel,
+  floorsBetween,
+  floorsCrossed,
   floorsDiffer,
   FLOOR_ORDER,
+  MS_PER_FLOOR,
+  rideDurationMs,
   ROOM_FLOORS,
   type FloorId,
 } from './floors';
@@ -73,5 +77,41 @@ describe('floorLabel', () => {
 
   it.each<FloorId>(['L', '1', '2', '3', '4', '5'])('names floor %s "FLOOR %s"', (floor) => {
     expect(floorLabel(floor)).toBe(`FLOOR ${floor}`);
+  });
+});
+
+describe('ride length (#163)', () => {
+  it('is 1.2s per floor', () => {
+    expect(MS_PER_FLOOR).toBe(1200);
+  });
+
+  it.each<[FloorId, FloorId, number]>([
+    ['5', 'R', 1],
+    ['R', '5', 1],
+    ['L', '5', 5],
+    ['L', 'R', 6],
+    ['R', 'L', 6],
+  ])('crosses %s -> %s in %i floors', (from, to, crossed) => {
+    expect(floorsCrossed(from, to)).toBe(crossed);
+  });
+
+  it.each<[FloorId, FloorId, number]>([
+    ['5', 'R', 1200],
+    ['R', '5', 1200],
+    ['L', '5', 6000],
+    ['L', 'R', 7200],
+    ['R', 'L', 7200],
+  ])('rides %s -> %s in %ims', (from, to, ms) => {
+    expect(rideDurationMs(from, to)).toBe(ms);
+  });
+
+  it('takes a custom ms per floor', () => {
+    expect(rideDurationMs('L', '5', 100)).toBe(500);
+  });
+
+  it('lists the floors strictly between, in travel order', () => {
+    expect(floorsBetween('L', '5')).toEqual(['1', '2', '3', '4']);
+    expect(floorsBetween('R', 'L')).toEqual(['5', '4', '3', '2', '1']);
+    expect(floorsBetween('5', 'R')).toEqual([]);
   });
 });
