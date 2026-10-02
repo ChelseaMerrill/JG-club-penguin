@@ -88,7 +88,13 @@ export type NpcId =
   | 'dan-bedian'
   | 'paul-carnival'
   | 'greg-westover'
-  | 'rebecca-congi';
+  | 'nick-brown'
+  | 'frank-nardone'
+  | 'chris-pence'
+  | 'rebecca-congi'
+  | 'abby-rivera'
+  | 'adam-wilson-hwang'
+  | 'bryan-sambrook';
 
 /**
  * A minigame-launching NPC's trigger dialog (#36 D4; round-1 review item 4
@@ -254,6 +260,13 @@ interface NpcDefinitionBase {
    * unless a designed motion (`npc-motions.ts`) replaces the bob.
    */
   still?: boolean;
+  /**
+   * `true` for an NPC who watches the Player (`game/npcs/watch.ts`): it leans
+   * its whole figure toward the local Penguin as it moves (owner request,
+   * 2026-10-02, Track D: Team Room 2's Chris Pence, with his binoculars).
+   * Give it no designed motion, which would set the same figure transform.
+   */
+  watchesPlayer?: boolean;
   /**
    * The Room design's draw scale for this NPC, when it isn't its kind's
    * default (`npc-layout.ts`): Team Room 3 draws its Humans at 0.58
@@ -1311,6 +1324,50 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
   // 2026-10-02, Track D): name, title and line from each one's card, drawn
   // from the card itself (`card-figures.ts`); their motions play the card's
   // bob instead of #36's. Greg's card title is "TITLE TBD".
+  // The Characters sheet's new people in Team Room 2 (owner request,
+  // 2026-10-02, Track D): name, title and line from each one's card, drawn
+  // from the card itself. Chris's card hangs his binoculars on his chest;
+  // here he holds them up to his eyes, watching the Player.
+  'nick-brown': {
+    id: 'nick-brown',
+    name: 'Nick Brown',
+    title: 'Developer',
+    roomId: 'team-room-2',
+    kind: 'human',
+    tagName: 'Nick Brown',
+    dialogLines: ['Just one more commit. Then lunch.'],
+    idleLines: [{ text: 'Just one more commit. Then lunch.', periodS: 20, delayS: -4 }],
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'nickBrown' },
+  },
+  'frank-nardone': {
+    id: 'frank-nardone',
+    name: 'Frank Nardone',
+    title: 'Software Engineer',
+    roomId: 'team-room-2',
+    kind: 'human',
+    tagName: 'Frank Nardone',
+    dialogLines: ["LGTM. Didn't read it."],
+    idleLines: [{ text: "LGTM. Didn't read it.", periodS: 20, delayS: -11 }],
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'frankNardone' },
+  },
+  'chris-pence': {
+    id: 'chris-pence',
+    name: 'Chris Pence',
+    title: 'Software Engineer',
+    roomId: 'team-room-2',
+    kind: 'human',
+    tagName: 'Chris Pence',
+    dialogLines: ['Chris P. Bacon'],
+    idleLines: [{ text: 'Chris P. Bacon', periodS: 20, delayS: -17 }],
+    still: true,
+    watchesPlayer: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'chrisPenceBinoculars' },
+  },
   // New from the Characters sheet (owner request, 2026-10-02, Track D):
   // name, title and line from her card, drawn from the card itself.
   'rebecca-congi': {
@@ -1325,6 +1382,48 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     still: true,
     dialog: LINE_DIALOG,
     figure: { card: 'rebeccaCongi' },
+  },
+  // The Characters sheet's new people in the Mullet (owner request,
+  // 2026-10-02, Track D): name, title and line from each one's card, drawn
+  // from the card itself. Abby paints the wall; Adam and Bryan walk laps.
+  'abby-rivera': {
+    id: 'abby-rivera',
+    name: 'Abby Rivera',
+    title: 'UI/UX',
+    roomId: 'the-mullet',
+    kind: 'human',
+    tagName: 'Abby Rivera',
+    dialogLines: ["Hold still, I'm sketching you."],
+    idleLines: [{ text: "Hold still, I'm sketching you.", periodS: 20, delayS: -3 }],
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'abbyRiveraPainting' },
+  },
+  'adam-wilson-hwang': {
+    id: 'adam-wilson-hwang',
+    name: 'Adam Wilson-Hwang',
+    title: 'Tech Lead',
+    roomId: 'the-mullet',
+    kind: 'human',
+    tagName: 'Adam Wilson-Hwang',
+    dialogLines: ["That's a three-pointer. Minimum."],
+    idleLines: [{ text: "That's a three-pointer. Minimum.", periodS: 20, delayS: -9 }],
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'adamWilsonHwang' },
+  },
+  'bryan-sambrook': {
+    id: 'bryan-sambrook',
+    name: 'Bryan Sambrook',
+    title: 'Principal Software Engineer',
+    roomId: 'the-mullet',
+    kind: 'human',
+    tagName: 'Bryan Sambrook',
+    dialogLines: ['Seen this bug before. Back in 2009.'],
+    idleLines: [{ text: 'Seen this bug before. Back in 2009.', periodS: 20, delayS: -15 }],
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'bryanSambrook' },
   },
   'dan-bedian': {
     id: 'dan-bedian',

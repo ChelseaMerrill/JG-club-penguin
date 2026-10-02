@@ -29,10 +29,10 @@ const DOOR_HOTSPOT_SIZE = { width: 70, height: 165 };
 // tile (see `npcSlots` below) is additionally blocked (#16 fix 5): Ian (5,1).
 const WALKABLE: readonly (readonly boolean[])[] = [
   [false, false, false, true, true, true, false, false, false],
-  [true, false, true, true, true, false, true, false, true],
-  [true, true, true, true, true, true, true, true, true],
+  [true, false, true, true, true, true, true, false, true],
+  [false, true, true, true, true, true, true, true, true],
   [true, true, true, false, false, false, true, true, true],
-  [true, true, true, false, false, false, true, true, true],
+  [false, true, true, false, false, false, true, false, true],
   [false, false, false, true, true, true, true, false, false],
   [false, false, false, true, false, true, false, false, false],
   [true, true, true, true, true, true, true, true, true],
@@ -71,7 +71,38 @@ export const teamRoom2: RoomDefinition = {
   npcSlots: [
     // The tile under Ian's shadow. The design draws his "TALK · BUG SQUASH"
     // prompt under him, so his Interaction is the Bug Squash Minigame.
-    { npcId: 'ian-team-room-2', tile: { col: 5, row: 1 } },
+    // Ian left Team Room 2 so that he appears in one Room only (owner
+    // request, 2026-10-02, Track D): he is in the Dev Pit. His (5,1) is
+    // open again.
+    //
+    // New from the Characters sheet (owner request, 2026-10-02, Track D):
+    // Frank Nardone and Nick Brown sit working at the two desks whose chair
+    // is behind them, each just into his desk from the chair's seat (the
+    // design centres the left desk's at (615, 485.5) and the front desk's at
+    // (925, 640.5)), with the desk drawn over him (`foregrounds` below):
+    // Frank at (615, 508), behind the left desk and the couch in front of
+    // it, Nick at (925, 663). Chris Pence stands at the back by the left wall,
+    // (0,2), just left of the back desk, facing into the Room with the
+    // Player on either side of him, watching them through his binoculars
+    // (`watchesPlayer`).
+    { npcId: 'frank-nardone', tile: { col: 0, row: 4 }, offset: { x: 15, y: 35 } },
+    { npcId: 'nick-brown', tile: { col: 7, row: 4 }, offset: { x: -25, y: 15 } },
+    { npcId: 'chris-pence', tile: { col: 0, row: 2 } },
     // "You" is the local Player's own Penguin, never a static NPC slot.
+  ],
+  // The two desks (and the couch in front of the left one), drawn in front of
+  // the two sitting at them. Exported by `npm run export:room-art --
+  // team-room-2` (`FOREGROUND_LAYERS`).
+  foregrounds: [
+    {
+      key: 'room-team-room-2-front-frank-desk',
+      url: 'rooms/team-room-2-front-frank-desk.png',
+      overNpcId: 'frank-nardone',
+    },
+    {
+      key: 'room-team-room-2-front-nick-desk',
+      url: 'rooms/team-room-2-front-nick-desk.png',
+      overNpcId: 'nick-brown',
+    },
   ],
 };
