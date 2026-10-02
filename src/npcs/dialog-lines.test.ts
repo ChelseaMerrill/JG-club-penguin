@@ -25,6 +25,9 @@ const AWAITING_BA_LINE: readonly string[] = [
   'dan-bedian',
   'paul-carnival',
   'greg-westover',
+  'nick-brown',
+  'frank-nardone',
+  'chris-pence',
 ];
 
 /**

@@ -87,7 +87,10 @@ export type NpcId =
   | 'alex-nikolis'
   | 'dan-bedian'
   | 'paul-carnival'
-  | 'greg-westover';
+  | 'greg-westover'
+  | 'nick-brown'
+  | 'frank-nardone'
+  | 'chris-pence';
 
 /**
  * A minigame-launching NPC's trigger dialog (#36 D4; round-1 review item 4
@@ -253,6 +256,13 @@ interface NpcDefinitionBase {
    * unless a designed motion (`npc-motions.ts`) replaces the bob.
    */
   still?: boolean;
+  /**
+   * `true` for an NPC who watches the Player (`game/npcs/watch.ts`): it leans
+   * its whole figure toward the local Penguin as it moves (owner request,
+   * 2026-10-02, Track D: Team Room 2's Chris Pence, with his binoculars).
+   * Give it no designed motion, which would set the same figure transform.
+   */
+  watchesPlayer?: boolean;
   /**
    * The Room design's draw scale for this NPC, when it isn't its kind's
    * default (`npc-layout.ts`): Team Room 3 draws its Humans at 0.58
@@ -1310,6 +1320,50 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
   // 2026-10-02, Track D): name, title and line from each one's card, drawn
   // from the card itself (`card-figures.ts`); their motions play the card's
   // bob instead of #36's. Greg's card title is "TITLE TBD".
+  // The Characters sheet's new people in Team Room 2 (owner request,
+  // 2026-10-02, Track D): name, title and line from each one's card, drawn
+  // from the card itself. Chris's card hangs his binoculars on his chest;
+  // here he holds them up to his eyes, watching the Player.
+  'nick-brown': {
+    id: 'nick-brown',
+    name: 'Nick Brown',
+    title: 'Developer',
+    roomId: 'team-room-2',
+    kind: 'human',
+    tagName: 'Nick Brown',
+    dialogLines: ['Just one more commit. Then lunch.'],
+    idleLines: [{ text: 'Just one more commit. Then lunch.', periodS: 20, delayS: -4 }],
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'nickBrown' },
+  },
+  'frank-nardone': {
+    id: 'frank-nardone',
+    name: 'Frank Nardone',
+    title: 'Software Engineer',
+    roomId: 'team-room-2',
+    kind: 'human',
+    tagName: 'Frank Nardone',
+    dialogLines: ["LGTM. Didn't read it."],
+    idleLines: [{ text: "LGTM. Didn't read it.", periodS: 20, delayS: -11 }],
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'frankNardone' },
+  },
+  'chris-pence': {
+    id: 'chris-pence',
+    name: 'Chris Pence',
+    title: 'Software Engineer',
+    roomId: 'team-room-2',
+    kind: 'human',
+    tagName: 'Chris Pence',
+    dialogLines: ['Chris P. Bacon'],
+    idleLines: [{ text: 'Chris P. Bacon', periodS: 20, delayS: -17 }],
+    still: true,
+    watchesPlayer: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'chrisPenceBinoculars' },
+  },
   'dan-bedian': {
     id: 'dan-bedian',
     name: 'Dan Bedian',

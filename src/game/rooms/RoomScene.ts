@@ -28,6 +28,7 @@ import { createNpcSprite, prefersReducedMotion, type NpcSprite } from '../npcs/n
 import type { ChickenTarget } from '../npcs/chicken-toss';
 import { RoomChickenToss } from '../npcs/room-chicken-toss';
 import { RoomTankFish } from './room-tank-fish';
+import { easeLean, watchTargetLean } from '../npcs/watch';
 import { RoomNpcMotions } from '../npcs/room-npc-motions';
 import {
   createPenguin,
@@ -344,6 +345,8 @@ export class RoomScene extends Scene {
   private npcHitAreas: HitArea<RoomNpcSlot>[] = [];
   private doorHitAreas: HitArea<RoomDoor>[] = [];
   private npcSprites: NpcSprite[] = [];
+  /** NPCs that lean toward the local Penguin (`watch.ts`), with their current lean. */
+  private watchers: { npcId: string; sprite: NpcSprite; lean: number }[] = [];
   /** #113: the Room's NPC motions, and the click-to-pause rule for roaming NPCs. Rebuilt by every `create()`. */
   private npcMotions: RoomNpcMotions | null = null;
   /** Ashley's chicken toss at the Room's Penguins, while she's in it and motion is allowed. Rebuilt by every `create()`. */
@@ -496,6 +499,7 @@ export class RoomScene extends Scene {
     this.debugPenguins = [];
     this.npcSprites.forEach((npcSprite) => npcSprite.destroy());
     this.npcSprites = [];
+    this.watchers = [];
     this.unsubscribeNpcDialog.forEach((unsubscribe) => unsubscribe());
     this.unsubscribeNpcDialog = [];
     this.npcMotions?.destroy();
@@ -541,6 +545,7 @@ export class RoomScene extends Scene {
     this.localPenguinArrivedLog = [];
     this.debugPenguins = [];
     this.npcSprites = [];
+    this.watchers = [];
     this.npcMotions = null;
     this.chickenToss = null;
     this.tankFish = null;
@@ -787,6 +792,7 @@ export class RoomScene extends Scene {
     if (this.aiming && this.reticleTile) this.drawReticle();
     this.npcMotions?.update(delta);
     this.chickenToss?.update(delta);
+    this.updateWatchers(delta);
     this.tankFish?.update(delta);
     const npcArrival = this.npcArrival;
     this.npcClickPause?.settle({
@@ -856,6 +862,7 @@ export class RoomScene extends Scene {
           }
         : null,
       chickenToss: this.chickenToss?.debug() ?? null,
+      watching: Object.fromEntries(this.watchers.map((w) => [w.npcId, w.lean])),
     });
   }
 
@@ -1898,6 +1905,17 @@ export class RoomScene extends Scene {
     });
   }
 
+  /** Leans each watching NPC toward the local Penguin (`watch.ts`), easing into it. */
+  private updateWatchers(deltaMs: number): void {
+    const penguin = this.penguin?.container;
+    if (!penguin || this.watchers.length === 0) return;
+    for (const watcher of this.watchers) {
+      const target = watchTargetLean(watcher.sprite.container.x, penguin.x);
+      watcher.lean = easeLean(watcher.lean, target, deltaMs);
+      watcher.sprite.figure.setRotation(watcher.lean);
+    }
+  }
+
   private drawForegrounds(room: RoomDefinition): void {
     for (const layer of room.foregrounds ?? []) {
       const slot = room.npcSlots.find((candidate) => candidate.npcId === layer.overNpcId);
@@ -1927,6 +1945,9 @@ export class RoomScene extends Scene {
       const npcSprite = createNpcSprite(this, point.x, point.y, npc, depth, { motion });
       npcSprite.container.setName(NPC_CONTAINER_NAME);
       this.npcSprites.push(npcSprite);
+      if (npc.watchesPlayer && !prefersReducedMotion()) {
+        this.watchers.push({ npcId: npc.id, sprite: npcSprite, lean: 0 });
+      }
 
       const { hitArea } = npcLayout(npc);
       const zone = this.add
