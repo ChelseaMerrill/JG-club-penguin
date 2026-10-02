@@ -20,10 +20,11 @@ const ELEVATOR_HOTSPOT_SIZE = { width: 90, height: 175 };
 // rows 8-9), and the recurring corner light/statue pedestal (cols 10-11,
 // rows 7-8) that every one of the five prototype Rooms places in about the
 // same spot (Dev Pit's own comment names it correctly; this Room's used to
-// mislabel it "a planter" -- #16 fix 5). Darrin's and Jon's own tiles (see
-// `npcSlots` below) are additionally blocked so a Penguin can't walk through
-// them (#16 fix 5); Sydney's and the Front Desk penguin's tiles already sat
-// on unwalkable fixtures.
+// mislabel it "a planter" -- #16 fix 5). Darrin's own tile (see `npcSlots`
+// below) is additionally blocked so a Penguin can't walk through him (#16
+// fix 5); the Front Desk penguin's tile already sat on an unwalkable fixture.
+// Jon's (6,6) is open again: he left Town Center (owner request, 2026-10-02,
+// Track D).
 const WALKABLE: readonly (readonly boolean[])[] = [
   [false, false, true, false, false, false, false, false, false, false, true, true],
   [false, false, true, false, false, false, false, false, false, true, true, true],
@@ -31,7 +32,7 @@ const WALKABLE: readonly (readonly boolean[])[] = [
   [true, true, true, true, true, true, true, true, true, true, true, true],
   [true, true, true, false, true, true, true, true, true, true, true, true],
   [true, true, true, true, true, true, true, true, true, true, true, true],
-  [true, false, false, false, false, true, false, true, true, true, true, true],
+  [true, false, false, false, false, true, true, true, true, true, true, true],
   [true, false, false, false, false, true, true, true, true, true, false, false],
   [true, true, false, false, true, true, true, true, true, true, false, false],
   [true, true, false, false, true, true, true, true, true, true, true, true],
@@ -238,21 +239,24 @@ export const townCenter: RoomDefinition = {
     },
   ],
   npcSlots: [
-    // Darrin Jahnel, Sydney Murauskas and Jon Keller: full names on their
-    // nameplates, kebab-cased to first name only per the #16 execution
-    // plan's example (`darrin`).
+    // Darrin Jahnel: full name on his nameplate, kebab-cased to first name
+    // only per the #16 execution plan's example (`darrin`). Sydney
+    // Murauskas and Jon Keller left Town Center so that each person appears
+    // in one Room only (owner request, 2026-10-02, Track D): Sydney is in
+    // Team Room 3 and Jon in the Mullet.
     { npcId: 'darrin', tile: { col: 3, row: 4 } },
-    { npcId: 'sydney', tile: { col: 6, row: 2 } },
-    { npcId: 'jon', tile: { col: 6, row: 6 } },
     // Penguin-kind NPCs (the Front Desk receptionist among them) are left out
     // of every Room: only Players appear as Penguins (owner decision,
     // 2026-09-25; PR #133). Their `NpcDefinition`s stay in `src/npcs/npcs.ts`.
-    // Jory Hutchins (#113): her `jump` group is a sibling of Sydney's
-    // `walkSyd` group in the design markup, not nested in it, so she has a
-    // fixed position of her own, on the couch with her feet at about Stage
-    // (590, 462). (2, 6) is the tile whose centre is nearest that point; it
-    // sits on the unwalkable stairwell platform, like Sydney's tile sits on a
-    // fixture.
+    // Jory Hutchins (#113): her `jump` group is a sibling of (the design's)
+    // Sydney's `walkSyd` group in the design markup, not nested in it, so she
+    // has a fixed position of her own, on the couch with her feet at about
+    // Stage (590, 462). (2, 6) is the tile whose centre is nearest that
+    // point; it sits on the unwalkable stairwell platform.
     { npcId: 'jory', tile: { col: 2, row: 6 } },
   ],
+  // The design's desk-tank betta, Gil, as Ghostfish Killa: purple instead of
+  // cyan and white (owner request, 2026-10-02, Track D). Its swim, nameplate
+  // and "feed me" bubble are the design's own (`tank-fish.ts`).
+  tankFish: { name: 'Ghostfish Killa', body: '#7B3FC4', fins: '#C9A2F2' },
 };

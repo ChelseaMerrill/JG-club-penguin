@@ -41,11 +41,12 @@ const MARKER_ARM = '<path d="M92 78 L112 56"';
 const ROD = '<path d="M92 96 L118 10"';
 
 describe('ensureNpcTexture: one of each prop while an NPC moves (#137 with PR #136)', () => {
-  it("drops Jon's resting cards while his spinning `trick` fan plays, and keeps his scarf", () => {
+  it("drops a resting pose (Jon's cards) when asked, and keeps the rest of the figure", () => {
+    const { manager, svgs } = fakeTextures();
     expect(stillFigureSvg('jon')).toContain(JON_CARDS);
-    const moving = movingFigureSvg('jon');
-    expect(moving).not.toContain(JON_CARDS);
-    expect(moving).toContain(JON_SCARF);
+    const key = ensureNpcTexture({ textures: manager }, NPCS.jon, { omitRestPose: true });
+    expect(svgs.get(key)).not.toContain(JON_CARDS);
+    expect(svgs.get(key)).toContain(JON_SCARF);
   });
 
   it('draws Steven with no marker, still or walking: he no longer scribbles', () => {

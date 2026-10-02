@@ -27,6 +27,7 @@ import { NpcClickPause } from '../npcs/npc-motion';
 import { createNpcSprite, prefersReducedMotion, type NpcSprite } from '../npcs/npc-sprite';
 import type { ChickenTarget } from '../npcs/chicken-toss';
 import { RoomChickenToss } from '../npcs/room-chicken-toss';
+import { RoomTankFish } from './room-tank-fish';
 import { RoomNpcMotions } from '../npcs/room-npc-motions';
 import {
   createPenguin,
@@ -173,6 +174,8 @@ const STAGE_BACKGROUND_COLOR = '#0e1013';
 const IMAGE_BACKGROUND_DEPTH = -2;
 /** How far in front of its NPC a `RoomForeground` sorts: under 1, the gap to the next tile's depth. */
 const FOREGROUND_DEPTH_OFFSET = 0.5;
+/** Town Center's desk tank stands on the floor here: the bottom of its desk's front corner. */
+const TANK_FLOOR_POINT = { x: 1220, y: 505 };
 const WALL_DEPTH = -1;
 const FLOOR_DEPTH = -1;
 const DOOR_DEPTH = 0;
@@ -345,6 +348,8 @@ export class RoomScene extends Scene {
   private npcMotions: RoomNpcMotions | null = null;
   /** Ashley's chicken toss at the Room's Penguins, while she's in it and motion is allowed. Rebuilt by every `create()`. */
   private chickenToss: RoomChickenToss | null = null;
+  /** The Room's tank fish (Town Center's Ghostfish Killa), when it has one. Rebuilt by every `create()`. */
+  private tankFish: RoomTankFish | null = null;
   private npcClickPause: NpcClickPause | null = null;
   /** The `onArrive` of the latest NPC click (#113), to tell whether that walk is still pending. */
   private npcArrival: (() => void) | null = null;
@@ -497,6 +502,8 @@ export class RoomScene extends Scene {
     this.npcMotions = null;
     this.chickenToss?.destroy();
     this.chickenToss = null;
+    this.tankFish?.destroy();
+    this.tankFish = null;
     this.npcClickPause = null;
     this.npcArrival = null;
     this.guard?.sprite.destroy();
@@ -536,6 +543,7 @@ export class RoomScene extends Scene {
     this.npcSprites = [];
     this.npcMotions = null;
     this.chickenToss = null;
+    this.tankFish = null;
     this.npcClickPause = null;
     this.npcArrival = null;
     this.unsubscribeNpcDialog = [];
@@ -730,6 +738,7 @@ export class RoomScene extends Scene {
     ];
     this.drawNpcs(room);
     this.drawForegrounds(room);
+    this.drawTankFish(room);
     this.spawnLocalPenguin(room);
 
     this.input.on('pointerdown', this.handlePointerDown);
@@ -778,6 +787,7 @@ export class RoomScene extends Scene {
     if (this.aiming && this.reticleTile) this.drawReticle();
     this.npcMotions?.update(delta);
     this.chickenToss?.update(delta);
+    this.tankFish?.update(delta);
     const npcArrival = this.npcArrival;
     this.npcClickPause?.settle({
       arrivalPending:
@@ -1870,6 +1880,21 @@ export class RoomScene extends Scene {
    * each sorted just in front of its NPC's slot tile: the next tile's depth is
    * at least 1 more, so anything standing further forward still draws over it.
    */
+  /**
+   * The Room's tank fish (`room-tank-fish.ts`), sorted with the tank's own
+   * floor tile, so a Penguin in front of the desk covers it; its "feed me"
+   * bubble sorts above everyone, as NPC bubbles do.
+   */
+  private drawTankFish(room: RoomDefinition): void {
+    if (!room.tankFish) return;
+    const depth = depthForTile(screenToTile(TANK_FLOOR_POINT, room.grid.origin));
+    this.tankFish = new RoomTankFish(this, room.tankFish, {
+      depth,
+      bubbleDepth: NPC_BUBBLE_LAYER + depth,
+      reducedMotion: prefersReducedMotion(),
+    });
+  }
+
   private drawForegrounds(room: RoomDefinition): void {
     for (const layer of room.foregrounds ?? []) {
       const slot = room.npcSlots.find((candidate) => candidate.npcId === layer.overNpcId);
