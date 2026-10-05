@@ -114,6 +114,9 @@ function seeded(seed: number): () => number {
 describe('dialogLinePool', () => {
   it('gives every placed NPC at least two lines, except the ones awaiting BA copy', () => {
     const short = placedNpcs()
+      // The Remote Lounge's people open their person card, not a dialog, so
+      // their one design quote is all they need.
+      .filter((npc) => npc.roomId !== 'remote-lounge')
       .filter((npc) => dialogLinePool(npc).length < 2)
       .map((npc) => npc.id)
       .sort();

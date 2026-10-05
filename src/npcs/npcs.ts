@@ -1,5 +1,6 @@
 import { DEFAULT_LOOK, type MinigameId, type PenguinLook, type RoomId } from '../contracts';
 import type { HumanFigureSpec } from '../game/npcs/render-npc-svg';
+import { remoteLoungeNpcs, type RemoteLoungeNpcId } from './remote-lounge-npcs';
 
 /**
  * Every NPC slot id on `main` (#16's five prototype Rooms' `npcSlots`,
@@ -97,7 +98,9 @@ export type NpcId =
   | 'eva-trimboli'
   | 'abby-rivera'
   | 'adam-wilson-hwang'
-  | 'bryan-sambrook';
+  | 'bryan-sambrook'
+  // The Remote Lounge's JGers (`remote-lounge-npcs.ts`).
+  | RemoteLoungeNpcId;
 
 /**
  * A minigame-launching NPC's trigger dialog (#36 D4; round-1 review item 4
@@ -1949,6 +1952,9 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
   // PR #133) -- dropped here and from the Bathroom's own npcSlots. Spelled
   // "Jessie" there, unlike The Melt's "Jesse" (see that entry's own
   // comment), which remains.
+  // The Remote Lounge's JGers, built from its design's own people list
+  // (`remote-lounge-npcs.ts`).
+  ...remoteLoungeNpcs(LINE_DIALOG),
 };
 
 const NPC_IDS = Object.keys(NPCS) as NpcId[];

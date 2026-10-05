@@ -43,7 +43,9 @@ export const remoteLounge: RoomDefinition = {
   background: { kind: 'image', key: 'room-remote-lounge', url: 'rooms/remote-lounge.png' },
   grid: createStandardRoomGrid(),
   walkable: WALKABLE,
-  spawnTile: { col: 6, row: 8 },
+  // A clear tile left of the pedestal: the design draws no "You", and the
+  // open front floor is where its people stand.
+  spawnTile: { col: 3, row: 5 },
   doors: [
     {
       label: 'BACK TO HQ',
@@ -54,5 +56,27 @@ export const remoteLounge: RoomDefinition = {
       entryTile: townCenter.spawnTile,
     },
   ],
-  npcSlots: [],
+  // The design's remote JGers, at its own `spots` (grid units, the figure's
+  // feet), in its list order. Each is on the nearest walkable tile clear of
+  // the pedestal, the spawn tile and the others, with `offset` the Stage px
+  // from that tile's point to the design's spot. Millie's spot (5, 10)
+  // shares its nearest tile with Austin's, so she takes the one beside it.
+  npcSlots: [
+    { npcId: 'matt-bessler', tile: { col: 1, row: 4 }, offset: { x: -20, y: -15 } },
+    { npcId: 'cameron-lynch', tile: { col: 2, row: 7 }, offset: { x: -10, y: 0 } },
+    { npcId: 'austin-marcum', tile: { col: 5, row: 9 }, offset: { x: 30, y: -10 } },
+    { npcId: 'matt-anderson', tile: { col: 8, row: 8 }, offset: { x: -30, y: 0 } },
+    { npcId: 'john-higgins', tile: { col: 10, row: 6 }, offset: { x: -20, y: -5 } },
+    { npcId: 'paul-macfarlane', tile: { col: 10, row: 3 }, offset: { x: 10, y: -10 } },
+    { npcId: 'dani-milliken', tile: { col: 0, row: 8 }, offset: { x: 10, y: 10 } },
+    { npcId: 'ethan-schoen', tile: { col: 11, row: 1 }, offset: { x: 0, y: -25 } },
+    { npcId: 'steven-remote-lounge', tile: { col: 11, row: 6 }, offset: { x: 20, y: -5 } },
+    { npcId: 'tommy-kneeland', tile: { col: 8, row: 9 }, offset: { x: -50, y: 0 } },
+    { npcId: 'casey-remote-lounge', tile: { col: 8, row: 0 }, offset: { x: 10, y: -10 } },
+    { npcId: 'steven-vickers', tile: { col: 9, row: 8 }, offset: { x: 40, y: -5 } },
+    { npcId: 'millie-remote-lounge', tile: { col: 4, row: 9 }, offset: { x: 0, y: 25 } },
+    { npcId: 'michael-shirk', tile: { col: 6, row: 0 }, offset: { x: 30, y: -10 } },
+    { npcId: 'matthew-wonkovich', tile: { col: 11, row: 0 }, offset: { x: 50, y: 0 } },
+    { npcId: 'joshua-jameson', tile: { col: 0, row: 4 }, offset: { x: -30, y: -10 } },
+  ],
 };

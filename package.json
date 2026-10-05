@@ -17,6 +17,7 @@
     "test": "vitest run",
     "test:e2e": "playwright test",
     "export:room-art": "node --experimental-strip-types scripts/export-room-art.ts",
+    "build:remote-lounge": "node --experimental-strip-types scripts/remote-lounge-figures.ts && prettier --write --end-of-line auto src/game/npcs/remote-lounge-figures.ts",
     "build:penguin-text": "node --experimental-strip-types scripts/penguin-text-to-paths.ts"
   },
   "dependencies": {
