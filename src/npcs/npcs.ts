@@ -91,6 +91,7 @@ export type NpcId =
   | 'nick-brown'
   | 'frank-nardone'
   | 'chris-pence'
+  | 'aleksandr-molchagin'
   | 'rebecca-congi'
   | 'bich-dudla'
   | 'eva-trimboli'
@@ -262,13 +263,6 @@ interface NpcDefinitionBase {
    * unless a designed motion (`npc-motions.ts`) replaces the bob.
    */
   still?: boolean;
-  /**
-   * `true` for an NPC who watches the Player (`game/npcs/watch.ts`): it leans
-   * its whole figure toward the local Penguin as it moves (owner request,
-   * 2026-10-02, Track D: Team Room 2's Chris Pence, with his binoculars).
-   * Give it no designed motion, which would set the same figure transform.
-   */
-  watchesPlayer?: boolean;
   /**
    * The Room design's draw scale for this NPC, when it isn't its kind's
    * default (`npc-layout.ts`): Team Room 3 draws its Humans at 0.58
@@ -1329,7 +1323,8 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
   // The Characters sheet's new people in Team Room 2 (owner request,
   // 2026-10-02, Track D): name, title and line from each one's card, drawn
   // from the card itself. Chris's card hangs his binoculars on his chest;
-  // here he holds them up to his eyes, watching the Player.
+  // here he holds them up to his eyes and looks round the Room through them
+  // (`motions/team-room-2.ts`).
   'nick-brown': {
     id: 'nick-brown',
     name: 'Nick Brown',
@@ -1366,9 +1361,23 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     dialogLines: ['Chris P. Bacon'],
     idleLines: [{ text: 'Chris P. Bacon', periodS: 20, delayS: -17 }],
     still: true,
-    watchesPlayer: true,
     dialog: LINE_DIALOG,
-    figure: { card: 'chrisPenceBinoculars' },
+    figure: { card: 'chrisPenceArmsRaised' },
+  },
+  // New from the Characters sheet (owner request, 2026-10-02, Track D):
+  // name, title and line from his card, drawn from the card itself.
+  'aleksandr-molchagin': {
+    id: 'aleksandr-molchagin',
+    name: 'Aleksandr Molchagin',
+    title: 'Developer',
+    roomId: 'team-room-2',
+    kind: 'human',
+    tagName: 'Aleksandr Molchagin',
+    dialogLines: ['This is not cold. This is spring.'],
+    idleLines: [{ text: 'This is not cold. This is spring.', periodS: 20, delayS: -8 }],
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'aleksandrMolchagin' },
   },
   // New from the Characters sheet (owner request, 2026-10-02, Track D):
   // name, title and line from her card, drawn from the card itself.

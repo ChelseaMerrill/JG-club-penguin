@@ -209,8 +209,6 @@ export interface RoomDebugInfo {
   guard?: GuardDebugInfo | null;
   /** Ashley's chicken toss, while this Room has one (the Dev Pit, motion allowed); else `null`. */
   chickenToss?: ChickenTossDebugInfo | null;
-  /** Each NPC watching the Player (`watch.ts`) by npcId: its current lean, in radians (+ leans right). */
-  watching?: Record<string, number>;
 }
 
 declare global {
