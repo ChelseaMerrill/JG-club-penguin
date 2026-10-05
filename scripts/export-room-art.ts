@@ -1085,14 +1085,13 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
   ],
   // `design/Remote Area.html` is a plain script-drawn page, not a `.dc.html`
   // design, so most of its live parts have their own ids. Its blinking "BACK
-  // TO HQ ↘" pill is deliberately kept: it is the Room's only exit, and
-  // `definitions/remote-lounge.ts` makes it a door to Town Center.
+  // TO HQ ↘" pill is HUD chrome, redrawn live by `src/ui/remote-lounge/`.
   'remote-lounge': [
     {
       kind: 'selector',
-      selectors: ['#globeG', '#figs', '#scene > g:not([id])', '#roster', '#card'],
+      selectors: ['#globeG', '#figs', '#scene > g:not([id])', '#roster', '#card', 'a[data-exit]'],
       comment:
-        'The spinning globe and its glow, beam and stand; the remote JGers standing on the floor; the layer their quote bubbles pop up in; the roster list; and the person card. The hex pedestal under the globe is part of #room and stays.',
+        'The spinning globe and its glow, beam and stand; the remote JGers standing on the floor; the layer their quote bubbles pop up in; the roster list; the person card; and the BACK TO HQ pill. The hex pedestal under the globe is part of #room and stays.',
     },
     {
       kind: 'cluster',

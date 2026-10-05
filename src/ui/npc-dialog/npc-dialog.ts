@@ -259,6 +259,9 @@ export function createNpcDialog(root: HTMLElement, deps: NpcDialogDeps): NpcDial
 
     const npc = getNpcDefinition(npcId);
     if (!npc) return;
+    // The Remote Lounge's JGers open their person card instead
+    // (`src/ui/remote-lounge/remote-lounge.ts`).
+    if (npc.dialog.kind === 'remote-card') return;
 
     const wasHidden = panel.hidden;
     // A repeated `npc:arrived` for the dialog already open re-renders with

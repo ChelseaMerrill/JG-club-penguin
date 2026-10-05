@@ -1,6 +1,5 @@
 import type { RoomDefinition } from '../room-definition';
 import { createStandardRoomGrid } from '../grid';
-import { townCenter } from './town-center';
 
 // `design/Remote Area.html` draws its room shell with the same isolib grid
 // as the HQ Rooms (`S=50, OX=800, OY=250, W=12, D=10`): the standard 12x10
@@ -28,34 +27,26 @@ const WALKABLE: readonly (readonly boolean[])[] = [
 /**
  * Traced from `design/Remote Area.html` ("16 · REMOTE LOUNGE"): where the
  * JGers who work outside HQ hang out. No HQ Room has a door into it, so it is
- * reached only from the Map, like the Bathroom. Its one way out is the
- * design's blinking "BACK TO HQ ↘" pill, kept in the exported art and made a
- * door to Town Center; the hotspot is the pill's own box, measured from the
- * design (it has no wall door).
+ * reached only from the Map, like the Bathroom, and left through the
+ * design's BACK TO HQ pill (see `doors`). The globe, roster and person card
+ * are live DOM over this Room (`src/ui/remote-lounge/`), not part of it.
  */
 export const remoteLounge: RoomDefinition = {
   id: 'remote-lounge',
   title: 'THE REMOTE LOUNGE',
-  // The banner's "JGERS OUTSIDE HQ · 6 ON THE GLOBE · CLICK ANYONE TO FLY
-  // THERE", minus its live count and the globe instruction (the globe is not
-  // built yet).
-  subtitle: 'JGERS OUTSIDE HQ',
+  // The banner's own "JGERS OUTSIDE HQ · <count> ON THE GLOBE · CLICK ANYONE
+  // TO FLY THERE", minus the count.
+  subtitle: 'JGERS OUTSIDE HQ · CLICK ANYONE TO FLY THERE',
   background: { kind: 'image', key: 'room-remote-lounge', url: 'rooms/remote-lounge.png' },
   grid: createStandardRoomGrid(),
   walkable: WALKABLE,
   // A clear tile left of the pedestal: the design draws no "You", and the
   // open front floor is where its people stand.
   spawnTile: { col: 3, row: 5 },
-  doors: [
-    {
-      label: 'BACK TO HQ',
-      hotspot: { x: 1439, y: 748, width: 125, height: 40 },
-      targetRoomId: 'town-center',
-      // Town Center draws no door back here, so this lands on Town Center's
-      // own spawn tile, as the Igloo's TOWN CENTER door does (#16 fix 4).
-      entryTile: townCenter.spawnTile,
-    },
-  ],
+  // Its one way out, the design's blinking "BACK TO HQ ↘" pill, is HUD
+  // chrome, not a door in the art: `src/ui/remote-lounge/remote-lounge.ts`
+  // draws it and goes straight to Town Center, as the Map does.
+  doors: [],
   // The design's remote JGers, at its own `spots` (grid units, the figure's
   // feet), in its list order. Each is on the nearest walkable tile clear of
   // the pedestal, the spawn tile and the others, with `offset` the Stage px

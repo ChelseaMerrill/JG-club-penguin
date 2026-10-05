@@ -598,8 +598,9 @@ describe('ROOM_DEFINITIONS registry', () => {
       bathroom: ['office-hallway'],
       // #51 slice 3: one-way doors out; nothing draws a door in (D5).
       'the-mullet': ['dev-pit', 'office-hallway'],
-      // Reached only from the Map; its BACK TO HQ pill is its one exit.
-      'remote-lounge': ['town-center'],
+      // Reached only from the Map; its BACK TO HQ pill (a HUD button, not a
+      // door) is its one exit.
+      'remote-lounge': [],
     });
   });
 

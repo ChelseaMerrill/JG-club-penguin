@@ -97,6 +97,7 @@ import { hasQuestStarter, startQuest } from './npcs/quest-giver';
 import { recordNpcTalked, recordOpenStall } from './game/rooms/dev-room-hook';
 import { createTrophyCase, TROPHY_CASE_OVERLAY_ID } from './ui/trophy-case';
 import { createMapScreen } from './ui/map-screen';
+import { createRemoteLounge } from './ui/remote-lounge/remote-lounge';
 import { createElevatorScreen } from './ui/elevator-screen';
 import { createMarket, MARKET_OVERLAY_ID } from './ui/market';
 import { createIglooEditor, type IglooEditor } from './ui/igloo-editor';
@@ -777,6 +778,17 @@ createMapScreen(uiLayer, {
     void roomNavigator?.changeRoom(roomId);
   },
   currentRoomId: () => roomNavigator?.currentRoomId() ?? null,
+});
+
+// The Remote Lounge's globe, roster, person card and BACK TO HQ pill, live
+// over that Room only. Mounted just under the HUD, like the wall text.
+createRemoteLounge(uiLayer, {
+  overlays: hud.overlays,
+  goToRoom: (roomId) => {
+    void roomNavigator?.changeRoom(roomId);
+  },
+  initialRoomId: resolveRoomIdFromLocation(window.location),
+  mountBefore: uiLayer.querySelector(':scope > .hud'),
 });
 
 // #77 D7: registers with the same shared `OverlayManager` MENU uses, so

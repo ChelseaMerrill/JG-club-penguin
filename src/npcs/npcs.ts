@@ -149,7 +149,17 @@ export interface NpcPhishingQuizDialog {
   subtitle: string;
 }
 
-export type NpcDialog = NpcMinigameDialog | NpcStallDialog | NpcLineDialog | NpcPhishingQuizDialog;
+/**
+ * A Remote Lounge JGer: walking up to them opens their person card and flies
+ * the lounge's globe to their city (`src/ui/remote-lounge/remote-lounge.ts`),
+ * never the NPC dialog.
+ */
+export interface NpcRemoteCardDialog {
+  kind: 'remote-card';
+}
+
+export type NpcDialog =
+  NpcMinigameDialog | NpcStallDialog | NpcLineDialog | NpcPhishingQuizDialog | NpcRemoteCardDialog;
 
 /**
  * One line of an NPC's idle speech-bubble cycle, ported from a Room design's
@@ -1954,7 +1964,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
   // comment), which remains.
   // The Remote Lounge's JGers, built from its design's own people list
   // (`remote-lounge-npcs.ts`).
-  ...remoteLoungeNpcs(LINE_DIALOG),
+  ...remoteLoungeNpcs({ kind: 'remote-card' }),
 };
 
 const NPC_IDS = Object.keys(NPCS) as NpcId[];

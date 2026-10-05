@@ -1,0 +1,317 @@
+/* The Remote Lounge's live layer (`src/ui/remote-lounge/remote-lounge.ts`),
+   from `design/Remote Area.html`. Every size is Stage pixels: the #ui layer
+   is the 1600x900 Stage. Mounted before the HUD, so it paints below it in
+   DOM order, except the person card, which `z-index: 1` lifts over the HUD's
+   quest widget while it's open (both sit top right in the design). */
+
+.remote-lounge {
+  position: absolute;
+  inset: 0;
+}
+
+/* Full-Stage, so it must let clicks through to the Room: `style.css`'s
+   `#ui > *` opts every direct child of #ui back into pointer events, and
+   only a selector as specific wins over it (`.hud` and `.wall-text` do the
+   same). The roster, card, exit and globe pins opt back in. */
+#ui > .remote-lounge {
+  pointer-events: none;
+}
+
+.remote-lounge[hidden] {
+  display: none;
+}
+
+.remote-lounge__globe,
+.remote-lounge__globe .globe {
+  position: absolute;
+  inset: 0;
+}
+
+.remote-lounge__globe .globe {
+  display: block;
+  overflow: visible;
+}
+
+.globe__pin:not(.globe__pin--hq) {
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+/* The design's roster: a 268px column under the Room title. */
+.remote-lounge__roster {
+  position: absolute;
+  top: 108px;
+  left: var(--hud-inset-x);
+  width: 268px;
+  max-height: 690px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow-y: auto;
+  pointer-events: auto;
+}
+
+.remote-lounge__roster-item {
+  all: unset;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 8px 3px 3px;
+  border: 2px solid var(--jg-secondary);
+  background: rgba(var(--jg-dark-rgb), 0.88);
+  cursor: pointer;
+  transition:
+    background 250ms ease,
+    border-color 250ms ease;
+}
+
+.remote-lounge__roster-item:hover,
+.remote-lounge__roster-item:focus-visible {
+  border-color: var(--jg-primary);
+}
+
+.remote-lounge__roster-item[aria-pressed='true'] {
+  background: var(--jg-secondary);
+  border-color: var(--jg-primary);
+}
+
+.remote-lounge__roster-face {
+  flex: none;
+  width: 32px;
+  height: 30px;
+  background: #0a0c0f;
+  border: 2px solid var(--jg-secondary);
+}
+
+.remote-lounge__roster-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.remote-lounge__roster-name {
+  font:
+    400 13px/1.15 'Anton',
+    sans-serif;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--jg-light);
+}
+
+.remote-lounge__roster-city {
+  font:
+    500 11px/1.2 'Libre Franklin',
+    sans-serif;
+  color: var(--jg-inactive);
+}
+
+/* The design's person card, top right. */
+.remote-lounge__card {
+  position: absolute;
+  top: 108px;
+  right: var(--hud-inset-x);
+  z-index: 1;
+  width: 300px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  background: rgba(var(--jg-dark-rgb), 0.92);
+  border: 2px solid var(--jg-secondary);
+  color: var(--jg-light);
+  pointer-events: auto;
+}
+
+.remote-lounge__card[hidden] {
+  display: none;
+}
+
+.remote-lounge__card-head {
+  display: flex;
+  justify-content: space-between;
+  font:
+    400 12px 'Anton',
+    sans-serif;
+  letter-spacing: 0.2em;
+  color: var(--jg-primary);
+}
+
+.remote-lounge__card-index {
+  color: var(--jg-light);
+}
+
+.remote-lounge__card-who {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.remote-lounge__card-face {
+  flex: none;
+  width: 84px;
+  height: 91px;
+  background: #0a0c0f;
+  border: 2px solid var(--jg-secondary);
+}
+
+.remote-lounge__card-face svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.remote-lounge__card-names {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.remote-lounge__card-name {
+  font:
+    400 24px/1.05 'Anton',
+    sans-serif;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.remote-lounge__card-title {
+  font:
+    700 13px 'Libre Franklin',
+    sans-serif;
+  color: var(--jg-primary);
+}
+
+.remote-lounge__card-title[hidden] {
+  display: none;
+}
+
+.remote-lounge__card-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-top: 10px;
+  border-top: 2px solid var(--jg-secondary);
+}
+
+.remote-lounge__card-fact {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  font:
+    500 13px 'Libre Franklin',
+    sans-serif;
+}
+
+.remote-lounge__card-fact > span:first-child {
+  color: var(--jg-inactive);
+}
+
+.remote-lounge__card-fact > span:last-child {
+  text-align: right;
+}
+
+.remote-lounge__card-line {
+  padding: 6px 10px;
+  background: var(--jg-light);
+  border-radius: 8px;
+  font:
+    700 12px 'Libre Franklin',
+    sans-serif;
+  color: var(--jg-dark);
+  text-align: center;
+}
+
+.remote-lounge__card-buttons {
+  display: flex;
+  gap: 8px;
+}
+
+.remote-lounge__hex {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  padding: 0 18px;
+  border: 0;
+  clip-path: polygon(
+    14px 0,
+    calc(100% - 14px) 0,
+    100% 50%,
+    calc(100% - 14px) 100%,
+    14px 100%,
+    0 50%
+  );
+  font-family: 'Bumbastika', 'Anton', sans-serif;
+  font-size: 15px;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+}
+
+.remote-lounge__hex--step {
+  background: var(--jg-secondary);
+  color: var(--jg-light);
+  box-shadow: inset 0 -4px 0 #06303d;
+}
+
+.remote-lounge__hex--globe {
+  flex: 1;
+  white-space: nowrap;
+  background: var(--jg-primary);
+  color: var(--jg-dark);
+  box-shadow: inset 0 -4px 0 var(--jg-secondary);
+}
+
+.remote-lounge__hex:hover {
+  filter: brightness(0.9);
+}
+
+.remote-lounge__hex:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 3px var(--jg-light);
+}
+
+/* The design's blinking BACK TO HQ pill. It sits just left of the HUD's "!?"
+   feedback button (72px wide, 12px above the bottom bar), centred on its
+   52px row, where the design's own `right: 36px; bottom: 112px` spot is
+   taken by that button. */
+@keyframes remote-lounge-blink {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.remote-lounge__exit {
+  position: absolute;
+  right: calc(var(--hud-inset-x) + 72px + 12px);
+  bottom: calc(var(--hud-inset-y) + 52px + 12px + 6px);
+  display: flex;
+  align-items: center;
+  height: 40px;
+  padding: 0 14px;
+  background: rgba(var(--jg-dark-rgb), 0.9);
+  border: 2px solid var(--jg-primary);
+  border-radius: 999px;
+  font:
+    400 13px 'Anton',
+    sans-serif;
+  letter-spacing: 0.16em;
+  color: var(--jg-primary);
+  white-space: nowrap;
+  cursor: pointer;
+  pointer-events: auto;
+  animation: remote-lounge-blink 1.6s steps(2, jump-none) infinite;
+}
+
+.remote-lounge__exit:hover,
+.remote-lounge__exit:focus-visible {
+  animation: none;
+  outline: none;
+  background: var(--jg-secondary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .remote-lounge__exit {
+    animation: none;
+  }
+}
