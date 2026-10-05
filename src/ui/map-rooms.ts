@@ -19,7 +19,7 @@ export interface MapRoomTile {
 /**
  * The design's 16 numbered cards, minus 05B (the day variant of 05 THE
  * MARKET / Roof Deck) and 14 ELEVATOR (a loading screen, stretch #52): 14
- * tiles, in the design's own document order. `00 · TOP WORKPLACES` is a
+ * tiles, in the design's own document order, then 16 REMOTE LOUNGE. `00 · TOP WORKPLACES` is a
  * decorative plaque, not one of the design's "16 ROOMS", and was never a
  * candidate tile.
  */
@@ -80,6 +80,15 @@ export const MAP_ROOMS: readonly MapRoomTile[] = [
     label: '15 · THE MULLET',
     subtitle: 'MEZZANINE · AFTER-PARTY',
     roomId: 'the-mullet',
+  },
+  // `design/Remote Area.html`'s own breadcrumb, "16 · REMOTE LOUNGE". Not
+  // one of the Map design's cards: it fills the grid's 15th slot. Its
+  // subtitle is the lounge banner's own "JGERS OUTSIDE HQ".
+  {
+    number: '16',
+    label: '16 · REMOTE LOUNGE',
+    subtitle: 'JGERS OUTSIDE HQ',
+    roomId: 'remote-lounge',
   },
 ] as const;
 
