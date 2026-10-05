@@ -2,6 +2,15 @@
 
 Newest first. Written by design_resync.py apply.
 
+## 2026-10-05 · plan 2caeddf39c5c
+
+From snap2 by Chelsea Merrill (partial pull; binaries not re-verified).
+
+Remote Lounge only (Remote Area.dc.html, Remote Area.html); other design changes not pulled
+
+- added: `Remote Area.dc.html`
+- added: `Remote Area.html`
+
 ## 2026-09-27 · plan 2937811514f1
 
 From Club JenGuin logo directions.zip by milliehime.

@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Club JenGuin · Remote Lounge</title>
+<link rel="stylesheet" href="_ds/jahnel-group-design-system-019df630-6921-74f8-9d13-c9b8506c740c/colors_and_type.css">
+<script src="https://unpkg.com/d3@7.9.0/dist/d3.min.js" integrity="sha384-CjloA8y00+1SDAUkjs099PVfnY2KmDC2BZnws9kh8D/lX1s46w6EPhpXdqMfjK6i" crossorigin="anonymous"></script>
+<script src="https://unpkg.com/topojson-client@3.1.0/dist/topojson-client.min.js" integrity="sha384-Ukv1p/xTma6P4/2bY5KzWBw+ydSpXmhCMtyciIQVDJ1RmOxtCYNMF1uXT9T63H67" crossorigin="anonymous"></script>
+<script src="build/humans.js"></script>
+<script src="door-nav.js"></script>
+<style>
+  @font-face { font-family: "Bumbastika"; src: url("assets/bumbastika.ttf") format("truetype"); }
+  body { margin: 0; background: #0E1013; color: #F4F4F4; font-family: "Libre Franklin", sans-serif; }
+  a { color: #00BDFF; } a:hover { color: #F4F4F4; }
+  @keyframes blink { 50% { opacity: .35; } }
+  @keyframes bob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
+  @keyframes idleBob { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-2.5px); } }
+  @keyframes idleSway { 0%,100% { transform: rotate(-2deg); } 50% { transform: rotate(2deg); } }
+  @keyframes idleBreathe { 0%,100% { transform: scale(1,1); } 50% { transform: scale(1.015,1.035); } }
+  @keyframes idleNod { 0%,70%,100% { transform: rotate(0); } 78% { transform: rotate(-3deg) translateY(-1px); } 86% { transform: rotate(2deg); } }
+  @keyframes idleHop { 0%,82%,100% { transform: translateY(0); } 88% { transform: translateY(-7px); } 94% { transform: translateY(0); } }
+  .fig .body { transform-box: fill-box; transform-origin: 50% 100%; }
+  @keyframes playTrumpet { 0%,100% { transform: rotate(0) translateY(0); } 25% { transform: rotate(-3deg) translateY(-2px); } 50% { transform: rotate(0) translateY(0); } 75% { transform: rotate(2deg) translateY(-1px); } }
+  @keyframes playHarp { 0%,100% { transform: rotate(0); } 30% { transform: rotate(1.6deg); } 60% { transform: rotate(-1.2deg); } }
+  @keyframes noteFloat { 0% { transform: translate(0,0) scale(.6); opacity: 0; } 15% { opacity: 1; } 100% { transform: translate(14px,-46px) scale(1.1); opacity: 0; } }
+  .note { transform-box: fill-box; transform-origin: 50% 50%; animation: noteFloat 2.4s ease-out infinite; pointer-events: none; }
+  .bubble { transition: opacity 300ms ease, transform 300ms ease; pointer-events: none; }
+  .fig { cursor: pointer; }
+  .fig:hover .tag rect { fill: #00BDFF; }
+  .fig:hover .tag text { fill: #161719; }
+  .pin { cursor: pointer; }
+  .chip { display:flex; align-items:center; height:40px; padding:0 16px; background:rgba(22,23,25,.88); border:2px solid #0C4B5F; border-radius:999px; font:400 15px 'Anton',sans-serif; letter-spacing:.1em; color:#F4F4F4; }
+  .hexbtn { display:flex; align-items:center; height:52px; padding:0 26px; clip-path:polygon(14px 0,calc(100% - 14px) 0,100% 50%,calc(100% - 14px) 100%,14px 100%,0 50%); font-family:'Bumbastika','Anton',sans-serif; font-size:20px; letter-spacing:.04em; border:0; cursor:pointer; }
+  .roster button { all:unset; cursor:pointer; display:flex; align-items:center; gap:8px; padding:3px 8px 3px 3px; border:2px solid #0C4B5F; background:rgba(22,23,25,.88); transition:background 250ms ease, border-color 250ms ease; }
+  .roster button:hover { border-color:#00BDFF; }
+  .roster button[aria-pressed="true"] { background:#0C4B5F; border-color:#00BDFF; }
+</style>
+</head>
+<body>
+<section style="display:flex; flex-direction:column; gap:14px; padding:40px; align-items:flex-start;">
+  <div style="display:flex; align-items:center; gap:18px; font:400 14px 'Anton',sans-serif; letter-spacing:.24em; color:#B3B6C9;"><a href="Club JenGuin Map.dc.html" style="color:#00BDFF; text-decoration:none;">← MAP</a><span>16 · REMOTE LOUNGE</span></div>
+  <div data-screen-label="REMOTE LOUNGE" style="position:relative; width:1600px; height:900px; flex:none; overflow:hidden; background:#0E1013; box-shadow:0 0 0 6px #0C4B5F, 0 0 0 9px #00BDFF;">
+    <svg id="scene" viewBox="0 0 1600 900" width="1600" height="900" style="display:block; position:absolute; inset:0;">
+      <defs>
+        <radialGradient id="ocean" cx="38%" cy="32%" r="75%"><stop offset="0" stop-color="#14627A"/><stop offset=".6" stop-color="#0C4B5F"/><stop offset="1" stop-color="#06303D"/></radialGradient>
+        <radialGradient id="shine" cx="34%" cy="26%" r="40%"><stop offset="0" stop-color="#F4F4F4" stop-opacity=".22"/><stop offset="1" stop-color="#F4F4F4" stop-opacity="0"/></radialGradient>
+        <radialGradient id="glow" cx="50%" cy="50%" r="50%"><stop offset=".7" stop-color="#00BDFF" stop-opacity=".25"/><stop offset="1" stop-color="#00BDFF" stop-opacity="0"/></radialGradient>
+        <clipPath id="globeClip"><circle id="clipC"/></clipPath>
+      </defs>
+      <g id="room"></g>
+      <g id="globeG"></g>
+      <g id="figs"></g>
+    </svg>
+
+    <div style="position:absolute; top:28px; left:36px; display:flex; flex-direction:column; gap:6px; pointer-events:none;">
+      <div style="font-family:'Bumbastika','Anton',sans-serif; font-size:44px; line-height:1; color:#00BDFF; -webkit-text-stroke:5px #0C4B5F; paint-order:stroke fill; text-shadow:0 4px 0 #0C4B5F;">THE REMOTE LOUNGE</div>
+      <div style="font:400 13px 'Anton',sans-serif; letter-spacing:.22em; color:#F4F4F4;">JGERS OUTSIDE HQ · <span id="count">6</span> ON THE GLOBE · CLICK ANYONE TO FLY THERE</div>
+    </div>
+
+    <div style="position:absolute; top:28px; right:36px; display:flex; gap:10px;">
+      <div class="chip"><span style="width:18px; height:20px; margin-right:8px; clip-path:polygon(50% 0,100% 25%,100% 75%,50% 100%,0 75%,0 25%); background:#00BDFF;"></span>1,250</div>
+      <div class="chip">12 ONLINE</div>
+      <div class="chip" style="background:#0C4B5F; border-radius:0; border:0; clip-path:polygon(12px 0,calc(100% - 12px) 0,100% 50%,calc(100% - 12px) 100%,12px 100%,0 50%);">MENU</div>
+    </div>
+
+    <div class="roster" id="roster" style="position:absolute; top:108px; left:36px; display:flex; flex-direction:column; gap:4px; width:268px; max-height:690px; overflow-y:auto;"></div>
+
+    <div id="card" style="position:absolute; top:108px; right:36px; width:300px; background:rgba(22,23,25,.92); border:2px solid #0C4B5F; padding:14px; display:none; flex-direction:column; gap:10px;">
+      <div style="display:flex; justify-content:space-between; font:400 12px 'Anton',sans-serif; letter-spacing:.2em; color:#00BDFF;"><span>REMOTE JGER</span><span id="cIdx" style="color:#F4F4F4;"></span></div>
+      <div style="display:flex; gap:12px; align-items:center;">
+        <svg id="cAv" viewBox="0 0 120 130" width="84" height="91" style="flex:none; background:#0A0C0F; border:2px solid #0C4B5F;"></svg>
+        <div style="display:flex; flex-direction:column; gap:4px; min-width:0;">
+          <div id="cName" style="font:400 24px/1.05 'Anton',sans-serif; letter-spacing:.02em; text-transform:uppercase; color:#F4F4F4;"></div>
+          <div id="cTitle" style="font:700 13px 'Libre Franklin',sans-serif; color:#00BDFF;"></div>
+        </div>
+      </div>
+      <div style="display:flex; flex-direction:column; gap:6px; padding-top:10px; border-top:2px solid #0C4B5F;">
+        <div style="display:flex; justify-content:space-between; gap:10px; font:500 13px 'Libre Franklin',sans-serif;"><span style="color:#B3B6C9;">Based in</span><span id="cLoc" style="text-align:right;"></span></div>
+        <div style="display:flex; justify-content:space-between; gap:10px; font:500 13px 'Libre Franklin',sans-serif;"><span style="color:#B3B6C9;">From HQ</span><span id="cDist"></span></div>
+      </div>
+      <div id="cLine" style="padding:6px 10px; background:#F4F4F4; border-radius:8px; font:700 12px 'Libre Franklin',sans-serif; color:#161719; text-align:center;"></div>
+      <div style="display:flex; gap:8px;">
+        <button id="prev" class="hexbtn" style="height:40px; padding:0 18px; font-size:15px; background:#0C4B5F; color:#F4F4F4; box-shadow:inset 0 -4px 0 #06303D;">◀</button>
+        <button id="world" class="hexbtn" style="flex:1; justify-content:center; height:40px; font-size:15px; white-space:nowrap; background:#00BDFF; color:#161719; box-shadow:inset 0 -4px 0 #0C4B5F;">GLOBE</button>
+        <button id="next" class="hexbtn" style="height:40px; padding:0 18px; font-size:15px; background:#0C4B5F; color:#F4F4F4; box-shadow:inset 0 -4px 0 #06303D;">▶</button>
+      </div>
+    </div>
+
+    <a href="Room 01 Town Center.dc.html" data-exit="1" style="position:absolute; right:36px; bottom:112px; display:flex; align-items:center; gap:8px; height:36px; padding:0 14px; background:rgba(22,23,25,.9); border:2px solid #00BDFF; border-radius:999px; font:400 13px 'Anton',sans-serif; letter-spacing:.16em; color:#00BDFF; animation:blink 1.6s steps(2,jump-none) infinite; text-decoration:none; white-space:nowrap;">BACK TO HQ ↘</a>
+
+    <div style="position:absolute; left:36px; right:36px; bottom:28px; display:flex; align-items:center; gap:12px;">
+      <div style="flex:1; display:flex; align-items:center; height:52px; padding:0 18px; background:rgba(22,23,25,.9); border:2px solid #0C4B5F; font:400 16px 'Libre Franklin',sans-serif; color:#B3B6C9;">Say something…</div>
+      <div class="hexbtn" style="background:#00BDFF; color:#161719; box-shadow:inset 0 -5px 0 #0C4B5F;">EMOTE</div>
+      <div class="hexbtn" style="background:#00BDFF; color:#161719; box-shadow:inset 0 -5px 0 #0C4B5F;">SNOWBALL</div>
+      <a href="Club JenGuin Map.dc.html" class="hexbtn" style="background:#0C4B5F; color:#F4F4F4; box-shadow:inset 0 -5px 0 #06303D; text-decoration:none;">MAP</a>
+      <div class="hexbtn" style="background:#0C4B5F; color:#F4F4F4; box-shadow:inset 0 -5px 0 #06303D;">IGLOO</div>
+      <div class="hexbtn" style="background:#0C4B5F; color:#F4F4F4; box-shadow:inset 0 -5px 0 #06303D;">QUESTS</div>
+    </div>
+  </div>
+</section>
+
+<script>
+(function(){
+const NS='http://www.w3.org/2000/svg';
+const HQ={city:'Schenectady, NY',lon:-73.94,lat:42.81};
+const REMOTE=[
+  {key:'bessler',line:"\"Tight lines. Deploying after I land this one.\"",name:'Matt Bessler',title:'Software Engineer',city:'New York City, NY',lon:-74.006,lat:40.713,
+   spec:{style:'short',hair:'brown',skin:'fair',top:'#2a2f3a',pattern:'stripes',pattern2:'#8B7355',collar:'crew',glasses:'rect',beard:'full',teeth:true}},
+  {key:'lynch',name:'Cameron Lynch',title:'Developer',city:'Long Island, NY',lon:-73.20,lat:40.79,
+   spec:{style:'spiky',hair:'blond',skin:'fair',top:'#6B2237',collar:'polo',necklace:true,teeth:true},line:'"Truck yeah."'},
+  {key:'marcum',line:"\"Pushed straight to prod. What could go wrong?\"",name:'Austin Marcum',title:'Software Engineer',city:'Columbus, OH',lon:-82.999,lat:39.961,
+   spec:{style:'buzz',hair:'auburn',skin:'fair',top:'#1f2a4a',pattern:'dots',collar:'button',beard:'full',beardColor:'#B8652F',teeth:true}},
+  {key:'anderson',line:"\"The AI wrote it. I just reviewed it.\"",name:'Matt Anderson',title:'Principal Engineer',city:'South Bend, IN',lon:-86.252,lat:41.676,
+   spec:{style:'short',hair:'brown',skin:'fair',top:'#E6E8EC',pattern:'stripes',pattern2:'#9FB3C8',collar:'polo',glasses:'roundBrown',beard:'stubble',mouth:'smirk'}},
+  {key:'higgins',line:"\"Has anyone seen my other sock?\"",name:'John Higgins',title:'Software Engineer',city:'Philadelphia, PA',lon:-75.165,lat:39.953,
+   spec:{style:'none',hair:'dark',skin:'fair',top:'#7C8C76',collar:'crew',necklace:true,glasses:'thin',teeth:true}},
+  {key:'macfarlane',line:"\"Let's Go Jets\"",name:'Paul MacFarlane',title:'Software Engineer',city:'Andover, MA',lon:-71.137,lat:42.658,
+   spec:{style:'spiky',hair:'dark',skin:'med',top:'#8C2A2A',collar:'button',beard:'stubble',teeth:true}},
+  {key:'milliken',line:'"Eat the rainbow. Mostly the green part."',name:'Dani Milliken',title:'Director of Human Resources',city:'Scarborough, ME',lon:-70.331,lat:43.578,
+   spec:{style:'wavyLong',hair:'brown',skin:'fair',top:'#2E6B34',collar:'crew',teeth:true}},
+  {key:'schoen',line:'"Pushing from the 6 train."',name:'Ethan Schoen',title:'Software Engineer',city:'New York City, NY',lon:-73.965,lat:40.785,
+   spec:{style:'short',hair:'blond',skin:'fair',top:'#1f2a4a',collar:'zip',teeth:true}},
+  {key:'steven',line:'"Architecture question. Ready?"',name:'Steven Zgaljic',title:'CTO',city:'Westchester, NY',lon:-73.763,lat:41.034,
+   spec:{style:'shortDark',hair:'dark',skin:'med',top:'#2B3557',pattern:'dots',jacket:'#161719',collar:'crew',beard:'full',mouth:'smirk',greys:true}},
+  {key:'kneeland',line:'"Toot toot. Build passed."',name:'Tommy Kneeland',title:'Software Engineer',city:'Brighton, MA',lon:-71.156,lat:42.348,
+   spec:{style:'none',hair:'dark',skin:'fair',top:'#E8706A',collar:'polo',mouth:'flat'}},
+  {key:'snow',line:'"Snow by name. Snowcones by trade."',name:'Casey Snow',title:'Developer',city:'Marathon, FL',lon:-81.09,lat:24.71,
+   spec:{style:'straightLong',hair:'sandy',skin:'fair',top:'#2FB59A',collar:'crew'}},
+  {key:'vickers',line:'"Remote from five minutes away. The cats insisted."',name:'Steven Vickers',title:'Title TBD',city:'Schenectady, NY',lon:-73.86,lat:42.87,
+   spec:{style:'none',hair:'dark',skin:'fair',top:'#8A8F96',collar:'henley'}},
+  {key:'melliott',line:"\"So what I'm hearing you say is...\"",name:"Millie Elliott",title:'Team Lead',city:'Austin, TX',lon:-97.743,lat:30.267,
+   spec:{style:'highBun',hair:'dark',skin:'fair',top:'#2a2f3a',collar:'crew'}},
+  {key:'shirk',line:"\"Harp-coded values? Never. Harp-played? Daily.\"",name:'Michael Shirk',title:'Developer',city:'St. Louis, MO',lon:-90.199,lat:38.627,
+   spec:{style:'bald',hair:'auburn',skin:'fair',top:'#F4F4F4',collar:'button'}},
+  {key:'wonkovich',line:"\"Deep dish, deep stack traces.\"",name:'Matthew Wonkovich',title:'Developer',city:'Chicago, IL',lon:-87.630,lat:41.878,
+   spec:{style:'short',hair:'dark',skin:'fair',top:'#2E4A8A',collar:'button'}},
+  {key:'jameson',line:"\"In Florida, a gator in the pool counts as a standup.\"",name:'Joshua Jameson',title:'Senior Software Engineer',city:'St. Petersburg, FL',lon:-82.640,lat:27.771,
+   spec:{style:'short',hair:'blond',skin:'fair',top:'#E6E2D8',collar:'crew'}}
+];
+function jgMod(k,o,u){
+  if(k==='jameson'){let s="<rect x=\"46\" y=\"104\" width=\"12\" height=\"18\" rx=\"3\" fill=\"#1d1f22\" stroke=\"#0C4B5F\" stroke-width=\"2\"/><rect x=\"62\" y=\"104\" width=\"12\" height=\"18\" rx=\"3\" fill=\"#1d1f22\" stroke=\"#0C4B5F\" stroke-width=\"2\"/><rect x=\"43\" y=\"118\" width=\"17\" height=\"7\" rx=\"3.5\" fill=\"#0f1012\" stroke=\"#0C4B5F\" stroke-width=\"2\"/><rect x=\"60\" y=\"118\" width=\"17\" height=\"7\" rx=\"3.5\" fill=\"#0f1012\" stroke=\"#0C4B5F\" stroke-width=\"2\"/><clipPath id=\"Ut\"><rect x=\"34\" y=\"66\" width=\"52\" height=\"44\" rx=\"12\"/></clipPath><rect x=\"34\" y=\"66\" width=\"52\" height=\"44\" rx=\"12\" fill=\"#E6E2D8\" stroke=\"#0C4B5F\" stroke-width=\"2.5\"/><rect x=\"24\" y=\"70\" width=\"12\" height=\"30\" rx=\"6\" fill=\"#E6E2D8\" stroke=\"#0C4B5F\" stroke-width=\"2.5\"/><rect x=\"84\" y=\"70\" width=\"12\" height=\"30\" rx=\"6\" fill=\"#E6E2D8\" stroke=\"#0C4B5F\" stroke-width=\"2.5\"/><circle cx=\"30\" cy=\"101\" r=\"5.5\" fill=\"#F6DCC6\" stroke=\"#0C4B5F\" stroke-width=\"2\"/><circle cx=\"90\" cy=\"101\" r=\"5.5\" fill=\"#F6DCC6\" stroke=\"#0C4B5F\" stroke-width=\"2\"/><path d=\"M50 66 Q60 74 70 66\" fill=\"none\" stroke=\"#0C4B5F\" stroke-width=\"2\"/><rect x=\"54\" y=\"58\" width=\"12\" height=\"12\" fill=\"#F6DCC6\"/><circle cx=\"60\" cy=\"40\" r=\"25\" fill=\"#F6DCC6\" stroke=\"#0C4B5F\" stroke-width=\"2.5\"/><circle cx=\"36\" cy=\"42\" r=\"4\" fill=\"#F6DCC6\" stroke=\"#0C4B5F\" stroke-width=\"2\"/><circle cx=\"84\" cy=\"42\" r=\"4\" fill=\"#F6DCC6\" stroke=\"#0C4B5F\" stroke-width=\"2\"/><path d=\"M36 34 C34 22 40 12 46 16 L50 8 L54 16 L60 6 L66 16 L70 8 L74 16 C80 12 86 22 84 34 C76 24 44 24 36 34 Z\" fill=\"#D9B566\" stroke=\"#0C4B5F\" stroke-width=\"2.5\"/><path d=\"M46 34 L54 33 M66 33 L74 34\" stroke=\"#0C4B5F\" stroke-width=\"2\" stroke-linecap=\"round\"/><circle cx=\"51\" cy=\"41\" r=\"2.4\" fill=\"#161719\"/><circle cx=\"69\" cy=\"41\" r=\"2.4\" fill=\"#161719\"/><path d=\"M52 53 Q62 58 68 52\" fill=\"none\" stroke=\"#0C4B5F\" stroke-width=\"2.5\" stroke-linecap=\"round\"/><path d=\"M40 46 C42 62 50 66 60 66 C70 66 78 62 80 46 C76 56 70 58 60 58 C50 58 44 56 40 46 Z\" fill=\"#D9B566\" opacity=\".35\"/><path d=\"M52 72 L60 80 L68 72\" fill=\"none\" stroke=\"#B9B3A6\" stroke-width=\"3\" stroke-linejoin=\"round\"/><path d=\"M60 80 V100\" stroke=\"#8A857A\" stroke-width=\"1.6\"/><rect x=\"58.4\" y=\"84\" width=\"3.2\" height=\"5\" rx=\"1\" fill=\"#8A857A\"/>";["Ut"].forEach(id=>{s=s.split('"'+id+'"').join('"'+id+u+'"').split('#'+id+')').join('#'+id+u+')');});return s;}
+  if(k==='wonkovich'){let s="<rect x=\"46\" y=\"104\" width=\"12\" height=\"18\" rx=\"3\" fill=\"#1d1f22\" stroke=\"#0C4B5F\" stroke-width=\"2\"/><rect x=\"62\" y=\"104\" width=\"12\" height=\"18\" rx=\"3\" fill=\"#1d1f22\" stroke=\"#0C4B5F\" stroke-width=\"2\"/><rect x=\"43\" y=\"118\" width=\"17\" height=\"7\" rx=\"3.5\" fill=\"#0f1012\" stroke=\"#0C4B5F\" stroke-width=\"2\"/><rect x=\"60\" y=\"118\" width=\"17\" height=\"7\" rx=\"3.5\" fill=\"#0f1012\" stroke=\"#0C4B5F\" stroke-width=\"2\"/><clipPath id=\"Ut\"><rect x=\"34\" y=\"66\" width=\"52\" height=\"44\" rx=\"12\"/></clipPath><rect x=\"34\" y=\"66\" width=\"52\" height=\"44\" rx=\"12\" fill=\"#2E4A8A\" stroke=\"#0C4B5F\" stroke-width=\"2.5\"/><rect x=\"34\" y=\"70\" width=\"52\" height=\"3.5\" fill=\"#9FB3D8\" clip-path=\"url(#Ut)\"/><rect x=\"34\" y=\"77\" width=\"52\" height=\"3.5\" fill=\"#9FB3D8\" clip-path=\"url(#Ut)\"/><rect x=\"34\" y=\"84\" width=\"52\" height=\"3.5\" fill=\"#9FB3D8\" clip-path=\"url(#Ut)\"/><rect x=\"34\" y=\"91\" width=\"52\" height=\"3.5\" fill=\"#9FB3D8\" clip-path=\"url(#Ut)\"/><rect x=\"34\" y=\"98\" width=\"52\" height=\"3.5\" fill=\"#9FB3D8\" clip-path=\"url(#Ut)\"/><rect x=\"34\" y=\"105\" width=\"52\" height=\"3.5\" fill=\"#9FB3D8\" clip-path=\"url(#Ut)\"/><rect x=\"24\" y=\"70\" width=\"12\" height=\"30\" rx=\"6\" fill=\"#2E4A8A\" stroke=\"#0C4B5F\" stroke-width=\"2.5\"/><rect x=\"84\" y=\"70\" width=\"12\" height=\"30\" rx=\"6\" fill=\"#2E4A8A\" stroke=\"#0C4B5F\" stroke-width=\"2.5\"/><circle cx=\"30\" cy=\"101\" r=\"5.5\" fill=\"#F6DCC6\" stroke=\"#0C4B5F\" stroke-width=\"2\"/><circle cx=\"90\" cy=\"101\" r=\"5.5\" fill=\"#F6DCC6\" stroke=\"#0C4B5F\" stroke-width=\"2\"/><path d=\"M52 66 L60 76 L68 66 L64 64 L60 70 L56 64 Z\" fill=\"#F4F4F4\" stroke=\"#0C4B5F\" stroke-width=\"1.5\"/><rect x=\"54\" y=\"58\" width=\"12\" height=\"12\" fill=\"#F6DCC6\"/><circle cx=\"60\" cy=\"40\" r=\"25\" fill=\"#F6DCC6\" stroke=\"#0C4B5F\" stroke-width=\"2.5\"/><circle cx=\"36\" cy=\"42\" r=\"4\" fill=\"#F6DCC6\" stroke=\"#0C4B5F\" stroke-width=\"2\"/><circle cx=\"84\" cy=\"42\" r=\"4\" fill=\"#F6DCC6\" stroke=\"#0C4B5F\" stroke-width=\"2\"/><path d=\"M35 36 C34 18 46 12 60 12 C74 12 86 18 85 36 C80 26 40 26 35 36 Z\" fill=\"#2b2118\" stroke=\"#0C4B5F\" stroke-width=\"2.5\"/><path d=\"M46 34 L54 33 M66 33 L74 34\" stroke=\"#0C4B5F\" stroke-width=\"2\" stroke-linecap=\"round\"/><circle cx=\"51\" cy=\"41\" r=\"2.4\" fill=\"#161719\"/><circle cx=\"69\" cy=\"41\" r=\"2.4\" fill=\"#161719\"/><path d=\"M52 53 Q62 58 68 52\" fill=\"none\" stroke=\"#0C4B5F\" stroke-width=\"2.5\" stroke-linecap=\"round\"/>";return s.split('"Ut"').join('"Ut'+u+'"').split('#Ut)').join('#Ut'+u+')');}
+  if(k==='shirk'){let s="<rect x=\"46\" y=\"104\" width=\"12\" height=\"18\" rx=\"3\" fill=\"#1d1f22\" stroke=\"#0C4B5F\" stroke-width=\"2\"/><rect x=\"62\" y=\"104\" width=\"12\" height=\"18\" rx=\"3\" fill=\"#1d1f22\" stroke=\"#0C4B5F\" stroke-width=\"2\"/><rect x=\"43\" y=\"118\" width=\"17\" height=\"7\" rx=\"3.5\" fill=\"#0f1012\" stroke=\"#0C4B5F\" stroke-width=\"2\"/><rect x=\"60\" y=\"118\" width=\"17\" height=\"7\" rx=\"3.5\" fill=\"#0f1012\" stroke=\"#0C4B5F\" stroke-width=\"2\"/><clipPath id=\"Ut\"><rect x=\"34\" y=\"66\" width=\"52\" height=\"44\" rx=\"12\"/></clipPath><rect x=\"34\" y=\"66\" width=\"52\" height=\"44\" rx=\"12\" fill=\"#F4F4F4\" stroke=\"#0C4B5F\" stroke-width=\"2.5\"/><path d=\"M34 78 L34 110 L52 110 L54 72 L44 66 Z\" fill=\"#26334d\" stroke=\"#0C4B5F\" stroke-width=\"2.5\"/><path d=\"M86 78 L86 110 L68 110 L66 72 L76 66 Z\" fill=\"#26334d\" stroke=\"#0C4B5F\" stroke-width=\"2.5\"/><rect x=\"24\" y=\"70\" width=\"12\" height=\"30\" rx=\"6\" fill=\"#26334d\" stroke=\"#0C4B5F\" stroke-width=\"2.5\"/><path d=\"M88 72 L98 88\" stroke=\"#0C4B5F\" stroke-width=\"13\" stroke-linecap=\"round\"/><path d=\"M88 72 L98 88\" stroke=\"#26334d\" stroke-width=\"9\" stroke-linecap=\"round\"/><circle cx=\"30\" cy=\"101\" r=\"5.5\" fill=\"#F6DCC6\" stroke=\"#0C4B5F\" stroke-width=\"2\"/><path d=\"M52 66 L60 76 L68 66 L64 64 L60 70 L56 64 Z\" fill=\"#F4F4F4\" stroke=\"#0C4B5F\" stroke-width=\"1.5\"/><rect x=\"54\" y=\"58\" width=\"12\" height=\"12\" fill=\"#F6DCC6\"/><circle cx=\"60\" cy=\"40\" r=\"25\" fill=\"#F6DCC6\" stroke=\"#0C4B5F\" stroke-width=\"2.5\"/><circle cx=\"36\" cy=\"42\" r=\"4\" fill=\"#F6DCC6\" stroke=\"#0C4B5F\" stroke-width=\"2\"/><circle cx=\"84\" cy=\"42\" r=\"4\" fill=\"#F6DCC6\" stroke=\"#0C4B5F\" stroke-width=\"2\"/><ellipse cx=\"52\" cy=\"24\" rx=\"6\" ry=\"3\" fill=\"#fff\" opacity=\".35\"/><path d=\"M35 44 C33 34 36 28 40 26 L41 40 Z M85 44 C87 34 84 28 80 26 L79 40 Z\" fill=\"#7A4A2A\" stroke=\"#0C4B5F\" stroke-width=\"2\"/><path d=\"M46 34 L54 33 M66 33 L74 34\" stroke=\"#0C4B5F\" stroke-width=\"2\" stroke-linecap=\"round\"/><circle cx=\"51\" cy=\"41\" r=\"2.4\" fill=\"#161719\"/><circle cx=\"69\" cy=\"41\" r=\"2.4\" fill=\"#161719\"/><rect x=\"42\" y=\"36\" width=\"15\" height=\"10\" rx=\"2\" fill=\"none\" stroke=\"#161719\" stroke-width=\"1.8\"/><rect x=\"63\" y=\"36\" width=\"15\" height=\"10\" rx=\"2\" fill=\"none\" stroke=\"#161719\" stroke-width=\"1.8\"/><line x1=\"57\" y1=\"40\" x2=\"63\" y2=\"40\" stroke=\"#161719\" stroke-width=\"1.8\"/><path d=\"M36 40 C34 64 42 90 60 94 C78 90 86 64 84 40 C82 50 79 55 75 57 C71 50 49 50 45 57 C41 55 38 50 36 40 Z\" fill=\"#7A4A2A\" stroke=\"#0C4B5F\" stroke-width=\"2\"/><path d=\"M46 66 q2 8 0 14 M53 70 q1 8 -1 16 M60 72 v16 M67 70 q-1 8 1 16 M74 66 q-2 8 0 14\" fill=\"none\" stroke=\"#5a3420\" stroke-width=\"1.4\" opacity=\".7\"/><path d=\"M45 54 Q52 47 60 50 Q68 47 75 54 Q68 53 60 54 Q52 53 45 54 Z\" fill=\"#7A4A2A\" stroke=\"#0C4B5F\" stroke-width=\"1.5\"/><path d=\"M52 57 Q60 61 68 57\" fill=\"none\" stroke=\"#0C4B5F\" stroke-width=\"2\" stroke-linecap=\"round\"/><path d=\"M52 96 L59 99 L52 102 Z M68 96 L61 99 L68 102 Z\" fill=\"#D6262E\" stroke=\"#0C4B5F\" stroke-width=\"1.4\" stroke-linejoin=\"round\"/><circle cx=\"60\" cy=\"99\" r=\"2\" fill=\"#D6262E\" stroke=\"#0C4B5F\" stroke-width=\"1.2\"/><circle cx=\"54\" cy=\"98\" r=\".7\" fill=\"#F4F4F4\"/><circle cx=\"66\" cy=\"100\" r=\".7\" fill=\"#F4F4F4\"/><path d=\"M92 59.8 L92 66.5 M94.5 58.8 L94.5 73.4 M97 56.9 L97 80.3 M99.5 54.2 L99.5 87.1 M102 51.0 L102 94.0 M104.5 47.8 L104.5 100.9 M107 45.1 L107 107.8 M109.5 43.3 L109.5 114.6 M112 42.3 L112 121.5 \" stroke=\"#F4F4F4\" stroke-width=\".9\" opacity=\".95\"/><path d=\"M117 40 L116 124\" stroke=\"#0C4B5F\" stroke-width=\"6.5\" stroke-linecap=\"round\"/><path d=\"M117 40 L116 124\" stroke=\"#9C7424\" stroke-width=\"4\" stroke-linecap=\"round\"/><path d=\"M85 56 L91 58 L116 127 L106 125 Z\" fill=\"#C99A3A\" stroke=\"#0C4B5F\" stroke-width=\"2\" stroke-linejoin=\"round\"/><path d=\"M90 62 L110 120\" stroke=\"#9C7424\" stroke-width=\"1.2\"/><path d=\"M88 58 L90 58.0 L91 58.0 L92 57.8 L93 57.5 L94 57.1 L95 56.5 L96 55.8 L97 54.9 L98 53.9 L99 52.8 L100 51.6 L101 50.3 L102 49.0 L103 47.7 L104 46.5 L105 45.2 L106 44.1 L107 43.1 L108 42.3 L109 41.6 L110 41.0 L111 40.6 L112 40.3 L113 40.1 L114 40.1 L115 40.1 L116 40.1 L117 40.1\" fill=\"none\" stroke=\"#0C4B5F\" stroke-width=\"6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><path d=\"M88 58 L90 58.0 L91 58.0 L92 57.8 L93 57.5 L94 57.1 L95 56.5 L96 55.8 L97 54.9 L98 53.9 L99 52.8 L100 51.6 L101 50.3 L102 49.0 L103 47.7 L104 46.5 L105 45.2 L106 44.1 L107 43.1 L108 42.3 L109 41.6 L110 41.0 L111 40.6 L112 40.3 L113 40.1 L114 40.1 L115 40.1 L116 40.1 L117 40.1\" fill=\"none\" stroke=\"#C99A3A\" stroke-width=\"3.6\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/><circle cx=\"117\" cy=\"39\" r=\"3.4\" fill=\"#C99A3A\" stroke=\"#0C4B5F\" stroke-width=\"1.5\"/><rect x=\"104\" y=\"123\" width=\"15\" height=\"4\" rx=\"1.5\" fill=\"#9C7424\" stroke=\"#0C4B5F\" stroke-width=\"1.5\"/><circle cx=\"100\" cy=\"90\" r=\"5.5\" fill=\"#F6DCC6\" stroke=\"#0C4B5F\" stroke-width=\"2\"/><path d=\"M96 74 L98 72 M104 66 q2 -3 4 -1\" stroke=\"#00BDFF\" stroke-width=\"1.8\" stroke-linecap=\"round\"/><circle cx=\"104\" cy=\"66\" r=\"1.6\" fill=\"#00BDFF\"/>";["Ut"].forEach(id=>{s=s.split('"'+id+'"').join('"'+id+u+'"').split('#'+id+')').join('#'+id+u+')');});return s;}
+  if(k==='melliott'){let s="<svg x=\"0\" y=\"0\" width=\"120\" height=\"130\" viewBox=\"0 -12 120 142\" overflow=\"visible\"><rect x=\"46\" y=\"104\" width=\"12\" height=\"18\" rx=\"3\" fill=\"#1d1f22\" stroke=\"#0C4B5F\" stroke-width=\"2\"></rect><rect x=\"62\" y=\"104\" width=\"12\" height=\"18\" rx=\"3\" fill=\"#1d1f22\" stroke=\"#0C4B5F\" stroke-width=\"2\"></rect><rect x=\"43\" y=\"118\" width=\"17\" height=\"7\" rx=\"3.5\" fill=\"#0f1012\" stroke=\"#0C4B5F\" stroke-width=\"2\"></rect><rect x=\"60\" y=\"118\" width=\"17\" height=\"7\" rx=\"3.5\" fill=\"#0f1012\" stroke=\"#0C4B5F\" stroke-width=\"2\"></rect><clipPath id=\"sheet-melliottt\"><rect x=\"34\" y=\"66\" width=\"52\" height=\"44\" rx=\"12\"></rect></clipPath><rect x=\"34\" y=\"66\" width=\"52\" height=\"44\" rx=\"12\" fill=\"#8C7A80\" stroke=\"#0C4B5F\" stroke-width=\"2.5\"></rect><path d=\"M34 78 L34 110 L52 110 L54 72 L44 66 Z\" fill=\"#1f2a4a\" stroke=\"#0C4B5F\" stroke-width=\"2.5\"></path><path d=\"M86 78 L86 110 L68 110 L66 72 L76 66 Z\" fill=\"#1f2a4a\" stroke=\"#0C4B5F\" stroke-width=\"2.5\"></path><rect x=\"24\" y=\"70\" width=\"12\" height=\"30\" rx=\"6\" fill=\"#1f2a4a\" stroke=\"#0C4B5F\" stroke-width=\"2.5\"></rect><rect x=\"84\" y=\"70\" width=\"12\" height=\"30\" rx=\"6\" fill=\"#1f2a4a\" stroke=\"#0C4B5F\" stroke-width=\"2.5\"></rect><circle cx=\"30\" cy=\"101\" r=\"5.5\" fill=\"#E4B896\" stroke=\"#0C4B5F\" stroke-width=\"2\"></circle><circle cx=\"90\" cy=\"101\" r=\"5.5\" fill=\"#E4B896\" stroke=\"#0C4B5F\" stroke-width=\"2\"></circle><path d=\"M50 66 Q60 74 70 66\" fill=\"none\" stroke=\"#0C4B5F\" stroke-width=\"2\"></path><path d=\"M50 68 Q60 80 70 68\" fill=\"none\" stroke=\"#d9dcdf\" stroke-width=\"1.5\"></path><circle cx=\"60\" cy=\"79\" r=\"2\" fill=\"#d9dcdf\"></circle><rect x=\"54\" y=\"58\" width=\"12\" height=\"12\" fill=\"#E4B896\"></rect><circle cx=\"60\" cy=\"40\" r=\"25\" fill=\"#E4B896\" stroke=\"#0C4B5F\" stroke-width=\"2.5\"></circle><circle cx=\"36\" cy=\"42\" r=\"4\" fill=\"#E4B896\" stroke=\"#0C4B5F\" stroke-width=\"2\"></circle><circle cx=\"84\" cy=\"42\" r=\"4\" fill=\"#E4B896\" stroke=\"#0C4B5F\" stroke-width=\"2\"></circle><path d=\"M35 38 C33 20 44 12 60 12 C76 12 87 20 85 38 C80 28 40 28 35 38 Z\" fill=\"#2b2118\" stroke=\"#0C4B5F\" stroke-width=\"2.5\"></path><path d=\"M42 30 Q60 22 78 30 M44 25 Q60 18 76 25 M50 20 Q60 15 70 20\" fill=\"none\" stroke=\"#161719\" stroke-width=\"1.2\" opacity=\".35\"></path><rect x=\"52\" y=\"11\" width=\"16\" height=\"5\" rx=\"2.5\" fill=\"#00BDFF\" stroke=\"#0C4B5F\" stroke-width=\"1.5\"></rect><circle cx=\"60\" cy=\"2\" r=\"11\" fill=\"#2b2118\" stroke=\"#0C4B5F\" stroke-width=\"2.5\"></circle><circle cx=\"52\" cy=\"-3\" r=\"4.5\" fill=\"#2b2118\" stroke=\"#0C4B5F\" stroke-width=\"1.6\"></circle><circle cx=\"60\" cy=\"-7\" r=\"4.5\" fill=\"#2b2118\" stroke=\"#0C4B5F\" stroke-width=\"1.6\"></circle><circle cx=\"68\" cy=\"-3\" r=\"4.5\" fill=\"#2b2118\" stroke=\"#0C4B5F\" stroke-width=\"1.6\"></circle><circle cx=\"50\" cy=\"5\" r=\"4.5\" fill=\"#2b2118\" stroke=\"#0C4B5F\" stroke-width=\"1.6\"></circle><circle cx=\"70\" cy=\"5\" r=\"4.5\" fill=\"#2b2118\" stroke=\"#0C4B5F\" stroke-width=\"1.6\"></circle><circle cx=\"60\" cy=\"8\" r=\"4.5\" fill=\"#2b2118\" stroke=\"#0C4B5F\" stroke-width=\"1.6\"></circle><circle cx=\"56\" cy=\"1\" r=\"4.5\" fill=\"#2b2118\" stroke=\"#0C4B5F\" stroke-width=\"1.6\"></circle><circle cx=\"64\" cy=\"1\" r=\"4.5\" fill=\"#2b2118\" stroke=\"#0C4B5F\" stroke-width=\"1.6\"></circle><path d=\"M50 -3 a2 2 0 1 1 4 0\" fill=\"none\" stroke=\"#161719\" stroke-width=\"1\" opacity=\".5\"></path><path d=\"M58 -7 a2 2 0 1 1 4 0\" fill=\"none\" stroke=\"#161719\" stroke-width=\"1\" opacity=\".5\"></path><path d=\"M66 -3 a2 2 0 1 1 4 0\" fill=\"none\" stroke=\"#161719\" stroke-width=\"1\" opacity=\".5\"></path><path d=\"M58 1 a2 2 0 1 1 4 0\" fill=\"none\" stroke=\"#161719\" stroke-width=\"1\" opacity=\".5\"></path><path d=\"M37 40 q-4 4 -1 8 q3 3 5 -1 M83 40 q4 4 1 8 q-3 3 -5 -1\" fill=\"none\" stroke=\"#2b2118\" stroke-width=\"2.5\" stroke-linecap=\"round\"></path><path d=\"M46 34 L54 33 M66 33 L74 34\" stroke=\"#0C4B5F\" stroke-width=\"2\" stroke-linecap=\"round\"></path><circle cx=\"51\" cy=\"41\" r=\"2.4\" fill=\"#161719\"></circle><circle cx=\"69\" cy=\"41\" r=\"2.4\" fill=\"#161719\"></circle><path d=\"M50 51 Q60 60 70 51\" fill=\"none\" stroke=\"#0C4B5F\" stroke-width=\"2.5\" stroke-linecap=\"round\"></path><path d=\"M52 52 Q60 58 68 52 Z\" fill=\"#F4F4F4\"></path></svg>";["sheet-melliottt"].forEach(id=>{s=s.split('"'+id+'"').join('"'+id+u+'"').split('#'+id+')').join('#'+id+u+')');});return s;}
+  if(k==='vickers'){let s="<path d=\"M31 36 C27 46 29 52 33 55 L87 55 C91 52 93 46 89 36 Z\" fill=\"#241b15\" stroke=\"#0C4B5F\" stroke-width=\"2.5\"/><rect x=\"46\" y=\"104\" width=\"12\" height=\"18\" rx=\"3\" fill=\"#1d1f22\" stroke=\"#0C4B5F\" stroke-width=\"2\"/><rect x=\"62\" y=\"104\" width=\"12\" height=\"18\" rx=\"3\" fill=\"#1d1f22\" stroke=\"#0C4B5F\" stroke-width=\"2\"/><rect x=\"43\" y=\"118\" width=\"17\" height=\"7\" rx=\"3.5\" fill=\"#0f1012\" stroke=\"#0C4B5F\" stroke-width=\"2\"/><rect x=\"60\" y=\"118\" width=\"17\" height=\"7\" rx=\"3.5\" fill=\"#0f1012\" stroke=\"#0C4B5F\" stroke-width=\"2\"/><clipPath id=\"Ut\"><rect x=\"34\" y=\"66\" width=\"52\" height=\"44\" rx=\"12\"/></clipPath><rect x=\"34\" y=\"66\" width=\"52\" height=\"44\" rx=\"12\" fill=\"#8A8F96\" stroke=\"#0C4B5F\" stroke-width=\"2.5\"/><rect x=\"24\" y=\"70\" width=\"12\" height=\"30\" rx=\"6\" fill=\"#8A8F96\" stroke=\"#0C4B5F\" stroke-width=\"2.5\"/><rect x=\"84\" y=\"70\" width=\"12\" height=\"30\" rx=\"6\" fill=\"#8A8F96\" stroke=\"#0C4B5F\" stroke-width=\"2.5\"/><circle cx=\"30\" cy=\"101\" r=\"5.5\" fill=\"#F6DCC6\" stroke=\"#0C4B5F\" stroke-width=\"2\"/><circle cx=\"90\" cy=\"101\" r=\"5.5\" fill=\"#F6DCC6\" stroke=\"#0C4B5F\" stroke-width=\"2\"/><path d=\"M60 66 V82\" stroke=\"#0C4B5F\" stroke-width=\"1.5\"/><circle cx=\"60\" cy=\"72\" r=\"1.5\" fill=\"#0C4B5F\"/><circle cx=\"60\" cy=\"78\" r=\"1.5\" fill=\"#0C4B5F\"/><rect x=\"54\" y=\"58\" width=\"12\" height=\"12\" fill=\"#F6DCC6\"/><circle cx=\"60\" cy=\"40\" r=\"25\" fill=\"#F6DCC6\" stroke=\"#0C4B5F\" stroke-width=\"2.5\"/><circle cx=\"36\" cy=\"42\" r=\"4\" fill=\"#F6DCC6\" stroke=\"#0C4B5F\" stroke-width=\"2\"/><circle cx=\"84\" cy=\"42\" r=\"4\" fill=\"#F6DCC6\" stroke=\"#0C4B5F\" stroke-width=\"2\"/><path d=\"M32 46 C24 20 40 5 60 6 C81 5 96 20 88 46 C86 36 81 30 75 28 C69 33 55 34 46 29 C40 31 35 38 32 46 Z\" fill=\"#241b15\" stroke=\"#0C4B5F\" stroke-width=\"2.5\"/><path d=\"M42 16 Q48 11 55 15 M60 11 Q67 7 75 13 M38 26 Q44 22 50 25 M68 22 Q75 19 82 25\" fill=\"none\" stroke=\"#3d3027\" stroke-width=\"2\" stroke-linecap=\"round\"/><path d=\"M46 34 L54 33 M66 33 L74 34\" stroke=\"#0C4B5F\" stroke-width=\"2\" stroke-linecap=\"round\"/><circle cx=\"51\" cy=\"41\" r=\"2.4\" fill=\"#161719\"/><circle cx=\"69\" cy=\"41\" r=\"2.4\" fill=\"#161719\"/><path d=\"M52 53 Q62 58 68 52\" fill=\"none\" stroke=\"#0C4B5F\" stroke-width=\"2.5\" stroke-linecap=\"round\"/><path d=\"M40 46 C42 62 50 66 60 66 C70 66 78 62 80 46 C76 56 70 58 60 58 C50 58 44 56 40 46 Z\" fill=\"#2b2118\" opacity=\".35\"/><rect x=\"41\" y=\"35\" width=\"16\" height=\"12\" rx=\"2.5\" fill=\"none\" stroke=\"#161719\" stroke-width=\"2.5\"/><rect x=\"63\" y=\"35\" width=\"16\" height=\"12\" rx=\"2.5\" fill=\"none\" stroke=\"#161719\" stroke-width=\"2.5\"/><line x1=\"57\" y1=\"40\" x2=\"63\" y2=\"40\" stroke=\"#161719\" stroke-width=\"2.5\"/><g><path d=\"M8 124 C2 122 2 114 7 113\" fill=\"none\" stroke=\"#0C4B5F\" stroke-width=\"4.5\" stroke-linecap=\"round\"/><path d=\"M8 124 C2 122 2 114 7 113\" fill=\"none\" stroke=\"#E8913A\" stroke-width=\"2.8\" stroke-linecap=\"round\"/><ellipse cx=\"16\" cy=\"117\" rx=\"8.5\" ry=\"8.5\" fill=\"#E8913A\" stroke=\"#0C4B5F\" stroke-width=\"1.6\"/><path d=\"M11 112 q2 2 0 4 M16 110 q2 2 0 4 M21 112 q-2 2 0 4\" fill=\"none\" stroke=\"#B9611F\" stroke-width=\"1.4\" stroke-linecap=\"round\"/><path d=\"M10.5 100 L11 93 L15 98 Z M21.5 100 L21 93 L17 98 Z\" fill=\"#E8913A\" stroke=\"#0C4B5F\" stroke-width=\"1.6\" stroke-linejoin=\"round\"/><circle cx=\"16\" cy=\"103\" r=\"6.5\" fill=\"#E8913A\" stroke=\"#0C4B5F\" stroke-width=\"1.6\"/><path d=\"M13 98.5 l1 2 M16 97.5 v2.5 M19 98.5 l-1 2\" stroke=\"#B9611F\" stroke-width=\"1.2\" stroke-linecap=\"round\"/><circle cx=\"13.6\" cy=\"103\" r=\"1.1\" fill=\"#2E6B34\"/><circle cx=\"18.4\" cy=\"103\" r=\"1.1\" fill=\"#2E6B34\"/><path d=\"M15.2 105.5 L16.8 105.5 L16 106.5 Z\" fill=\"#D6646A\"/><path d=\"M12 124 h3 M17 124 h3\" stroke=\"#F4F4F4\" stroke-width=\"1.6\" stroke-linecap=\"round\"/></g><g><path d=\"M114 123 C122 121 121 110 116 108\" fill=\"none\" stroke=\"#0C4B5F\" stroke-width=\"7\" stroke-linecap=\"round\"/><path d=\"M114 123 C122 121 121 110 116 108\" fill=\"none\" stroke=\"#F7F4EE\" stroke-width=\"5\" stroke-linecap=\"round\"/><path d=\"M114.0 116.0Q115.2 118.6  113.0 120.4Q113.0 123.3  110.2 124.0Q109.0 126.6  106.2 125.9Q104.0 127.7  101.8 125.9Q99.0 126.6  97.8 124.0Q95.0 123.3  95.0 120.4Q92.8 118.6  94.0 116.0Q92.8 113.4  95.0 111.6Q95.0 108.7  97.8 108.0Q99.0 105.4  101.8 106.1Q104.0 104.3  106.2 106.1Q109.0 105.4  110.2 108.0Q113.0 108.7  113.0 111.6Q115.2 113.4  114.0 116.0Z\" fill=\"#F7F4EE\" stroke=\"#0C4B5F\" stroke-width=\"1.6\"/><path d=\"M97.5 98 L97 90 L101.5 95.5 Z M110.5 98 L111 90 L106.5 95.5 Z\" fill=\"#C9A47A\" stroke=\"#0C4B5F\" stroke-width=\"1.6\" stroke-linejoin=\"round\"/><path d=\"M111.2 102.0Q112.0 104.6  109.8 106.2Q108.9 108.8  106.2 108.8Q104.0 110.4  101.8 108.8Q99.1 108.8  98.2 106.2Q96.0 104.6  96.8 102.0Q96.0 99.4  98.2 97.8Q99.1 95.2  101.8 95.2Q104.0 93.6  106.2 95.2Q108.9 95.2  109.8 97.8Q112.0 99.4  111.2 102.0Z\" fill=\"#F7F4EE\" stroke=\"#0C4B5F\" stroke-width=\"1.6\"/><ellipse cx=\"104\" cy=\"102.5\" rx=\"4.8\" ry=\"4.6\" fill=\"#C9A47A\"/><path d=\"M104 98 v5\" stroke=\"#F7F4EE\" stroke-width=\"1.6\" stroke-linecap=\"round\"/><circle cx=\"101.8\" cy=\"102\" r=\"1.15\" fill=\"#3B7FC4\"/><circle cx=\"106.2\" cy=\"102\" r=\"1.15\" fill=\"#3B7FC4\"/><path d=\"M103.3 104.6 L104.7 104.6 L104 105.5 Z\" fill=\"#D6646A\"/></g>";["Ut"].forEach(id=>{s=s.split('"'+id+'"').join('"'+id+u+'"').split('#'+id+')').join('#'+id+u+')');});return s;}
+  if(k==='snow'){let s="<path d=\"M32 30 C28 50 28 76 32 96 L88 96 C92 76 92 50 88 30 Z\" fill=\"#C9A366\" stroke=\"#0C4B5F\" stroke-width=\"2.5\"></path><rect x=\"46\" y=\"104\" width=\"12\" height=\"18\" rx=\"3\" fill=\"#1d1f22\" stroke=\"#0C4B5F\" stroke-width=\"2\"></rect><rect x=\"62\" y=\"104\" width=\"12\" height=\"18\" rx=\"3\" fill=\"#1d1f22\" stroke=\"#0C4B5F\" stroke-width=\"2\"></rect><rect x=\"43\" y=\"118\" width=\"17\" height=\"7\" rx=\"3.5\" fill=\"#0f1012\" stroke=\"#0C4B5F\" stroke-width=\"2\"></rect><rect x=\"60\" y=\"118\" width=\"17\" height=\"7\" rx=\"3.5\" fill=\"#0f1012\" stroke=\"#0C4B5F\" stroke-width=\"2\"></rect><clipPath id=\"sheet-snowt\"><rect x=\"34\" y=\"66\" width=\"52\" height=\"44\" rx=\"12\"></rect></clipPath><rect x=\"34\" y=\"66\" width=\"52\" height=\"44\" rx=\"12\" fill=\"#2FB59A\" stroke=\"#0C4B5F\" stroke-width=\"2.5\"></rect><rect x=\"34\" y=\"70\" width=\"52\" height=\"3.5\" fill=\"#F4F4F4\" clip-path=\"url(#sheet-snowt)\"></rect><rect x=\"34\" y=\"77\" width=\"52\" height=\"3.5\" fill=\"#F4F4F4\" clip-path=\"url(#sheet-snowt)\"></rect><rect x=\"34\" y=\"84\" width=\"52\" height=\"3.5\" fill=\"#F4F4F4\" clip-path=\"url(#sheet-snowt)\"></rect><rect x=\"34\" y=\"91\" width=\"52\" height=\"3.5\" fill=\"#F4F4F4\" clip-path=\"url(#sheet-snowt)\"></rect><rect x=\"34\" y=\"98\" width=\"52\" height=\"3.5\" fill=\"#F4F4F4\" clip-path=\"url(#sheet-snowt)\"></rect><rect x=\"34\" y=\"105\" width=\"52\" height=\"3.5\" fill=\"#F4F4F4\" clip-path=\"url(#sheet-snowt)\"></rect><rect x=\"24\" y=\"70\" width=\"12\" height=\"30\" rx=\"6\" fill=\"#2FB59A\" stroke=\"#0C4B5F\" stroke-width=\"2.5\"></rect><rect x=\"84\" y=\"70\" width=\"12\" height=\"30\" rx=\"6\" fill=\"#2FB59A\" stroke=\"#0C4B5F\" stroke-width=\"2.5\"></rect><circle cx=\"30\" cy=\"101\" r=\"5.5\" fill=\"#F6DCC6\" stroke=\"#0C4B5F\" stroke-width=\"2\"></circle><circle cx=\"90\" cy=\"101\" r=\"5.5\" fill=\"#F6DCC6\" stroke=\"#0C4B5F\" stroke-width=\"2\"></circle><path d=\"M50 66 Q60 74 70 66\" fill=\"none\" stroke=\"#0C4B5F\" stroke-width=\"2\"></path><path d=\"M50 68 Q60 80 70 68\" fill=\"none\" stroke=\"#d9dcdf\" stroke-width=\"1.5\"></path><circle cx=\"60\" cy=\"79\" r=\"2\" fill=\"#d9dcdf\"></circle><rect x=\"54\" y=\"58\" width=\"12\" height=\"12\" fill=\"#F6DCC6\"></rect><circle cx=\"60\" cy=\"40\" r=\"25\" fill=\"#F6DCC6\" stroke=\"#0C4B5F\" stroke-width=\"2.5\"></circle><circle cx=\"36\" cy=\"42\" r=\"4\" fill=\"#F6DCC6\" stroke=\"#0C4B5F\" stroke-width=\"2\"></circle><circle cx=\"84\" cy=\"42\" r=\"4\" fill=\"#F6DCC6\" stroke=\"#0C4B5F\" stroke-width=\"2\"></circle><path d=\"M34 42 C32 16 50 10 62 12 C76 12 88 18 86 42 C82 30 72 26 60 26 C48 26 40 30 34 42 Z\" fill=\"#C9A366\" stroke=\"#0C4B5F\" stroke-width=\"2.5\"></path><path d=\"M46 34 L54 33 M66 33 L74 34\" stroke=\"#0C4B5F\" stroke-width=\"2\" stroke-linecap=\"round\"></path><circle cx=\"51\" cy=\"41\" r=\"2.4\" fill=\"#161719\"></circle><circle cx=\"69\" cy=\"41\" r=\"2.4\" fill=\"#161719\"></circle><path d=\"M50 51 Q60 60 70 51\" fill=\"none\" stroke=\"#0C4B5F\" stroke-width=\"2.5\" stroke-linecap=\"round\"></path><path d=\"M52 52 Q60 58 68 52 Z\" fill=\"#F4F4F4\"></path><path d=\"M32 40 C30 14 90 14 88 40\" fill=\"none\" stroke=\"#0C4B5F\" stroke-width=\"5\"></path><rect x=\"26\" y=\"34\" width=\"11\" height=\"17\" rx=\"4\" fill=\"#00BDFF\" stroke=\"#0C4B5F\" stroke-width=\"2\"></rect><rect x=\"83\" y=\"34\" width=\"11\" height=\"17\" rx=\"4\" fill=\"#00BDFF\" stroke=\"#0C4B5F\" stroke-width=\"2\"></rect>";["sheet-snowt"].forEach(id=>{s=s.split('"'+id+'"').join('"'+id+u+'"').split('#'+id+')').join('#'+id+u+')');});return s;}
+  if(k==='kneeland'){let s="<path d=\"M31 34 C27 44 29 50 34 54 L86 54 C91 50 93 44 89 34 Z\" fill=\"#543b28\" stroke=\"#0C4B5F\" stroke-width=\"2.5\"/><rect x=\"46\" y=\"104\" width=\"12\" height=\"18\" rx=\"3\" fill=\"#1d1f22\" stroke=\"#0C4B5F\" stroke-width=\"2\"/><rect x=\"62\" y=\"104\" width=\"12\" height=\"18\" rx=\"3\" fill=\"#1d1f22\" stroke=\"#0C4B5F\" stroke-width=\"2\"/><rect x=\"43\" y=\"118\" width=\"17\" height=\"7\" rx=\"3.5\" fill=\"#0f1012\" stroke=\"#0C4B5F\" stroke-width=\"2\"/><rect x=\"60\" y=\"118\" width=\"17\" height=\"7\" rx=\"3.5\" fill=\"#0f1012\" stroke=\"#0C4B5F\" stroke-width=\"2\"/><clipPath id=\"Ut\"><rect x=\"34\" y=\"66\" width=\"52\" height=\"44\" rx=\"12\"/></clipPath><rect x=\"34\" y=\"66\" width=\"52\" height=\"44\" rx=\"12\" fill=\"#E8706A\" stroke=\"#0C4B5F\" stroke-width=\"2.5\"/><path d=\"M53 66 L60 74 L67 66\" fill=\"none\" stroke=\"#0C4B5F\" stroke-width=\"2\"/><rect x=\"54\" y=\"58\" width=\"12\" height=\"12\" fill=\"#F6DCC6\"/><circle cx=\"60\" cy=\"40\" r=\"25\" fill=\"#F6DCC6\" stroke=\"#0C4B5F\" stroke-width=\"2.5\"/><circle cx=\"36\" cy=\"42\" r=\"4\" fill=\"#F6DCC6\" stroke=\"#0C4B5F\" stroke-width=\"2\"/><circle cx=\"84\" cy=\"42\" r=\"4\" fill=\"#F6DCC6\" stroke=\"#0C4B5F\" stroke-width=\"2\"/><path d=\"M32 48 C24 22 40 7 60 8 C80 7 96 22 88 48 C86 37 81 31 75 28 C69 33 54 34 46 29 C40 31 35 38 32 48 Z\" fill=\"#543b28\" stroke=\"#0C4B5F\" stroke-width=\"2.5\"/><path d=\"M44 16 Q51 22 58 15 M62 13 Q69 19 77 14 M40 25 Q46 29 52 24\" fill=\"none\" stroke=\"#735438\" stroke-width=\"2\" stroke-linecap=\"round\"/><path d=\"M46 34 L54 33 M66 33 L74 34\" stroke=\"#0C4B5F\" stroke-width=\"2\" stroke-linecap=\"round\"/><circle cx=\"51\" cy=\"41\" r=\"2.4\" fill=\"#161719\"/><circle cx=\"69\" cy=\"41\" r=\"2.4\" fill=\"#161719\"/><path d=\"M52 54 L68 54\" stroke=\"#0C4B5F\" stroke-width=\"2.5\" stroke-linecap=\"round\"/><path d=\"M48 66 L56 74 M72 66 L64 74\" stroke=\"#F4F4F4\" stroke-width=\"1.6\"/><circle cx=\"49\" cy=\"50\" r=\"4.5\" fill=\"#F6DCC6\" opacity=\".9\"/><circle cx=\"71\" cy=\"50\" r=\"4.5\" fill=\"#F6DCC6\" opacity=\".9\"/><circle cx=\"49\" cy=\"50\" r=\"4.5\" fill=\"#E8706A\" opacity=\".18\"/><circle cx=\"71\" cy=\"50\" r=\"4.5\" fill=\"#E8706A\" opacity=\".18\"/><path d=\"M36 72 C30 80 40 74 58 64\" fill=\"none\" stroke=\"#0C4B5F\" stroke-width=\"13\" stroke-linecap=\"round\"/><path d=\"M36 72 C30 80 40 74 58 64\" fill=\"none\" stroke=\"#E8706A\" stroke-width=\"9\" stroke-linecap=\"round\"/><path d=\"M84 72 C92 78 88 70 82 62\" fill=\"none\" stroke=\"#0C4B5F\" stroke-width=\"13\" stroke-linecap=\"round\"/><path d=\"M84 72 C92 78 88 70 82 62\" fill=\"none\" stroke=\"#E8706A\" stroke-width=\"9\" stroke-linecap=\"round\"/><rect x=\"59\" y=\"52\" width=\"5\" height=\"3\" rx=\"1\" fill=\"#B8962E\" stroke=\"#0C4B5F\" stroke-width=\"1.8\"/><path d=\"M63 52.5 H96 M63 56.5 H96\" stroke=\"#0C4B5F\" stroke-width=\"5.5\"/><path d=\"M63 52.5 H96 M63 56.5 H96\" stroke=\"#E8C547\" stroke-width=\"2.8\"/><rect x=\"66\" y=\"58\" width=\"22\" height=\"8\" rx=\"3\" fill=\"none\" stroke=\"#0C4B5F\" stroke-width=\"4.5\"/><rect x=\"66\" y=\"58\" width=\"22\" height=\"8\" rx=\"3\" fill=\"none\" stroke=\"#E8C547\" stroke-width=\"2\"/><rect x=\"71\" y=\"47\" width=\"3.5\" height=\"12\" fill=\"#B8962E\" stroke=\"#0C4B5F\" stroke-width=\"1.8\"/><rect x=\"76\" y=\"47\" width=\"3.5\" height=\"12\" fill=\"#B8962E\" stroke=\"#0C4B5F\" stroke-width=\"1.8\"/><rect x=\"81\" y=\"47\" width=\"3.5\" height=\"12\" fill=\"#B8962E\" stroke=\"#0C4B5F\" stroke-width=\"1.8\"/><path d=\"M95 54.5 L112 44 Q116 54.5 112 65 Z\" fill=\"#E8C547\" stroke=\"#0C4B5F\" stroke-width=\"1.8\"/><ellipse cx=\"112.5\" cy=\"54.5\" rx=\"3\" ry=\"10.5\" fill=\"#B8962E\" stroke=\"#0C4B5F\" stroke-width=\"1.8\"/><circle cx=\"60\" cy=\"62\" r=\"5.5\" fill=\"#F6DCC6\" stroke=\"#0C4B5F\" stroke-width=\"2\"/><circle cx=\"80\" cy=\"60\" r=\"5.5\" fill=\"#F6DCC6\" stroke=\"#0C4B5F\" stroke-width=\"2\"/><path d=\"M104 30 q3 -6 7 -2 v8 M112 24 q3 -6 7 -2 v8\" fill=\"none\" stroke=\"#00BDFF\" stroke-width=\"2\" stroke-linecap=\"round\"/><circle cx=\"110\" cy=\"36\" r=\"2.2\" fill=\"#00BDFF\"/><circle cx=\"118\" cy=\"30\" r=\"2.2\" fill=\"#00BDFF\"/>";["Ut"].forEach(id=>{s=s.split('"'+id+'"').join('"'+id+u+'"').split('#'+id+')').join('#'+id+u+')');});return s;}
+  if(k==='steven'){let s="<rect x=\"46\" y=\"104\" width=\"12\" height=\"18\" rx=\"3\" fill=\"#1d1f22\" stroke=\"#0C4B5F\" stroke-width=\"2\"></rect><rect x=\"62\" y=\"104\" width=\"12\" height=\"18\" rx=\"3\" fill=\"#1d1f22\" stroke=\"#0C4B5F\" stroke-width=\"2\"></rect><rect x=\"43\" y=\"118\" width=\"17\" height=\"7\" rx=\"3.5\" fill=\"#0f1012\" stroke=\"#0C4B5F\" stroke-width=\"2\"></rect><rect x=\"60\" y=\"118\" width=\"17\" height=\"7\" rx=\"3.5\" fill=\"#0f1012\" stroke=\"#0C4B5F\" stroke-width=\"2\"></rect><clipPath id=\"sheet-stevent\"><rect x=\"34\" y=\"66\" width=\"52\" height=\"44\" rx=\"12\"></rect></clipPath><rect x=\"34\" y=\"66\" width=\"52\" height=\"44\" rx=\"12\" fill=\"#2B3557\" stroke=\"#0C4B5F\" stroke-width=\"2.5\"></rect><circle cx=\"41\" cy=\"71\" r=\"1.2\" fill=\"#F4F4F4\" clip-path=\"url(#sheet-stevent)\" opacity=\".9\"></circle><circle cx=\"48\" cy=\"71\" r=\"1.2\" fill=\"#F4F4F4\" clip-path=\"url(#sheet-stevent)\" opacity=\".9\"></circle><circle cx=\"55\" cy=\"71\" r=\"1.2\" fill=\"#F4F4F4\" clip-path=\"url(#sheet-stevent)\" opacity=\".9\"></circle><circle cx=\"62\" cy=\"71\" r=\"1.2\" fill=\"#F4F4F4\" clip-path=\"url(#sheet-stevent)\" opacity=\".9\"></circle><circle cx=\"69\" cy=\"71\" r=\"1.2\" fill=\"#F4F4F4\" clip-path=\"url(#sheet-stevent)\" opacity=\".9\"></circle><circle cx=\"76\" cy=\"71\" r=\"1.2\" fill=\"#F4F4F4\" clip-path=\"url(#sheet-stevent)\" opacity=\".9\"></circle><circle cx=\"83\" cy=\"71\" r=\"1.2\" fill=\"#F4F4F4\" clip-path=\"url(#sheet-stevent)\" opacity=\".9\"></circle><circle cx=\"41\" cy=\"78\" r=\"1.2\" fill=\"#F4F4F4\" clip-path=\"url(#sheet-stevent)\" opacity=\".9\"></circle><circle cx=\"48\" cy=\"78\" r=\"1.2\" fill=\"#F4F4F4\" clip-path=\"url(#sheet-stevent)\" opacity=\".9\"></circle><circle cx=\"55\" cy=\"78\" r=\"1.2\" fill=\"#F4F4F4\" clip-path=\"url(#sheet-stevent)\" opacity=\".9\"></circle><circle cx=\"62\" cy=\"78\" r=\"1.2\" fill=\"#F4F4F4\" clip-path=\"url(#sheet-stevent)\" opacity=\".9\"></circle><circle cx=\"69\" cy=\"78\" r=\"1.2\" fill=\"#F4F4F4\" clip-path=\"url(#sheet-stevent)\" opacity=\".9\"></circle><circle cx=\"76\" cy=\"78\" r=\"1.2\" fill=\"#F4F4F4\" clip-path=\"url(#sheet-stevent)\" opacity=\".9\"></circle><circle cx=\"83\" cy=\"78\" r=\"1.2\" fill=\"#F4F4F4\" clip-path=\"url(#sheet-stevent)\" opacity=\".9\"></circle><circle cx=\"41\" cy=\"85\" r=\"1.2\" fill=\"#F4F4F4\" clip-path=\"url(#sheet-stevent)\" opacity=\".9\"></circle><circle cx=\"48\" cy=\"85\" r=\"1.2\" fill=\"#F4F4F4\" clip-path=\"url(#sheet-stevent)\" opacity=\".9\"></circle><circle cx=\"55\" cy=\"85\" r=\"1.2\" fill=\"#F4F4F4\" clip-path=\"url(#sheet-stevent)\" opacity=\".9\"></circle><circle cx=\"62\" cy=\"85\" r=\"1.2\" fill=\"#F4F4F4\" clip-path=\"url(#sheet-stevent)\" opacity=\".9\"></circle><circle cx=\"69\" cy=\"85\" r=\"1.2\" fill=\"#F4F4F4\" clip-path=\"url(#sheet-stevent)\" opacity=\".9\"></circle><circle cx=\"76\" cy=\"85\" r=\"1.2\" fill=\"#F4F4F4\" clip-path=\"url(#sheet-stevent)\" opacity=\".9\"></circle><circle cx=\"83\" cy=\"85\" r=\"1.2\" fill=\"#F4F4F4\" clip-path=\"url(#sheet-stevent)\" opacity=\".9\"></circle><circle cx=\"41\" cy=\"92\" r=\"1.2\" fill=\"#F4F4F4\" clip-path=\"url(#sheet-stevent)\" opacity=\".9\"></circle><circle cx=\"48\" cy=\"92\" r=\"1.2\" fill=\"#F4F4F4\" clip-path=\"url(#sheet-stevent)\" opacity=\".9\"></circle><circle cx=\"55\" cy=\"92\" r=\"1.2\" fill=\"#F4F4F4\" clip-path=\"url(#sheet-stevent)\" opacity=\".9\"></circle><circle cx=\"62\" cy=\"92\" r=\"1.2\" fill=\"#F4F4F4\" clip-path=\"url(#sheet-stevent)\" opacity=\".9\"></circle><circle cx=\"69\" cy=\"92\" r=\"1.2\" fill=\"#F4F4F4\" clip-path=\"url(#sheet-stevent)\" opacity=\".9\"></circle><circle cx=\"76\" cy=\"92\" r=\"1.2\" fill=\"#F4F4F4\" clip-path=\"url(#sheet-stevent)\" opacity=\".9\"></circle><circle cx=\"83\" cy=\"92\" r=\"1.2\" fill=\"#F4F4F4\" clip-path=\"url(#sheet-stevent)\" opacity=\".9\"></circle><circle cx=\"41\" cy=\"99\" r=\"1.2\" fill=\"#F4F4F4\" clip-path=\"url(#sheet-stevent)\" opacity=\".9\"></circle><circle cx=\"48\" cy=\"99\" r=\"1.2\" fill=\"#F4F4F4\" clip-path=\"url(#sheet-stevent)\" opacity=\".9\"></circle><circle cx=\"55\" cy=\"99\" r=\"1.2\" fill=\"#F4F4F4\" clip-path=\"url(#sheet-stevent)\" opacity=\".9\"></circle><circle cx=\"62\" cy=\"99\" r=\"1.2\" fill=\"#F4F4F4\" clip-path=\"url(#sheet-stevent)\" opacity=\".9\"></circle><circle cx=\"69\" cy=\"99\" r=\"1.2\" fill=\"#F4F4F4\" clip-path=\"url(#sheet-stevent)\" opacity=\".9\"></circle><circle cx=\"76\" cy=\"99\" r=\"1.2\" fill=\"#F4F4F4\" clip-path=\"url(#sheet-stevent)\" opacity=\".9\"></circle><circle cx=\"83\" cy=\"99\" r=\"1.2\" fill=\"#F4F4F4\" clip-path=\"url(#sheet-stevent)\" opacity=\".9\"></circle><circle cx=\"41\" cy=\"106\" r=\"1.2\" fill=\"#F4F4F4\" clip-path=\"url(#sheet-stevent)\" opacity=\".9\"></circle><circle cx=\"48\" cy=\"106\" r=\"1.2\" fill=\"#F4F4F4\" clip-path=\"url(#sheet-stevent)\" opacity=\".9\"></circle><circle cx=\"55\" cy=\"106\" r=\"1.2\" fill=\"#F4F4F4\" clip-path=\"url(#sheet-stevent)\" opacity=\".9\"></circle><circle cx=\"62\" cy=\"106\" r=\"1.2\" fill=\"#F4F4F4\" clip-path=\"url(#sheet-stevent)\" opacity=\".9\"></circle><circle cx=\"69\" cy=\"106\" r=\"1.2\" fill=\"#F4F4F4\" clip-path=\"url(#sheet-stevent)\" opacity=\".9\"></circle><circle cx=\"76\" cy=\"106\" r=\"1.2\" fill=\"#F4F4F4\" clip-path=\"url(#sheet-stevent)\" opacity=\".9\"></circle><circle cx=\"83\" cy=\"106\" r=\"1.2\" fill=\"#F4F4F4\" clip-path=\"url(#sheet-stevent)\" opacity=\".9\"></circle><path d=\"M34 78 L34 110 L52 110 L54 72 L44 66 Z\" fill=\"#161719\" stroke=\"#0C4B5F\" stroke-width=\"2.5\"></path><path d=\"M86 78 L86 110 L68 110 L66 72 L76 66 Z\" fill=\"#161719\" stroke=\"#0C4B5F\" stroke-width=\"2.5\"></path><g transform=\"translate(44 82)\"><path d=\"M0 -6 C5 -6 7 -3 7 0 C7 4 3 7 0 8 C-3 7 -7 4 -7 0 C-7 -3 -5 -6 0 -6 Z\" fill=\"#7ED957\" stroke=\"#0C4B5F\" stroke-width=\"1.5\"></path><ellipse cx=\"-3\" cy=\"0\" rx=\"2.3\" ry=\"1.3\" transform=\"rotate(30 -3 0)\" fill=\"#161719\"></ellipse><ellipse cx=\"3\" cy=\"0\" rx=\"2.3\" ry=\"1.3\" transform=\"rotate(-30 3 0)\" fill=\"#161719\"></ellipse></g><rect x=\"24\" y=\"70\" width=\"12\" height=\"30\" rx=\"6\" fill=\"#161719\" stroke=\"#0C4B5F\" stroke-width=\"2.5\"></rect><rect x=\"84\" y=\"70\" width=\"12\" height=\"30\" rx=\"6\" fill=\"#161719\" stroke=\"#0C4B5F\" stroke-width=\"2.5\"></rect><circle cx=\"30\" cy=\"101\" r=\"5.5\" fill=\"#E4B896\" stroke=\"#0C4B5F\" stroke-width=\"2\"></circle><circle cx=\"90\" cy=\"101\" r=\"5.5\" fill=\"#E4B896\" stroke=\"#0C4B5F\" stroke-width=\"2\"></circle><path d=\"M50 66 Q60 74 70 66\" fill=\"none\" stroke=\"#0C4B5F\" stroke-width=\"2\"></path><rect x=\"54\" y=\"58\" width=\"12\" height=\"12\" fill=\"#E4B896\"></rect><circle cx=\"60\" cy=\"40\" r=\"25\" fill=\"#E4B896\" stroke=\"#0C4B5F\" stroke-width=\"2.5\"></circle><circle cx=\"36\" cy=\"42\" r=\"4\" fill=\"#E4B896\" stroke=\"#0C4B5F\" stroke-width=\"2\"></circle><circle cx=\"84\" cy=\"42\" r=\"4\" fill=\"#E4B896\" stroke=\"#0C4B5F\" stroke-width=\"2\"></circle><path d=\"M35 34 C32 14 48 8 62 10 C78 12 88 18 85 34 C80 24 40 22 35 34 Z\" fill=\"#6E7075\" stroke=\"#0C4B5F\" stroke-width=\"2.5\"></path><path d=\"M46 34 L54 33 M66 33 L74 34\" stroke=\"#0C4B5F\" stroke-width=\"2\" stroke-linecap=\"round\"></path><circle cx=\"51\" cy=\"41\" r=\"2.4\" fill=\"#161719\"></circle><circle cx=\"69\" cy=\"41\" r=\"2.4\" fill=\"#161719\"></circle><path d=\"M52 53 Q62 58 68 52\" fill=\"none\" stroke=\"#0C4B5F\" stroke-width=\"2.5\" stroke-linecap=\"round\"></path>";["sheet-stevent"].forEach(id=>{s=s.split('"'+id+'"').join('"'+id+u+'"').split('#'+id+')').join('#'+id+u+')');});return s;}
+
+  if(k==='lynch'){const B='#7A4A26',D='#4A2C14',T='#E2B47A';o+='<path d="M45 110 H59 V118 L63 119 Q65 120 65 123 V125 H43 V120 Q43 118 45 117 Z" fill="'+B+'" stroke="#0C4B5F" stroke-width="2"/><path d="M61 110 H75 V117 Q77 118 77 120 V125 H55 V123 Q55 120 57 119 L61 118 Z" fill="'+B+'" stroke="#0C4B5F" stroke-width="2"/><rect x="43" y="122" width="5" height="3" fill="'+D+'"/><rect x="72" y="122" width="5" height="3" fill="'+D+'"/><path d="M48 112 L52 115 L56 112 M64 112 L68 115 L72 112" fill="none" stroke="'+T+'" stroke-width="1.4"/>';}
+  if(k==='marcum'){o+='<rect x="88" y="80" width="14" height="22" rx="2.5" fill="#1E4FA0" stroke="#0C4B5F" stroke-width="2"/><ellipse cx="95" cy="81" rx="7" ry="2" fill="#C9CDD3" stroke="#0C4B5F" stroke-width="1.5"/><circle cx="95" cy="91" r="4.2" fill="#F4F4F4" stroke="#0C4B5F" stroke-width=".8"/><path d="M90.9 90.2 Q95 88 99.1 90.2 A4.2 4.2 0 0 0 90.9 90.2 Z" fill="#D6262E"/><path d="M90.9 92 Q95 94.4 99.1 92 A4.2 4.2 0 0 1 90.9 92 Z" fill="#1E4FA0"/><path d="M93 84 L97 84" stroke="#F4F4F4" stroke-width="1.2"/><circle cx="87" cy="92" r="5.5" fill="#F6DCC6" stroke="#0C4B5F" stroke-width="2"/>';}
+  if(k==='higgins'){const m='<path d="M46 34 L54 33';const i=o.indexOf(m);const hair="<circle cx=\"40\" cy=\"26\" r=\"7\" fill=\"#4A3326\" stroke=\"#0C4B5F\" stroke-width=\"1.5\"></circle><circle cx=\"48\" cy=\"19\" r=\"7\" fill=\"#4A3326\" stroke=\"#0C4B5F\" stroke-width=\"1.5\"></circle><circle cx=\"57\" cy=\"15\" r=\"7.5\" fill=\"#4A3326\" stroke=\"#0C4B5F\" stroke-width=\"1.5\"></circle><circle cx=\"67\" cy=\"16\" r=\"7.5\" fill=\"#4A3326\" stroke=\"#0C4B5F\" stroke-width=\"1.5\"></circle><circle cx=\"76\" cy=\"21\" r=\"7\" fill=\"#4A3326\" stroke=\"#0C4B5F\" stroke-width=\"1.5\"></circle><circle cx=\"82\" cy=\"29\" r=\"6\" fill=\"#4A3326\" stroke=\"#0C4B5F\" stroke-width=\"1.5\"></circle><circle cx=\"37\" cy=\"33\" r=\"5\" fill=\"#4A3326\" stroke=\"#0C4B5F\" stroke-width=\"1.5\"></circle><circle cx=\"62\" cy=\"22\" r=\"6\" fill=\"#4A3326\" stroke=\"#0C4B5F\" stroke-width=\"1.5\"></circle><circle cx=\"50\" cy=\"25\" r=\"5\" fill=\"#4A3326\" stroke=\"#0C4B5F\" stroke-width=\"1.5\"></circle><circle cx=\"72\" cy=\"26\" r=\"5\" fill=\"#4A3326\" stroke=\"#0C4B5F\" stroke-width=\"1.5\"></circle><circle cx=\"62\" cy=\"22\" r=\"6\" fill=\"#4A3326\"></circle><circle cx=\"50\" cy=\"25\" r=\"5\" fill=\"#4A3326\"></circle><circle cx=\"72\" cy=\"26\" r=\"5\" fill=\"#4A3326\"></circle><circle cx=\"57\" cy=\"20\" r=\"6\" fill=\"#4A3326\"></circle><circle cx=\"67\" cy=\"21\" r=\"6\" fill=\"#4A3326\"></circle>";o=i>=0?o.slice(0,i)+hair+o.slice(i):o+hair;}
+  if(k==='macfarlane'){o=o.split('#2b2118').join('#120d0a');}
+  if(k==='milliken'){
+    const rf=(cx,cy,rx,ry,n,a)=>{let d='';for(let i=0;i<=n*2;i++){const t=Math.PI*2*i/(n*2),q=i%2,x=cx+(rx+q*a)*Math.cos(t),y=cy+(ry+q*a)*Math.sin(t);d+=(i===0?'M':(q?'Q':' '))+x.toFixed(1)+' '+y.toFixed(1)+(q?' ':'');}return d+'Z';};
+    const G='#2E6B34',G2='#3F8A45',V='#A8D08D',S='stroke="#0C4B5F" stroke-width="2.2"';
+    let c='<path d="'+rf(60,40,33,33,12,5)+'" fill="'+G+'" '+S+'/><path d="'+rf(60,40,28,28,10,3)+'" fill="'+G2+'"/>';
+    c+='<path d="'+rf(29,84,8,17,6,3)+'" fill="'+G+'" '+S+'/><path d="'+rf(91,84,8,17,6,3)+'" fill="'+G+'" '+S+'/>';
+    c+='<path d="'+rf(60,87,27,24,14,4)+'" fill="'+G2+'" '+S+'/>';
+    c+='<path d="M60 66 V110 M60 76 L46 70 M60 76 L74 70 M60 88 L42 82 M60 88 L78 82 M60 100 L46 96 M60 100 L74 96" fill="none" stroke="'+V+'" stroke-width="2" stroke-linecap="round"/>';
+    const m='<rect x="54" y="58"';const i=o.indexOf(m);o=i>=0?o.slice(0,i)+c+o.slice(i):o;
+  }
+  if(k==='schoen'){o=o.split('#E5C27A').join('#C9935A');o+='<path d="M50 66 L60 76 L70 66" fill="#F4F4F4" stroke="#0C4B5F" stroke-width="1.5"/><path d="M48 66 L60 79 L72 66" fill="none" stroke="#B8323A" stroke-width="1.6"/>';}
+  return o;
+}
+const HUM=(p,u)=>jgMod(p.key,human(p.spec,u),u);
+document.getElementById('count').textContent=REMOTE.length;
+
+/* ---------- room shell (same iso grid as HQ rooms) ---------- */
+const S=50,OX=800,OY=250,W=12,D=10,H=4.4;
+const P=(x,y,z=0)=>[OX+(x-y)*S,OY+(x+y)*S/2-z*S];
+const pts=a=>a.map(p=>p.map(n=>+n.toFixed(1)).join(',')).join(' ');
+let r='<rect width="1600" height="900" fill="#0E1013"/>';
+r+='<polygon points="'+pts([P(0,D),P(W,D),P(W,D,-.35),P(0,D,-.35)])+'" fill="#0b0c0e"/>';
+r+='<polygon points="'+pts([P(W,0),P(W,D),P(W,D,-.35),P(W,0,-.35)])+'" fill="#08090a"/>';
+for(let x=0;x<W;x++)for(let y=0;y<D;y++)r+='<polygon points="'+pts([P(x,y),P(x+1,y),P(x+1,y+1),P(x,y+1)])+'" fill="'+((x+y)%2?'#BFE3F0':'#d3ebf3')+'"/>';
+r+='<polygon points="'+pts([P(0,0),P(0,D),P(0,D,H),P(0,0,H)])+'" fill="#1a1c1f"/>';
+r+='<polygon points="'+pts([P(0,0),P(W,0),P(W,0,H),P(0,0,H)])+'" fill="#222528"/>';
+r+='<polygon points="'+pts([P(0,0),P(0,D),P(0,D,2),P(0,0,2)])+'" fill="#0C4B5F" opacity=".55"/>';
+r+='<polygon points="'+pts([P(0,0),P(W,0),P(W,0,2),P(0,0,2)])+'" fill="#0C4B5F" opacity=".4"/>';
+r+='<polyline points="'+pts([P(W,0),P(0,0),P(0,D)])+'" fill="none" stroke="#0C4B5F" stroke-width="5"/>';
+r+='<polyline points="'+pts([P(W,0,H),P(0,0,H),P(0,D,H)])+'" fill="none" stroke="#0C4B5F" stroke-width="3"/>';
+r+='<polyline points="'+pts([P(W,0,2),P(0,0,2),P(0,D,2)])+'" fill="none" stroke="#00BDFF" stroke-width="2" opacity=".6"/>';
+// wall signs
+const [sx,sy]=P(6.8,0,3.1);
+r+='<g transform="matrix(1 .5 0 1 '+sx+' '+sy+')"><rect x="-120" y="-34" width="240" height="68" fill="#161719" stroke="#00BDFF" stroke-width="3"/><text x="0" y="-4" text-anchor="middle" font-family="Bumbastika, Anton, sans-serif" font-size="22" fill="#00BDFF">WFH</text><text x="0" y="20" text-anchor="middle" font-family="Anton, Impact, sans-serif" font-size="11" letter-spacing="2" fill="#F4F4F4">WORK FROM HOME(ICE)</text></g>';
+const [tx,ty]=P(0,4.5,3.1);
+r+='<g transform="matrix(1 -.5 0 1 '+tx+' '+ty+')"><rect x="-90" y="-30" width="180" height="60" fill="#F4F4F4" stroke="#0C4B5F" stroke-width="4"/><text x="0" y="-4" text-anchor="middle" font-family="Anton, Impact, sans-serif" font-size="12" letter-spacing="2" fill="#0C4B5F">HQ</text><text x="0" y="16" text-anchor="middle" font-family="Anton, Impact, sans-serif" font-size="14" letter-spacing="1" fill="#161719">SCHENECTADY, NY</text></g>';
+// pedestal (hex) under globe
+const PC=[6.2,4.8];
+const hex=(rad,z)=>{const a=[];for(let k=0;k<6;k++){const t=Math.PI/3*k+Math.PI/6;a.push(P(PC[0]+rad*Math.cos(t),PC[1]+rad*Math.sin(t),z));}return a;};
+const top=hex(1.5,.9),bot=hex(1.5,0);
+r+='<ellipse cx="'+P(...PC)[0]+'" cy="'+(P(...PC)[1]+6)+'" rx="150" ry="60" fill="#000" opacity=".25"/>';
+for(let k=0;k<6;k++){const k2=(k+1)%6;r+='<polygon points="'+pts([bot[k],bot[k2],top[k2],top[k]])+'" fill="'+['#0C4B5F','#0a3d4d','#082f3c','#082f3c','#0a3d4d','#0C4B5F'][k]+'" stroke="#06303D" stroke-width="2"/>';}
+r+='<polygon points="'+pts(top)+'" fill="#161719" stroke="#00BDFF" stroke-width="3"/>';
+r+='<polygon points="'+pts(hex(1.05,.9))+'" fill="none" stroke="#0C4B5F" stroke-width="3"/>';
+document.getElementById('room').innerHTML=r;
+
+/* ---------- globe ---------- */
+const [gcx,pTopY]=P(...PC,.9);
+const R=175,GC=[gcx,pTopY-R-6];
+const gG=d3.select('#globeG');
+d3.select('#clipC').attr('cx',GC[0]).attr('cy',GC[1]).attr('r',R);
+gG.append('ellipse').attr('cx',GC[0]).attr('cy',pTopY-4).attr('rx',70).attr('ry',18).attr('fill','#00BDFF').attr('opacity',.35);
+gG.append('rect').attr('x',GC[0]-10).attr('y',GC[1]+R-8).attr('width',20).attr('height',pTopY-GC[1]-R+4).attr('fill','#494949').attr('stroke','#0C4B5F').attr('stroke-width',2);
+gG.append('circle').attr('cx',GC[0]).attr('cy',GC[1]).attr('r',R+26).attr('fill','url(#glow)');
+const body=gG.append('g').attr('clip-path','url(#globeClip)');
+body.append('circle').attr('cx',GC[0]).attr('cy',GC[1]).attr('r',R).attr('fill','url(#ocean)');
+const gratP=body.append('path').attr('fill','none').attr('stroke','#00BDFF').attr('stroke-opacity',.18).attr('stroke-width',1);
+const landP=body.append('path').attr('fill','#d3ebf3').attr('stroke','#0C4B5F').attr('stroke-width',1.2);
+const statesP=body.append('path').attr('fill','none').attr('stroke','#0C4B5F').attr('stroke-opacity',.35).attr('stroke-width',.8);
+const arcs=body.append('g');
+const pinsG=body.append('g');
+gG.append('circle').attr('cx',GC[0]).attr('cy',GC[1]).attr('r',R).attr('fill','url(#shine)').attr('pointer-events','none');
+gG.append('circle').attr('cx',GC[0]).attr('cy',GC[1]).attr('r',R).attr('fill','none').attr('stroke','#00BDFF').attr('stroke-width',4);
+// meridian ring
+gG.append('path').attr('d','M'+(GC[0]-R-14)+','+GC[1]+' A'+(R+14)+','+(R+14)+' 0 0 1 '+(GC[0]+R+14)+','+GC[1]).attr('fill','none').attr('stroke','#494949').attr('stroke-width',8).attr('stroke-linecap','round').attr('transform','rotate(-23 '+GC[0]+' '+GC[1]+')');
+
+const proj=d3.geoOrthographic().translate(GC).scale(R).clipAngle(90).precision(.3);
+const path=d3.geoPath(proj);
+const grat=d3.geoGraticule10();
+let land=null,borders=null;
+let view={lon:60,lat:-28,k:1};
+let spinning=true,sel=-1;
+
+const hexPts=(cx,cy,rad)=>{const a=[];for(let i=0;i<6;i++){const t=Math.PI/3*i-Math.PI/2;a.push([cx+rad*Math.cos(t),cy+rad*Math.sin(t)]);}return a.map(p=>p.join(',')).join(' ');};
+const pinData=[{...HQ,hq:true,name:'JG HQ'}].concat(REMOTE.map((p,i)=>({...p,i})));
+const pins=pinsG.selectAll('g').data(pinData).enter().append('g').attr('class','pin')
+  .on('click',(e,d)=>{if(!d.hq)fly(d.i);});
+pins.append('line').attr('class','stem').attr('stroke','#161719').attr('stroke-width',2);
+pins.append('polygon').attr('class','hx');
+pins.append('g').attr('class','lbl');
+
+function draw(){
+  proj.rotate([-view.lon,-view.lat]).scale(R*view.k);
+  gratP.attr('d',path(grat));
+  if(land)landP.attr('d',path(land));
+  statesP.attr('d',borders&&view.k>2?path(borders):null);
+  const zoomed=view.k>2.2;
+  const c=[view.lon,view.lat];
+  // arcs HQ -> each remote
+  const arcD=REMOTE.map(p=>path({type:'LineString',coordinates:[[HQ.lon,HQ.lat],[p.lon,p.lat]]})).filter(Boolean);
+  const as=arcs.selectAll('path').data(arcD);
+  as.enter().append('path').attr('fill','none').attr('stroke','#00BDFF').attr('stroke-width',2).attr('stroke-dasharray','5 5').merge(as).attr('d',d=>d).attr('opacity',zoomed?.9:.6);
+  as.exit().remove();
+  pins.each(function(d){
+    const vis=d3.geoDistance([d.lon,d.lat],c)<Math.PI/2-.02;
+    const g=d3.select(this).attr('display',vis?null:'none');
+    if(!vis)return;
+    const [x,y]=proj([d.lon,d.lat]);
+    const big=zoomed?1.6:1, on=d.i===sel;
+    const h=(d.hq?14:10)*big;
+    g.select('.stem').attr('x1',x).attr('y1',y).attr('x2',x).attr('y2',y-h*1.4);
+    g.select('.hx').attr('points',hexPts(x,y-h*1.4-h*.2,h*(on?1.3:1)))
+      .attr('fill',d.hq?'#F4F4F4':(on?'#F4F4F4':'#00BDFF')).attr('stroke','#161719').attr('stroke-width',2.5);
+    const L=g.select('.lbl');
+    if(zoomed||d.hq&&!zoomed){
+      const t=d.hq?'HQ':d.name.split(' ')[0];
+      const tw=t.length*7.4+18;
+      L.html('<rect x="'+(x-tw/2)+'" y="'+(y-h*3.2-18)+'" width="'+tw+'" height="20" rx="10" fill="'+(on?'#00BDFF':'#161719')+'" stroke="#0C4B5F" stroke-width="2"/><text x="'+x+'" y="'+(y-h*3.2-4)+'" text-anchor="middle" font-family="Libre Franklin, sans-serif" font-weight="700" font-size="11" fill="'+(on?'#161719':'#F4F4F4')+'">'+t+'</text>');
+    } else L.html('');
+  });
+  if(sel>=0)pins.filter(d=>d.i===sel).raise();
+}
+
+let anim=null;
+function tweenTo(lon,lat,k,ms){
+  if(anim)anim.stop();
+  const i=d3.interpolate([view.lon,view.lat,view.k],[lon,lat,k]);
+  // shortest longitude path
+  let dl=((lon-view.lon)%360+540)%360-180; const l0=view.lon;
+  anim=d3.timer(el=>{const t=Math.min(1,el/ms),e=d3.easeCubicInOut(t);const v=i(e);view={lon:l0+dl*e,lat:v[1],k:v[2]};draw();if(t>=1){anim.stop();anim=null;view.lon=((view.lon+540)%360)-180;}});
+}
+function fly(i){
+  sel=i;spinning=false;const p=REMOTE[i];
+  tweenTo(p.lon,p.lat,14,1400);
+  setFigs();showCard();
+}
+function world(){
+  sel=-1;setFigs();document.getElementById('card').style.display='none';
+  tweenTo(view.lon,30,1,1100);
+  setTimeout(()=>{if(sel<0)spinning=true;},1150);
+}
+d3.timer(()=>{if(spinning&&!anim){view.lon+=.12;if(view.lat<28)view.lat+=.25;draw();}});
+
+/* ---------- people on the floor ---------- */
+const spots=[[1.0,4.4],[2.4,7.6],[5.6,9.0],[8.2,8.8],[10.2,6.6],[10.4,3.2],[0.8,8.6],[11.0,1.0],[11.6,6.2],[8.0,10.0],[8.4,0.2],[9.8,8.0],[5.0,10.0],[6.6,0.0],[12.0,0.0],[0.0,4.6]];
+const figs=d3.select('#figs');
+const FIGPOS=[];
+const order=REMOTE.map((p,i)=>({p,i,s:spots[i]})).sort((a,b)=>(a.s[0]+a.s[1])-(b.s[0]+b.s[1]));
+order.forEach(({p,i,s})=>{
+  const [px,py]=P(s[0],s[1]);const sc=.66,w=120*sc,h=130*sc;
+  const tag=p.name.split(' ')[0];const tw=tag.length*7.5+22;
+  const g=figs.append('g').attr('class','fig').attr('data-i',i).on('click',()=>fly(i));
+  g.append('ellipse').attr('class','ring').attr('cx',px).attr('cy',py).attr('rx',w*.46).attr('ry',w*.18).attr('fill','none').attr('stroke','#00BDFF').attr('stroke-width',4).attr('opacity',0);
+  g.append('ellipse').attr('cx',px).attr('cy',py).attr('rx',w*.36).attr('ry',w*.13).attr('fill','#000').attr('opacity',.4);
+  const PLAY={kneeland:'playTrumpet',shirk:'playHarp'};
+  const moves=['idleBob','idleSway','idleBreathe','idleNod','idleHop'],mv=PLAY[p.key]||moves[i%moves.length],dur=(mv==='idleNod'||mv==='idleHop'?3.2:2)+((i*0.37)%1.4);
+  g.append('g').attr('class','body').style('animation',mv+' '+dur.toFixed(2)+'s ease-in-out '+(-(i*0.53)%dur).toFixed(2)+'s infinite').append('svg').attr('x',px-w/2).attr('y',py-h+5*sc).attr('width',w).attr('height',h).attr('viewBox','0 0 120 130').html(HUM(p,'r'+p.key));
+  FIGPOS[i]={px,py,h};
+  const NOTE={kneeland:[112,50],shirk:[104,62]}[p.key];
+  if(NOTE){const nx=px-w/2+NOTE[0]*sc,ny=py-h+5*sc+NOTE[1]*sc;for(let k=0;k<3;k++){g.append('path').attr('class','note').attr('d','M'+(nx+k*4)+' '+(ny-k*3)+' v-9 l6 -2 v9').attr('fill','none').attr('stroke','#00BDFF').attr('stroke-width',2).attr('stroke-linecap','round').style('animation-delay',(k*0.8)+'s');g.append('circle').attr('class','note').attr('cx',nx+k*4-1.6).attr('cy',ny-k*3).attr('r',2.4).attr('fill','#00BDFF').style('animation-delay',(k*0.8)+'s');}}
+  const t=g.append('g').attr('class','tag');
+  t.append('rect').attr('x',px-tw/2).attr('y',py-h-22).attr('width',tw).attr('height',22).attr('rx',11).attr('fill','#161719').attr('stroke','#0C4B5F').attr('stroke-width',2);
+  t.append('text').attr('x',px).attr('y',py-h-7).attr('text-anchor','middle').attr('font-family','Libre Franklin, sans-serif').attr('font-weight',700).attr('font-size',12).attr('fill','#F4F4F4').text(tag);
+});
+/* ---------- quote pop-ups ---------- */
+const bubbleL=d3.select('#scene').append('g');
+function wrap(s,n){const w=s.split(' '),L=[];let c='';w.forEach(x=>{if((c+' '+x).trim().length>n){L.push(c.trim());c=x;}else c+=' '+x;});if(c.trim())L.push(c.trim());return L;}
+let lastQ=-1;
+function popQuote(){
+  const pool=REMOTE.map((p,i)=>i).filter(i=>REMOTE[i].line&&i!==lastQ&&i!==sel);if(!pool.length)return;
+  const i=pool[Math.floor(Math.random()*pool.length)];lastQ=i;const p=REMOTE[i],f=FIGPOS[i];
+  const lines=wrap(p.line,24),lh=15,bw=Math.max(...lines.map(l=>l.length))*6.6+22,bh=lines.length*lh+14;
+  let bx=Math.min(Math.max(f.px-bw/2,350),1564-bw);const by=f.py-f.h-30-bh;
+  const g=bubbleL.append('g').attr('class','bubble').style('opacity',0).style('transform','translateY(6px)');
+  g.append('rect').attr('x',bx).attr('y',by).attr('width',bw).attr('height',bh).attr('rx',10).attr('fill','#F4F4F4').attr('stroke','#0C4B5F').attr('stroke-width',2.5);
+  g.append('path').attr('d','M'+(f.px-7)+' '+(by+bh-1)+' L'+f.px+' '+(by+bh+9)+' L'+(f.px+7)+' '+(by+bh-1)+' Z').attr('fill','#F4F4F4').attr('stroke','#0C4B5F').attr('stroke-width',2.5).attr('stroke-linejoin','round');
+  g.append('rect').attr('x',f.px-6).attr('y',by+bh-3).attr('width',12).attr('height',4).attr('fill','#F4F4F4');
+  lines.forEach((l,k)=>g.append('text').attr('x',bx+bw/2).attr('y',by+19+k*lh).attr('text-anchor','middle').attr('font-family','Libre Franklin, sans-serif').attr('font-weight',700).attr('font-size',12).attr('fill','#161719').text(l));
+  requestAnimationFrame(()=>g.style('opacity',1).style('transform','translateY(0)'));
+  setTimeout(()=>{g.style('opacity',0).style('transform','translateY(-6px)');setTimeout(()=>g.remove(),350);},3200);
+}
+setTimeout(popQuote,1200);setInterval(popQuote,4000);
+function setFigs(){
+  figs.selectAll('.fig').each(function(){const g=d3.select(this),on=+g.attr('data-i')===sel;g.select('.ring').attr('opacity',on?1:0);});
+  document.querySelectorAll('#roster button').forEach((b,j)=>b.setAttribute('aria-pressed',j===sel));
+}
+
+/* ---------- roster + card ---------- */
+const ro=document.getElementById('roster');
+REMOTE.forEach((p,i)=>{
+  const b=document.createElement('button');b.setAttribute('aria-pressed','false');
+  b.innerHTML='<svg viewBox="22 6 76 70" width="32" height="30" style="flex:none;background:#0A0C0F;border:2px solid #0C4B5F;">'+HUM(p,'ro'+p.key)+'</svg><span style="display:flex;flex-direction:column;gap:0;min-width:0;"><span style="font:400 13px/1.15 \'Anton\',sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#F4F4F4;">'+p.name+'</span><span style="font:500 11px/1.2 \'Libre Franklin\',sans-serif;color:#B3B6C9;">'+p.city+'</span></span>';
+  b.onclick=()=>fly(i);ro.appendChild(b);
+});
+function miles(a,b){return Math.round(d3.geoDistance([a.lon,a.lat],[b.lon,b.lat])*3958.8);}
+function showCard(){
+  const p=REMOTE[sel],c=document.getElementById('card');c.style.display='flex';
+  document.getElementById('cIdx').textContent=(sel+1)+' / '+REMOTE.length;
+  document.getElementById('cAv').innerHTML=HUM(p,'cv'+p.key);
+  document.getElementById('cName').textContent=p.name;
+  document.getElementById('cTitle').textContent=p.title;
+  document.getElementById('cLoc').textContent=p.city;
+  document.getElementById('cLine').textContent=p.line||'';
+  document.getElementById('cDist').textContent=miles(p,HQ)+' mi';
+}
+document.getElementById('world').onclick=world;
+document.getElementById('next').onclick=()=>fly((sel+1)%REMOTE.length);
+document.getElementById('prev').onclick=()=>fly((sel-1+REMOTE.length)%REMOTE.length);
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&sel>=0)world();});
+
+draw();
+Promise.all([
+  fetch('https://cdn.jsdelivr.net/npm/world-atlas@2.0.2/countries-110m.json').then(r=>r.json()),
+  fetch('https://cdn.jsdelivr.net/npm/us-atlas@3.0.1/states-10m.json').then(r=>r.json()).catch(()=>null)
+]).then(([w,us])=>{
+  land=topojson.feature(w,w.objects.land);
+  if(us)borders=topojson.mesh(us,us.objects.states,(a,b)=>a!==b);
+  draw();
+});
+})();
+</script>
+</body>
+</html>

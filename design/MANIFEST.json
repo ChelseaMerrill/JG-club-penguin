@@ -2,10 +2,10 @@
   "tool": "claude-design",
   "source": "6050d967-ba2e-4edd-819f-f7dcf4ed9d61",
   "source_url": "https://claude.ai/design/p/6050d967-ba2e-4edd-819f-f7dcf4ed9d61",
-  "synced": "2026-09-27",
-  "synced_by": "milliehime",
-  "snapshot": "Club JenGuin logo directions.zip",
-  "plan_id": "2937811514f1",
+  "synced": "2026-10-05",
+  "synced_by": "Chelsea Merrill",
+  "snapshot": "snap2",
+  "plan_id": "2caeddf39c5c",
   "files": {
     "Canvas.dc.html": {
       "sha256": "d3a65cc8ce0e759849eaa1ca985d0fbc49bafb3212f9029731ca08d1bda42293",
@@ -78,6 +78,14 @@
     "Penguin Creator.dc.html": {
       "sha256": "496e0572db4246dc27e54e284e3e8f77dc9559ba56642c2a11fd8b0c8f8534d3",
       "bytes": 23309
+    },
+    "Remote Area.dc.html": {
+      "sha256": "bc10256fe48bcd55daae1f209626fa734ade92fec55479a3f1fba876b6f06975",
+      "bytes": 604
+    },
+    "Remote Area.html": {
+      "sha256": "eb37cca21f869a2cab52602afed53f5684c516d627927e0cf75876bdaff1036d",
+      "bytes": 69556
     },
     "Room 00 JGHQ Lobby.dc.html": {
       "sha256": "7e8afd0c908f31c4997273338b6af50163a474a3b7b32ef7948ac2c9b9d503f6",
@@ -193,7 +201,8 @@
     },
     "assets/bumbastika.ttf": {
       "sha256": "bad89893bad8b20b714a5f84e2f622c12f81d7ab3fc86b35c661b71bafc74303",
-      "bytes": 14792
+      "bytes": 14792,
+      "unverified_since": "2026-10-05"
     },
     "assets/jg-logo-bars.svg": {
       "sha256": "770ff422b0979675b266278fe7dcaf45591c1f2c25af4d3a8791964eddeee550",
@@ -205,7 +214,8 @@
     },
     "assets/jg-pin.png": {
       "sha256": "993af4f628fa69ea550f646c413e81973d8c76e7f444dac741e19703fef82d22",
-      "bytes": 4091
+      "bytes": 4091,
+      "unverified_since": "2026-10-05"
     },
     "assets/knowbe4-logo.svg": {
       "sha256": "60af4a5a3c5ea25a659f8ce198af7dfc5e31e92fce3b22e4434ef24d8f651969",
@@ -213,19 +223,23 @@
     },
     "build/01-tr3.jpg": {
       "sha256": "9162ea62f6c1c9b62a4c80069a468fb894f8530a2e250ec8bdc2a13140bd2dac",
-      "bytes": 28165
+      "bytes": 28165,
+      "unverified_since": "2026-10-05"
     },
     "build/01-tr3h.jpg": {
       "sha256": "e89251e7cc416ce7b98b596de944234ca4f4fe984d7bbc4f6dd4241dd027e732",
-      "bytes": 27084
+      "bytes": 27084,
+      "unverified_since": "2026-10-05"
     },
     "build/02-tr3.jpg": {
       "sha256": "b6ca04bc1884eef1a03d33040985d7c110317d66faf775ffd4e24cea5cd72b22",
-      "bytes": 31237
+      "bytes": 31237,
+      "unverified_since": "2026-10-05"
     },
     "build/02-tr3h.jpg": {
       "sha256": "c810641a6d93ba3e0ca30ae5536d40e867c50eaaa9c5c0be235893f809129867",
-      "bytes": 25000
+      "bytes": 25000,
+      "unverified_since": "2026-10-05"
     },
     "build/humans.js": {
       "sha256": "ee6772b470b524ec5b931c5fefb25b78c3ba394a35b1668ab351abc82c542338",
@@ -245,7 +259,8 @@
     },
     "build/tr3.jpg": {
       "sha256": "9aae9e9e34a3ec0326ed24880cb8557770c5ba6715be4fe6068d8e64d9d496e4",
-      "bytes": 33781
+      "bytes": 33781,
+      "unverified_since": "2026-10-05"
     },
     "design_handoff_club_jenguin/README.md": {
       "sha256": "5c70e9bda379637124c2d6f5e5b8839fe82e2404b03a40dc797b19516ed23664",
@@ -253,111 +268,138 @@
     },
     "design_handoff_club_jenguin/screenshots/Characters.jpg": {
       "sha256": "d0937861c7a0a4dd42d6b9e0c00240d76f91aabe901850f402c83b5829ffcaf9",
-      "bytes": 29345
+      "bytes": 29345,
+      "unverified_since": "2026-10-05"
     },
     "design_handoff_club_jenguin/screenshots/Club JenGuin HUD Menus.jpg": {
       "sha256": "663d19ced6762847aec44950985b02216982d45bd58d2857400adc837208695e",
-      "bytes": 30344
+      "bytes": 30344,
+      "unverified_since": "2026-10-05"
     },
     "design_handoff_club_jenguin/screenshots/Club JenGuin Landing.jpg": {
       "sha256": "75aaf98e26eeb7eeccf278a7cd0a5f6a3bfeaad2c8b0fc45222262f1243b7220",
-      "bytes": 33170
+      "bytes": 33170,
+      "unverified_since": "2026-10-05"
     },
     "design_handoff_club_jenguin/screenshots/Club JenGuin Logo Final.jpg": {
       "sha256": "3a2f4d8d46f1f6ec8541b16636a4f79ac744b666144de4827fd8a4f2545c0b1c",
-      "bytes": 22220
+      "bytes": 22220,
+      "unverified_since": "2026-10-05"
     },
     "design_handoff_club_jenguin/screenshots/Club JenGuin Logo.jpg": {
       "sha256": "a18ee4dda964fac6a50dc5beac89e8cc3f1372c8bcc0414db61a0c1e54e56b65",
-      "bytes": 24165
+      "bytes": 24165,
+      "unverified_since": "2026-10-05"
     },
     "design_handoff_club_jenguin/screenshots/Club JenGuin Rooms.jpg": {
       "sha256": "4973e04829382bf77bd06772df71aed68c2743ab9cd2f6d972d8548363b3da8a",
-      "bytes": 28964
+      "bytes": 28964,
+      "unverified_since": "2026-10-05"
     },
     "design_handoff_club_jenguin/screenshots/Elevator.jpg": {
       "sha256": "0bca533b5d1ef5db384798ca560ca475fade33a3a165dabe0e93a9291a728341",
-      "bytes": 31201
+      "bytes": 31201,
+      "unverified_since": "2026-10-05"
     },
     "design_handoff_club_jenguin/screenshots/Minigame Bug Squash.jpg": {
       "sha256": "fbe6b3cb3802ece66353b9cdbf1b7a9c2a0fa4928592facdf7b14ac5e69dc8ce",
-      "bytes": 26341
+      "bytes": 26341,
+      "unverified_since": "2026-10-05"
     },
     "design_handoff_club_jenguin/screenshots/Minigame Coffee Rush.jpg": {
       "sha256": "2f1d36f2e2a993d4ba09e98a12fba7fe5841e3a6fffdf04328a5e7c3975a7b03",
-      "bytes": 34862
+      "bytes": 34862,
+      "unverified_since": "2026-10-05"
     },
     "design_handoff_club_jenguin/screenshots/Minigame Snow Cone Stand.jpg": {
       "sha256": "535857f8c1c80eb2776f1bf69a9bfc7a837c572361797070478e3e86d3258d64",
-      "bytes": 29321
+      "bytes": 29321,
+      "unverified_since": "2026-10-05"
     },
     "design_handoff_club_jenguin/screenshots/Penguin Creator.jpg": {
       "sha256": "c93646e29989a583cdc001f96047f9abee0801d02bf1e062b7de7b20378de5c8",
-      "bytes": 26760
+      "bytes": 26760,
+      "unverified_since": "2026-10-05"
     },
     "design_handoff_club_jenguin/screenshots/Room 01 Town Center.jpg": {
       "sha256": "d8024af76b002579378543b585a24c4a8dd87a98d8eed8eaa7f72cddcef435ad",
-      "bytes": 30083
+      "bytes": 30083,
+      "unverified_since": "2026-10-05"
     },
     "design_handoff_club_jenguin/screenshots/Room 02 Dev Pit.jpg": {
       "sha256": "52c20c21f382de00638e88cb3548f88dfdc4242f4affcbe7f9e3ce0ecc37dd85",
-      "bytes": 32635
+      "bytes": 32635,
+      "unverified_since": "2026-10-05"
     },
     "design_handoff_club_jenguin/screenshots/Room 03 The Icebox.jpg": {
       "sha256": "2aac999b6e183018a46d4939ac7b0a4242809a6ba05f19abfe1e6b8aec6fae37",
-      "bytes": 31800
+      "bytes": 31800,
+      "unverified_since": "2026-10-05"
     },
     "design_handoff_club_jenguin/screenshots/Room 04 Kitchen.jpg": {
       "sha256": "09faca3208012fee524abeea4af4f308ad7863080d8167bc4821f1162783bede",
-      "bytes": 32082
+      "bytes": 32082,
+      "unverified_since": "2026-10-05"
     },
     "design_handoff_club_jenguin/screenshots/Room 05 Roof Deck.jpg": {
       "sha256": "30674c6b9d461f9d268015e65b7a5815223cddb47795282e406483b83fc6735e",
-      "bytes": 47425
+      "bytes": 47425,
+      "unverified_since": "2026-10-05"
     },
     "design_handoff_club_jenguin/screenshots/Room 05b Roof Deck Day.jpg": {
       "sha256": "f8df8cb51ed822f9bbc1899355a93a88f6d005c5ce25b05a56b2b141ff23b1de",
-      "bytes": 47455
+      "bytes": 47455,
+      "unverified_since": "2026-10-05"
     },
     "design_handoff_club_jenguin/screenshots/Room 06 Igloo.jpg": {
       "sha256": "cf9d97dd9f2bc1714efe7b191461a4e1b4ae3cfe83c4fc504298fa266d0a225e",
-      "bytes": 36169
+      "bytes": 36169,
+      "unverified_since": "2026-10-05"
     },
     "design_handoff_club_jenguin/screenshots/Room 07 Team Room 4.jpg": {
       "sha256": "933fc25671cdb0a72cd70d03ad6c812d2538468aa285b368b3207be6da5effe1",
-      "bytes": 27745
+      "bytes": 27745,
+      "unverified_since": "2026-10-05"
     },
     "design_handoff_club_jenguin/screenshots/Room 11 Office Hallway.jpg": {
       "sha256": "e7202f9366c36def64e348a4a4db45199e4179c99f0c18d1788a4f758c9e0482",
-      "bytes": 27527
+      "bytes": 27527,
+      "unverified_since": "2026-10-05"
     },
     "design_handoff_club_jenguin/screenshots/Room 13 Bathroom.jpg": {
       "sha256": "090d2229cdd8ee0ca9e4a882bee992b21bd948d75af81ba5e7b7171f13e67e02",
-      "bytes": 31771
+      "bytes": 31771,
+      "unverified_since": "2026-10-05"
     },
     "design_handoff_club_jenguin/screenshots/Room 15 The Mullet.jpg": {
       "sha256": "a15fca5c135cbea7881316e0fe4f7de69f2ea80bc0456dd926433c6b80179e57",
-      "bytes": 41971
+      "bytes": 41971,
+      "unverified_since": "2026-10-05"
     },
     "design_handoff_club_jenguin/screenshots/Stairwell.jpg": {
       "sha256": "95fc445b8e63f50294707fd096c49aaa09628ce91cf430d84ef366ffa885f0a5",
-      "bytes": 29246
+      "bytes": 29246,
+      "unverified_since": "2026-10-05"
     },
     "design_handoff_club_jenguin/screenshots/Team Room 1.jpg": {
       "sha256": "3519eff9bee47abd3edc366e7575aecfe70a09a77053e0c8be6f095bbddd79ec",
-      "bytes": 30003
+      "bytes": 30003,
+      "unverified_since": "2026-10-05"
     },
     "design_handoff_club_jenguin/screenshots/Team Room 2.jpg": {
       "sha256": "7500aa89a92f1c184500a948c0f1eee0e6cc72bcbaf90d40fcb56fdac2fb43e4",
-      "bytes": 28523
+      "bytes": 28523,
+      "unverified_since": "2026-10-05"
     },
     "design_handoff_club_jenguin/screenshots/Team Room 3.jpg": {
       "sha256": "2f0e1b831f689a8c461e4c6bc532533ef85290bc2e9cb290fa2510a066d03165",
-      "bytes": 28047
+      "bytes": 28047,
+      "unverified_since": "2026-10-05"
     },
     "design_handoff_club_jenguin/screenshots/Trophy Case.jpg": {
       "sha256": "8accd5fc0ce60555dd7087bbfbaef8692c500f28e5087c1dd5e952c21492d5b3",
-      "bytes": 31574
+      "bytes": 31574,
+      "unverified_since": "2026-10-05"
     },
     "door-nav.js": {
       "sha256": "1f4389afd4bb34767b6fbda385db23747ec940a6e600db67289be7dff46ee406",
