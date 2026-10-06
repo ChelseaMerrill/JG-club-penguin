@@ -349,6 +349,12 @@ export class RoomScene extends Scene {
   private room: RoomDefinition | null = null;
   private controller: LocalPenguinController | null = null;
   private penguin: Penguin | null = null;
+  /**
+   * #141: whether the local Penguin carries Nicole's coffee. Deliberately
+   * not reset by `init()`, so the cup stays in the flipper through every Room
+   * change (doors and the Map alike); `spawnLocalPenguin` re-applies it.
+   */
+  private localCarriesCup = false;
   private currentLook: PenguinLook = resolveRegisteredLook(undefined);
   private currentAnim: PenguinAnim = this.currentLook.emote;
   private activeTween: Tweens.Tween | null = null;
@@ -983,6 +989,17 @@ export class RoomScene extends Scene {
     return this.reticleTile;
   }
 
+  /** #141: shows or hides Nicole's coffee cup in the local Penguin's flipper, now and after every Room change. */
+  setLocalCarriedCup(on: boolean): void {
+    this.localCarriesCup = on;
+    if (this.live) this.penguin?.setCarriedCup(on);
+  }
+
+  /** Whether the local Penguin is drawing the coffee cup right now (`__questsTest.coffee().cupRendered`). */
+  localHasCarriedCup(): boolean {
+    return this.live && (this.penguin?.hasCarriedCup() ?? false);
+  }
+
   /** Whether the local Penguin is drawing its snow hat right now (`__snowballDebug.snowHats[own].rendered`). */
   localHasSnowHat(): boolean {
     return this.live && (this.penguin?.hasSnowHat() ?? false);
@@ -1141,6 +1158,7 @@ export class RoomScene extends Scene {
     this.currentAnim = look.emote;
     this.penguin = createPenguin(this, spawnPoint.x, spawnPoint.y, look);
     this.penguin.container.setDepth(depthForTile(spawnTile));
+    this.penguin.setCarriedCup(this.localCarriesCup);
     // #162: hidden until the Player's Session starts. Every Room restart
     // respawns here with the registry's current value.
     this.applyLocalPenguinVisibility();

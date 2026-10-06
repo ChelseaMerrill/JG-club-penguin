@@ -18,6 +18,7 @@ import {
   isProgressErrorCode,
   validateLook,
   type BadgeCheckResult,
+  type CoffeeRun,
   type CompleteQuestResult,
   type QuestProgress,
   type IglooSlot,
@@ -219,9 +220,45 @@ export interface ProgressClient {
       | 'mark_dev_pit_visited'
       | 'mark_casey_talked'
       | 'complete_quest'
-      | 'check_session_badges',
+      | 'check_session_badges'
+      | CoffeeRpcName,
     args: Record<string, unknown>,
   ): PromiseLike<RpcResult>;
+}
+
+/** #141: the Nicole coffee Quest's RPCs (20261006020000_quest_nicole_coffee.sql C5). */
+export type CoffeeRpcName =
+  | 'coffee_run'
+  | 'start_coffee_run'
+  | 'mark_kitchen_visited'
+  | 'ask_tom_for_coffee'
+  | 'deliver_coffee';
+
+/**
+ * A coffee RPC's result (C6). A reply without the expected shape rejects
+ * with `invalid_response` rather than reading as a run the client would act on.
+ */
+function toCoffeeRun(value: unknown): CoffeeRun {
+  if (!isPlainObject(value)) throw new ProgressStoreError('invalid_response');
+  const { talkedToNicole, kitchenVisited, delivered, handedOverAt, secondsLeft } = value;
+  if (
+    typeof talkedToNicole !== 'boolean' ||
+    typeof kitchenVisited !== 'boolean' ||
+    typeof delivered !== 'boolean'
+  ) {
+    throw new ProgressStoreError('invalid_response');
+  }
+  const carrying =
+    typeof handedOverAt === 'string' &&
+    typeof secondsLeft === 'number' &&
+    Number.isFinite(secondsLeft);
+  return {
+    talkedToNicole,
+    kitchenVisited,
+    delivered,
+    handedOverAt: carrying ? handedOverAt : null,
+    secondsLeft: carrying ? Math.min(Math.max(secondsLeft, 0), 60) : null,
+  };
 }
 
 /** `public.leaderboard`'s row shape, straight off PostgREST. */
@@ -347,6 +384,10 @@ const TOAST_MESSAGES: Record<ProgressErrorCode, string> = {
   unknown_quest: "That quest doesn't exist",
   quest_incomplete: "That quest isn't finished yet",
   invalid_response: "Couldn't read the server's reply",
+  coffee_not_started: 'Talk to Nicole first',
+  coffee_not_carrying: "You don't have Nicole's coffee",
+  // #141: the ticket's own copy.
+  coffee_cold: 'Your coffee went cold.',
 };
 
 /** Anything that isn't a typed `ProgressStoreError`: network failures, unrecognized errors. */
@@ -735,6 +776,17 @@ export function createSupabaseProgressStore(
     return { badges: result.badges, balance: result.balance };
   }
 
+  // #141: the Nicole coffee Quest. `coffeeRun` is a read (no toast, like
+  // `questProgress`); the four writes toast a failure like
+  // `markDevPitVisited`.
+  async function readCoffeeRun(fn: CoffeeRpcName): Promise<CoffeeRun> {
+    const { data, error } = await client.rpc(fn, {});
+    if (error) {
+      throw toProgressError(error);
+    }
+    return toCoffeeRun(data);
+  }
+
   return {
     loadAll,
     saveLook,
@@ -747,6 +799,11 @@ export function createSupabaseProgressStore(
     markCaseyTalked,
     completeQuest,
     checkBadges,
+    coffeeRun: () => readCoffeeRun('coffee_run'),
+    talkToNicole: () => guarded(() => readCoffeeRun('start_coffee_run')),
+    markKitchenVisited: () => guarded(() => readCoffeeRun('mark_kitchen_visited')),
+    askTomForCoffee: () => guarded(() => readCoffeeRun('ask_tom_for_coffee')),
+    deliverCoffee: () => guarded(() => readCoffeeRun('deliver_coffee')),
   };
 }
 

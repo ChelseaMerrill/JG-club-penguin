@@ -161,6 +161,23 @@ export interface CompleteQuestResult {
  * The result of the Session Badge check (#138's `check_session_badges`):
  * every Badge the Player now holds and the server's balance after the check.
  */
+/**
+ * The Player's run at the Nicole coffee Quest (#141), as the server's
+ * `coffee_run_state` reports it (20261006020000_quest_nicole_coffee.sql C6).
+ * `handedOverAt` and `secondsLeft` are `null` unless a cup is being carried
+ * within the 60 s limit; `secondsLeft` is worked out by the server's clock,
+ * so the client's countdown starts from it rather than from `handedOverAt`.
+ */
+export interface CoffeeRun {
+  talkedToNicole: boolean;
+  kitchenVisited: boolean;
+  delivered: boolean;
+  /** When Tom handed over the cup being carried (ISO 8601), or `null`. */
+  handedOverAt: string | null;
+  /** Seconds (0-60, fractional) left on the cup being carried, or `null`. */
+  secondsLeft: number | null;
+}
+
 export interface BadgeCheckResult {
   badges: BadgeId[];
   balance: number;
@@ -219,6 +236,13 @@ export const PROGRESS_ERROR_CODES = [
   // Session Badge check's malformed `check_session_badges` result). Raised
   // client-side only, never by the database.
   'invalid_response',
+  // #141: the Nicole coffee Quest's RPCs (20261006020000_quest_nicole_coffee.sql
+  // C7). A Kitchen visit, an ask or a delivery before talking to Nicole; a
+  // delivery before Tom handed over a cup; a delivery more than 65 s (60 s
+  // plus 5 s of grace) after the hand-over, by the server's clock.
+  'coffee_not_started',
+  'coffee_not_carrying',
+  'coffee_cold',
 ] as const;
 
 export type ProgressErrorCode = (typeof PROGRESS_ERROR_CODES)[number];
@@ -430,4 +454,33 @@ export interface ProgressStore {
    * the session wrapper (`progress-session.ts`) announces what's new.
    */
   checkBadges(): Promise<BadgeCheckResult>;
+
+  /**
+   * #141, the Nicole coffee Quest (20261006020000_quest_nicole_coffee.sql).
+   * The Player's coffee run. Read-only: a failure never emits `ui:toast`.
+   */
+  coffeeRun(): Promise<CoffeeRun>;
+
+  /** Talking to Nicole starts the run; a repeat keeps the first talk. Rejects with `no_player`. */
+  talkToNicole(): Promise<CoffeeRun>;
+
+  /** The first Kitchen visit after talking to Nicole. Rejects with `coffee_not_started`. */
+  markKitchenVisited(): Promise<CoffeeRun>;
+
+  /**
+   * Tom hands over a fresh cup (the server's now(), 60 s on the clock) when
+   * none is being carried or the last one went past 60 s; while a cup is
+   * still hot, or once delivered, it changes nothing. Also counts as the
+   * Kitchen visit. Rejects with `coffee_not_started`.
+   */
+  askTomForCoffee(): Promise<CoffeeRun>;
+
+  /**
+   * Hands the cup to Nicole. Accepted only up to 65 s (60 s plus 5 s of
+   * grace) after the hand-over, by the server's clock; later it rejects with
+   * `coffee_cold` and writes nothing (steps 3-5 already read as reset).
+   * Rejects with `coffee_not_started` or `coffee_not_carrying`; once
+   * delivered, a repeat changes nothing. Paying is still `completeQuest`'s.
+   */
+  deliverCoffee(): Promise<CoffeeRun>;
 }

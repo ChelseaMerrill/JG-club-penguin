@@ -1,6 +1,12 @@
 import type { BadgeId, MinigameId } from '../contracts/game-events';
 import { IGLOO_GEAR_CATALOG, JG_AWARD_ITEM_IDS } from './minigame-rules';
 import { MAIN_QUEST_REWARD, type IglooSlot } from './progress-store';
+import {
+  coffeeQuestSteps,
+  NICOLE_COFFEE_QUEST_ID,
+  NICOLE_COFFEE_REWARD,
+  type CoffeeRunRecord,
+} from './coffee-run-rules';
 
 /**
  * The in-memory fake's mirror of `public.quests` plus the
@@ -25,6 +31,10 @@ export interface InMemoryQuestState {
   matchWins: Readonly<Partial<Record<MinigameId, number>>>;
   /** #143: the Igloo Badge Quest's "talk to Casey" flag (`player_quest_state.casey_talked_at`). */
   caseyTalked: boolean;
+  /** #141: the fake's `player_coffee_runs` row, `null` before talking to Nicole. */
+  coffeeRun: Readonly<CoffeeRunRecord> | null;
+  /** The fake's clock (the server's `now()`), for time-limited steps. */
+  nowMs: number;
 }
 
 /** One registered steps Quest: a `public.quests` row plus its steps function. */
@@ -76,4 +86,11 @@ registerInMemoryStepsQuest('igloo-badge', {
       (itemId) => itemId !== null && (JG_AWARD_ITEM_IDS as readonly string[]).includes(itemId),
     ),
   }),
+});
+
+// #141 "Bring Nicole a coffee before kickoff": `public.quest_steps__nicole_coffee`
+// (20261006020000_quest_nicole_coffee.sql C4), timed by the fake's clock.
+registerInMemoryStepsQuest(NICOLE_COFFEE_QUEST_ID, {
+  rewardTokens: NICOLE_COFFEE_REWARD,
+  steps: (state) => coffeeQuestSteps(state.coffeeRun, state.nowMs),
 });

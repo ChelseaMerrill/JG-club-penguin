@@ -413,3 +413,38 @@ shows this Quest merges or deploys.
    including Player B, is rolled back) and prints only booleans, counts and
    Token amounts. Then rerun `quest_registry_proof.sql` the same way: it still
    passes, and now also checks this Quest's steps function.
+
+## Nicole coffee Quest (reviewer gate; #141)
+
+`quest_nicole_coffee_proof.sql` proves `20261006020000_quest_nicole_coffee.sql`
+(decisions C1-C7 in its header) against the same #9 H1 fixture Player. As
+postgres it checks the `('nicole-coffee', 75)` registry row and that
+`public.player_coffee_runs` is RLS-on, SELECT-only for its owner and closed to
+anon. As the fixture signed in: the internal functions are denied (`42501`);
+every step before talking to Nicole is refused (`coffee_not_started`), a
+delivery before Tom hands over a cup is refused (`coffee_not_carrying`), and
+the Quest is refused (`quest_incomplete`) until delivery. Time is controlled
+by setting the stored hand-over time into the past, as postgres, relative to
+the database's own `now()` -- the only clock the server reads, and a write
+the fixture is shown to be denied. So: re-asking Tom while the cup is hot
+keeps its timer; a delivery 66 s after the hand-over is refused
+(`coffee_cold`, nothing written) and steps 3-5 read as reset; Tom then hands
+over a fresh cup; 64 s (inside the 5 s grace) is accepted; a delivery at 20 s
+completes all five steps and `complete_quest('nicole-coffee')` pays 75 once,
+without Ship It. As anon every RPC is denied. It also checks `security
+definer`/`search_path = ''`/one overload, that the five RPCs take no
+arguments, and the grants.
+
+**Apply it before the client that calls its RPCs merges or deploys**, after
+`20261006000000_quest_registry.sql`.
+
+1. Local: covered automatically by `sql-quest-nicole-coffee.test.ts`'s PGlite
+   run in `npm test`, including a rerun, a 70 s refusal, and a two-Player
+   isolation check.
+2. Real Postgres/Supabase: apply `20261006020000_quest_nicole_coffee.sql` in
+   the SQL editor, then open `quest_nicole_coffee_proof.sql`, replace every
+   occurrence of `00000000-0000-0000-0000-00000000f1f0` with the real fixture
+   Player's id, and run it. Expect every row's `pass` column to read `true`,
+   including the final `ALL` row. It changes nothing and prints only
+   booleans, error codes and Token amounts. Then rerun
+   `quest_registry_proof.sql`: it still passes.

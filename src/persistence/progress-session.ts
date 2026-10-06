@@ -308,6 +308,12 @@ function wrapStore(
       markCaseyTalked: () => store.markCaseyTalked(),
       completeQuest,
       checkBadges,
+      // #141: the coffee run changes nothing the snapshot holds.
+      coffeeRun: () => store.coffeeRun(),
+      talkToNicole: () => store.talkToNicole(),
+      markKitchenVisited: () => store.markKitchenVisited(),
+      askTomForCoffee: () => store.askTomForCoffee(),
+      deliverCoffee: () => store.deliverCoffee(),
     },
     loadInitial: loadAll,
   };
@@ -426,5 +432,10 @@ export function createActiveProgressStore(
     markCaseyTalked: async () => current().markCaseyTalked(),
     completeQuest: async (questId) => current().completeQuest(questId),
     checkBadges: async () => current().checkBadges(),
+    coffeeRun: async () => current().coffeeRun(),
+    talkToNicole: async () => current().talkToNicole(),
+    markKitchenVisited: async () => current().markKitchenVisited(),
+    askTomForCoffee: async () => current().askTomForCoffee(),
+    deliverCoffee: async () => current().deliverCoffee(),
   };
 }

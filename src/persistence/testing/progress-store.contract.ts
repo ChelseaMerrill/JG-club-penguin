@@ -8,7 +8,8 @@ import { emptySlots, type IglooSlot, type ProgressStore, type ShopItem } from '.
 /** One fresh Player, wired to whichever `ProgressStore` implementation is under test. */
 export interface ProgressStoreHarness {
   store: ProgressStore;
-  /** Makes `seconds` seconds appear to have passed since every earlier round. */
+  /** Makes `seconds` seconds appear to have passed since every earlier round
+   *  and since Tom's latest coffee hand-over (#141). */
   advanceSeconds(seconds: number): Promise<void>;
   /** Adds Tokens directly, as the postgres role would (#138's Badge tests). */
   grantTokens(tokens: number): Promise<void>;
@@ -865,12 +866,14 @@ export function describeProgressStoreContract(
       it('starts a fresh Player with no Dev Pit visit, no finished rounds and no completed Quests', async () => {
         const { store } = await makeHarness();
 
+        // Only 'main' is pinned in questSteps: each later steps Quest adds
+        // its own entry (#140, #141, #143).
         expect(await store.questProgress()).toEqual({
           devPitVisited: false,
           roundsFinished: [],
           completedQuests: [],
           matchWins: {},
-          questSteps: {
+          questSteps: expect.objectContaining({
             main: {
               'create-penguin': false,
               'visit-dev-pit': false,
@@ -878,13 +881,7 @@ export function describeProgressStoreContract(
               'finish-pancake-flip': false,
               'buy-igloo-gear': false,
             },
-            // #143
-            'igloo-badge': {
-              'talk-to-casey': false,
-              'buy-jg-award': false,
-              'hang-jg-award': false,
-            },
-          },
+          }),
         });
       });
 
@@ -998,6 +995,170 @@ export function describeProgressStoreContract(
           tokensAwarded: 150,
           alreadyCompleted: false,
         });
+      });
+    });
+
+    // #141: "Bring Nicole a coffee before kickoff". `advanceSeconds` moves
+    // the clock past Tom's hand-over (the fake's clock; the real store
+    // backdates the stored hand-over against the database's own now()).
+    describe('Nicole coffee Quest (#141)', () => {
+      const COFFEE = 'nicole-coffee';
+
+      async function coffeeSteps(store: ProgressStore): Promise<Record<string, boolean>> {
+        return (await store.questProgress()).questSteps[COFFEE];
+      }
+
+      it('starts a fresh Player with no coffee run and every step unmet', async () => {
+        const { store } = await makeHarness();
+
+        expect(await store.coffeeRun()).toEqual({
+          talkedToNicole: false,
+          kitchenVisited: false,
+          delivered: false,
+          handedOverAt: null,
+          secondsLeft: null,
+        });
+        expect(await coffeeSteps(store)).toEqual({
+          'talk-to-nicole': false,
+          'visit-kitchen': false,
+          'ask-tom': false,
+          'carry-coffee': false,
+          'deliver-coffee': false,
+        });
+      });
+
+      it('refuses the Kitchen visit, asking Tom and delivering before talking to Nicole', async () => {
+        const { store } = await makeHarness();
+
+        await expect(store.markKitchenVisited()).rejects.toMatchObject({
+          code: 'coffee_not_started',
+        });
+        await expect(store.askTomForCoffee()).rejects.toMatchObject({
+          code: 'coffee_not_started',
+        });
+        await expect(store.deliverCoffee()).rejects.toMatchObject({
+          code: 'coffee_not_started',
+        });
+        await expect(store.completeQuest(COFFEE)).rejects.toMatchObject({
+          code: 'quest_incomplete',
+        });
+      });
+
+      it('refuses a delivery before Tom hands over a cup', async () => {
+        const { store } = await makeHarness();
+        await store.talkToNicole();
+
+        await expect(store.deliverCoffee()).rejects.toMatchObject({
+          code: 'coffee_not_carrying',
+        });
+      });
+
+      it('walks the five steps in order, then pays 75 Tokens exactly once', async () => {
+        const { store, advanceSeconds } = await makeHarness();
+
+        expect(await store.talkToNicole()).toMatchObject({ talkedToNicole: true });
+        expect(await store.markKitchenVisited()).toMatchObject({ kitchenVisited: true });
+        const asked = await store.askTomForCoffee();
+        expect(asked.handedOverAt).toEqual(expect.any(String));
+        expect(asked.secondsLeft).toBeCloseTo(60, 0);
+        expect(await coffeeSteps(store)).toEqual({
+          'talk-to-nicole': true,
+          'visit-kitchen': true,
+          'ask-tom': true,
+          'carry-coffee': false,
+          'deliver-coffee': false,
+        });
+
+        await advanceSeconds(30);
+        expect((await store.coffeeRun()).secondsLeft).toBeCloseTo(30, 0);
+        expect(await store.deliverCoffee()).toEqual({
+          talkedToNicole: true,
+          kitchenVisited: true,
+          delivered: true,
+          handedOverAt: null,
+          secondsLeft: null,
+        });
+        expect(Object.values(await coffeeSteps(store))).toEqual([true, true, true, true, true]);
+
+        const before = (await store.loadAll()).tokens;
+        expect(await store.completeQuest(COFFEE)).toEqual({
+          tokensAwarded: 75,
+          balance: before + 75,
+          alreadyCompleted: false,
+          badgesEarned: [],
+        });
+        expect(await store.completeQuest(COFFEE)).toEqual({
+          tokensAwarded: 0,
+          balance: before + 75,
+          alreadyCompleted: true,
+          badgesEarned: [],
+        });
+        expect((await store.loadAll()).tokens).toBe(before + 75);
+        expect((await store.questProgress()).completedQuests).toEqual([COFFEE]);
+      });
+
+      it('a cup past 60 s resets steps 3-5, a delivery past 65 s is refused as coffee_cold, and Tom hands over a fresh cup', async () => {
+        const { store, advanceSeconds } = await makeHarness();
+        await store.talkToNicole();
+        await store.markKitchenVisited();
+        await store.askTomForCoffee();
+        const before = (await store.loadAll()).tokens;
+
+        await advanceSeconds(66);
+
+        expect(await store.coffeeRun()).toMatchObject({ handedOverAt: null, secondsLeft: null });
+        expect(await coffeeSteps(store)).toEqual({
+          'talk-to-nicole': true,
+          'visit-kitchen': true,
+          'ask-tom': false,
+          'carry-coffee': false,
+          'deliver-coffee': false,
+        });
+        await expect(store.deliverCoffee()).rejects.toMatchObject({ code: 'coffee_cold' });
+        expect((await store.coffeeRun()).delivered).toBe(false);
+        await expect(store.completeQuest(COFFEE)).rejects.toMatchObject({
+          code: 'quest_incomplete',
+        });
+        expect((await store.loadAll()).tokens).toBe(before);
+
+        expect((await store.askTomForCoffee()).secondsLeft).toBeCloseTo(60, 0);
+        await advanceSeconds(10);
+        expect((await store.deliverCoffee()).delivered).toBe(true);
+        await expect(store.completeQuest(COFFEE)).resolves.toMatchObject({ tokensAwarded: 75 });
+      });
+
+      it('accepts a delivery inside the 5 s grace after the 1:00', async () => {
+        const { store, advanceSeconds } = await makeHarness();
+        await store.talkToNicole();
+        await store.askTomForCoffee();
+
+        await advanceSeconds(64);
+
+        expect((await store.deliverCoffee()).delivered).toBe(true);
+      });
+
+      it('asking Tom again while the cup is hot keeps its timer, and asking counts as the Kitchen visit', async () => {
+        const { store, advanceSeconds } = await makeHarness();
+        await store.talkToNicole();
+        const first = await store.askTomForCoffee();
+        expect(first.kitchenVisited).toBe(true);
+
+        await advanceSeconds(30);
+        const again = await store.askTomForCoffee();
+
+        expect(again.secondsLeft).toBeCloseTo(30, 0);
+        expect(again.handedOverAt).not.toBeNull();
+      });
+
+      it('talking to Nicole again changes nothing', async () => {
+        const { store } = await makeHarness();
+        await store.talkToNicole();
+        await store.askTomForCoffee();
+
+        const again = await store.talkToNicole();
+
+        expect(again).toMatchObject({ talkedToNicole: true, kitchenVisited: true });
+        expect(again.secondsLeft).toBeCloseTo(60, 0);
       });
     });
 

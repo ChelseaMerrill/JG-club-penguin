@@ -55,6 +55,8 @@ declare
   v_tokens int;
   v_before int;
   v_src_before text;
+  -- Every registered Quest id, read as postgres (the table is closed to clients).
+  v_quest_ids text[];
   v_bad text[];
   v_all boolean;
   v_total int;
@@ -131,6 +133,8 @@ begin
     select p.prosrc into v_src_before
     from pg_proc p join pg_namespace n on n.oid = p.pronamespace
     where n.nspname = 'public' and p.proname = 'complete_quest';
+
+    select array_agg(q.id order by q.id) into v_quest_ids from public.quests q;
 
     -----------------------------------------------------------------------
     -- As the fixture (signed in): the main Quest.
@@ -260,29 +264,23 @@ begin
     v_names := array_append(v_names, 'quest_progress_keeps_every_key_and_adds_quest_steps');
     v_pass := array_append(
       v_pass,
-      v_progress = jsonb_build_object(
+      v_progress - 'questSteps' = jsonb_build_object(
         'devPitVisited', true,
         'roundsFinished', jsonb_build_array('bug-squash', 'pancake-flip'),
         'completedQuests', jsonb_build_array('main'),
-        'matchWins', '{}'::jsonb,
-        -- 'igloo-badge' (#143's 20261006010000_quest_igloo_badge.sql, the
-        -- first Quest this registry gained) is unmet here: this proof never
-        -- talks to Casey, buys or hangs an award.
-        'questSteps', jsonb_build_object(
-          'main', jsonb_build_object(
-            'create-penguin', true,
-            'visit-dev-pit', true,
-            'finish-bug-squash', true,
-            'finish-pancake-flip', true,
-            'buy-igloo-gear', true
-          ),
-          'igloo-badge', jsonb_build_object(
-            'talk-to-casey', false,
-            'buy-jg-award', false,
-            'hang-jg-award', false
-          )
-        )
+        'matchWins', '{}'::jsonb
       )
+        and v_progress -> 'questSteps' -> 'main' = jsonb_build_object(
+          'create-penguin', true,
+          'visit-dev-pit', true,
+          'finish-bug-squash', true,
+          'finish-pancake-flip', true,
+          'buy-igloo-gear', true
+        )
+        -- One questSteps entry per registered Quest, so a later Quest's own
+        -- migration (#140, #141, #143) keeps this check passing.
+        and (select array_agg(k order by k) from jsonb_object_keys(v_progress -> 'questSteps') k)
+          = v_quest_ids
     );
     v_detail := array_append(v_detail, format('quest_progress=%s', v_progress));
 
