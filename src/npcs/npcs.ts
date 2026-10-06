@@ -123,6 +123,13 @@ export interface NpcMinigameDialog {
   triggerLine: string;
   /** The minigame design's own name-badge text (e.g. "DEV PIT · VP OF ENGINEERING"). */
   subtitle: string;
+  /**
+   * The NPC's own line when the Player clicks `declineLabel`, shown in place
+   * of the trigger line before the dialog closes (#181's Ian: "Cool. Enjoy
+   * the red build."). Omitted (every other minigame NPC): decline just
+   * closes the dialog, unchanged.
+   */
+  declineLine?: string;
 }
 
 /** Casey's Igloo Gear stall trigger (#36 D4/D5, wired to #40's real Market panel). */
@@ -317,6 +324,8 @@ const BUG_SQUASH_DIALOG: NpcMinigameDialog = {
   triggerLine:
     "CI is red. Something's crawling through the test suite and I've got a 2 o'clock. Grab the hammer, squash what you find. 500 points and I'll put you on the Exterminator wall.",
   subtitle: 'DEV PIT · VP OF ENGINEERING',
+  // #181, verbatim from design/Minigame Bug Squash.dc.html's own `decline`.
+  declineLine: 'Cool. Enjoy the red build.',
 };
 
 const PANCAKE_FLIP_DIALOG: NpcMinigameDialog = {

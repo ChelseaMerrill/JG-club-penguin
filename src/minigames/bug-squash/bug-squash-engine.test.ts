@@ -113,11 +113,11 @@ describe('createBugSquashEngine: bug types', () => {
 });
 
 describe('createBugSquashEngine: escapes end the round', () => {
-  it('losing all three build lights to escapes ends the round', () => {
+  it('losing all five build lights to escapes ends the round', () => {
     const engine = createBugSquashEngine({ rng: alwaysSpawnNonFlakyRng() });
 
     // Never hit anything: every bug that spawns eventually ages out. Ticking
-    // in a bounded loop (well past what 3 escapes could plausibly need)
+    // in a bounded loop (well past what 5 escapes could plausibly need)
     // avoids hard-coding the exact lifetime/spawn timing.
     for (let i = 0; i < 200 && !engine.getState().ended; i++) {
       engine.tick(1);
@@ -126,7 +126,7 @@ describe('createBugSquashEngine: escapes end the round', () => {
     const state = engine.getState();
     expect(state.ended).toBe(true);
     expect(state.lights).toBe(0);
-    expect(state.escaped).toBeGreaterThanOrEqual(3);
+    expect(state.escaped).toBeGreaterThanOrEqual(5);
   });
 
   it('tick and hit are no-ops once the round has ended', () => {
@@ -173,26 +173,26 @@ function makeSpawnProbe(): { rng: () => number; setSpawnCheckRoll: (roll: number
 }
 
 describe('createBugSquashEngine: the ramp', () => {
-  it('caps concurrent bugs at 2 early, 3 by 20s, and 4 by 40s', () => {
+  it('caps concurrent bugs at 1 early, 2 by 20s, and 3 by 40s', () => {
     const early = makeSpawnProbe();
     const earlyEngine = createBugSquashEngine({ rng: early.rng });
     early.setSpawnCheckRoll(0);
     for (let i = 0; i < 6; i++) earlyEngine.tick(0.1); // ~0.6s elapsed: well inside any bug's TTL
-    expect(earlyEngine.getState().cells.filter((c) => c.bug).length).toBe(2);
+    expect(earlyEngine.getState().cells.filter((c) => c.bug).length).toBe(1);
 
     const mid = makeSpawnProbe();
     const midEngine = createBugSquashEngine({ rng: mid.rng });
     midEngine.tick(25); // elapsed = 25s (never spawning), in the [20, 40) band
     mid.setSpawnCheckRoll(0);
     for (let i = 0; i < 6; i++) midEngine.tick(0.1);
-    expect(midEngine.getState().cells.filter((c) => c.bug).length).toBe(3);
+    expect(midEngine.getState().cells.filter((c) => c.bug).length).toBe(2);
 
     const late = makeSpawnProbe();
     const lateEngine = createBugSquashEngine({ rng: late.rng });
     lateEngine.tick(40); // elapsed = 40s (never spawning), at/after the 40s band
     late.setSpawnCheckRoll(0);
     for (let i = 0; i < 6; i++) lateEngine.tick(0.1);
-    expect(lateEngine.getState().cells.filter((c) => c.bug).length).toBe(4);
+    expect(lateEngine.getState().cells.filter((c) => c.bug).length).toBe(3);
   });
 
   it('spawn probability rises from 0.10 at the start to 0.32 by 60s', () => {
@@ -208,6 +208,45 @@ describe('createBugSquashEngine: the ramp', () => {
     late.setSpawnCheckRoll(0.31); // < 0.32 (elapsed ~60), so it now passes
     lateEngine.tick(0.1);
     expect(lateEngine.getState().cells.some((c) => c.bug)).toBe(true);
+  });
+});
+
+describe('createBugSquashEngine: bug lifetime ramp (#181, bug speed unchanged)', () => {
+  it('a bug spawned at the very start of the round lives ~2.6s before escaping', () => {
+    const probe = makeSpawnProbe();
+    const engine = createBugSquashEngine({ rng: probe.rng });
+    probe.setSpawnCheckRoll(0); // force a spawn on the very next step
+    engine.tick(0.1); // spawns at elapsed 0.1s
+    expect(engine.getState().cells[0].bug).not.toBeNull();
+    probe.setSpawnCheckRoll(null); // no replacement spawn once this one escapes
+
+    // Comfortably short of the ~2.6s lifetime: still alive.
+    engine.tick(2.4); // elapsed now 2.5s
+    expect(engine.getState().cells[0].bug).not.toBeNull();
+    expect(engine.getState().escaped).toBe(0);
+
+    // Past the ~2.6s lifetime: escaped.
+    engine.tick(0.3); // elapsed now 2.8s
+    expect(engine.getState().cells[0].bug).toBeNull();
+    expect(engine.getState().escaped).toBe(1);
+  });
+
+  it('a bug spawned at 60s lives only ~1.4s before escaping (never under 1.1s)', () => {
+    const probe = makeSpawnProbe();
+    const engine = createBugSquashEngine({ rng: probe.rng });
+    engine.tick(59.9); // elapsed = 59.9s, never spawning yet
+    probe.setSpawnCheckRoll(0); // force a spawn on the next step
+    engine.tick(0.1); // spawns at elapsed 60s, ttl = 1400ms (>= the 1100ms floor)
+    probe.setSpawnCheckRoll(null); // no replacement spawn once this one escapes
+
+    // Comfortably short of the ~1.4s lifetime: still alive.
+    engine.tick(1.2);
+    expect(engine.getState().cells[0].bug).not.toBeNull();
+
+    // Past the ~1.4s lifetime: escaped.
+    engine.tick(0.3);
+    expect(engine.getState().cells[0].bug).toBeNull();
+    expect(engine.getState().escaped).toBe(1);
   });
 });
 

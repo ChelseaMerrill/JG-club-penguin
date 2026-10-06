@@ -138,6 +138,34 @@ test('Dev Pit: clicking Ian arrives, opens his dialog, and GRAB THE HAMMER opens
   expect(errors).toEqual([]);
 });
 
+test('Dev Pit: clicking Ian arrives, opens his dialog, and NOT MY TICKET shows his decline line (#181)', async ({
+  page,
+}) => {
+  const errors = await bootRoom(page, 'dev-pit');
+
+  const ian = await npc(page, 'ian');
+  await clickStagePoint(page, { x: ian.x, y: ian.y });
+
+  await expect
+    .poll(async () => (await debugInfo(page))?.npcArrivedLog, { timeout: LONG_WALK_TIMEOUT })
+    .toContain('ian');
+
+  const dialog = page.locator('.npc-dialog');
+  await expect(dialog).toBeVisible();
+
+  const declineButton = dialog.getByRole('button', { name: 'NOT MY TICKET' });
+  await expect(declineButton).toBeVisible();
+  await declineButton.click();
+
+  await expect(dialog.locator('.npc-dialog__line')).toHaveText('Cool. Enjoy the red build.');
+  await expect(dialog).toBeVisible();
+
+  await dialog.locator('.npc-dialog__close').click();
+  await expect(dialog).toBeHidden();
+
+  expect(errors).toEqual([]);
+});
+
 // Team Room 2's Ian, and his Bug Squash dialog there, went when he left the
 // Room (owner request, 2026-10-02, Track D); the Dev Pit's Ian test above
 // covers that dialog.

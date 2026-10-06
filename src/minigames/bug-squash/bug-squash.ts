@@ -1,5 +1,5 @@
 import { MINIGAME_RULES } from '../../persistence/minigame-rules';
-import type { Minigame, MinigameContext } from '../minigame';
+import type { Minigame, MinigameContext, MinigameDoneSummary } from '../minigame';
 import type { StubMinigameTestHooks } from '../stub-minigame';
 import {
   CELL_COUNT,
@@ -8,9 +8,11 @@ import {
   MAX_LIGHTS,
   type BugSquashEngine,
 } from './bug-squash-engine';
+import { bugSquashResultLine, createBugSquashIanLine } from './bug-squash-ian-lines';
 import './bug-squash.css';
 
 const DURATION_SEC = MINIGAME_RULES['bug-squash'].durationSeconds;
+const TITLE = 'BUG SQUASH';
 
 /** The engine's own tick granularity, run on a real `setInterval` while the
  *  round is playing and unpaused (`bug-squash-engine.ts`'s `STEP_MS`,
@@ -38,29 +40,44 @@ const CODE_LINES: readonly string[] = [
   'coverage 91%',
 ];
 
+export interface BugSquashOptions {
+  /** Test-only: a pre-built engine (e.g. with a controllable RNG) instead of
+   *  a fresh `createBugSquashEngine()`. */
+  engine?: BugSquashEngine;
+}
+
 /**
  * Bug Squash: a grid of 16 test cells that spawn bugs to click (or press the
  * cell's key) before they crawl away. Reproduces
  * `design/Minigame Bug Squash.dc.html`'s play-area chrome (cells, bugs,
- * build lights) inside the shell's play area; the shell (#37) owns the
- * round's timer, pause state and phase transitions, and the how-to-play/done
- * screens.
+ * build lights, and Ian's own line under the grid) inside the shell's play
+ * area; the shell (#37) owns the round's timer, pause state and phase
+ * transitions, and the how-to-play/done screens.
  *
  * The DOM layer here is thin: all scoring/spawn/escape logic lives in
  * `createBugSquashEngine` (`bug-squash-engine.ts`), driven by this module's
  * own 100ms interval (started on `start`/`resume`, stopped on
- * `pause`/`end`) so the ramp only ever advances during unpaused play.
+ * `pause`/`end`) so the ramp only ever advances during unpaused play. Ian's
+ * line (`bug-squash-ian-lines.ts`) is driven from the engine's own events:
+ * `start()` for the round-start line, `engine.hit()`'s returned `kind` for a
+ * squash/flaky-hit/empty-click, and the per-tick rise in `engine.getState()
+ * .escaped` for an escape (#181).
  *
  * Producer: #38. Replaces the #37 stub in `createDefaultMinigameRegistry`
- * (`minigame-registry.ts`).
+ * (`minigame-registry.ts`). #181 brings the build-light count, bug-count ramp
+ * and Ian's lines in line with the design.
  */
-export function createBugSquashMinigame(): Minigame<'bug-squash'> & StubMinigameTestHooks {
-  let engine: BugSquashEngine = createBugSquashEngine();
+export function createBugSquashMinigame(
+  options: BugSquashOptions = {},
+): Minigame<'bug-squash'> & StubMinigameTestHooks {
+  let engine: BugSquashEngine = options.engine ?? createBugSquashEngine();
   let context: MinigameContext<'bug-squash'> | undefined;
   let intervalId: ReturnType<typeof setInterval> | undefined;
   let cellEls: HTMLButtonElement[] = [];
   let bugEls: HTMLElement[] = [];
   let lightEls: HTMLElement[] = [];
+  let ianLineEl: HTMLElement | undefined;
+  let ian = createBugSquashIanLine();
   let running = false;
 
   function report(): void {
@@ -92,6 +109,12 @@ export function createBugSquashMinigame(): Minigame<'bug-squash'> & StubMinigame
     renderLights();
   }
 
+  /** Ian's line under the grid, wrapped as the design's own `Ian: "..."`. */
+  function renderIanLine(): void {
+    if (!ianLineEl) return;
+    ianLineEl.textContent = `Ian: "${ian.current}"`;
+  }
+
   function stopTicking(): void {
     if (intervalId !== undefined) {
       clearInterval(intervalId);
@@ -102,10 +125,16 @@ export function createBugSquashMinigame(): Minigame<'bug-squash'> & StubMinigame
   function startTicking(): void {
     stopTicking();
     intervalId = setInterval(() => {
+      const escapedBefore = engine.getState().escaped;
       engine.tick(TICK_MS / 1000);
+      const state = engine.getState();
+      // One `ian.escape()` per bug that aged out this tick (almost always
+      // 0 or 1 at this 100ms granularity, but never assumed).
+      for (let i = escapedBefore; i < state.escaped; i++) ian.escape();
       renderAll();
+      if (state.escaped > escapedBefore) renderIanLine();
       report();
-      if (engine.getState().ended) {
+      if (state.ended) {
         stopTicking();
         context?.finish();
       }
@@ -114,8 +143,12 @@ export function createBugSquashMinigame(): Minigame<'bug-squash'> & StubMinigame
 
   function squash(index: number): void {
     if (!running) return;
-    engine.hit(index);
+    const result = engine.hit(index);
+    if (result.kind === 'squashed') ian.squash();
+    else if (result.kind === 'partial') ian.flakyHit();
+    else ian.emptyClick();
     renderCell(index);
+    renderIanLine();
     report();
   }
 
@@ -127,20 +160,32 @@ export function createBugSquashMinigame(): Minigame<'bug-squash'> & StubMinigame
     squash(index);
   }
 
+  function doneSummary(): MinigameDoneSummary {
+    const stats = engine.getStats();
+    const failed = engine.getState().lights <= 0;
+    return {
+      kicker: 'ROUND COMPLETE',
+      title: TITLE,
+      rows: [],
+      quote: `Ian: "${bugSquashResultLine({ failed, score: stats.score })}"`,
+    };
+  }
+
   return {
     id: 'bug-squash',
-    title: 'BUG SQUASH',
+    title: TITLE,
     durationSec: DURATION_SEC,
     howToPlay: [
       'Bugs pop out of the 16 test cells at random and crawl away after a moment. The later it gets, the faster they come.',
       'Click a bug, or press its cell key (1-9, 0, Q W E R T Y). Cyan bugs take 1 hit for +10; white flaky bugs take 2 hits for +25. Consecutive squashes build a combo multiplier up to x4.',
-      'Every bug that escapes costs a build light. Lose all three and CI fails. Clicking an empty cell resets your combo. 500 points unlocks the Exterminator badge.',
+      'Every bug that escapes costs a build light. Lose all five and CI fails. Clicking an empty cell resets your combo. 500 points unlocks the Exterminator badge.',
     ],
     statLabels: { squashed: 'SQUASHED' },
 
     start(container, ctx) {
       context = ctx;
-      engine = createBugSquashEngine();
+      engine = options.engine ?? createBugSquashEngine();
+      ian = createBugSquashIanLine();
       running = true;
 
       const root = document.createElement('div');
@@ -185,11 +230,16 @@ export function createBugSquashMinigame(): Minigame<'bug-squash'> & StubMinigame
         bugEls.push(bugEl);
       }
 
-      root.append(lights, grid);
+      ianLineEl = document.createElement('div');
+      ianLineEl.className = 'bug-squash__ian-line';
+      ian.roundStart();
+
+      root.append(lights, grid, ianLineEl);
       container.replaceChildren(root);
 
       window.addEventListener('keydown', handleKeydown);
       renderAll();
+      renderIanLine();
       report();
       startTicking();
     },
@@ -219,5 +269,7 @@ export function createBugSquashMinigame(): Minigame<'bug-squash'> & StubMinigame
     debugFinishNow() {
       context?.finish();
     },
+
+    doneSummary,
   };
 }

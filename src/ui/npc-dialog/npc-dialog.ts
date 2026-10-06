@@ -195,7 +195,8 @@ export function createNpcDialog(root: HTMLElement, deps: NpcDialogDeps): NpcDial
 
     actionsEl.replaceChildren();
     if (npc.dialog.kind === 'minigame') {
-      const { minigameId, actionLabel, declineLabel, triggerLine, subtitle } = npc.dialog;
+      const { minigameId, actionLabel, declineLabel, triggerLine, subtitle, declineLine } =
+        npc.dialog;
       // The minigame trigger design shows one "ROOM · ROLE" badge next to the
       // name instead of the plain title line (#36 round-1 review item 4).
       subtitleEl.textContent = subtitle;
@@ -207,7 +208,16 @@ export function createNpcDialog(root: HTMLElement, deps: NpcDialogDeps): NpcDial
           deps.actions.launchMinigame(minigameId);
           handleClose();
         }),
-        actionButton('npc-dialog__button', declineLabel, handleClose),
+        actionButton('npc-dialog__button', declineLabel, () => {
+          // #181: an NPC with its own decline line (Ian's "Cool. Enjoy the
+          // red build.") shows it in place of the trigger line instead of
+          // closing outright; the dialog's own close button dismisses it.
+          if (declineLine !== undefined) {
+            lineEl.textContent = declineLine;
+            return;
+          }
+          handleClose();
+        }),
       );
     } else if (npc.dialog.kind === 'phishing-quiz') {
       // #146: the same trigger layout; the action opens the quiz. Closed
