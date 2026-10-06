@@ -69,5 +69,9 @@ export const remoteLounge: RoomDefinition = {
     { npcId: 'michael-shirk', tile: { col: 6, row: 0 }, offset: { x: 30, y: -10 } },
     { npcId: 'matthew-wonkovich', tile: { col: 11, row: 0 }, offset: { x: 50, y: 0 } },
     { npcId: 'joshua-jameson', tile: { col: 0, row: 4 }, offset: { x: -30, y: -10 } },
+    // The design's front corner spot, (12, 10), is past the grid's last
+    // tile, so Nick stands on (11, 9) drawn 25 px nearer the corner.
+    { npcId: 'nick-carson', tile: { col: 11, row: 9 }, offset: { x: 0, y: 25 } },
+    { npcId: 'chris-nyberg', tile: { col: 8, row: 4 }, offset: { x: 10, y: -10 } },
   ],
 };
