@@ -25,6 +25,8 @@ export const REMOTE_LOUNGE_NPC_IDS = {
   shirk: 'michael-shirk',
   wonkovich: 'matthew-wonkovich',
   jameson: 'joshua-jameson',
+  carson: 'nick-carson',
+  nyberg: 'chris-nyberg',
 } as const;
 
 export type RemoteLoungeNpcId = (typeof REMOTE_LOUNGE_NPC_IDS)[keyof typeof REMOTE_LOUNGE_NPC_IDS];
@@ -32,8 +34,8 @@ export type RemoteLoungeNpcId = (typeof REMOTE_LOUNGE_NPC_IDS)[keyof typeof REMO
 /**
  * The design pops one person's quote at a time, every 4 s, for 3.2 s
  * (`popQuote`), first at 1.2 s, picking at random. A bubble cycle can't pick
- * at random, so this takes them in the design's own order instead: 16 people
- * at 4 s apart is a 64 s cycle, each person shown for 3.2 s of it.
+ * at random, so this takes them in the design's own order instead: 18 people
+ * at 4 s apart is a 72 s cycle, each person shown for 3.2 s of it.
  */
 const QUOTE_EVERY_S = 4;
 const QUOTE_SHOWN_S = 3.2;

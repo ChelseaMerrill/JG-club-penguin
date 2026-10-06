@@ -70,7 +70,7 @@ describe('createRemoteLounge', () => {
     expect(q('.remote-lounge__card').hidden).toBe(false);
     expect(q('.remote-lounge__card-name').textContent).toBe('Matt Anderson');
     expect(q('.remote-lounge__card-title').textContent).toBe('Principal Engineer');
-    expect(q('.remote-lounge__card-index').textContent).toBe('4 / 16');
+    expect(q('.remote-lounge__card-index').textContent).toBe('4 / 18');
     expect(rows[3]!.getAttribute('aria-pressed')).toBe('true');
     expect(overlays.current()).toBe(REMOTE_CARD_OVERLAY_ID);
   });
@@ -116,7 +116,7 @@ describe('createRemoteLounge', () => {
     const { q, root } = setup();
     root.querySelector<HTMLButtonElement>('.remote-lounge__roster-item')!.click();
     q<HTMLButtonElement>('[aria-label="Previous"]').click();
-    expect(q('.remote-lounge__card-name').textContent).toBe('Joshua Jameson');
+    expect(q('.remote-lounge__card-name').textContent).toBe('Chris Nyberg');
     q<HTMLButtonElement>('[aria-label="Next"]').click();
     expect(q('.remote-lounge__card-name').textContent).toBe('Matt Bessler');
 

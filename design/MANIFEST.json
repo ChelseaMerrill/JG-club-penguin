@@ -2,10 +2,10 @@
   "tool": "claude-design",
   "source": "6050d967-ba2e-4edd-819f-f7dcf4ed9d61",
   "source_url": "https://claude.ai/design/p/6050d967-ba2e-4edd-819f-f7dcf4ed9d61",
-  "synced": "2026-10-05",
+  "synced": "2026-10-06",
   "synced_by": "Chelsea Merrill",
-  "snapshot": "snap2",
-  "plan_id": "2caeddf39c5c",
+  "snapshot": "snap3",
+  "plan_id": "959f6851cd75",
   "files": {
     "Canvas.dc.html": {
       "sha256": "d3a65cc8ce0e759849eaa1ca985d0fbc49bafb3212f9029731ca08d1bda42293",
@@ -84,8 +84,8 @@
       "bytes": 604
     },
     "Remote Area.html": {
-      "sha256": "eb37cca21f869a2cab52602afed53f5684c516d627927e0cf75876bdaff1036d",
-      "bytes": 69556
+      "sha256": "65fa391b0ee3284d8cfadd5931d28a92cb44c69407f98be630dfa7689eeff018",
+      "bytes": 77365
     },
     "Room 00 JGHQ Lobby.dc.html": {
       "sha256": "7e8afd0c908f31c4997273338b6af50163a474a3b7b32ef7948ac2c9b9d503f6",
