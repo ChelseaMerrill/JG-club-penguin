@@ -1,7 +1,7 @@
 /**
  * Bug Squash's pure game logic: spawns and expires bugs across a 16-cell
  * grid, scores hits with a combo multiplier, and tracks build lights until
- * three escapes end the round. DOM-free and driven entirely by an injected
+ * five escapes end the round (#181). DOM-free and driven entirely by an injected
  * `rng` and explicit `tick(dtSeconds)` calls, so it's deterministically
  * unit-testable without touching `document`, a real clock, or real
  * randomness. Ported from `design/Minigame Bug Squash.dc.html`'s `tick`/
@@ -43,7 +43,7 @@ export const CELL_KEYS: readonly string[] = [
  *  keeps the shell's own timer at the same value). */
 export const ROUND_SECONDS = 60;
 
-export const MAX_LIGHTS = 3;
+export const MAX_LIGHTS = 5;
 export const MAX_COMBO_MULTIPLIER = 4;
 export const CYAN_POINTS = 10;
 export const FLAKY_POINTS = 25;
@@ -81,10 +81,10 @@ export interface BugSquashState {
   /** The best `comboMultiplier` reached this round; reported as the
    *  `bestCombo` stat. */
   bestComboMultiplier: number;
-  /** Remaining build lights, `3` down to `0`. */
+  /** Remaining build lights, `5` down to `0`. */
   lights: number;
   escaped: number;
-  /** True once `lights` has reached 0 (three escapes). The DOM layer calls
+  /** True once `lights` has reached 0 (five escapes). The DOM layer calls
    *  `context.finish()` when this flips true. */
   ended: boolean;
   cells: readonly BugSquashCell[];
@@ -142,9 +142,9 @@ function spawnProbability(elapsedSec: number): number {
 
 function maxConcurrentBugs(elapsedSec: number): number {
   const elapsed = clampElapsed(elapsedSec);
-  if (elapsed < 20) return 2;
-  if (elapsed < 40) return 3;
-  return 4;
+  if (elapsed < 20) return 1;
+  if (elapsed < 40) return 2;
+  return 3;
 }
 
 function spawnTtlMs(elapsedSec: number): number {

@@ -132,7 +132,7 @@ describe('createNpcDialog', () => {
     unsubscribe();
   });
 
-  it("Ian's buttons: GRAB THE HAMMER launches bug-squash and closes; NOT MY TICKET just closes", () => {
+  it("Ian's buttons: GRAB THE HAMMER launches bug-squash and closes; NOT MY TICKET shows his decline line and keeps the dialog open (#181)", () => {
     const { root, launchMinigame } = setup();
     gameEvents.emit('npc:arrived', { npcId: 'ian' });
 
@@ -152,6 +152,11 @@ describe('createNpcDialog', () => {
     ) as HTMLButtonElement;
     declineButton.click();
 
+    expect(lineText(root)).toBe('Cool. Enjoy the red build.');
+    expect(panel(root).hidden).toBe(false);
+    expect(overlays!.current()).toBe(NPC_DIALOG_OVERLAY_ID);
+
+    (root.querySelector('.npc-dialog__close') as HTMLButtonElement).click();
     expect(panel(root).hidden).toBe(true);
   });
 
