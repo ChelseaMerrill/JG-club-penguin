@@ -160,6 +160,33 @@ export const QUEST_DEFINITIONS: readonly QuestDefinition[] = [
       },
     ],
   },
+  {
+    kind: 'steps',
+    id: 'igloo-badge',
+    title: 'Decorate your igloo with a JG badge',
+    location: 'THE MARKET · IGLOO GEAR',
+    rewardTokens: 75,
+    steps: [
+      {
+        id: 'talk-to-casey',
+        label: 'Talk to Casey at the Igloo Gear stall',
+        hint: 'Talk to Casey',
+        roomId: 'roof-deck',
+      },
+      {
+        id: 'buy-jg-award',
+        label: 'Buy a JG award from Casey',
+        hint: 'Buy a JG award',
+        roomId: 'roof-deck',
+      },
+      {
+        id: 'hang-jg-award',
+        label: 'Hang the award on an igloo wall',
+        hint: 'Hang the award in your Igloo',
+        roomId: 'igloo',
+      },
+    ],
+  },
   minigameQuest('bug-squash', 'Bug Squash', 'dev-pit', 'TALK TO IAN', 'Score 500 in one round'),
   minigameQuest(
     'pancake-flip',

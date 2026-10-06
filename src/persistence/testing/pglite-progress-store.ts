@@ -52,6 +52,7 @@ export const MIGRATIONS = [
   ['beystadium', '20260928000000_beystadium.sql'],
   ['phishing-quiz', '20260928020000_phishing_quiz.sql'],
   ['quest-registry', '20261006000000_quest_registry.sql'],
+  ['quest-igloo-badge', '20261006010000_quest_igloo_badge.sql'],
 ] as const;
 
 export type MigrationName = (typeof MIGRATIONS)[number][0];
@@ -374,6 +375,11 @@ function createSqlProgressStore(db: PGliteInterface, playerId: string): Progress
     await runAsPlayer((tx) => tx.query('select public.mark_dev_pit_visited()'));
   }
 
+  // #143: the Igloo Badge Quest's "talk to Casey" flag.
+  async function markCaseyTalked(): Promise<void> {
+    await runAsPlayer((tx) => tx.query('select public.mark_casey_talked()'));
+  }
+
   async function completeQuest(questId: string): Promise<CompleteQuestResult> {
     return runAsPlayer(async (tx) => {
       const res = await tx.query<{ result: CompleteQuestResult }>(
@@ -403,6 +409,7 @@ function createSqlProgressStore(db: PGliteInterface, playerId: string): Progress
     leaderboard,
     questProgress,
     markDevPitVisited,
+    markCaseyTalked,
     completeQuest,
     checkBadges,
   };

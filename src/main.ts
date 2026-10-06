@@ -77,7 +77,7 @@ import {
 } from './snowball/dev-snowball-hook';
 import { DEFAULT_LOOK, type EmoteId, type PenguinLook, type RoomBroadcastMap } from './contracts';
 import { createInMemoryProgressStore } from './persistence/in-memory-progress-store';
-import type { ProgressStore } from './persistence/progress-store';
+import type { IglooSlot, ProgressStore } from './persistence/progress-store';
 import { createActiveProgressStore, createProgressSession } from './persistence/progress-session';
 import {
   createSupabaseProgressStore,
@@ -93,7 +93,7 @@ import { createPenguinLoadError } from './ui/penguin-load-error';
 import { createPenguinEditor } from './penguin/penguin-editor';
 import { initDevCreatorHook, withDevLoadFailures } from './penguin/dev-creator-hook';
 import { createNpcDialog } from './ui/npc-dialog/npc-dialog';
-import { hasQuestStarter, startQuest } from './npcs/quest-giver';
+import { hasQuestStarter, registerQuestStarter, startQuest } from './npcs/quest-giver';
 import { recordNpcTalked, recordOpenStall } from './game/rooms/dev-room-hook';
 import { createTrophyCase, TROPHY_CASE_OVERLAY_ID } from './ui/trophy-case';
 import { createMapScreen } from './ui/map-screen';
@@ -901,7 +901,16 @@ const questAwareStore: ProgressStore = {
   recordRound: (minigameId, score, stats) =>
     refreshQuestsAfter(progressStore.recordRound(minigameId, score, stats)),
   purchase: (itemId) => refreshQuestsAfter(progressStore.purchase(itemId)),
+  // #143: the Igloo Badge Quest's "talk to Casey" step.
+  markCaseyTalked: () => refreshQuestsAfter(progressStore.markCaseyTalked()),
 };
+
+// #143: Casey's "Got any work for me?" starts the Igloo Badge Quest by
+// recording the "talk to Casey" step; the engine claims the Quest itself
+// once every step (this one, the purchase and the wall placement) is met.
+registerQuestStarter('igloo-badge', () => {
+  void questAwareStore.markCaseyTalked();
+});
 
 const minigameLauncher = createMinigameLauncher({
   layer: getUiLayer(),
@@ -971,7 +980,14 @@ iglooEditor = createIglooEditor(uiLayer, {
     roomScene?.setFurnitureEditMode(on);
     if (on) setSnowballMode(false);
   },
-  onSlotsChanged: () => void refreshIglooFurniture(),
+  onSlotsChanged: () => {
+    void refreshIglooFurniture();
+    // #143: the Igloo Badge Quest's "hang the award" step depends on slot
+    // state, so a placement needs its own refresh (recordRound/purchase
+    // already get one through `questAwareStore`; `iglooEditor` calls
+    // `progressStore.setSlot` directly, above).
+    void quests.refresh();
+  },
 });
 
 gameEvents.on('room:leave', ({ roomId }) => {
@@ -1043,6 +1059,13 @@ if (e2eHooksEnabled) {
     },
     async purchase(itemId) {
       await questAwareStore.purchase(itemId);
+    },
+    async markCaseyTalked() {
+      await questAwareStore.markCaseyTalked();
+    },
+    async setSlot(slot, itemId) {
+      await progressStore.setSlot(slot as IglooSlot, itemId);
+      void quests.refresh();
     },
   };
 }

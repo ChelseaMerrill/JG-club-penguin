@@ -1157,6 +1157,8 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     bubbleOffsetX: -90,
     dialog: IGLOO_GEAR_STALL_DIALOG,
     figure: CASEY_FIGURE,
+    // #143: the Igloo Badge Quest's giver; "talk to Casey" starts it.
+    questGiver: { questId: 'igloo-badge', startStepId: 'talk-to-casey' },
   },
   tom: {
     id: 'tom',

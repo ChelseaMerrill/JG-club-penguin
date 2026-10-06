@@ -878,6 +878,12 @@ export function describeProgressStoreContract(
               'finish-pancake-flip': false,
               'buy-igloo-gear': false,
             },
+            // #143
+            'igloo-badge': {
+              'talk-to-casey': false,
+              'buy-jg-award': false,
+              'hang-jg-award': false,
+            },
           },
         });
       });

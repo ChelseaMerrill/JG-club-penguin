@@ -43,6 +43,7 @@ describe('questsInBuild', () => {
 
     expect(questsInBuild(QUEST_DEFINITIONS, registry).map((q) => q.id)).toEqual([
       'main',
+      'igloo-badge',
       'bug-squash',
       'pancake-flip',
     ]);

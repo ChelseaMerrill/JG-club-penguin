@@ -219,3 +219,95 @@ describe('createInMemoryProgressStore steps Quest registry', () => {
     expect((await store.questProgress()).questSteps).not.toHaveProperty('proof-extra');
   });
 });
+
+// #143: the Igloo Badge Quest, registered permanently (not a test-only
+// 'proof-extra' entry) by in-memory-steps-quests.ts's own module load.
+describe('createInMemoryProgressStore igloo-badge Quest (#143)', () => {
+  it('seeds the igloo-badge Quest with its 75-Token reward', () => {
+    expect(IN_MEMORY_STEPS_QUESTS.get('igloo-badge')?.rewardTokens).toBe(75);
+  });
+
+  it('markCaseyTalked is idempotent and meets only talk-to-casey', async () => {
+    const store = createInMemoryProgressStore({ completedLook: DEFAULT_LOOK });
+
+    await store.markCaseyTalked();
+    await store.markCaseyTalked();
+
+    expect((await store.questProgress()).questSteps['igloo-badge']).toEqual({
+      'talk-to-casey': true,
+      'buy-jg-award': false,
+      'hang-jg-award': false,
+    });
+  });
+
+  it('buying a non-award item never meets buy-jg-award; buying a JG award does', async () => {
+    const store = createInMemoryProgressStore({ completedLook: DEFAULT_LOOK });
+
+    await store.purchase('jg-pennant');
+    expect((await store.questProgress()).questSteps['igloo-badge']['buy-jg-award']).toBe(false);
+
+    await store.purchase('award-bptw');
+    expect((await store.questProgress()).questSteps['igloo-badge']['buy-jg-award']).toBe(true);
+  });
+
+  it('hanging a JG award in a wall slot meets hang-jg-award; a floor slot rejects it', async () => {
+    const store = createInMemoryProgressStore({ completedLook: DEFAULT_LOOK });
+    await store.purchase('award-bptw');
+
+    await expect(store.setSlot(1, 'award-bptw')).rejects.toMatchObject({
+      code: 'wrong_placement',
+    });
+    expect((await store.questProgress()).questSteps['igloo-badge']['hang-jg-award']).toBe(false);
+
+    await store.setSlot(7, 'award-bptw');
+    expect((await store.questProgress()).questSteps['igloo-badge']['hang-jg-award']).toBe(true);
+  });
+
+  it('pays 75 Tokens once all three steps are met, and nothing again after', async () => {
+    const store = createInMemoryProgressStore({ completedLook: DEFAULT_LOOK });
+    await store.markCaseyTalked();
+    await store.purchase('award-bptw');
+    await store.setSlot(7, 'award-bptw');
+
+    const first = await store.completeQuest('igloo-badge');
+    const second = await store.completeQuest('igloo-badge');
+
+    expect(first).toEqual({
+      tokensAwarded: 75,
+      balance: 115,
+      alreadyCompleted: false,
+      badgesEarned: [],
+    });
+    expect(second).toEqual({
+      tokensAwarded: 0,
+      balance: 115,
+      alreadyCompleted: true,
+      badgesEarned: [],
+    });
+  });
+
+  it('refuses while any step is unmet, paying nothing', async () => {
+    const store = createInMemoryProgressStore({ completedLook: DEFAULT_LOOK });
+    await store.markCaseyTalked();
+    await store.purchase('award-bptw');
+
+    await expect(store.completeQuest('igloo-badge')).rejects.toMatchObject({
+      code: 'quest_incomplete',
+    });
+    expect((await store.loadAll()).tokens).toBe(40);
+  });
+
+  it('credits a Player who already owns and had hung an award, and had talked, before the Quest is ever claimed (earlier play counts, #46)', async () => {
+    const store = createInMemoryProgressStore({ completedLook: DEFAULT_LOOK });
+    // Out of order, and nothing claimed in between -- exactly like a Player
+    // who did all of this before the Quest existed.
+    await store.purchase('award-bptw');
+    await store.setSlot(7, 'award-bptw');
+    await store.markCaseyTalked();
+
+    await expect(store.completeQuest('igloo-badge')).resolves.toMatchObject({
+      tokensAwarded: 75,
+      alreadyCompleted: false,
+    });
+  });
+});

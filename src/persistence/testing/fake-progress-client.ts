@@ -90,6 +90,8 @@ export interface FakeResponses {
   /** #46 */
   questProgress?: FakeResult<unknown>;
   markDevPitVisited?: FakeResult<unknown>;
+  /** #143 */
+  markCaseyTalked?: FakeResult<unknown>;
   completeQuest?: FakeResult<unknown>;
 }
 
@@ -160,6 +162,8 @@ export function makeFakeClient(responses: FakeResponses = {}): {
     } satisfies FakeResult<unknown>);
   const markDevPitVisited =
     responses.markDevPitVisited ?? ({ data: null, error: null } satisfies FakeResult<unknown>);
+  const markCaseyTalked =
+    responses.markCaseyTalked ?? ({ data: null, error: null } satisfies FakeResult<unknown>);
   const completeQuest =
     responses.completeQuest ??
     ({
@@ -323,6 +327,9 @@ export function makeFakeClient(responses: FakeResponses = {}): {
       }
       if (fn === 'mark_dev_pit_visited') {
         return Promise.resolve(markDevPitVisited);
+      }
+      if (fn === 'mark_casey_talked') {
+        return Promise.resolve(markCaseyTalked);
       }
       if (fn === 'complete_quest') {
         return Promise.resolve(completeQuest);

@@ -401,6 +401,15 @@ export interface ProgressStore {
   markDevPitVisited(): Promise<void>;
 
   /**
+   * Records the Player's first "talk to Casey" moment for the Igloo Badge
+   * Quest (#143's `quest_steps__igloo_badge` 'talk-to-casey' step), the same
+   * client-asserted, idempotent shape as `markDevPitVisited`: the first call
+   * sticks. Always the caller's own row -- there is no Player id argument,
+   * so no caller can ever mark it for someone else.
+   */
+  markCaseyTalked(): Promise<void>;
+
+  /**
    * Asks the server to pay the steps Quest `questId` (any `kind: 'steps'`
    * id in `QUEST_DEFINITIONS` that the server registers in `public.quests`;
    * the Minigame Quests have no RPC). The server checks every one of that

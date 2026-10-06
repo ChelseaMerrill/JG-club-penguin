@@ -11,4 +11,8 @@
 export interface QuestsTestHandle {
   recordRound(minigameId: string, score: number, stats: Record<string, number>): Promise<void>;
   purchase(itemId: string): Promise<void>;
+  /** #143: the Igloo Badge Quest's "talk to Casey" step, without driving the NPC dialog. */
+  markCaseyTalked(): Promise<void>;
+  /** #143: hangs (or empties, with `null`) an Igloo slot without driving the Igloo editor. */
+  setSlot(slot: number, itemId: string | null): Promise<void>;
 }

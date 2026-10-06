@@ -305,6 +305,7 @@ function wrapStore(
       leaderboard,
       questProgress: () => store.questProgress(),
       markDevPitVisited: () => store.markDevPitVisited(),
+      markCaseyTalked: () => store.markCaseyTalked(),
       completeQuest,
       checkBadges,
     },
@@ -422,6 +423,7 @@ export function createActiveProgressStore(
     leaderboard: async (minigameId, maxRows) => current().leaderboard(minigameId, maxRows),
     questProgress: async () => current().questProgress(),
     markDevPitVisited: async () => current().markDevPitVisited(),
+    markCaseyTalked: async () => current().markCaseyTalked(),
     completeQuest: async (questId) => current().completeQuest(questId),
     checkBadges: async () => current().checkBadges(),
   };

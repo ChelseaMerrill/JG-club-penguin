@@ -108,11 +108,11 @@ test('the widget tracks the main Quest and opens the Quests panel; TRACK and BAD
   const panel = page.locator('.quests');
   await expect(panel).toBeVisible();
   await expect(widget).toBeHidden();
-  // Main + one per registered Minigame (Bug Squash, Pancake Flip, Snow Cone
-  // Stand, Coffee Rush, Beystadium).
-  await expect(panel.locator('[data-quests-tab="active"]')).toHaveText('ACTIVE · 6');
+  // Main + the Igloo Badge Quest (#143) + one per registered Minigame (Bug
+  // Squash, Pancake Flip, Snow Cone Stand, Coffee Rush, Beystadium).
+  await expect(panel.locator('[data-quests-tab="active"]')).toHaveText('ACTIVE · 7');
   await expect(panel.locator('[data-quests-tab="done"]')).toHaveText('DONE · 0');
-  await expect(panel.locator('.quests__row')).toHaveCount(6);
+  await expect(panel.locator('.quests__row')).toHaveCount(7);
   const bey = panel.locator('[data-quest-id="beystadium"]');
   await expect(bey.locator('.quests__row-title')).toHaveText('LET IT RIP · WIN 3 MATCHES');
   await expect(bey.locator('.quests__row-location')).toHaveText('TEAM ROOM 4 · TALK TO MICHAEL');
@@ -122,6 +122,13 @@ test('the widget tracks the main Quest and opens the Quests panel; TRACK and BAD
   await expect(main.locator('.quests__row-location')).toHaveText('MAIN · ANY ROOM');
   await expect(main.locator('.quests__row-reward')).toHaveText('150');
   await expect(main.locator('.quests__row-status')).toHaveText('TRACKING');
+  const iglooBadge = panel.locator('[data-quest-id="igloo-badge"]');
+  await expect(iglooBadge.locator('.quests__row-title')).toHaveText(
+    'Decorate your igloo with a JG badge',
+  );
+  await expect(iglooBadge.locator('.quests__row-location')).toHaveText('THE MARKET · IGLOO GEAR');
+  await expect(iglooBadge.locator('.quests__row-progress')).toHaveText('0 / 3');
+  await expect(iglooBadge.locator('.quests__row-reward')).toHaveText('75');
   const pancake = panel.locator('[data-quest-id="pancake-flip"]');
   await expect(pancake.locator('.quests__row-location')).toHaveText(
     'THE KITCHEN · TALK TO CHELSEA',
@@ -226,9 +233,12 @@ test('steps complete in any order with 3-second toasts; the main Quest pays 150 
   await page.locator('.market__close').click();
   await shot(page, 'quest-complete-banner');
 
-  // The tracked Quest moves on to the next active one.
-  await expect(widget.locator('.quest-widget__title')).toHaveText('Bug Squash');
-  await expect(widget.locator('.quest-widget__count')).toHaveText('0 / 500');
+  // The tracked Quest moves on to the next active one: the Igloo Badge
+  // Quest (#143), the panel entry right after main.
+  await expect(widget.locator('.quest-widget__title')).toHaveText(
+    'Decorate your igloo with a JG badge',
+  );
+  await expect(widget.locator('.quest-widget__count')).toHaveText('0 / 3');
 
   // #138: Ship It's popup appears only once the banner has gone.
   await expect(banner).toBeHidden({ timeout: 5_000 });
@@ -278,6 +288,10 @@ test('every Quest done: the widget shows ALL QUESTS DONE with a line and opens t
       lost: 0,
     });
     await t.purchase('beanbag');
+    // The Igloo Badge Quest (#143): talk, buy a JG award, hang it.
+    await t.markCaseyTalked();
+    await t.purchase('award-bptw');
+    await t.setSlot(7, 'award-bptw');
   });
   // Beystadium's Quest is three match wins, and record_round's anti-farm
   // rule refuses a round less than 10 s after the previous one of the same
@@ -302,9 +316,9 @@ test('every Quest done: the widget shows ALL QUESTS DONE with a line and opens t
   await widget.click();
   const panel = page.locator('.quests');
   await expect(panel).toBeVisible();
-  await expect(panel.locator('[data-quests-tab="done"]')).toHaveText('DONE · 6');
+  await expect(panel.locator('[data-quests-tab="done"]')).toHaveText('DONE · 7');
   await expect(panel.locator('[data-quests-tab="done"]')).toHaveAttribute('aria-pressed', 'true');
-  await expect(panel.locator('.quests__row')).toHaveCount(6);
+  await expect(panel.locator('.quests__row')).toHaveCount(7);
 
   expect(errors).toEqual([]);
 });

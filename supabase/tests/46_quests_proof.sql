@@ -188,6 +188,9 @@ begin
         -- Added by 20260928000000_beystadium.sql (B9): no Beystadium wins here.
         'matchWins', '{}'::jsonb,
         -- Added by 20261006000000_quest_registry.sql (R6): every step met.
+        -- 'igloo-badge' (#143's 20261006010000_quest_igloo_badge.sql) is
+        -- unmet here: this proof never talks to Casey, buys or hangs an
+        -- award.
         'questSteps', jsonb_build_object(
           'main', jsonb_build_object(
             'create-penguin', true,
@@ -195,6 +198,11 @@ begin
             'finish-bug-squash', true,
             'finish-pancake-flip', true,
             'buy-igloo-gear', true
+          ),
+          'igloo-badge', jsonb_build_object(
+            'talk-to-casey', false,
+            'buy-jg-award', false,
+            'hang-jg-award', false
           )
         )
       )

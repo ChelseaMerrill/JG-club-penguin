@@ -217,6 +217,7 @@ export interface ProgressClient {
       | 'leaderboard'
       | 'quest_progress'
       | 'mark_dev_pit_visited'
+      | 'mark_casey_talked'
       | 'complete_quest'
       | 'check_session_badges',
     args: Record<string, unknown>,
@@ -686,6 +687,16 @@ export function createSupabaseProgressStore(
     });
   }
 
+  // #143: the Igloo Badge Quest's "talk to Casey" flag.
+  function markCaseyTalked(): Promise<void> {
+    return guarded(async () => {
+      const { error } = await client.rpc('mark_casey_talked', {});
+      if (error) {
+        throw toProgressError(error);
+      }
+    });
+  }
+
   function completeQuest(questId: string): Promise<CompleteQuestResult> {
     return guarded(async () => {
       const { data, error } = await client.rpc('complete_quest', { quest_id: questId });
@@ -733,6 +744,7 @@ export function createSupabaseProgressStore(
     leaderboard,
     questProgress,
     markDevPitVisited,
+    markCaseyTalked,
     completeQuest,
     checkBadges,
   };

@@ -67,6 +67,7 @@ function deferredStore(): { store: ProgressStore; resolve: (snapshot: ProgressSn
       leaderboard: () => Promise.reject(new Error('unused in this test')),
       questProgress: () => Promise.reject(new Error('unused in this test')),
       markDevPitVisited: () => Promise.reject(new Error('unused in this test')),
+      markCaseyTalked: () => Promise.reject(new Error('unused in this test')),
       completeQuest: () => Promise.reject(new Error('unused in this test')),
       checkBadges: () => Promise.reject(new Error('unused in this test')),
     },
@@ -85,6 +86,7 @@ function failingStore(): ProgressStore {
     leaderboard: () => Promise.reject(new Error('unused in this test')),
     questProgress: () => Promise.reject(new Error('unused in this test')),
     markDevPitVisited: () => Promise.reject(new Error('unused in this test')),
+    markCaseyTalked: () => Promise.reject(new Error('unused in this test')),
     completeQuest: () => Promise.reject(new Error('unused in this test')),
     checkBadges: () => Promise.reject(new Error('unused in this test')),
   };
@@ -261,6 +263,7 @@ describe('createProgressSession', () => {
         leaderboard: () => Promise.reject(new Error('unused in this test')),
         questProgress: () => Promise.reject(new Error('unused in this test')),
         markDevPitVisited: () => Promise.reject(new Error('unused in this test')),
+        markCaseyTalked: () => Promise.reject(new Error('unused in this test')),
         completeQuest: () => Promise.reject(new Error('unused in this test')),
         checkBadges: () => Promise.reject(new Error('unused in this test')),
       };
@@ -333,6 +336,12 @@ describe('createProgressSession', () => {
             'finish-bug-squash': true,
             'finish-pancake-flip': true,
             'buy-igloo-gear': true,
+          },
+          // #143
+          'igloo-badge': {
+            'talk-to-casey': false,
+            'buy-jg-award': false,
+            'hang-jg-award': false,
           },
         },
       });

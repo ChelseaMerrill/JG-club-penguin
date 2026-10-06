@@ -1,5 +1,5 @@
 import type { BadgeId, MinigameId } from '../contracts/game-events';
-import { IGLOO_GEAR_CATALOG } from './minigame-rules';
+import { IGLOO_GEAR_CATALOG, JG_AWARD_ITEM_IDS } from './minigame-rules';
 import { MAIN_QUEST_REWARD, type IglooSlot } from './progress-store';
 
 /**
@@ -23,6 +23,8 @@ export interface InMemoryQuestState {
   badges: readonly BadgeId[];
   bests: Readonly<Partial<Record<MinigameId, number>>>;
   matchWins: Readonly<Partial<Record<MinigameId, number>>>;
+  /** #143: the Igloo Badge Quest's "talk to Casey" flag (`player_quest_state.casey_talked_at`). */
+  caseyTalked: boolean;
 }
 
 /** One registered steps Quest: a `public.quests` row plus its steps function. */
@@ -58,6 +60,20 @@ registerInMemoryStepsQuest('main', {
     'finish-pancake-flip': state.roundsFinished.includes('pancake-flip'),
     'buy-igloo-gear': state.ownedItems.some(
       (itemId) => IGLOO_GEAR_CATALOG.find((item) => item.id === itemId)?.stall === 'igloo',
+    ),
+  }),
+});
+
+// The Igloo Badge Quest (#143): `public.quest_steps__igloo_badge`'s three checks.
+registerInMemoryStepsQuest('igloo-badge', {
+  rewardTokens: 75,
+  steps: (state) => ({
+    'talk-to-casey': state.caseyTalked,
+    'buy-jg-award': state.ownedItems.some((itemId) =>
+      (JG_AWARD_ITEM_IDS as readonly string[]).includes(itemId),
+    ),
+    'hang-jg-award': Object.values(state.slots).some(
+      (itemId) => itemId !== null && (JG_AWARD_ITEM_IDS as readonly string[]).includes(itemId),
     ),
   }),
 });

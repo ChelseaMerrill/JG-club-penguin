@@ -803,6 +803,15 @@ describe('createSupabaseProgressStore', () => {
       expect(calls).toContainEqual(['rpc.mark_dev_pit_visited', {}]);
     });
 
+    it('markCaseyTalked calls mark_casey_talked with no arguments (#143)', async () => {
+      const { client, calls } = makeFakeClient();
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID });
+
+      await store.markCaseyTalked();
+
+      expect(calls).toContainEqual(['rpc.mark_casey_talked', {}]);
+    });
+
     it('completeQuest sends quest_id, emits tokens:changed with the server balance and badge:earned per awarded Badge', async () => {
       const { client, calls } = makeFakeClient({
         completeQuest: {

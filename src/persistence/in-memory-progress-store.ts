@@ -69,6 +69,8 @@ interface PlayerState {
   slots: Record<IglooSlot, string | null>;
   /** #46: the Dev Pit visit flag (`player_quest_state.dev_pit_visited_at`). */
   devPitVisited: boolean;
+  /** #143: the Igloo Badge Quest's "talk to Casey" flag (`player_quest_state.casey_talked_at`). */
+  caseyTalked: boolean;
   /** #46: Quests `completeQuest` has paid (`player_quest_completions`). */
   completedQuests: Set<string>;
 }
@@ -142,6 +144,7 @@ export function createInMemoryProgressStoreWithControls(
     ownedItems: new Map(),
     slots: emptySlots(),
     devPitVisited: false,
+    caseyTalked: false,
     completedQuests: new Set(),
   };
 
@@ -433,6 +436,7 @@ export function createInMemoryProgressStoreWithControls(
       badges: sortedByTimeThenId(state.badges),
       bests: { ...state.bests },
       matchWins: { ...state.matchWins },
+      caseyTalked: state.caseyTalked,
     };
   }
 
@@ -453,6 +457,11 @@ export function createInMemoryProgressStoreWithControls(
 
   async function markDevPitVisited(): Promise<void> {
     state.devPitVisited = true;
+  }
+
+  // #143: the Igloo Badge Quest's "talk to Casey" flag.
+  async function markCaseyTalked(): Promise<void> {
+    state.caseyTalked = true;
   }
 
   async function completeQuest(questId: string): Promise<CompleteQuestResult> {
@@ -509,6 +518,7 @@ export function createInMemoryProgressStoreWithControls(
       leaderboard,
       questProgress,
       markDevPitVisited,
+      markCaseyTalked,
       completeQuest,
       checkBadges,
     },
