@@ -870,6 +870,38 @@ export function describeProgressStoreContract(
           roundsFinished: [],
           completedQuests: [],
           matchWins: {},
+          questSteps: {
+            main: {
+              'create-penguin': false,
+              'visit-dev-pit': false,
+              'finish-bug-squash': false,
+              'finish-pancake-flip': false,
+              'buy-igloo-gear': false,
+            },
+          },
+        });
+      });
+
+      it('reports each main-Quest step in questProgress().questSteps.main as it is met', async () => {
+        const { store } = await makeHarness();
+        await meetMainQuestSteps(store, ['finish-pancake-flip', 'buy-igloo-gear']);
+
+        expect((await store.questProgress()).questSteps.main).toEqual({
+          'create-penguin': true,
+          'visit-dev-pit': true,
+          'finish-bug-squash': true,
+          'finish-pancake-flip': false,
+          'buy-igloo-gear': false,
+        });
+
+        await meetMainQuestSteps(store, ['create-penguin', 'visit-dev-pit', 'finish-bug-squash']);
+
+        expect((await store.questProgress()).questSteps.main).toEqual({
+          'create-penguin': true,
+          'visit-dev-pit': true,
+          'finish-bug-squash': true,
+          'finish-pancake-flip': true,
+          'buy-igloo-gear': true,
         });
       });
 

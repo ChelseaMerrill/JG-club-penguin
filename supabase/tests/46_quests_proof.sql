@@ -186,7 +186,17 @@ begin
         'roundsFinished', jsonb_build_array('bug-squash', 'pancake-flip'),
         'completedQuests', jsonb_build_array('main'),
         -- Added by 20260928000000_beystadium.sql (B9): no Beystadium wins here.
-        'matchWins', '{}'::jsonb
+        'matchWins', '{}'::jsonb,
+        -- Added by 20261006000000_quest_registry.sql (R6): every step met.
+        'questSteps', jsonb_build_object(
+          'main', jsonb_build_object(
+            'create-penguin', true,
+            'visit-dev-pit', true,
+            'finish-bug-squash', true,
+            'finish-pancake-flip', true,
+            'buy-igloo-gear', true
+          )
+        )
       )
     );
     v_detail := array_append(v_detail, format('quest_progress=%s', v_progress));

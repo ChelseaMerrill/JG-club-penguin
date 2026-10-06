@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { MinigameRegistry } from '../minigames/minigame';
-import { QUEST_DEFINITIONS, questsInBuild } from './quest-definitions';
+import { QUEST_DEFINITIONS, questsInBuild, type StepsQuestDefinition } from './quest-definitions';
 import {
   ALL_DONE_LINES,
   evaluateQuests,
@@ -304,5 +304,99 @@ describe('all-done line', () => {
     expect(pickAllDoneLine(() => 0)).toBe('Overachiever. Noted.');
     expect(pickAllDoneLine(() => 0.5)).toBe('Shipped it. Go touch snow.');
     expect(pickAllDoneLine(() => 0.9999)).toBe('Excellence is our approach to everything.');
+  });
+});
+
+// A steps Quest other than 'main' (#140/#141/#143's shape): its steps come
+// from the server's quest_progress().questSteps, not from client-side checks.
+const EXTRA_QUEST: StepsQuestDefinition = {
+  kind: 'steps',
+  id: 'proof-extra',
+  title: 'Proof extra',
+  location: 'EXTRA · DEV PIT',
+  rewardTokens: 40,
+  steps: [
+    { id: 'step-a', label: 'Do step A', hint: 'Do A', roomId: 'dev-pit' },
+    { id: 'step-b', label: 'Do step B', hint: 'Do B', roomId: null },
+  ],
+};
+
+describe('steps Quest evaluation from questSteps', () => {
+  it('reads a steps Quest from questSteps, with the next unmet step as the hint', () => {
+    const inputs = freshPlayer({
+      questSteps: { 'proof-extra': { 'step-a': true, 'step-b': false } },
+    });
+
+    const extra = status(evaluateQuests([EXTRA_QUEST], inputs), 'proof-extra');
+
+    expect(extra.progress).toBe(1);
+    expect(extra.target).toBe(2);
+    expect(extra.done).toBe(false);
+    expect(extra.steps.map((s) => s.done)).toEqual([true, false]);
+    expect(extra.nextHint).toEqual({ text: 'Do B', location: 'ANY ROOM' });
+  });
+
+  it('counts no step of a non-main steps Quest the server reports nothing for', () => {
+    const extra = status(evaluateQuests([EXTRA_QUEST], freshPlayer()), 'proof-extra');
+
+    expect(extra.progress).toBe(0);
+    expect(extra.nextHint).toEqual({ text: 'Do A', location: 'DEV PIT' });
+  });
+
+  it('is done once every step is met, or once the server has paid it', () => {
+    const met = freshPlayer({ questSteps: { 'proof-extra': { 'step-a': true, 'step-b': true } } });
+    const paid = freshPlayer({ completedQuests: ['proof-extra'] });
+
+    expect(status(evaluateQuests([EXTRA_QUEST], met), 'proof-extra').done).toBe(true);
+    expect(status(evaluateQuests([EXTRA_QUEST], paid), 'proof-extra')).toMatchObject({
+      done: true,
+      nextHint: null,
+    });
+  });
+
+  it('toasts a newly met step of a non-main steps Quest with its own count', () => {
+    const before = evaluateQuests(
+      [EXTRA_QUEST],
+      freshPlayer({ questSteps: { 'proof-extra': { 'step-a': true, 'step-b': false } } }),
+    );
+    const after = evaluateQuests(
+      [EXTRA_QUEST],
+      freshPlayer({ questSteps: { 'proof-extra': { 'step-a': true, 'step-b': true } } }),
+    );
+
+    expect(questTransitions(before, after).map(stepToastMessage)).toEqual([
+      'Quest: Do step B ✓ (2 / 2)',
+      '',
+    ]);
+  });
+
+  it("uses the server's main-Quest steps when present", () => {
+    const inputs = freshPlayer({
+      ownedItems: ['beanbag'],
+      questSteps: {
+        main: {
+          'create-penguin': true,
+          'visit-dev-pit': true,
+          'finish-bug-squash': false,
+          'finish-pancake-flip': false,
+          'buy-igloo-gear': true,
+        },
+      },
+    });
+
+    const main = status(evaluateQuests(QUEST_DEFINITIONS, inputs), 'main');
+
+    expect(main.progress).toBe(3);
+    expect(main.nextHint).toEqual({ text: 'Finish Bug Squash', location: 'DEV PIT' });
+  });
+
+  it("falls back to the client's own main-Quest checks for a step the server doesn't report", () => {
+    const inputs = freshPlayer({
+      ownedItems: ['beanbag'],
+      questSteps: { main: { 'visit-dev-pit': true } },
+    });
+
+    // create-penguin and buy-igloo-gear from saved data, visit-dev-pit from the server.
+    expect(status(evaluateQuests(QUEST_DEFINITIONS, inputs), 'main').progress).toBe(3);
   });
 });

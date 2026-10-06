@@ -4,27 +4,44 @@ import type { MinigameRegistry } from '../minigames/minigame';
 import { MINIGAME_RULES, type MinigameRule } from '../persistence/minigame-rules';
 
 /**
- * Quest definitions as data (#46). The build has one main Quest (five steps,
- * counted in any order, paid once by the server's `complete_quest`) plus one
- * Quest per shipped Minigame (its Badge goal; the existing Badge bonus is its
- * reward, so it has no RPC of its own). Every Quest is active from the start.
+ * Quest definitions as data (#46). The build has "steps" Quests -- the main
+ * Quest (five steps) and any later one (#140, #141, #143) -- each with steps
+ * counted in any order and paid once by the server's `complete_quest`, plus
+ * one Quest per shipped Minigame (its Badge goal; the existing Badge bonus is
+ * its reward, so it has no RPC of its own). Every Quest is active from the
+ * start.
+ *
+ * Adding a steps Quest: append a `kind: 'steps'` entry to `QUEST_DEFINITIONS`
+ * whose `id` and step ids match the server's `public.quests` row and
+ * `public.quest_steps__<id>` function (20261006000000_quest_registry.sql),
+ * and register the same Quest with the in-memory fake
+ * (`registerInMemoryStepsQuest`, src/persistence/in-memory-steps-quests.ts).
+ * The engine reads its steps from `QuestProgress.questSteps` and the
+ * controller claims it through `completeQuest(id)`; neither needs a change.
  */
 
-/** The main Quest's id: the only one `ProgressStore.completeQuest` accepts. */
+/** The main Quest's id. */
 export const MAIN_QUEST_ID = 'main';
 
-export type QuestId = typeof MAIN_QUEST_ID | MinigameId;
+/** A steps Quest's id (the server's `public.quests.id`) or a Minigame Quest's id. */
+export type QuestId = string;
 
-/** One main-Quest step, checked against saved progress by `quest-engine.ts`. */
-export type MainQuestStepId =
-  | 'create-penguin'
-  | 'visit-dev-pit'
-  | 'finish-bug-squash'
-  | 'finish-pancake-flip'
-  | 'buy-igloo-gear';
+/** The main Quest's step ids, checked against saved progress by `quest-engine.ts`. */
+export const MAIN_QUEST_STEP_IDS = [
+  'create-penguin',
+  'visit-dev-pit',
+  'finish-bug-squash',
+  'finish-pancake-flip',
+  'buy-igloo-gear',
+] as const;
+
+/** One main-Quest step. */
+export type MainQuestStepId = (typeof MAIN_QUEST_STEP_IDS)[number];
 
 export interface QuestStepDefinition {
-  id: MainQuestStepId;
+  /** The step's id within its Quest: the key in the server's
+   *  `QuestProgress.questSteps[questId]` (a `MainQuestStepId` for 'main'). */
+  id: string;
   /** The ticket's step copy, used in the step toast ("Quest: <label> ✓ (x / 5)"). */
   label: string;
   /** The short form the HUD widget shows as the next step. */
@@ -35,12 +52,14 @@ export interface QuestStepDefinition {
 
 export interface StepsQuestDefinition {
   kind: 'steps';
-  id: typeof MAIN_QUEST_ID;
+  /** The server's `public.quests.id` (lowercase letters, digits and '-'). */
+  id: string;
   title: string;
   /** The panel's small line under the title. */
   location: string;
   steps: readonly QuestStepDefinition[];
-  /** Paid once by `complete_quest`; shown on the panel row and the banner. */
+  /** Paid once by `complete_quest` (the server's `public.quests.reward_tokens`);
+   *  shown on the panel row and the banner. */
   rewardTokens: number;
 }
 
@@ -169,7 +188,7 @@ export const QUEST_DEFINITIONS: readonly QuestDefinition[] = [
 ];
 
 /**
- * The main Quest plus the Quests whose Minigame is registered in `registry`
+ * Every steps Quest plus the Quests whose Minigame is registered in `registry`
  * (`createDefaultMinigameRegistry()`), so a Minigame's Quest appears exactly
  * when its game ships.
  */

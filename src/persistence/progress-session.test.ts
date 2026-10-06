@@ -326,6 +326,15 @@ describe('createProgressSession', () => {
         roundsFinished: ['bug-squash', 'pancake-flip'],
         completedQuests: [],
         matchWins: {},
+        questSteps: {
+          main: {
+            'create-penguin': true,
+            'visit-dev-pit': true,
+            'finish-bug-squash': true,
+            'finish-pancake-flip': true,
+            'buy-igloo-gear': true,
+          },
+        },
       });
       const result = await wrapped.completeQuest('main');
 

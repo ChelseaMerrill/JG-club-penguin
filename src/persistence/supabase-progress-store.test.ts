@@ -720,6 +720,10 @@ describe('createSupabaseProgressStore', () => {
             roundsFinished: ['bug-squash', 'beystadium'],
             completedQuests: [],
             matchWins: { beystadium: 2 },
+            questSteps: {
+              main: { 'create-penguin': true, 'visit-dev-pit': false },
+              'igloo-badge': { 'place-six': false },
+            },
           },
           error: null,
         },
@@ -731,8 +735,50 @@ describe('createSupabaseProgressStore', () => {
         roundsFinished: ['bug-squash', 'beystadium'],
         completedQuests: [],
         matchWins: { beystadium: 2 },
+        questSteps: {
+          main: { 'create-penguin': true, 'visit-dev-pit': false },
+          'igloo-badge': { 'place-six': false },
+        },
       });
       expect(calls).toContainEqual(['rpc.quest_progress', {}]);
+    });
+
+    it('questProgress reads a missing questSteps (an older server) as {}', async () => {
+      const { client } = makeFakeClient({
+        questProgress: {
+          data: { devPitVisited: false, roundsFinished: [], completedQuests: [], matchWins: {} },
+          error: null,
+        },
+      });
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID });
+
+      await expect(store.questProgress()).resolves.toMatchObject({ questSteps: {} });
+    });
+
+    it('questProgress keeps only boolean steps of object-shaped Quests from questSteps', async () => {
+      const { client } = makeFakeClient({
+        questProgress: {
+          data: {
+            devPitVisited: false,
+            roundsFinished: [],
+            completedQuests: [],
+            matchWins: {},
+            questSteps: {
+              main: { 'create-penguin': true, 'visit-dev-pit': 'yes', 'buy-igloo-gear': null },
+              broken: ['create-penguin'],
+              alsoBroken: true,
+            },
+          },
+          error: null,
+        },
+      });
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID });
+
+      await expect(store.questProgress()).resolves.toMatchObject({
+        questSteps: { main: { 'create-penguin': true } },
+      });
+      expect((await store.questProgress()).questSteps).not.toHaveProperty('broken');
+      expect((await store.questProgress()).questSteps).not.toHaveProperty('alsoBroken');
     });
 
     it('questProgress never emits ui:toast on failure', async () => {

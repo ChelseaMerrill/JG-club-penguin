@@ -252,6 +252,31 @@ function toMatchWins(value: unknown): Partial<Record<MinigameId, number>> {
   return wins;
 }
 
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+/**
+ * `quest_progress().questSteps` (20261006000000_quest_registry.sql): Quest id
+ * -> (step id -> met). Keeps only object-shaped Quests and their boolean
+ * steps; anything else (missing on an older server, malformed) reads as no
+ * entry, so a steps Quest falls back to the client's own evaluation or to
+ * "not met" rather than trusting an unexpected shape.
+ */
+function toQuestSteps(value: unknown): Record<string, Record<string, boolean>> {
+  const questSteps: Record<string, Record<string, boolean>> = {};
+  if (!isPlainObject(value)) return questSteps;
+  for (const [questId, steps] of Object.entries(value)) {
+    if (!isPlainObject(steps)) continue;
+    const parsed: Record<string, boolean> = {};
+    for (const [stepId, met] of Object.entries(steps)) {
+      if (typeof met === 'boolean') parsed[stepId] = met;
+    }
+    questSteps[questId] = parsed;
+  }
+  return questSteps;
+}
+
 /**
  * Column -> `PenguinLook` field mapping, exactly `pglite-progress-store.ts`'s
  * `toLook`: `penguin_color` is the body colour, `idle_emote` is the emote,
@@ -648,6 +673,7 @@ export function createSupabaseProgressStore(
       roundsFinished: Array.isArray(result.roundsFinished) ? result.roundsFinished : [],
       completedQuests: Array.isArray(result.completedQuests) ? result.completedQuests : [],
       matchWins: toMatchWins(result.matchWins),
+      questSteps: toQuestSteps(result.questSteps),
     };
   }
 

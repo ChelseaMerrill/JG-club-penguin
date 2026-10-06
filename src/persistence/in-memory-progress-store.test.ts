@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { createEmitter } from '../contracts/emitter';
 import { DEFAULT_LOOK } from '../contracts/penguin';
 import type { BadgeId, GameEventMap } from '../contracts/game-events';
@@ -6,6 +6,7 @@ import {
   createInMemoryProgressStore,
   createInMemoryProgressStoreWithControls,
 } from './in-memory-progress-store';
+import { IN_MEMORY_STEPS_QUESTS, registerInMemoryStepsQuest } from './in-memory-steps-quests';
 import {
   describeProgressStoreContract,
   type ProgressStoreHarness,
@@ -122,5 +123,99 @@ describe('createInMemoryProgressStore event emission', () => {
       store.recordRound('bug-squash', 520, { score: 520, squashed: 520, bestCombo: 0, escaped: 0 }),
     ).resolves.toBeDefined();
     await expect(store.purchase('beanbag')).resolves.toBeDefined();
+  });
+});
+
+// The fake mirrors 20261006000000_quest_registry.sql: a steps Quest is a
+// registry entry (its reward and its steps), and completeQuest pays any
+// registered Quest without knowing about it in advance.
+describe('createInMemoryProgressStore steps Quest registry', () => {
+  const unregister: Array<() => void> = [];
+  afterEach(() => {
+    while (unregister.length > 0) unregister.pop()!();
+  });
+
+  function registerExtraQuest(): { setStepB(met: boolean): void } {
+    let stepB = false;
+    unregister.push(
+      registerInMemoryStepsQuest('proof-extra', {
+        rewardTokens: 40,
+        steps: (state) => ({ 'step-a': state.profileCreatedAt !== null, 'step-b': stepB }),
+      }),
+    );
+    return {
+      setStepB(met: boolean) {
+        stepB = met;
+      },
+    };
+  }
+
+  it('seeds the main Quest with its 150-Token reward', () => {
+    expect(IN_MEMORY_STEPS_QUESTS.get('main')?.rewardTokens).toBe(150);
+  });
+
+  it('refuses a registered Quest with quest_incomplete while one of its steps is false, paying nothing', async () => {
+    registerExtraQuest();
+    const store = createInMemoryProgressStore({ completedLook: DEFAULT_LOOK });
+
+    await expect(store.completeQuest('proof-extra')).rejects.toMatchObject({
+      code: 'quest_incomplete',
+    });
+    expect((await store.loadAll()).tokens).toBe(100);
+    expect((await store.questProgress()).questSteps['proof-extra']).toEqual({
+      'step-a': true,
+      'step-b': false,
+    });
+  });
+
+  it('pays a registered Quest its own reward once, with no Ship It, and reports it done', async () => {
+    const extra = registerExtraQuest();
+    const emitter = createEmitter<GameEventMap>();
+    const badgeEvents: BadgeId[] = [];
+    emitter.on('badge:earned', ({ badgeId }) => badgeEvents.push(badgeId));
+    const store = createInMemoryProgressStore({ emitter, completedLook: DEFAULT_LOOK });
+    extra.setStepB(true);
+
+    const first = await store.completeQuest('proof-extra');
+    const second = await store.completeQuest('proof-extra');
+
+    expect(first).toEqual({
+      tokensAwarded: 40,
+      balance: 140,
+      alreadyCompleted: false,
+      badgesEarned: [],
+    });
+    expect(second).toEqual({
+      tokensAwarded: 0,
+      balance: 140,
+      alreadyCompleted: true,
+      badgesEarned: [],
+    });
+    expect(badgeEvents).toEqual([]);
+    const progress = await store.questProgress();
+    expect(progress.completedQuests).toEqual(['proof-extra']);
+    expect(progress.questSteps['proof-extra']).toEqual({ 'step-a': true, 'step-b': true });
+  });
+
+  it('refuses a registered Quest with no steps as quest_incomplete', async () => {
+    unregister.push(
+      registerInMemoryStepsQuest('proof-empty', { rewardTokens: 10, steps: () => ({}) }),
+    );
+    const store = createInMemoryProgressStore({ completedLook: DEFAULT_LOOK });
+
+    await expect(store.completeQuest('proof-empty')).rejects.toMatchObject({
+      code: 'quest_incomplete',
+    });
+  });
+
+  it('refuses a Quest id once it is unregistered, as unknown_quest', async () => {
+    registerExtraQuest();
+    unregister.pop()!();
+    const store = createInMemoryProgressStore({ completedLook: DEFAULT_LOOK });
+
+    await expect(store.completeQuest('proof-extra')).rejects.toMatchObject({
+      code: 'unknown_quest',
+    });
+    expect((await store.questProgress()).questSteps).not.toHaveProperty('proof-extra');
   });
 });

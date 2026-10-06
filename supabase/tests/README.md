@@ -107,6 +107,8 @@ It also checks `security definer`/`search_path = ''`/one overload each and the
 
    #121's `20260928000000_beystadium.sql` adds `matchWins` to `quest_progress()`,
    so once it is applied this proof expects `matchWins: {}` in that row.
+   `20261006000000_quest_registry.sql` adds `questSteps`, so once it is
+   applied the same row also expects `questSteps.main` with every step met.
 
 ## #138 Badges (gate H1)
 
@@ -344,3 +346,39 @@ overload and the `authenticated`-only grant.
    `true`, including the final `ALL` row. It changes nothing (everything is
    rolled back, so no webhook fires) and prints only booleans, counts and
    error codes.
+
+## Quest registry (reviewer gate; shared by #140, #141 and #143)
+
+`quest_registry_proof.sql` proves `20261006000000_quest_registry.sql`
+(decisions R1-R8 in its header) against the same #9 H1 fixture Player. As
+postgres it checks that `public.quests` holds `('main', 150)` and is closed to
+every client role, that every `public.quests` row has its
+`public.quest_steps__<id>(uuid)` function, and that no `quest_steps__*`
+function (nor `quest_steps_for`) is executable by anon or authenticated --
+so it also catches a later Quest that breaks the convention. As the fixture
+signed in: the steps functions and the table are denied (`42501`);
+`complete_quest` refuses unlisted, malformed and null ids (`unknown_quest`)
+and the main Quest while a step is unmet (`quest_incomplete`);
+`quest_progress().questSteps.main` reports the saved state; the main Quest
+still pays 150 once plus Ship It. It then adds a test-only Quest the way a
+later migration would (a `public.quests` row plus its steps function, with
+`complete_quest`'s body proved unchanged) and shows it is refused while a step
+is false, paid its own reward (no Ship It) once, reported in `questSteps` and
+`completedQuests`; a Quest with no steps (an empty object or no function) is
+refused. As anon every function is denied. It also checks `security
+definer`/`search_path = ''`/one overload each and the grants.
+
+**Apply it before the client that reads `questSteps` merges or deploys**
+(#138's deploy-order rule), after every earlier migration.
+
+1. Local: covered automatically by `sql-quest-registry.test.ts`'s PGlite run
+   in `npm test` (not by `run-local.sh`), including a rerun and the
+   test-only Quests' rollback.
+2. Real Postgres/Supabase: apply `20261006000000_quest_registry.sql` in the
+   SQL editor, then open `quest_registry_proof.sql`, replace every occurrence
+   of `00000000-0000-0000-0000-00000000f1f0` with the real #9 H1 fixture
+   Player's id, and run it. Expect every row's `pass` column to read `true`,
+   including the final `ALL` row. It changes nothing (everything, including
+   the test-only Quests and their functions, is rolled back) and prints only
+   booleans, counts and Token amounts. Then rerun `46_quests_proof.sql` and
+   `138_badges_proof.sql` the same way: both still pass.

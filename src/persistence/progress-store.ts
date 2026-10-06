@@ -133,6 +133,12 @@ export interface QuestProgress {
    *  no entry. Producer: the Beystadium migration's `quest_progress`.
    *  Consumer: the Beystadium Quest's "x / 3" progress. */
   matchWins: Partial<Record<MinigameId, number>>;
+  /** Every server-paid steps Quest's steps for this Player: Quest id ->
+   *  (step id -> met), in the client's step ids (`QuestStepDefinition.id`).
+   *  Producer: 20261006000000_quest_registry.sql's `quest_progress` (one
+   *  entry per `public.quests` row). `{}` from a server without it.
+   *  Consumer: `src/quests/quest-engine.ts`'s step evaluation. */
+  questSteps: Record<string, Record<string, boolean>>;
 }
 
 /**
@@ -160,10 +166,10 @@ export interface BadgeCheckResult {
   balance: number;
 }
 
-/** The Quest ids `completeQuest` accepts: only the main Quest is server-paid (#46). */
-export const SERVER_QUEST_IDS = ['main'] as const;
-
-/** The main Quest's reward, paid once by `complete_quest` (#46). */
+/**
+ * The main Quest's reward, paid once by `complete_quest` (#46;
+ * `public.quests`' 'main' row since 20261006000000_quest_registry.sql).
+ */
 export const MAIN_QUEST_REWARD = 150;
 
 /** `ProgressStore.leaderboard`'s row count when `maxRows` is omitted. */
@@ -205,8 +211,8 @@ export const PROGRESS_ERROR_CODES = [
   // #135: an item placed in a slot of another placement (a wall item in a
   // floor slot, and so on). Raised by `igloo_slots_placement_guard`.
   'wrong_placement',
-  // #46: `complete_quest` with an id other than 'main', or before every
-  // main-Quest step is met.
+  // #46: `complete_quest` with an id that isn't a registered steps Quest
+  // (`public.quests`), or before every one of that Quest's steps is met.
   'unknown_quest',
   'quest_incomplete',
   // #138: a response that doesn't have the shape the client expects (the
@@ -395,10 +401,13 @@ export interface ProgressStore {
   markDevPitVisited(): Promise<void>;
 
   /**
-   * Asks the server to pay `questId` (only 'main'). The server checks every
-   * main-Quest step against saved records and pays `MAIN_QUEST_REWARD` once;
-   * a repeat call resolves `alreadyCompleted: true` and pays nothing.
-   * Rejects with `unknown_quest` or `quest_incomplete`. Emits
+   * Asks the server to pay the steps Quest `questId` (any `kind: 'steps'`
+   * id in `QUEST_DEFINITIONS` that the server registers in `public.quests`;
+   * the Minigame Quests have no RPC). The server checks every one of that
+   * Quest's steps against saved records (`public.quest_steps__<id>`) and pays
+   * its reward once (`MAIN_QUEST_REWARD` for 'main'); a repeat call resolves
+   * `alreadyCompleted: true` and pays nothing. Only 'main' also awards Ship
+   * It. Rejects with `unknown_quest` or `quest_incomplete`. Emits
    * `tokens:changed` with the server's balance on success, as `purchase` does,
    * and `badge:earned` once for each id in `badgesEarned` (#138).
    */

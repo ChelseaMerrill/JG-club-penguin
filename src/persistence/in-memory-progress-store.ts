@@ -21,8 +21,6 @@ import {
 import {
   clampLeaderboardRows,
   IGLOO_SLOTS,
-  MAIN_QUEST_REWARD,
-  SERVER_QUEST_IDS,
   type BadgeCheckResult,
   type CompleteQuestResult,
   type QuestProgress,
@@ -38,6 +36,7 @@ import {
   type PurchaseResult,
   type RoundResult,
 } from './progress-store';
+import { IN_MEMORY_STEPS_QUESTS, type InMemoryQuestState } from './in-memory-steps-quests';
 
 function defaultLook(): PenguinLook {
   return { ...DEFAULT_LOOK };
@@ -416,14 +415,39 @@ export function createInMemoryProgressStoreWithControls(
   }
 
   // #46: mirrors `20260925000000_quests.sql`'s `quest_progress`,
-  // `mark_dev_pit_visited` and `complete_quest`. A finished round is any
-  // recorded round (`lastRoundFinishedAtMs` has an entry), best or not.
+  // `mark_dev_pit_visited` and `complete_quest`, as generalized by
+  // `20261006000000_quest_registry.sql` (every steps Quest comes from
+  // `IN_MEMORY_STEPS_QUESTS`). A finished round is any recorded round
+  // (`lastRoundFinishedAtMs` has an entry), best or not.
+  function roundsFinished(): MinigameId[] {
+    return (Object.keys(state.lastRoundFinishedAtMs) as MinigameId[]).sort();
+  }
+
+  function questState(): InMemoryQuestState {
+    return {
+      profileCreatedAt: state.profileCreatedAt,
+      devPitVisited: state.devPitVisited,
+      roundsFinished: roundsFinished(),
+      ownedItems: sortedByTimeThenId(state.ownedItems),
+      slots: { ...state.slots },
+      badges: sortedByTimeThenId(state.badges),
+      bests: { ...state.bests },
+      matchWins: { ...state.matchWins },
+    };
+  }
+
   async function questProgress(): Promise<QuestProgress> {
+    const view = questState();
+    const questSteps: Record<string, Record<string, boolean>> = {};
+    for (const [id, quest] of IN_MEMORY_STEPS_QUESTS) {
+      questSteps[id] = { ...quest.steps(view) };
+    }
     return {
       devPitVisited: state.devPitVisited,
-      roundsFinished: (Object.keys(state.lastRoundFinishedAtMs) as MinigameId[]).sort(),
+      roundsFinished: roundsFinished(),
       completedQuests: [...state.completedQuests].sort(),
       matchWins: { ...state.matchWins },
+      questSteps,
     };
   }
 
@@ -432,31 +456,28 @@ export function createInMemoryProgressStoreWithControls(
   }
 
   async function completeQuest(questId: string): Promise<CompleteQuestResult> {
-    if (!(SERVER_QUEST_IDS as readonly string[]).includes(questId)) {
+    const quest = IN_MEMORY_STEPS_QUESTS.get(questId);
+    if (!quest) {
       throw new ProgressStoreError('unknown_quest');
     }
     if (state.completedQuests.has(questId)) {
       emitter?.emit('tokens:changed', { balance: state.tokens });
       return { tokensAwarded: 0, balance: state.tokens, alreadyCompleted: true, badgesEarned: [] };
     }
-    const stepsMet =
-      state.profileCreatedAt !== null &&
-      state.devPitVisited &&
-      state.lastRoundFinishedAtMs['bug-squash'] !== undefined &&
-      state.lastRoundFinishedAtMs['pancake-flip'] !== undefined &&
-      state.ownedItems.size > 0;
-    if (!stepsMet) {
+    const steps = Object.values(quest.steps(questState()));
+    if (steps.length === 0 || steps.some((met) => met !== true)) {
       throw new ProgressStoreError('quest_incomplete');
     }
-    state.tokens += MAIN_QUEST_REWARD;
+    state.tokens += quest.rewardTokens;
     state.completedQuests.add(questId);
-    const badgesEarned: BadgeId[] = awardBadge('ship-it') ? ['ship-it'] : [];
+    // #138: Ship It, for the main Quest only.
+    const badgesEarned: BadgeId[] = questId === 'main' && awardBadge('ship-it') ? ['ship-it'] : [];
     emitter?.emit('tokens:changed', { balance: state.tokens });
     for (const badgeId of badgesEarned) {
       emitter?.emit('badge:earned', { badgeId });
     }
     return {
-      tokensAwarded: MAIN_QUEST_REWARD,
+      tokensAwarded: quest.rewardTokens,
       balance: state.tokens,
       alreadyCompleted: false,
       badgesEarned,
