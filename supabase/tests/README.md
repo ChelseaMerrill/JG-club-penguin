@@ -382,3 +382,34 @@ definer`/`search_path = ''`/one overload each and the grants.
    the test-only Quests and their functions, is rolled back) and prints only
    booleans, counts and Token amounts. Then rerun `46_quests_proof.sql` and
    `138_badges_proof.sql` the same way: both still pass.
+
+## Igloo Badge Quest (reviewer gate; #143)
+
+`quest_igloo_badge_proof.sql` proves `20261006010000_quest_igloo_badge.sql`
+against the same #9 H1 fixture Player. As postgres it checks the
+`('igloo-badge', 75)` registry row and its `quest_steps__igloo_badge(uuid)`
+function. As the fixture signed in: `complete_quest('igloo-badge')` refuses
+with `quest_incomplete` (paying nothing) until all three steps are met;
+`mark_casey_talked()` keeps the first time; a non-award item never meets
+`buy-jg-award` and one of the three JG awards does; an award in a floor slot is
+rejected outright (`wrong_placement`) and in a wall slot meets
+`hang-jg-award`; the Quest then pays 75 once, with no Badge, and a second call
+pays nothing. A second Player shows `mark_casey_talked` only touches the
+caller's own row, and that an award already owned and hung before the Quest
+is credited straight away (#46's "earlier play counts" rule). As anon both
+functions are denied (`42501`). It also checks `security definer`/
+`search_path = ''`/one overload each and the grants.
+
+Apply it after `20261006000000_quest_registry.sql`, before the client that
+shows this Quest merges or deploys.
+
+1. Local: covered automatically by `sql-quest-igloo-badge.test.ts`'s PGlite
+   run in `npm test` (not by `run-local.sh`).
+2. Real Postgres/Supabase: apply `20261006010000_quest_igloo_badge.sql` in the
+   SQL editor, then open `quest_igloo_badge_proof.sql`, replace every
+   occurrence of `00000000-0000-0000-0000-00000000f1f0` with the real #9 H1
+   fixture Player's id, and run it. Expect every row's `pass` column to read
+   `true`, including the final `ALL` row. It changes nothing (everything,
+   including Player B, is rolled back) and prints only booleans, counts and
+   Token amounts. Then rerun `quest_registry_proof.sql` the same way: it still
+   passes, and now also checks this Quest's steps function.
