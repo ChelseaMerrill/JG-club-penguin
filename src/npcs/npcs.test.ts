@@ -765,6 +765,11 @@ describe('NPCS', () => {
     ];
     for (const npc of Object.values(NPCS)) {
       if (talkers.includes(npc.id)) continue;
+      // The Remote Lounge's JGers open their person card instead.
+      if (npc.roomId === 'remote-lounge') {
+        expect(npc.dialog).toEqual({ kind: 'remote-card' });
+        continue;
+      }
       expect(npc.dialog).toMatchObject({ kind: 'line' });
     }
   });

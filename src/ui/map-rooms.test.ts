@@ -15,7 +15,7 @@ const COMING_SOON_TILE: MapRoomTile = {
 };
 
 describe('MAP_ROOMS', () => {
-  it('has the 14 design tiles, in the design document order', () => {
+  it('has the 14 design tiles, in the design document order, then the Remote Lounge', () => {
     expect(MAP_ROOMS.map((tile) => tile.number)).toEqual([
       '01',
       '02',
@@ -31,6 +31,7 @@ describe('MAP_ROOMS', () => {
       '12',
       '13',
       '15',
+      '16',
     ]);
   });
 

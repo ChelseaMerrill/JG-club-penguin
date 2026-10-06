@@ -70,7 +70,8 @@ type RoomId =
   | 'team-room-3'
   | 'team-room-4'
   | 'bathroom'
-  | 'the-mullet';
+  | 'the-mullet'
+  | 'remote-lounge';
 
 // Per-Room overrides of STAGE_SELECTOR (#51 D3), for a design file whose
 // first `data-screen-label` element isn't the Stage this Room exports (e.g.
@@ -98,6 +99,16 @@ const ROOM_FILES: Record<RoomId, string> = {
   'team-room-4': 'Team Room 4.dc.html',
   bathroom: 'Room 13 Bathroom.dc.html', // #51 D1: the design calls it THE THAW ROOM.
   'the-mullet': 'The Mullet.dc.html', // #51 slice 3: THE MULLET (MEZZANINE).
+  // Not `Remote Area.dc.html`: that file only redirects here.
+  'remote-lounge': 'Remote Area.html',
+};
+
+// Per-Room overrides of the element `openRoomStage` waits for before it
+// screenshots. Every `.dc.html` design renders into `#dc-root`; `Remote
+// Area.html` is a plain page that draws its own room shell with a script, so
+// it waits for that shell instead.
+const READY_SELECTORS: Partial<Record<RoomId, string>> = {
+  'remote-lounge': '#room polygon',
 };
 
 // A hide rule targets one of three shapes the design markup uses for a live
@@ -1072,6 +1083,35 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
       comment: 'Bottom chat/action toolbar (HUD).',
     },
   ],
+  // `design/Remote Area.html` is a plain script-drawn page, not a `.dc.html`
+  // design, so most of its live parts have their own ids. Its blinking "BACK
+  // TO HQ ↘" pill is HUD chrome, redrawn live by `src/ui/remote-lounge/`.
+  'remote-lounge': [
+    {
+      kind: 'selector',
+      selectors: ['#globeG', '#figs', '#scene > g:not([id])', '#roster', '#card', 'a[data-exit]'],
+      comment:
+        'The spinning globe and its glow, beam and stand; the remote JGers standing on the floor; the layer their quote bubbles pop up in; the roster list; the person card; and the BACK TO HQ pill. The hex pedestal under the globe is part of #room and stays.',
+    },
+    {
+      kind: 'cluster',
+      anchor: 'THE REMOTE LOUNGE',
+      companions: ['THE REMOTE LOUNGE', 'JGERS OUTSIDE HQ'],
+      comment: 'Room title/subtitle banner (HUD).',
+    },
+    {
+      kind: 'cluster',
+      anchor: 'MENU',
+      companions: ['1,250', '12 ONLINE', 'MENU'],
+      comment: 'Top-right token/presence/menu HUD cluster.',
+    },
+    {
+      kind: 'cluster',
+      anchor: 'EMOTE',
+      companions: ['EMOTE', 'SNOWBALL', 'QUESTS'],
+      comment: 'Bottom chat/action toolbar (HUD).',
+    },
+  ],
 };
 
 // Art fixes: geometry corrections applied to the rendered design before
@@ -1720,7 +1760,9 @@ async function openRoomStage(
 
   await page.addInitScript(freezeAnimations);
   await page.goto(`http://127.0.0.1:${port}/${encodeURIComponent(file)}`, { waitUntil: 'load' });
-  await page.waitForSelector('#dc-root', { timeout: PAGE_LOAD_TIMEOUT_MS });
+  await page.waitForSelector(READY_SELECTORS[roomId] ?? '#dc-root', {
+    timeout: PAGE_LOAD_TIMEOUT_MS,
+  });
   const stage = page.locator(STAGE_SELECTORS[roomId] ?? STAGE_SELECTOR);
   await stage.waitFor({ state: 'visible', timeout: PAGE_LOAD_TIMEOUT_MS });
   // Let the @font-face fonts finish loading before screenshotting -- without

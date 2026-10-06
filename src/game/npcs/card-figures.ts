@@ -1,3 +1,4 @@
+import { REMOTE_LOUNGE_CARD_FIGURES } from './remote-lounge-figures';
 import { NPC_TEXT_PATHS } from './text-paths';
 
 /**
@@ -65,6 +66,10 @@ export const CARD_FIGURES = {
   /** `design/Characters.dc.html`'s BRYAN SAMBROOK card. */
   bryanSambrook:
     '<rect x="46" y="104" width="12" height="18" rx="3" fill="#1d1f22" stroke="#0C4B5F" stroke-width="2"/><rect x="62" y="104" width="12" height="18" rx="3" fill="#1d1f22" stroke="#0C4B5F" stroke-width="2"/><rect x="43" y="118" width="17" height="7" rx="3.5" fill="#0f1012" stroke="#0C4B5F" stroke-width="2"/><rect x="60" y="118" width="17" height="7" rx="3.5" fill="#0f1012" stroke="#0C4B5F" stroke-width="2"/><clipPath id="__ID__"><rect x="34" y="66" width="52" height="44" rx="12"/></clipPath><rect x="34" y="66" width="52" height="44" rx="12" fill="#1d1f22" stroke="#0C4B5F" stroke-width="2.5"/><rect x="24" y="70" width="12" height="30" rx="6" fill="#1d1f22" stroke="#0C4B5F" stroke-width="2.5"/><rect x="84" y="70" width="12" height="30" rx="6" fill="#1d1f22" stroke="#0C4B5F" stroke-width="2.5"/><circle cx="30" cy="101" r="5.5" fill="#F6DCC6" stroke="#0C4B5F" stroke-width="2"/><circle cx="90" cy="101" r="5.5" fill="#F6DCC6" stroke="#0C4B5F" stroke-width="2"/><path d="M53 66 L60 74 L67 66" fill="none" stroke="#0C4B5F" stroke-width="2"/><rect x="54" y="58" width="12" height="12" fill="#F6DCC6"/><circle cx="60" cy="40" r="25" fill="#F6DCC6" stroke="#0C4B5F" stroke-width="2.5"/><circle cx="36" cy="42" r="4" fill="#F6DCC6" stroke="#0C4B5F" stroke-width="2"/><circle cx="84" cy="42" r="4" fill="#F6DCC6" stroke="#0C4B5F" stroke-width="2"/><ellipse cx="52" cy="24" rx="6" ry="3" fill="#fff" opacity=".35"/><path d="M40 24 q6 -6 12 -8 M48 18 q8 -5 16 -6 M74 20 q5 3 8 8 M38 32 q3 -4 6 -6" fill="none" stroke="#B3B6C9" stroke-width="2" stroke-linecap="round" opacity=".85"/><path d="M46 34 L54 33 M66 33 L74 34" stroke="#0C4B5F" stroke-width="2" stroke-linecap="round"/><circle cx="51" cy="41" r="2.4" fill="#161719"/><circle cx="69" cy="41" r="2.4" fill="#161719"/><path d="M50 51 Q60 60 70 51" fill="none" stroke="#0C4B5F" stroke-width="2.5" stroke-linecap="round"/><path d="M52 52 Q60 58 68 52 Z" fill="#F4F4F4"/><path d="M40 46 C42 62 50 66 60 66 C70 66 78 62 80 46 C76 56 70 58 60 58 C50 58 44 56 40 46 Z" fill="#5e4128" opacity=".35"/><rect x="41" y="35" width="16" height="12" rx="2.5" fill="none" stroke="#161719" stroke-width="2.5"/><rect x="63" y="35" width="16" height="12" rx="2.5" fill="none" stroke="#161719" stroke-width="2.5"/><line x1="57" y1="40" x2="63" y2="40" stroke="#161719" stroke-width="2.5"/>',
+  // The Remote Lounge's JGers, generated from `design/Remote Area.html`
+  // (`scripts/remote-lounge-figures.ts`): the same verbatim-markup kind of
+  // figure, from that design rather than the Characters sheet.
+  ...REMOTE_LOUNGE_CARD_FIGURES,
 } as const;
 
 export type CardFigureId = keyof typeof CARD_FIGURES;

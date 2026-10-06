@@ -1,5 +1,6 @@
 import { DEFAULT_LOOK, type MinigameId, type PenguinLook, type RoomId } from '../contracts';
 import type { HumanFigureSpec } from '../game/npcs/render-npc-svg';
+import { remoteLoungeNpcs, type RemoteLoungeNpcId } from './remote-lounge-npcs';
 
 /**
  * Every NPC slot id on `main` (#16's five prototype Rooms' `npcSlots`,
@@ -97,7 +98,9 @@ export type NpcId =
   | 'eva-trimboli'
   | 'abby-rivera'
   | 'adam-wilson-hwang'
-  | 'bryan-sambrook';
+  | 'bryan-sambrook'
+  // The Remote Lounge's JGers (`remote-lounge-npcs.ts`).
+  | RemoteLoungeNpcId;
 
 /**
  * A minigame-launching NPC's trigger dialog (#36 D4; round-1 review item 4
@@ -146,7 +149,17 @@ export interface NpcPhishingQuizDialog {
   subtitle: string;
 }
 
-export type NpcDialog = NpcMinigameDialog | NpcStallDialog | NpcLineDialog | NpcPhishingQuizDialog;
+/**
+ * A Remote Lounge JGer: walking up to them opens their person card and flies
+ * the lounge's globe to their city (`src/ui/remote-lounge/remote-lounge.ts`),
+ * never the NPC dialog.
+ */
+export interface NpcRemoteCardDialog {
+  kind: 'remote-card';
+}
+
+export type NpcDialog =
+  NpcMinigameDialog | NpcStallDialog | NpcLineDialog | NpcPhishingQuizDialog | NpcRemoteCardDialog;
 
 /**
  * One line of an NPC's idle speech-bubble cycle, ported from a Room design's
@@ -1949,6 +1962,9 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
   // PR #133) -- dropped here and from the Bathroom's own npcSlots. Spelled
   // "Jessie" there, unlike The Melt's "Jesse" (see that entry's own
   // comment), which remains.
+  // The Remote Lounge's JGers, built from its design's own people list
+  // (`remote-lounge-npcs.ts`).
+  ...remoteLoungeNpcs({ kind: 'remote-card' }),
 };
 
 const NPC_IDS = Object.keys(NPCS) as NpcId[];

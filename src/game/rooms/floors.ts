@@ -39,6 +39,10 @@ export const ROOM_FLOORS: Record<RoomId, FloorId | null> = {
   bathroom: '5',
   // #51 slice 3: THE MULLET is the JG HQ floor's mezzanine.
   'the-mullet': '5',
+  // The Remote Lounge is where the JGers outside HQ hang out, not a room in
+  // 108 State St, so like the Igloo it has no floor and never shows the
+  // Elevator.
+  'remote-lounge': null,
 };
 
 /** Whether `a` and `b` are both real (non-null) floors and differ -- the Elevator's own show condition (#52 D3). */
