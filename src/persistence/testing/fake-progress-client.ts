@@ -93,6 +93,8 @@ export interface FakeResponses {
   /** #143 */
   markCaseyTalked?: FakeResult<unknown>;
   completeQuest?: FakeResult<unknown>;
+  /** #141: every coffee RPC answers with this. */
+  coffeeRun?: FakeResult<unknown>;
 }
 
 export type LoggedCall = [op: string, ...args: unknown[]];
@@ -168,6 +170,19 @@ export function makeFakeClient(responses: FakeResponses = {}): {
     responses.completeQuest ??
     ({
       data: { tokensAwarded: 0, balance: 100, alreadyCompleted: true, badgesEarned: [] },
+      error: null,
+    } satisfies FakeResult<unknown>);
+
+  const coffeeRun =
+    responses.coffeeRun ??
+    ({
+      data: {
+        talkedToNicole: false,
+        kitchenVisited: false,
+        delivered: false,
+        handedOverAt: null,
+        secondsLeft: null,
+      },
       error: null,
     } satisfies FakeResult<unknown>);
 
@@ -336,6 +351,17 @@ export function makeFakeClient(responses: FakeResponses = {}): {
       }
       if (fn === 'check_session_badges') {
         return Promise.resolve(checkSessionBadges);
+      }
+      if (
+        [
+          'coffee_run',
+          'start_coffee_run',
+          'mark_kitchen_visited',
+          'ask_tom_for_coffee',
+          'deliver_coffee',
+        ].includes(fn)
+      ) {
+        return Promise.resolve(coffeeRun);
       }
       throw new Error(`unexpected rpc ${fn}`);
     },

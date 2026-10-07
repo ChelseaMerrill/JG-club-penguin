@@ -1,4 +1,5 @@
 import type { QuestView } from '../quests/quest-controller';
+import { formatCountdown } from '../quests/coffee-run';
 import { progressPercent, type QuestsTab } from './quests-panel';
 import './quests.css';
 
@@ -11,6 +12,11 @@ export interface QuestWidget {
   render(view: QuestView | null): void;
   /** Hides the widget while the Quests panel itself is open (design HUD-QUESTS). */
   setSuppressed(suppressed: boolean): void;
+  /**
+   * A timed step's countdown (#141's 1:00 coffee), shown as " · mm:ss" after
+   * the next step while `questId` is the tracked Quest; `null` hides it.
+   */
+  setCountdown(questId: string, secondsLeft: number | null): void;
 }
 
 /**
@@ -54,7 +60,12 @@ export function createQuestWidget(slot: HTMLElement, options: QuestWidgetOptions
   hintArrow.className = 'quest-widget__hint-arrow';
   hintArrow.setAttribute('aria-hidden', 'true');
   hintArrow.textContent = ' ↘';
-  hint.append(hintText, hintArrow);
+  // #141: the design's "THE MELT → THE ICEBOX · 04:32" countdown.
+  const timer = document.createElement('span');
+  timer.className = 'quest-widget__timer';
+  timer.hidden = true;
+  hint.append(hintText, timer, hintArrow);
+  let countdown: { questId: string; secondsLeft: number } | null = null;
 
   widget.append(head, title, bar, hint);
   slot.append(widget);
@@ -87,11 +98,16 @@ export function createQuestWidget(slot: HTMLElement, options: QuestWidgetOptions
       hintText.textContent = tracked.nextHint
         ? `${tracked.nextHint.text} · ${tracked.nextHint.location}`
         : '';
+      const timed = countdown !== null && countdown.questId === tracked.quest.id;
+      const left = timed && countdown ? formatCountdown(countdown.secondsLeft) : '';
+      timer.hidden = !timed;
+      timer.textContent = timed ? ` · ${left}` : '';
       widget.setAttribute(
         'aria-label',
-        `Quest ${count.textContent}: ${tracked.quest.title}. Open quests`,
+        `Quest ${count.textContent}: ${tracked.quest.title}.${timed ? ` ${left} left.` : ''} Open quests`,
       );
     }
+    if (!tracked || allDone()) timer.hidden = true;
     widget.hidden = suppressed || next === null || (!tracked && !allDone());
   }
 
@@ -99,6 +115,10 @@ export function createQuestWidget(slot: HTMLElement, options: QuestWidgetOptions
     render,
     setSuppressed(value) {
       suppressed = value;
+      render(view);
+    },
+    setCountdown(questId, secondsLeft) {
+      countdown = secondsLeft === null ? null : { questId, secondsLeft };
       render(view);
     },
   };

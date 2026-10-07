@@ -22,6 +22,7 @@ import {
   isProgressErrorCode,
   type BadgeCheckResult,
   type BadgeDefinition,
+  type CoffeeRun,
   type CompleteQuestResult,
   type QuestProgress,
   type IglooSlot,
@@ -53,6 +54,7 @@ export const MIGRATIONS = [
   ['phishing-quiz', '20260928020000_phishing_quiz.sql'],
   ['quest-registry', '20261006000000_quest_registry.sql'],
   ['quest-igloo-badge', '20261006010000_quest_igloo_badge.sql'],
+  ['quest-nicole-coffee', '20261006020000_quest_nicole_coffee.sql'],
 ] as const;
 
 export type MigrationName = (typeof MIGRATIONS)[number][0];
@@ -400,6 +402,14 @@ function createSqlProgressStore(db: PGliteInterface, playerId: string): Progress
     });
   }
 
+  // #141: the Nicole coffee Quest's RPCs, as the Supabase store calls them.
+  async function coffeeRpc(fn: string): Promise<CoffeeRun> {
+    return runAsPlayer(async (tx) => {
+      const res = await tx.query<{ result: CoffeeRun }>(`select public.${fn}() as result`);
+      return res.rows[0].result;
+    });
+  }
+
   return {
     loadAll,
     saveLook,
@@ -412,6 +422,11 @@ function createSqlProgressStore(db: PGliteInterface, playerId: string): Progress
     markCaseyTalked,
     completeQuest,
     checkBadges,
+    coffeeRun: () => coffeeRpc('coffee_run'),
+    talkToNicole: () => coffeeRpc('start_coffee_run'),
+    markKitchenVisited: () => coffeeRpc('mark_kitchen_visited'),
+    askTomForCoffee: () => coffeeRpc('ask_tom_for_coffee'),
+    deliverCoffee: () => coffeeRpc('deliver_coffee'),
   };
 }
 
@@ -462,6 +477,12 @@ export async function createPgliteProgressStoreHarness(): Promise<
       await db.query(
         `update public.minigame_rounds set finished_at = now() - make_interval(secs => $1)
          where player_id = $2`,
+        [seconds, playerId],
+      );
+      // #141: the same for Tom's latest coffee hand-over.
+      await db.query(
+        `update public.player_coffee_runs set handed_over_at = now() - make_interval(secs => $1)
+         where player_id = $2 and handed_over_at is not null`,
         [seconds, playerId],
       );
     },

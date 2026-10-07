@@ -22,6 +22,7 @@ import {
   clampLeaderboardRows,
   IGLOO_SLOTS,
   type BadgeCheckResult,
+  type CoffeeRun,
   type CompleteQuestResult,
   type QuestProgress,
   ProgressStoreError,
@@ -37,6 +38,14 @@ import {
   type RoundResult,
 } from './progress-store';
 import { IN_MEMORY_STEPS_QUESTS, type InMemoryQuestState } from './in-memory-steps-quests';
+import {
+  askTom,
+  coffeeRunView,
+  deliverCoffee,
+  startCoffeeRun,
+  visitKitchen,
+  type CoffeeRunRecord,
+} from './coffee-run-rules';
 
 function defaultLook(): PenguinLook {
   return { ...DEFAULT_LOOK };
@@ -73,6 +82,8 @@ interface PlayerState {
   caseyTalked: boolean;
   /** #46: Quests `completeQuest` has paid (`player_quest_completions`). */
   completedQuests: Set<string>;
+  /** #141: the `player_coffee_runs` row, `null` before talking to Nicole. */
+  coffeeRun: CoffeeRunRecord | null;
 }
 
 /** One rival's Minigame best, for `InMemoryProgressStoreOptions.leaderboardRivals`. Test-only. */
@@ -146,6 +157,7 @@ export function createInMemoryProgressStoreWithControls(
     devPitVisited: false,
     caseyTalked: false,
     completedQuests: new Set(),
+    coffeeRun: null,
   };
 
   async function loadAll(): Promise<ProgressSnapshot> {
@@ -437,6 +449,8 @@ export function createInMemoryProgressStoreWithControls(
       bests: { ...state.bests },
       matchWins: { ...state.matchWins },
       caseyTalked: state.caseyTalked,
+      coffeeRun: state.coffeeRun ? { ...state.coffeeRun } : null,
+      nowMs: now(),
     };
   }
 
@@ -493,6 +507,16 @@ export function createInMemoryProgressStoreWithControls(
     };
   }
 
+  // #141: mirrors 20261006020000_quest_nicole_coffee.sql's RPCs. A refused
+  // step throws before anything is written, as the SQL's raise rolls back.
+  function applyCoffee(
+    step: (record: CoffeeRunRecord | null, nowMs: number) => CoffeeRunRecord,
+  ): CoffeeRun {
+    const nowMs = now();
+    state.coffeeRun = step(state.coffeeRun, nowMs);
+    return coffeeRunView(state.coffeeRun, nowMs);
+  }
+
   // #138: mirrors `check_session_badges` / `evaluate_session_badges`, with
   // the injected clock standing in for the server's `now()`.
   async function checkBadges(): Promise<BadgeCheckResult> {
@@ -521,6 +545,11 @@ export function createInMemoryProgressStoreWithControls(
       markCaseyTalked,
       completeQuest,
       checkBadges,
+      coffeeRun: async () => coffeeRunView(state.coffeeRun, now()),
+      talkToNicole: async () => applyCoffee(startCoffeeRun),
+      markKitchenVisited: async () => applyCoffee(visitKitchen),
+      askTomForCoffee: async () => applyCoffee(askTom),
+      deliverCoffee: async () => applyCoffee(deliverCoffee),
     },
     grantTokens(tokens: number): void {
       state.tokens += tokens;

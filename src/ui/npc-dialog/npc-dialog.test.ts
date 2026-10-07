@@ -4,7 +4,8 @@ import { gameEvents } from '../../contracts';
 import { createOverlayManager, type OverlayManager } from '../hud/overlay-manager';
 import { dialogLinePool } from '../../npcs/dialog-lines';
 import { NPCS } from '../../npcs/npcs';
-import type { QuestStatus } from '../../quests/quest-engine';
+import { QUEST_DEFINITIONS } from '../../quests/quest-definitions';
+import { evaluateQuests, type QuestStatus } from '../../quests/quest-engine';
 import {
   createNpcDialog,
   NPC_DIALOG_OVERLAY_ID,
@@ -560,5 +561,98 @@ describe('createNpcDialog quest givers (#144)', () => {
     );
     expect(labels).toEqual(['GRAB THE HAMMER', 'NOT MY TICKET']);
     expect(document.activeElement?.textContent).toBe('GRAB THE HAMMER');
+  });
+});
+
+describe('createNpcDialog: the Nicole coffee Quest (#141)', () => {
+  function coffeeStatus(steps: Record<string, boolean>): QuestStatus {
+    const statuses = evaluateQuests(QUEST_DEFINITIONS, {
+      profileCreatedAt: '2026-09-25T09:00:00.000Z',
+      bests: {},
+      badges: [],
+      ownedItems: [],
+      devPitVisited: false,
+      roundsFinished: [],
+      completedQuests: [],
+      questSteps: { 'nicole-coffee': steps },
+    });
+    return statuses.find((s) => s.quest.id === 'nicole-coffee')!;
+  }
+
+  const NOT_STARTED = {
+    'talk-to-nicole': false,
+    'visit-kitchen': false,
+    'ask-tom': false,
+    'carry-coffee': false,
+    'deliver-coffee': false,
+  };
+
+  function labels(root: HTMLElement): string[] {
+    return Array.from(root.querySelectorAll('.npc-dialog__actions button')).map(
+      (b) => b.textContent ?? '',
+    );
+  }
+
+  it('Nicole gives the Quest from "Got any work for me?" with her line, keeping the dialog open', () => {
+    const quests: NpcDialogQuests = {
+      status: (id) => (id === 'nicole-coffee' ? coffeeStatus(NOT_STARTED) : undefined),
+      canStart: (id) => id === 'nicole-coffee',
+    };
+    const { root, startQuest } = setup({ quests });
+    gameEvents.emit('npc:arrived', { npcId: 'nicole' });
+
+    questButton(root)!.click();
+
+    expect(startQuest).toHaveBeenCalledWith('nicole-coffee');
+    expect(lineText(root)).toBe('Client call in five. I need an oat latte.');
+    expect(panel(root).hidden).toBe(false);
+  });
+
+  it("adds an extra action after Tom's Coffee Rush buttons, which runs it and closes the dialog", () => {
+    const root = document.createElement('div');
+    document.body.append(root);
+    overlays = createOverlayManager();
+    const ask = vi.fn();
+    const launchMinigame = vi.fn();
+    dialog = createNpcDialog(root, {
+      overlays,
+      actions: { launchMinigame, openStall: vi.fn(), startQuest: vi.fn() },
+      extraActions: (npcId) =>
+        npcId === 'tom' ? [{ label: "Nicole's oat latte?", run: ask }] : [],
+      random: () => 0,
+    });
+
+    gameEvents.emit('npc:arrived', { npcId: 'tom' });
+    expect(labels(root)).toEqual([
+      NPCS.tom.dialog.kind === 'minigame' ? NPCS.tom.dialog.actionLabel : '',
+      NPCS.tom.dialog.kind === 'minigame' ? NPCS.tom.dialog.declineLabel : '',
+      "Nicole's oat latte?",
+    ]);
+    root.querySelector<HTMLButtonElement>('.npc-dialog__button--extra')!.click();
+
+    expect(ask).toHaveBeenCalledTimes(1);
+    expect(launchMinigame).not.toHaveBeenCalled();
+    expect(panel(root).hidden).toBe(true);
+
+    // Coffee Rush still launches from the same dialog.
+    gameEvents.emit('npc:arrived', { npcId: 'tom' });
+    root.querySelector<HTMLButtonElement>('.npc-dialog__button--primary')!.click();
+    expect(launchMinigame).toHaveBeenCalledWith('coffee-rush');
+  });
+
+  it('shows no extra action when none is offered', () => {
+    const root = document.createElement('div');
+    document.body.append(root);
+    overlays = createOverlayManager();
+    dialog = createNpcDialog(root, {
+      overlays,
+      actions: { launchMinigame: vi.fn(), openStall: vi.fn(), startQuest: vi.fn() },
+      extraActions: () => [],
+      random: () => 0,
+    });
+
+    gameEvents.emit('npc:arrived', { npcId: 'tom' });
+
+    expect(root.querySelector('.npc-dialog__button--extra')).toBeNull();
   });
 });

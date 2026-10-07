@@ -1,6 +1,6 @@
 import { gameEvents, type MinigameId } from '../../contracts';
 import { dialogLinePool, pickDialogLine } from '../../npcs/dialog-lines';
-import { getNpcDefinition, type NpcDefinition } from '../../npcs/npcs';
+import { getNpcDefinition, type NpcDefinition, type NpcId } from '../../npcs/npcs';
 import {
   QUEST_GIVER_BUTTON_LABEL,
   resolveQuestGiverResponse,
@@ -36,9 +36,22 @@ export interface NpcDialogQuests {
   canStart: (questId: string) => boolean;
 }
 
+/** A Quest errand button on an NPC's dialog (#141's Tom: Nicole's coffee). */
+export interface NpcExtraAction {
+  label: string;
+  /** Runs on click; the dialog then closes. */
+  run: () => void;
+}
+
 export interface NpcDialogDeps {
   overlays: OverlayManager;
   actions: NpcDialogActions;
+  /**
+   * Extra buttons for this NPC right now, shown after its own buttons and
+   * before "Got any work for me?" (#141: Tom's "Nicole's coffee" while that
+   * Quest needs it, alongside Coffee Rush's). Read on every open.
+   */
+  extraActions?: (npcId: NpcId) => readonly NpcExtraAction[];
   /** Omitted (tests, or before Quests are wired): every quest giver answers as if no Quest were connected. */
   quests?: NpcDialogQuests;
   /** Picks each dialog line (#144 D3); `Math.random` by default, injected by tests. */
@@ -174,6 +187,11 @@ export function createNpcDialog(root: HTMLElement, deps: NpcDialogDeps): NpcDial
         if (response === null) return;
         if (response.kind === 'start') {
           deps.actions.startQuest(response.questId);
+          // #141: a giver with a start line says it, and the dialog stays open.
+          if (npc.questGiver?.startLine !== undefined) {
+            lineEl.textContent = npc.questGiver.startLine;
+            return;
+          }
           handleClose();
           return;
         }
@@ -254,6 +272,14 @@ export function createNpcDialog(root: HTMLElement, deps: NpcDialogDeps): NpcDial
         );
       }
       // 'line': no extra action buttons; the panel's own close button covers it.
+    }
+    for (const extra of deps.extraActions?.(npc.id) ?? []) {
+      actionsEl.append(
+        actionButton('npc-dialog__button npc-dialog__button--extra', extra.label, () => {
+          extra.run();
+          handleClose();
+        }),
+      );
     }
     appendQuestGiverButton(npc);
   }

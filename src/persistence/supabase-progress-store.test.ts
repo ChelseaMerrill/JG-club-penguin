@@ -990,4 +990,77 @@ describe('createSupabaseProgressStore', () => {
       expect(toasts).toEqual([]);
     });
   });
+
+  describe('Nicole coffee Quest (#141)', () => {
+    const CARRYING = {
+      talkedToNicole: true,
+      kitchenVisited: true,
+      delivered: false,
+      handedOverAt: '2026-10-06T19:00:00.000+00:00',
+      secondsLeft: 42.5,
+    };
+
+    it.each([
+      ['coffeeRun', 'coffee_run'],
+      ['talkToNicole', 'start_coffee_run'],
+      ['markKitchenVisited', 'mark_kitchen_visited'],
+      ['askTomForCoffee', 'ask_tom_for_coffee'],
+      ['deliverCoffee', 'deliver_coffee'],
+    ] as const)('%s calls %s with no arguments and returns the run', async (method, rpc) => {
+      const { client, calls } = makeFakeClient({ coffeeRun: { data: CARRYING, error: null } });
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID });
+
+      await expect(store[method]()).resolves.toEqual(CARRYING);
+      expect(calls).toContainEqual([`rpc.${rpc}`, {}]);
+    });
+
+    it('a refused delivery toasts "Your coffee went cold." and rejects with coffee_cold', async () => {
+      const { client } = makeFakeClient({
+        coffeeRun: { data: null, error: { message: 'coffee_cold', code: 'P0001' } },
+      });
+      const toasts: string[] = [];
+      const emitter = createEmitter<GameEventMap>();
+      emitter.on('ui:toast', ({ message }) => toasts.push(message));
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID, emitter });
+
+      await expect(store.deliverCoffee()).rejects.toMatchObject({ code: 'coffee_cold' });
+      expect(toasts).toEqual(['Your coffee went cold.']);
+    });
+
+    it('coffeeRun is a read: a failure rejects without a toast', async () => {
+      const { client } = makeFakeClient({
+        coffeeRun: { data: null, error: { message: 'not_authenticated', code: '42501' } },
+      });
+      const toasts: string[] = [];
+      const emitter = createEmitter<GameEventMap>();
+      emitter.on('ui:toast', ({ message }) => toasts.push(message));
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID, emitter });
+
+      await expect(store.coffeeRun()).rejects.toMatchObject({ code: 'not_authenticated' });
+      expect(toasts).toEqual([]);
+    });
+
+    it.each([
+      ['no data', null],
+      ['a missing flag', { talkedToNicole: true, kitchenVisited: true }],
+      ['a string flag', { ...CARRYING, delivered: 'false' }],
+    ])('rejects a malformed reply (%s) with invalid_response', async (_label, data) => {
+      const { client } = makeFakeClient({ coffeeRun: { data, error: null } });
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID });
+
+      await expect(store.coffeeRun()).rejects.toMatchObject({ code: 'invalid_response' });
+    });
+
+    it('reads a cup as not carried unless both handedOverAt and secondsLeft are present', async () => {
+      const { client } = makeFakeClient({
+        coffeeRun: { data: { ...CARRYING, secondsLeft: null }, error: null },
+      });
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID });
+
+      await expect(store.coffeeRun()).resolves.toMatchObject({
+        handedOverAt: null,
+        secondsLeft: null,
+      });
+    });
+  });
 });

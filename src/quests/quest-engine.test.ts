@@ -46,6 +46,8 @@ describe('questsInBuild', () => {
       'igloo-badge',
       'bug-squash',
       'pancake-flip',
+      // #141: a steps Quest is always in the build.
+      'nicole-coffee',
     ]);
   });
 
@@ -58,6 +60,88 @@ describe('questsInBuild', () => {
 
     expect(without.map((q) => q.id)).not.toContain('coffee-rush');
     expect(withIt.map((q) => q.id)).toContain('coffee-rush');
+  });
+});
+
+describe('the Nicole coffee Quest (#141)', () => {
+  const NONE = {
+    'talk-to-nicole': false,
+    'visit-kitchen': false,
+    'ask-tom': false,
+    'carry-coffee': false,
+    'deliver-coffee': false,
+  };
+
+  function coffee(steps: Record<string, boolean>): QuestStatus {
+    return status(
+      evaluateQuests(QUEST_DEFINITIONS, freshPlayer({ questSteps: { 'nicole-coffee': steps } })),
+      'nicole-coffee',
+    );
+  }
+
+  it("is a 75-Token steps Quest from The Kitchen to The Icebox with the ticket's five steps", () => {
+    const quest = QUEST_DEFINITIONS.find((q) => q.id === 'nicole-coffee') as StepsQuestDefinition;
+
+    expect(quest).toMatchObject({
+      kind: 'steps',
+      title: 'Bring Nicole a coffee before kickoff',
+      location: 'THE KITCHEN → THE ICEBOX',
+      rewardTokens: 75,
+    });
+    expect(quest.steps.map((s) => [s.id, s.label, s.roomId])).toEqual([
+      ['talk-to-nicole', 'Talk to Nicole in The Icebox', 'the-icebox'],
+      ['visit-kitchen', 'Go to The Kitchen', 'the-melt'],
+      ['ask-tom', "Ask Tom for Nicole's coffee", 'the-melt'],
+      ['carry-coffee', 'Carry it back before it goes cold', 'the-icebox'],
+      ['deliver-coffee', 'Hand it to Nicole in The Icebox', 'the-icebox'],
+    ]);
+  });
+
+  it('starts at 0 / 5 pointing at Nicole in The Icebox', () => {
+    const run = coffee(NONE);
+
+    expect(run.progress).toBe(0);
+    expect(run.nextHint).toEqual({ text: 'Talk to Nicole', location: 'THE ICEBOX' });
+  });
+
+  it('while the cup is carried, points back at The Icebox', () => {
+    const run = coffee({ ...NONE, 'talk-to-nicole': true, 'visit-kitchen': true, 'ask-tom': true });
+
+    expect(run.progress).toBe(3);
+    expect(run.nextHint).toEqual({
+      text: 'Carry it back before it goes cold',
+      location: 'THE ICEBOX',
+    });
+  });
+
+  it('after the cup goes cold, falls back to 2 / 5 and asking Tom in The Kitchen', () => {
+    const run = coffee({ ...NONE, 'talk-to-nicole': true, 'visit-kitchen': true });
+
+    expect(run.progress).toBe(2);
+    expect(run.nextHint).toEqual({ text: "Ask Tom for Nicole's coffee", location: 'THE KITCHEN' });
+  });
+
+  it('is done once every step is met, and toasts the last two steps', () => {
+    const carrying = coffee({
+      ...NONE,
+      'talk-to-nicole': true,
+      'visit-kitchen': true,
+      'ask-tom': true,
+    });
+    const delivered = coffee({
+      'talk-to-nicole': true,
+      'visit-kitchen': true,
+      'ask-tom': true,
+      'carry-coffee': true,
+      'deliver-coffee': true,
+    });
+
+    expect(delivered.done).toBe(true);
+    expect(questTransitions([carrying], [delivered]).map(stepToastMessage)).toEqual([
+      'Quest: Carry it back before it goes cold ✓ (5 / 5)',
+      'Quest: Hand it to Nicole in The Icebox ✓ (5 / 5)',
+      '',
+    ]);
   });
 });
 

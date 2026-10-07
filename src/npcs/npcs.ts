@@ -205,6 +205,12 @@ export interface NpcQuestGiver {
   startStepId?: string;
   /** The in-character "nothing right now" reply while no Quest is connected. BA copy only. */
   nothingRightNowLine?: string;
+  /**
+   * What the giver says when they give the Quest (#141's Nicole: "Client
+   * call in five. I need an oat latte."). With it the dialog stays open on
+   * this line; without it, starting the Quest closes the dialog.
+   */
+  startLine?: string;
 }
 
 interface NpcDefinitionBase {
@@ -1289,7 +1295,12 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     kind: 'human',
     tagName: 'Nicole',
     dialogLines: NICOLE_LINES,
-    questGiver: {},
+    // #141: "Bring Nicole a coffee before kickoff", her line verbatim from the ticket.
+    questGiver: {
+      questId: 'nicole-coffee',
+      startStepId: 'talk-to-nicole',
+      startLine: 'Client call in five. I need an oat latte.',
+    },
     idleLines: [
       { text: 'Client call in 5. Shh.', periodS: 15, delayS: -2 },
       { text: 'Account manager mode: on.', periodS: 15, delayS: -7 },

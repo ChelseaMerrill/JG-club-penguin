@@ -212,6 +212,49 @@ export const QUEST_DEFINITIONS: readonly QuestDefinition[] = [
     'TALK TO MICHAEL',
     'Win 3 Beystadium matches',
   ),
+  // #141: Nicole's coffee run, steps in the ticket's order. The server's
+  // `quest_steps__nicole_coffee` (20261006020000_quest_nicole_coffee.sql C4)
+  // reports them; a cup that goes cold resets steps 3-5 until Tom hands over
+  // another. The 1:00 countdown is `src/quests/coffee-run.ts`'s.
+  {
+    kind: 'steps',
+    id: 'nicole-coffee',
+    title: 'Bring Nicole a coffee before kickoff',
+    location: 'THE KITCHEN → THE ICEBOX',
+    rewardTokens: 75,
+    steps: [
+      {
+        id: 'talk-to-nicole',
+        label: 'Talk to Nicole in The Icebox',
+        hint: 'Talk to Nicole',
+        roomId: 'the-icebox',
+      },
+      {
+        id: 'visit-kitchen',
+        label: 'Go to The Kitchen',
+        hint: 'Go to The Kitchen',
+        roomId: 'the-melt',
+      },
+      {
+        id: 'ask-tom',
+        label: "Ask Tom for Nicole's coffee",
+        hint: "Ask Tom for Nicole's coffee",
+        roomId: 'the-melt',
+      },
+      {
+        id: 'carry-coffee',
+        label: 'Carry it back before it goes cold',
+        hint: 'Carry it back before it goes cold',
+        roomId: 'the-icebox',
+      },
+      {
+        id: 'deliver-coffee',
+        label: 'Hand it to Nicole in The Icebox',
+        hint: 'Hand it to Nicole',
+        roomId: 'the-icebox',
+      },
+    ],
+  },
 ];
 
 /**

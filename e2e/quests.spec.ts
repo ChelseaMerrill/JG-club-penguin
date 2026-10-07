@@ -108,11 +108,12 @@ test('the widget tracks the main Quest and opens the Quests panel; TRACK and BAD
   const panel = page.locator('.quests');
   await expect(panel).toBeVisible();
   await expect(widget).toBeHidden();
-  // Main + the Igloo Badge Quest (#143) + one per registered Minigame (Bug
-  // Squash, Pancake Flip, Snow Cone Stand, Coffee Rush, Beystadium).
-  await expect(panel.locator('[data-quests-tab="active"]')).toHaveText('ACTIVE · 7');
+  // Main, the Igloo Badge Quest (#143), Nicole's coffee (#141) + one per
+  // registered Minigame (Bug Squash, Pancake Flip, Snow Cone Stand, Coffee
+  // Rush, Beystadium).
+  await expect(panel.locator('[data-quests-tab="active"]')).toHaveText('ACTIVE · 8');
   await expect(panel.locator('[data-quests-tab="done"]')).toHaveText('DONE · 0');
-  await expect(panel.locator('.quests__row')).toHaveCount(7);
+  await expect(panel.locator('.quests__row')).toHaveCount(8);
   const bey = panel.locator('[data-quest-id="beystadium"]');
   await expect(bey.locator('.quests__row-title')).toHaveText('LET IT RIP · WIN 3 MATCHES');
   await expect(bey.locator('.quests__row-location')).toHaveText('TEAM ROOM 4 · TALK TO MICHAEL');
@@ -292,6 +293,8 @@ test('every Quest done: the widget shows ALL QUESTS DONE with a line and opens t
     await t.markCaseyTalked();
     await t.purchase('award-bptw');
     await t.setSlot(7, 'award-bptw');
+    // #141: Nicole's coffee, delivered in time.
+    await t.finishCoffeeRun();
   });
   // Beystadium's Quest is three match wins, and record_round's anti-farm
   // rule refuses a round less than 10 s after the previous one of the same
@@ -316,9 +319,9 @@ test('every Quest done: the widget shows ALL QUESTS DONE with a line and opens t
   await widget.click();
   const panel = page.locator('.quests');
   await expect(panel).toBeVisible();
-  await expect(panel.locator('[data-quests-tab="done"]')).toHaveText('DONE · 7');
+  await expect(panel.locator('[data-quests-tab="done"]')).toHaveText('DONE · 8');
   await expect(panel.locator('[data-quests-tab="done"]')).toHaveAttribute('aria-pressed', 'true');
-  await expect(panel.locator('.quests__row')).toHaveCount(7);
+  await expect(panel.locator('.quests__row')).toHaveCount(8);
 
   expect(errors).toEqual([]);
 });
