@@ -1,11 +1,16 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createEmitter } from '../contracts/emitter';
 import type { GameEventMap, MinigameStatsMap } from '../contracts/game-events';
 import { DEFAULT_LOOK } from '../contracts/penguin';
 import { createInMemoryProgressStore } from '../persistence/in-memory-progress-store';
+import { registerInMemoryStepsQuest } from '../persistence/in-memory-steps-quests';
 import type { ProgressStore } from '../persistence/progress-store';
 import { createQuestController, TRACKED_QUEST_STORAGE_KEY } from './quest-controller';
-import { QUEST_DEFINITIONS } from './quest-definitions';
+import {
+  QUEST_DEFINITIONS,
+  type QuestDefinition,
+  type StepsQuestDefinition,
+} from './quest-definitions';
 
 const IN_BUILD = QUEST_DEFINITIONS.filter((q) =>
   ['main', 'bug-squash', 'pancake-flip'].includes(q.id),
@@ -44,7 +49,11 @@ async function settle(): Promise<void> {
 }
 
 function setup(
-  options: { store?: ProgressStore; storage?: ReturnType<typeof memoryStorage> | null } = {},
+  options: {
+    store?: ProgressStore;
+    storage?: ReturnType<typeof memoryStorage> | null;
+    quests?: readonly QuestDefinition[];
+  } = {},
 ) {
   const events = createEmitter<GameEventMap>();
   const store =
@@ -54,7 +63,7 @@ function setup(
   const storage = options.storage === undefined ? memoryStorage() : options.storage;
   const controller = createQuestController({
     store,
-    quests: IN_BUILD,
+    quests: options.quests ?? IN_BUILD,
     events,
     storage,
     random: () => 0,
@@ -223,5 +232,79 @@ describe('createQuestController', () => {
     enterRoom('dev-pit');
     await settle();
     expect((await store.questProgress()).devPitVisited).toBe(false);
+  });
+});
+
+// Any steps Quest in the build is claimed like the main Quest: once the
+// server's questSteps say every step is met (#140/#141/#143's shape).
+describe('createQuestController with another steps Quest', () => {
+  const EXTRA_QUEST: StepsQuestDefinition = {
+    kind: 'steps',
+    id: 'proof-extra',
+    title: 'Proof extra',
+    location: 'EXTRA · ANY ROOM',
+    rewardTokens: 40,
+    steps: [
+      { id: 'step-a', label: 'Do step A', hint: 'Do A', roomId: null },
+      { id: 'step-b', label: 'Do step B', hint: 'Do B', roomId: null },
+    ],
+  };
+  const unregister: Array<() => void> = [];
+  afterEach(() => {
+    while (unregister.length > 0) unregister.pop()!();
+  });
+
+  function registerExtra(): { meetStepB(): void } {
+    let stepB = false;
+    unregister.push(
+      registerInMemoryStepsQuest('proof-extra', {
+        rewardTokens: 40,
+        steps: () => ({ 'step-a': true, 'step-b': stepB }),
+      }),
+    );
+    return {
+      meetStepB() {
+        stepB = true;
+      },
+    };
+  }
+
+  it('toasts its step and claims it once when its last step lands, without claiming main', async () => {
+    const extra = registerExtra();
+    const { store, controller, completions, toasts } = setup({
+      quests: [...IN_BUILD, EXTRA_QUEST],
+    });
+    const completeQuest = vi.spyOn(store, 'completeQuest');
+    await controller.start();
+    expect(completions).toEqual([]);
+
+    extra.meetStepB();
+    await controller.refresh();
+    await settle();
+    await controller.refresh();
+
+    expect(completeQuest.mock.calls).toEqual([['proof-extra']]);
+    expect(completions).toEqual([{ questId: 'proof-extra', tokensAwarded: 40 }]);
+    expect(toasts).toContainEqual({ message: 'Quest: Do step B ✓ (2 / 2)', durationMs: 3000 });
+    expect((await store.questProgress()).completedQuests).toEqual(['proof-extra']);
+  });
+
+  it('claims a steps Quest whose steps were already met at start, but not one already paid', async () => {
+    const extra = registerExtra();
+    extra.meetStepB();
+    const events = createEmitter<GameEventMap>();
+    const store = createInMemoryProgressStore({ emitter: events, completedLook: DEFAULT_LOOK });
+    const { controller, completions } = setup({ store, quests: [...IN_BUILD, EXTRA_QUEST] });
+
+    await controller.start();
+    await settle();
+    expect(completions).toEqual([{ questId: 'proof-extra', tokensAwarded: 40 }]);
+
+    const completeQuest = vi.spyOn(store, 'completeQuest');
+    const again = setup({ store, quests: [...IN_BUILD, EXTRA_QUEST] });
+    await again.controller.start();
+    await settle();
+    expect(completeQuest).not.toHaveBeenCalled();
+    expect(again.completions).toEqual([]);
   });
 });

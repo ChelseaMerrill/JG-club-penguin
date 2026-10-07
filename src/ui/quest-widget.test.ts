@@ -92,4 +92,63 @@ describe('createQuestWidget', () => {
     widget.setSuppressed(false);
     expect(q('.quest-widget')?.hidden).toBe(false);
   });
+
+  describe('countdown (#141)', () => {
+    const CARRYING = {
+      'talk-to-nicole': true,
+      'visit-kitchen': true,
+      'ask-tom': true,
+      'carry-coffee': false,
+      'deliver-coffee': false,
+    };
+
+    function coffeeView(trackedId: string): QuestView {
+      return {
+        statuses: evaluateQuests(
+          QUEST_DEFINITIONS.filter((q) => ['main', 'nicole-coffee'].includes(q.id)),
+          {
+            profileCreatedAt: '2026-09-25T09:00:00.000Z',
+            bests: {},
+            badges: [],
+            ownedItems: [],
+            devPitVisited: false,
+            roundsFinished: [],
+            completedQuests: [],
+            questSteps: { 'nicole-coffee': CARRYING },
+          },
+        ),
+        trackedId,
+        allDoneLine: '',
+      };
+    }
+
+    it("shows the tracked Quest's countdown as mm:ss after its next step, as the design's 04:32", () => {
+      const { widget, q } = setup();
+      widget.render(coffeeView('nicole-coffee'));
+
+      widget.setCountdown('nicole-coffee', 47.3);
+
+      expect(q('.quest-widget__hint-text')?.textContent).toBe(
+        'Carry it back before it goes cold · THE ICEBOX',
+      );
+      expect(q('.quest-widget__timer')?.textContent).toBe(' · 00:48');
+      expect(q('.quest-widget__timer')?.hidden).toBe(false);
+      expect(q('.quest-widget')?.getAttribute('aria-label')).toContain('00:48 left');
+
+      widget.setCountdown('nicole-coffee', 9);
+      expect(q('.quest-widget__timer')?.textContent).toBe(' · 00:09');
+    });
+
+    it('hides the countdown once it is cleared, or while another Quest is tracked', () => {
+      const { widget, q } = setup();
+      widget.render(coffeeView('main'));
+      widget.setCountdown('nicole-coffee', 30);
+      expect(q('.quest-widget__timer')?.hidden).toBe(true);
+
+      widget.render(coffeeView('nicole-coffee'));
+      expect(q('.quest-widget__timer')?.hidden).toBe(false);
+      widget.setCountdown('nicole-coffee', null);
+      expect(q('.quest-widget__timer')?.hidden).toBe(true);
+    });
+  });
 });

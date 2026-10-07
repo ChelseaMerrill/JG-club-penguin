@@ -43,7 +43,7 @@ export interface QuestController {
   stop(): void;
   /**
    * Re-reads saved progress (after a round, a purchase, a Room visit). Toasts
-   * each step newly done since the last read, claims the main Quest once its
+   * each step newly done since the last read, claims each steps Quest once its
    * steps are met, and moves the tracked Quest on when it finishes. Never
    * rejects.
    */
@@ -61,7 +61,7 @@ export interface QuestController {
  * The quest engine's runtime (#46): reads saved progress through the store,
  * evaluates it with `quest-engine.ts`, and turns transitions observed during
  * this Session into step toasts (`ui:toast`, 3 s), the main Quest's
- * `completeQuest('main')` claim and the tracked-Quest switch.
+ * steps Quests' `completeQuest(id)` claims and the tracked-Quest switch.
  */
 export function createQuestController(deps: QuestControllerDeps): QuestController {
   const { store, quests, events, storage } = deps;
@@ -73,8 +73,9 @@ export function createQuestController(deps: QuestControllerDeps): QuestControlle
   let trackedId: string | null = null;
   let devPitVisited = false;
   let visitRequested = false;
-  let claimInFlight = false;
-  let claimed = false;
+  /** Steps Quest ids with a `completeQuest` call pending, and ids paid this Session. */
+  const claimsInFlight = new Set<string>();
+  const claimed = new Set<string>();
   let allDoneLine: string | null = null;
   let queue: Promise<void> = Promise.resolve();
   const changeListeners = new Set<(view: QuestView) => void>();
@@ -109,14 +110,13 @@ export function createQuestController(deps: QuestControllerDeps): QuestControlle
     for (const listener of Array.from(changeListeners)) listener(view);
   }
 
-  async function claimMainQuest(myGeneration: number): Promise<void> {
-    claimInFlight = true;
+  async function claimQuest(quest: QuestDefinition, myGeneration: number): Promise<void> {
+    claimsInFlight.add(quest.id);
     try {
-      const result = await store.completeQuest(MAIN_QUEST_ID);
+      const result = await store.completeQuest(quest.id);
       if (myGeneration !== generation) return;
-      claimed = true;
-      const quest = quests.find((q) => q.id === MAIN_QUEST_ID);
-      if (!result.alreadyCompleted && quest) {
+      claimed.add(quest.id);
+      if (!result.alreadyCompleted) {
         for (const listener of Array.from(completeListeners)) {
           listener(quest, result.tokensAwarded);
         }
@@ -124,7 +124,7 @@ export function createQuestController(deps: QuestControllerDeps): QuestControlle
     } catch {
       // The store already toasts a failed save; the next refresh retries.
     } finally {
-      claimInFlight = false;
+      claimsInFlight.delete(quest.id);
     }
   }
 
@@ -147,6 +147,7 @@ export function createQuestController(deps: QuestControllerDeps): QuestControlle
         roundsFinished: progress.roundsFinished,
         completedQuests: progress.completedQuests,
         matchWins: progress.matchWins,
+        questSteps: progress.questSteps,
       });
     } catch {
       return;
@@ -172,10 +173,20 @@ export function createQuestController(deps: QuestControllerDeps): QuestControlle
     statuses = next;
     notify();
 
-    const main = next.find((s) => s.quest.id === MAIN_QUEST_ID);
-    const stepsMet = main !== undefined && main.progress === main.target;
-    if (stepsMet && !completedQuests.includes(MAIN_QUEST_ID) && !claimed && !claimInFlight) {
-      await claimMainQuest(myGeneration);
+    // Claim every steps Quest (main first, in panel order) whose steps are
+    // all met and that the server hasn't paid yet, one at a time.
+    for (const status of next) {
+      const { quest } = status;
+      const stepsMet = quest.kind === 'steps' && status.progress === status.target;
+      if (
+        stepsMet &&
+        !completedQuests.includes(quest.id) &&
+        !claimed.has(quest.id) &&
+        !claimsInFlight.has(quest.id)
+      ) {
+        await claimQuest(quest, myGeneration);
+        if (myGeneration !== generation) return;
+      }
     }
   }
 
@@ -206,7 +217,7 @@ export function createQuestController(deps: QuestControllerDeps): QuestControlle
       trackedId = null;
       devPitVisited = false;
       visitRequested = false;
-      claimed = false;
+      claimed.clear();
       return refresh();
     },
     stop() {

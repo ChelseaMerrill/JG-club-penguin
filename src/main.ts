@@ -77,7 +77,7 @@ import {
 } from './snowball/dev-snowball-hook';
 import { DEFAULT_LOOK, type EmoteId, type PenguinLook, type RoomBroadcastMap } from './contracts';
 import { createInMemoryProgressStore } from './persistence/in-memory-progress-store';
-import type { ProgressStore } from './persistence/progress-store';
+import type { IglooSlot, ProgressStore } from './persistence/progress-store';
 import { createActiveProgressStore, createProgressSession } from './persistence/progress-session';
 import {
   createSupabaseProgressStore,
@@ -93,7 +93,9 @@ import { createPenguinLoadError } from './ui/penguin-load-error';
 import { createPenguinEditor } from './penguin/penguin-editor';
 import { initDevCreatorHook, withDevLoadFailures } from './penguin/dev-creator-hook';
 import { createNpcDialog } from './ui/npc-dialog/npc-dialog';
-import { hasQuestStarter, startQuest } from './npcs/quest-giver';
+import { hasQuestStarter, registerQuestStarter, startQuest } from './npcs/quest-giver';
+import { createCoffeeRunController, TOM_COFFEE_ACTION_LABEL } from './quests/coffee-run';
+import { NICOLE_COFFEE_QUEST_ID } from './persistence/coffee-run-rules';
 import { recordNpcTalked, recordOpenStall } from './game/rooms/dev-room-hook';
 import { createTrophyCase, TROPHY_CASE_OVERLAY_ID } from './ui/trophy-case';
 import { createMapScreen } from './ui/map-screen';
@@ -542,6 +544,7 @@ function endSession(): RoomChannel | null {
   debugOverlay?.setSubscribed(false);
   // #46: Quest tracking lives and dies with the Session.
   quests.stop();
+  stopCoffee();
   // #138: so do the Session Badge checks.
   stopBadgeChecks?.();
   stopBadgeChecks = null;
@@ -596,6 +599,7 @@ async function startSession(player: Player, previous: RoomChannel | null): Promi
   }
   // #46: loads Quest progress from saved data (steps already done aren't toasted).
   void quests.start();
+  startCoffee();
   // #138 D11: the Session Badge check, now and every 5 minutes (First Waddle,
   // Night Owl), by the server's own clock.
   stopBadgeChecks?.();
@@ -804,8 +808,13 @@ const progress = createProgressSession({ registry: game.registry, emitter: gameE
 // deployment never falls back to the fake: signed out, the store rejects
 // with `not_authenticated`.
 const e2eHooksEnabled = import.meta.env.DEV || import.meta.env.VITE_E2E_HOOKS === 'true';
+// #141: the dev store's clock, which `__questsTest.advanceClock` moves on so
+// e2e can let Nicole's coffee go cold without waiting a real minute. The
+// coffee countdown reads the same clock in a hooks build.
+let devClockOffsetMs = 0;
+const devNow = (): number => Date.now() + devClockOffsetMs;
 const devFallbackStore: ProgressStore | null = e2eHooksEnabled
-  ? createInMemoryProgressStore({ emitter: gameEvents, ...devLeaderboardSeed() })
+  ? createInMemoryProgressStore({ emitter: gameEvents, now: devNow, ...devLeaderboardSeed() })
   : null;
 
 declare global {
@@ -901,7 +910,16 @@ const questAwareStore: ProgressStore = {
   recordRound: (minigameId, score, stats) =>
     refreshQuestsAfter(progressStore.recordRound(minigameId, score, stats)),
   purchase: (itemId) => refreshQuestsAfter(progressStore.purchase(itemId)),
+  // #143: the Igloo Badge Quest's "talk to Casey" step.
+  markCaseyTalked: () => refreshQuestsAfter(progressStore.markCaseyTalked()),
 };
+
+// #143: Casey's "Got any work for me?" starts the Igloo Badge Quest by
+// recording the "talk to Casey" step; the engine claims the Quest itself
+// once every step (this one, the purchase and the wall placement) is met.
+registerQuestStarter('igloo-badge', () => {
+  void questAwareStore.markCaseyTalked();
+});
 
 const minigameLauncher = createMinigameLauncher({
   layer: getUiLayer(),
@@ -971,7 +989,14 @@ iglooEditor = createIglooEditor(uiLayer, {
     roomScene?.setFurnitureEditMode(on);
     if (on) setSnowballMode(false);
   },
-  onSlotsChanged: () => void refreshIglooFurniture(),
+  onSlotsChanged: () => {
+    void refreshIglooFurniture();
+    // #143: the Igloo Badge Quest's "hang the award" step depends on slot
+    // state, so a placement needs its own refresh (recordRound/purchase
+    // already get one through `questAwareStore`; `iglooEditor` calls
+    // `progressStore.setSlot` directly, above).
+    void quests.refresh();
+  },
 });
 
 gameEvents.on('room:leave', ({ roomId }) => {
@@ -1028,6 +1053,32 @@ quests.onChange((view) => {
 });
 quests.onQuestComplete((quest, tokensAwarded) => questBanner.show(quest.title, tokensAwarded));
 
+// #141: "Bring Nicole a coffee before kickoff". Nicole's "Got any work for
+// me?" starts the run and tracks the Quest; the countdown drives the HUD
+// widget's mm:ss and the cup in the local Penguin's flipper.
+const coffee = createCoffeeRunController({
+  store: progressStore,
+  events: gameEvents,
+  refreshQuests: () => void quests.refresh(),
+  now: e2eHooksEnabled ? devNow : undefined,
+});
+registerQuestStarter(NICOLE_COFFEE_QUEST_ID, () => {
+  quests.track(NICOLE_COFFEE_QUEST_ID);
+  void coffee.talkToNicole();
+});
+function showCoffee(carrying: boolean, secondsLeft: number | null): void {
+  questWidget.setCountdown(NICOLE_COFFEE_QUEST_ID, carrying ? secondsLeft : null);
+  roomScene?.setLocalCarriedCup(carrying);
+}
+coffee.onChange((view) => showCoffee(view.carrying, view.secondsLeft));
+function startCoffee(): void {
+  void coffee.start();
+}
+function stopCoffee(): void {
+  coffee.stop();
+  showCoffee(false, null);
+}
+
 declare global {
   interface Window {
     /** Test-only (#46); see `src/quests/quests-test-handle.ts`. */
@@ -1043,6 +1094,34 @@ if (e2eHooksEnabled) {
     },
     async purchase(itemId) {
       await questAwareStore.purchase(itemId);
+    },
+    async markCaseyTalked() {
+      await questAwareStore.markCaseyTalked();
+    },
+    async setSlot(slot, itemId) {
+      await progressStore.setSlot(slot as IglooSlot, itemId);
+      void quests.refresh();
+    },
+    coffee() {
+      const view = coffee.view();
+      return {
+        carrying: view?.carrying ?? false,
+        secondsLeft: view?.secondsLeft ?? null,
+        cupRendered: roomScene?.localHasCarriedCup() ?? false,
+      };
+    },
+    advanceClock(ms) {
+      devClockOffsetMs += ms;
+    },
+    async balance() {
+      return (await progressStore.loadAll()).tokens;
+    },
+    async finishCoffeeRun() {
+      await coffee.talkToNicole();
+      await coffee.askTom();
+      await progressStore.deliverCoffee();
+      await coffee.start();
+      await quests.refresh();
     },
   };
 }
@@ -1115,6 +1194,12 @@ createNpcDialog(getUiLayer(), {
     status: (questId) => quests.view()?.statuses.find((status) => status.quest.id === questId),
     canStart: hasQuestStarter,
   },
+  // #141: Tom's "Nicole's coffee" option while that Quest needs it, next to
+  // (never instead of) Coffee Rush.
+  extraActions: (npcId) =>
+    npcId === 'tom' && coffee.canAskTom()
+      ? [{ label: TOM_COFFEE_ACTION_LABEL, run: () => void coffee.askTom() }]
+      : [],
 });
 gameEvents.on('npc:talked', ({ npcId }) => {
   recordNpcTalked(npcId);
@@ -1186,7 +1271,10 @@ const devAsPlayerActive = initDevAsPlayerHook();
 const devHookActive = devHudActive || devMinigameActive || devCreatorActive || devAsPlayerActive;
 // #46: the dev/e2e hooks never start a real Session, so Quest tracking
 // starts here instead, against the in-memory fallback store.
-if (devHookActive) void quests.start();
+if (devHookActive) {
+  void quests.start();
+  startCoffee();
+}
 
 gameEvents.on('ui:open-creator', () => {
   penguinEditor.edit();

@@ -79,6 +79,19 @@ const SNOW_HAT_LUMP_RIGHT_R = 7;
 const SNOW_HAT_LUMP_CENTER_Y = 14;
 const SNOW_HAT_LUMP_CENTER_R = 5;
 
+// Nicole's coffee (#141): a lidded paper cup with a JG-cyan sleeve, held at
+// the right flipper while the local Penguin carries it. Unscaled frame
+// units, like the snow hat; the Graphics object is scaled as a whole.
+const CUP_X = 46;
+const CUP_TOP_Y = -86;
+const CUP_HEIGHT = 36;
+const CUP_TOP_HALF_WIDTH = 14;
+const CUP_BOTTOM_HALF_WIDTH = 11;
+const CUP_COLOR = 0xf4f4f4;
+const CUP_SLEEVE_COLOR = 0x00bdff;
+const CUP_LID_COLOR = 0x3b2a20;
+const CUP_OUTLINE = 0x0c4b5f;
+
 /** Phaser's always-present built-in placeholder texture. */
 const PLACEHOLDER_TEXTURE_KEY = '__DEFAULT';
 
@@ -126,6 +139,10 @@ export interface Penguin {
   setSnowHat(on: boolean): void;
   /** Whether the snow hat is drawn right now (the hat child's `visible`). */
   hasSnowHat(): boolean;
+  /** Draws or removes #141's coffee cup in the flipper. */
+  setCarriedCup(on: boolean): void;
+  /** Whether the coffee cup is drawn right now. */
+  hasCarriedCup(): boolean;
   /**
    * Test support (#68 D3): how many tweens are running on this Penguin's
    * body motion. 1 while an anim with a body motion plays (or while the body
@@ -250,13 +267,33 @@ export function createPenguin(
   snowHat.fillCircle(0, SNOW_HAT_Y - SNOW_HAT_LUMP_CENTER_Y, SNOW_HAT_LUMP_CENTER_R);
   snowHat.setVisible(false);
 
+  const cup = new GameObjects.Graphics(scene);
+  cup.setScale(PLAYER_PENGUIN_SCALE);
+  const cupBottomY = CUP_TOP_Y + CUP_HEIGHT;
+  const cupBody = [
+    { x: CUP_X - CUP_TOP_HALF_WIDTH, y: CUP_TOP_Y },
+    { x: CUP_X + CUP_TOP_HALF_WIDTH, y: CUP_TOP_Y },
+    { x: CUP_X + CUP_BOTTOM_HALF_WIDTH, y: cupBottomY },
+    { x: CUP_X - CUP_BOTTOM_HALF_WIDTH, y: cupBottomY },
+  ];
+  cup.fillStyle(CUP_COLOR, 1);
+  cup.fillPoints(cupBody, true);
+  cup.fillStyle(CUP_SLEEVE_COLOR, 1);
+  cup.fillRect(CUP_X - CUP_TOP_HALF_WIDTH + 2, CUP_TOP_Y + 11, CUP_TOP_HALF_WIDTH * 2 - 4, 13);
+  cup.lineStyle(2, CUP_OUTLINE, 1);
+  cup.strokePoints(cupBody, true);
+  cup.fillStyle(CUP_LID_COLOR, 1);
+  cup.fillRect(CUP_X - CUP_TOP_HALF_WIDTH - 2, CUP_TOP_Y - 6, CUP_TOP_HALF_WIDTH * 2 + 4, 6);
+  cup.strokeRect(CUP_X - CUP_TOP_HALF_WIDTH - 2, CUP_TOP_Y - 6, CUP_TOP_HALF_WIDTH * 2 + 4, 6);
+  cup.setVisible(false);
+
   // #68 D3: the figure's tilt, lift and (WADDLE's) sideways sway, tweened on
-  // the sprite and the snow hat only -- never the container (so the
+  // the sprite, the snow hat and the cup only -- never the container (so the
   // Penguin's position and Tile never move), the name tag or the bubble.
   const motionProxy = { phase: 0, blend: 0 };
-  const motion = createBodyMotion(scene.tweens, [sprite, snowHat], motionProxy);
+  const motion = createBodyMotion(scene.tweens, [sprite, snowHat, cup], motionProxy);
 
-  const container = scene.add.container(x, y, [sprite, snowHat]);
+  const container = scene.add.container(x, y, [sprite, snowHat, cup]);
   // #161 review (milliehime): the name tag and chat bubble live in their own
   // top-layer container, not the body's, so the ceiling item (which hangs
   // above every Tile depth) never draws over them. The body keeps its own
@@ -458,6 +495,12 @@ export function createPenguin(
     },
     hasSnowHat() {
       return !destroyed && snowHat.visible;
+    },
+    setCarriedCup(on: boolean) {
+      if (!destroyed) cup.setVisible(on);
+    },
+    hasCarriedCup() {
+      return !destroyed && cup.visible;
     },
     bodyMotionTweenCount() {
       // A removed tween stays in Phaser's list, already stopped, until the

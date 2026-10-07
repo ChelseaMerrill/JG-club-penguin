@@ -1,10 +1,13 @@
 import type { BadgeId, MinigameId } from '../contracts';
 import { MINIGAME_RULES } from '../persistence/minigame-rules';
 import {
+  MAIN_QUEST_ID,
+  MAIN_QUEST_STEP_IDS,
   roomTitle,
   type MainQuestStepId,
   type QuestDefinition,
   type QuestStepDefinition,
+  type StepsQuestDefinition,
 } from './quest-definitions';
 
 /**
@@ -25,6 +28,11 @@ export interface QuestInputs {
   /** Recorded match wins per Minigame (`QuestProgress.matchWins`), for a
    *  `'match-wins'` Minigame Quest; missing counts as none. */
   matchWins?: Partial<Record<MinigameId, number>>;
+  /** Each server-paid steps Quest's steps (`QuestProgress.questSteps`):
+   *  Quest id -> (step id -> met). A step the server reports is taken as
+   *  is; missing, a main-Quest step falls back to the client's own check
+   *  and any other step counts as not met. */
+  questSteps?: Readonly<Record<string, Readonly<Record<string, boolean>>>>;
 }
 
 export interface QuestStepStatus {
@@ -40,17 +48,22 @@ export interface QuestHint {
 
 export interface QuestStatus {
   quest: QuestDefinition;
-  /** Steps done (main Quest), or the personal best or match wins (Minigame Quest). */
+  /** Steps done (steps Quest), or the personal best or match wins (Minigame Quest). */
   progress: number;
   target: number;
   done: boolean;
-  /** The main Quest's steps in order; empty for a Minigame Quest. */
+  /** A steps Quest's steps in order; empty for a Minigame Quest. */
   steps: QuestStepStatus[];
   /** `null` once the Quest is done. */
   nextHint: QuestHint | null;
 }
 
-function stepDone(id: MainQuestStepId, inputs: QuestInputs): boolean {
+function isMainQuestStepId(id: string): id is MainQuestStepId {
+  return (MAIN_QUEST_STEP_IDS as readonly string[]).includes(id);
+}
+
+/** The client's own check of a main-Quest step, used when the server reports none. */
+function mainStepDone(id: MainQuestStepId, inputs: QuestInputs): boolean {
   switch (id) {
     case 'create-penguin':
       return inputs.profileCreatedAt !== null;
@@ -65,9 +78,22 @@ function stepDone(id: MainQuestStepId, inputs: QuestInputs): boolean {
   }
 }
 
+function stepDone(
+  quest: StepsQuestDefinition,
+  step: QuestStepDefinition,
+  inputs: QuestInputs,
+): boolean {
+  const reported = inputs.questSteps?.[quest.id]?.[step.id];
+  if (typeof reported === 'boolean') return reported;
+  if (quest.id === MAIN_QUEST_ID && isMainQuestStepId(step.id)) {
+    return mainStepDone(step.id, inputs);
+  }
+  return false;
+}
+
 function evaluateQuest(quest: QuestDefinition, inputs: QuestInputs): QuestStatus {
   if (quest.kind === 'steps') {
-    const steps = quest.steps.map((step) => ({ step, done: stepDone(step.id, inputs) }));
+    const steps = quest.steps.map((step) => ({ step, done: stepDone(quest, step, inputs) }));
     const progress = steps.filter((s) => s.done).length;
     const done = progress === steps.length || inputs.completedQuests.includes(quest.id);
     const next = steps.find((s) => !s.done);
@@ -117,7 +143,7 @@ export type QuestTransition =
   | { kind: 'quest-done'; questId: string; quest: QuestDefinition };
 
 /**
- * What changed between two evaluations: each main-Quest step newly done
+ * What changed between two evaluations: each steps-Quest step newly done
  * (for the step toast) and each Quest newly done (for the banner and the
  * tracked-Quest switch). Quests missing from `previous` report nothing.
  */

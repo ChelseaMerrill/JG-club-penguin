@@ -11,4 +11,20 @@
 export interface QuestsTestHandle {
   recordRound(minigameId: string, score: number, stats: Record<string, number>): Promise<void>;
   purchase(itemId: string): Promise<void>;
+  /** #143: the Igloo Badge Quest's "talk to Casey" step, without driving the NPC dialog. */
+  markCaseyTalked(): Promise<void>;
+  /** #143: hangs (or empties, with `null`) an Igloo slot without driving the Igloo editor. */
+  setSlot(slot: number, itemId: string | null): Promise<void>;
+  /** #141: Nicole's coffee as the Player sees it, and whether the cup is drawn in the flipper. */
+  coffee(): { carrying: boolean; secondsLeft: number | null; cupRendered: boolean };
+  /**
+   * #141: moves the dev store's clock (the stand-in server's now()) and the
+   * countdown's clock on by `ms`, so a spec can let the coffee go cold
+   * without waiting a real minute.
+   */
+  advanceClock(ms: number): void;
+  /** #141: the store's saved Token balance (the HUD shows it only after the first change in a dev boot). */
+  balance(): Promise<number>;
+  /** #141: talks to Nicole, asks Tom and delivers through the same store, for specs that only need the Quest done. */
+  finishCoffeeRun(): Promise<void>;
 }
