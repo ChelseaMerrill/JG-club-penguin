@@ -41,13 +41,13 @@ async function clickStagePoint(page: Page, point: { x: number; y: number }): Pro
   );
 }
 
-test('Remote Lounge: the globe spins with its land, and the roster lists all 18 remote JGers', async ({
+test('Remote Lounge: the globe spins with its land, and the roster lists all 17 remote JGers', async ({
   page,
 }) => {
   const errors = await bootLounge(page);
 
   await expect(page.locator('.remote-lounge')).toBeVisible();
-  await expect(page.locator('.remote-lounge__roster-item')).toHaveCount(18);
+  await expect(page.locator('.remote-lounge__roster-item')).toHaveCount(17);
   // The land arrives once the world map has loaded.
   await expect
     .poll(() => page.locator('.globe path[fill="#d3ebf3"]').getAttribute('d'), {
@@ -75,7 +75,7 @@ test("Remote Lounge: a roster row flies the globe to that person's city and open
   await expect(card).toContainText('St. Petersburg, FL');
   await expect(card).toContainText(/\d+ mi/);
   await expect(card).toContainText('In Florida, a gator in the pool counts as a standup.');
-  await expect(card.locator('.remote-lounge__card-index')).toHaveText('16 / 18');
+  await expect(card.locator('.remote-lounge__card-index')).toHaveText('15 / 17');
   await expect(josh).toHaveAttribute('aria-pressed', 'true');
   // Zoomed in, the pins carry first-name labels.
   await expect(page.locator('.globe text', { hasText: 'Joshua' })).toBeVisible({ timeout: 3000 });

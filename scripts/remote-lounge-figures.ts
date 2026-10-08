@@ -51,6 +51,13 @@ function unquote(line: string): string {
   return line.replace(/^"(.*)"$/, '$1');
 }
 
+/**
+ * Design keys left out of the game on purpose, though the design still lists
+ * them. `anderson`: Matt Anderson, removed from the lounge at the owner's
+ * request (2026-10-08).
+ */
+const OMIT: ReadonlySet<string> = new Set(['anderson']);
+
 function cardKey(key: string): string {
   return `remote${key[0]!.toUpperCase()}${key.slice(1)}`;
 }
@@ -68,6 +75,7 @@ async function main(): Promise<void> {
     hq: { city: string; lon: number; lat: number };
     people: RemoteJger[];
   };
+  out.people = out.people.filter((p) => !OMIT.has(p.key));
 
   const lines: string[] = [
     '// GENERATED FILE -- do not hand-edit.',

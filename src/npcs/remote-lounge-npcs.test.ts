@@ -9,8 +9,8 @@ import { REMOTE_LOUNGE_NPC_IDS } from './remote-lounge-npcs';
 const lounge = getRoomDefinition('remote-lounge');
 
 describe('Remote Lounge NPCs', () => {
-  it("places the design's 18 remote JGers, each once, in the design's own order", () => {
-    expect(REMOTE_JGERS).toHaveLength(18);
+  it("places the design's remote JGers (all 17 kept in the game), each once, in the design's own order", () => {
+    expect(REMOTE_JGERS).toHaveLength(17);
     expect(lounge.npcSlots.map((slot) => slot.npcId)).toEqual(
       REMOTE_JGERS.map((p) => REMOTE_LOUNGE_NPC_IDS[p.key as keyof typeof REMOTE_LOUNGE_NPC_IDS]),
     );
@@ -43,14 +43,14 @@ describe('Remote Lounge NPCs', () => {
     expect(NPCS['casey-remote-lounge'].title).toBeNull();
     expect(NPCS['millie-remote-lounge'].title).toBeNull();
     expect(NPCS['steven-vickers'].title).toBeNull();
-    expect(NPCS['matt-anderson'].title).toBe('Principal Engineer');
+    expect(NPCS['john-higgins'].title).not.toBeNull();
   });
 
-  it('shows one quote at a time, 4 s apart, each for 3.2 s of a 72 s cycle', () => {
+  it('shows one quote at a time, 4 s apart, each for 3.2 s of a 68 s cycle', () => {
     const lines = lounge.npcSlots.map((slot) => NPCS[slot.npcId as keyof typeof NPCS].idleLines);
     for (const [i, idle] of lines.entries()) {
       expect(idle).toEqual([
-        expect.objectContaining({ periodS: 72, delayS: 1.2 + 4 * i - 72, window: [0, 3.2 / 72] }),
+        expect.objectContaining({ periodS: 68, delayS: 1.2 + 4 * i - 68, window: [0, 3.2 / 68] }),
       ]);
     }
   });
