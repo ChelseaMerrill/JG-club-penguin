@@ -56,7 +56,6 @@ export const remoteLounge: RoomDefinition = {
     { npcId: 'matt-bessler', tile: { col: 1, row: 4 }, offset: { x: -20, y: -15 } },
     { npcId: 'cameron-lynch', tile: { col: 2, row: 7 }, offset: { x: -10, y: 0 } },
     { npcId: 'austin-marcum', tile: { col: 5, row: 9 }, offset: { x: 30, y: -10 } },
-    { npcId: 'matt-anderson', tile: { col: 8, row: 8 }, offset: { x: -30, y: 0 } },
     { npcId: 'john-higgins', tile: { col: 10, row: 6 }, offset: { x: -20, y: -5 } },
     { npcId: 'paul-macfarlane', tile: { col: 10, row: 3 }, offset: { x: 10, y: -10 } },
     { npcId: 'dani-milliken', tile: { col: 0, row: 8 }, offset: { x: 10, y: 10 } },

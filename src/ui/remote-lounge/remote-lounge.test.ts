@@ -68,9 +68,9 @@ describe('createRemoteLounge', () => {
     rows[3]!.click();
 
     expect(q('.remote-lounge__card').hidden).toBe(false);
-    expect(q('.remote-lounge__card-name').textContent).toBe('Matt Anderson');
-    expect(q('.remote-lounge__card-title').textContent).toBe('Principal Engineer');
-    expect(q('.remote-lounge__card-index').textContent).toBe('4 / 18');
+    expect(q('.remote-lounge__card-name').textContent).toBe('John Higgins');
+    expect(q('.remote-lounge__card-title').textContent).toBe('Software Engineer');
+    expect(q('.remote-lounge__card-index').textContent).toBe('4 / 17');
     expect(rows[3]!.getAttribute('aria-pressed')).toBe('true');
     expect(overlays.current()).toBe(REMOTE_CARD_OVERLAY_ID);
   });

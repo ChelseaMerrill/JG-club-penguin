@@ -12,7 +12,6 @@ export const REMOTE_LOUNGE_NPC_IDS = {
   bessler: 'matt-bessler',
   lynch: 'cameron-lynch',
   marcum: 'austin-marcum',
-  anderson: 'matt-anderson',
   higgins: 'john-higgins',
   macfarlane: 'paul-macfarlane',
   milliken: 'dani-milliken',
@@ -34,8 +33,8 @@ export type RemoteLoungeNpcId = (typeof REMOTE_LOUNGE_NPC_IDS)[keyof typeof REMO
 /**
  * The design pops one person's quote at a time, every 4 s, for 3.2 s
  * (`popQuote`), first at 1.2 s, picking at random. A bubble cycle can't pick
- * at random, so this takes them in the design's own order instead: 18 people
- * at 4 s apart is a 72 s cycle, each person shown for 3.2 s of it.
+ * at random, so this takes them in the design's own order instead: 17 people
+ * at 4 s apart is a 68 s cycle, each person shown for 3.2 s of it.
  */
 const QUOTE_EVERY_S = 4;
 const QUOTE_SHOWN_S = 3.2;
@@ -57,7 +56,6 @@ const TBD_TITLES: ReadonlySet<string> = new Set(['snow', 'melliott', 'vickers'])
  */
 const BUBBLE_OFFSETS: Partial<Record<string, { x?: number; y?: number }>> = {
   bessler: { y: -20 },
-  anderson: { x: 40 },
   steven: { y: -30 },
   kneeland: { y: -30 },
   snow: { y: -50 },
