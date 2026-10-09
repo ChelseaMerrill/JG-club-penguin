@@ -53,10 +53,9 @@ const WALKABLE: readonly (readonly boolean[])[] = [
  * from that design's own banner text).
  *
  * Reached only from the Remote Lounge globe's LATAM pin
- * (`src/ui/remote-lounge/`), not the Map -- `latam-disco-hall` and
- * `latam-futebol-field` are sibling Rooms landing separately, so this
- * branch's two in-scene door pills to them stay disabled (`targetRoomId:
- * null`). The design's third pill, "MAP", isn't a `RoomDoor`: nothing in
+ * (`src/ui/remote-lounge/`), not the Map. Its two in-scene door pills lead
+ * to the sibling LATAM Rooms, `latam-futebol-field` and `latam-disco-hall`,
+ * which link back. The design's third pill, "MAP", isn't a `RoomDoor`: nothing in
  * `RoomDoor`/`room-definition.ts` can open the Map screen (that's
  * `src/ui/map-screen.ts`, a HUD overlay, not a Room), so it is left out of
  * `doors` entirely. The design draws no "BACK TO HQ"-style pill of its own
@@ -78,22 +77,19 @@ export const latamCafe: RoomDefinition = {
   // spawn the Remote Lounge uses (the design draws no "You" of its own).
   spawnTile: { col: 5, row: 9 },
   doors: [
-    // Both sibling LATAM Rooms are built on their own branches, not this
-    // one: disabled (the Hallway's TEAM ROOM 5-9 precedent), `entryTile`
-    // unchecked (`validate.ts` skips a null-target door's `entryTile`).
     {
       label: 'FUTEBOL FIELD',
       hotspot: { x: 542.6, y: 826, width: 360.3, height: 52 },
-      // wired to latam-futebol-field when that Room lands
-      targetRoomId: null,
-      entryTile: { col: 0, row: 0 },
+      targetRoomId: 'latam-futebol-field',
+      // The target's own spawn tile: every LATAM pill sits on the bottom edge.
+      entryTile: { col: 6, row: 8 },
     },
     {
       label: 'DISCO HALL',
       hotspot: { x: 916.9, y: 826, width: 292.1, height: 52 },
-      // wired to latam-disco-hall when that Room lands
-      targetRoomId: null,
-      entryTile: { col: 0, row: 0 },
+      targetRoomId: 'latam-disco-hall',
+      // The target's own spawn tile: every LATAM pill sits on the bottom edge.
+      entryTile: { col: 5, row: 7 },
     },
   ],
   // The design's seven JGers (`design/Characters LATAM.dc.html`'s cards whose

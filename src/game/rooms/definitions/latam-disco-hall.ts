@@ -66,10 +66,7 @@ export const latamDiscoHall: RoomDefinition = {
   spawnTile: { col: 5, row: 7 },
   // The design's bottom exit-pill bar draws three pills: MAP, CAFE LOUNGE
   // (-> `Latam Cafe.dc.html`) and FUTEBOL FIELD (-> `Latam Futebol
-  // Field.dc.html`). Neither sibling Room exists on this branch, so both get
-  // `targetRoomId: null` (the existing disabled-door "COMING SOON"
-  // behaviour), per the #51 Hallway precedent's `entryTile: { col: 0, row: 0
-  // }` placeholder. The MAP pill has no door here at all: `RoomDoor` can only
+  // Field.dc.html`), and both lead to those sibling LATAM Rooms. The MAP pill has no door here at all: `RoomDoor` can only
   // target another `RoomId`, and nothing in this codebase opens the Map
   // overlay (`src/ui/map-screen.ts`) from inside a Room (it's `main.ts`'s own
   // top-level HUD control, not a Room mechanism) -- reported rather than
@@ -80,16 +77,16 @@ export const latamDiscoHall: RoomDefinition = {
     {
       label: 'CAFE LOUNGE',
       hotspot: { x: 523, y: 826, width: 331, height: 52 },
-      // wired to latam-cafe when that Room lands
-      targetRoomId: null,
-      entryTile: { col: 0, row: 0 },
+      targetRoomId: 'latam-cafe',
+      // The target's own spawn tile: every LATAM pill sits on the bottom edge.
+      entryTile: { col: 5, row: 9 },
     },
     {
       label: 'FUTEBOL FIELD',
       hotspot: { x: 868, y: 826, width: 360, height: 52 },
-      // wired to latam-futebol-field when that Room lands
-      targetRoomId: null,
-      entryTile: { col: 0, row: 0 },
+      targetRoomId: 'latam-futebol-field',
+      // The target's own spawn tile: every LATAM pill sits on the bottom edge.
+      entryTile: { col: 6, row: 8 },
     },
   ],
   // The six JGers from `design/Characters LATAM.dc.html` whose card reads

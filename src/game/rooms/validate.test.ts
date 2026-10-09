@@ -601,21 +601,13 @@ describe('ROOM_DEFINITIONS registry', () => {
       // Reached only from the Map; its BACK TO HQ pill (a HUD button, not a
       // door) is its one exit.
       'remote-lounge': [],
-      // Reached only from the Remote Lounge globe's LATAM pin. Both of its
-      // in-scene door pills (FUTEBOL FIELD, DISCO HALL) stay disabled: the
-      // sibling LATAM Rooms land on their own branches. Its third pill, MAP,
-      // isn't a `RoomDoor` (nothing in this contract can open the Map
-      // screen), so it isn't represented here at all; the Room has no
-      // dedicated exit to HQ of its own (the HUD's persistent MAP button is
-      // the way back).
-      'latam-cafe': [],
-      // Reached only from the LATAM Café (not built on this branch); its own
-      // CAFE LOUNGE/FUTEBOL FIELD pills stay disabled until those Rooms land.
-      'latam-disco-hall': [],
-      // Reached only from the LATAM Cafe, not the Map; its CAFE LOUNGE and
-      // DISCO HALL pills are both disabled (neither sibling Room exists on
-      // this branch).
-      'latam-futebol-field': [],
+      // The LATAM section (owner request, 2026-10-09): the Café is reached
+      // from the Remote Lounge globe's LATAM pin; its three Rooms link to each
+      // other. Their MAP pills aren't `RoomDoor`s (nothing in this contract
+      // opens the Map screen); the HUD's MAP button is the way back to HQ.
+      'latam-cafe': ['latam-disco-hall', 'latam-futebol-field'],
+      'latam-disco-hall': ['latam-cafe', 'latam-futebol-field'],
+      'latam-futebol-field': ['latam-cafe', 'latam-disco-hall'],
     });
   });
 

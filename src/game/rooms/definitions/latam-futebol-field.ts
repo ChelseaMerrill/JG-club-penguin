@@ -42,12 +42,8 @@ const WALKABLE: readonly (readonly boolean[])[] = [
  * the HUD level (`main.ts`'s `createMapScreen`, self-wiring the HUD's own
  * MAP button) rather than through any `RoomDoor`/`RoomHotspot` -- there is no
  * door/hotspot mechanism that opens it, so it is left out of `doors` here
- * (reported, not invented). CAFE LOUNGE and DISCO HALL are real sibling
- * Rooms other Track D work is building on other branches; neither exists on
- * this branch, so both doors are disabled (`targetRoomId: null`) the same
- * way Office Hallway's TEAM ROOM 5-9 doors are, with a placeholder
- * `{ col: 0, row: 0 }` entryTile (unused while disabled, `validate.ts` skips
- * it).
+ * (reported, not invented). CAFE LOUNGE and DISCO HALL lead to those
+ * sibling LATAM Rooms.
  *
  * The design's six LATAM JGers (`design/Characters LATAM.dc.html`) each walk
  * a ping-pong path of the open pitch (`src/npcs/npcs.ts`,
@@ -78,16 +74,16 @@ export const latamFutebolField: RoomDefinition = {
     {
       label: 'CAFE LOUNGE',
       hotspot: { x: 557, y: 826, width: 331, height: 52 },
-      // wired to latam-cafe when that Room lands
-      targetRoomId: null,
-      entryTile: { col: 0, row: 0 },
+      targetRoomId: 'latam-cafe',
+      // The target's own spawn tile: every LATAM pill sits on the bottom edge.
+      entryTile: { col: 5, row: 9 },
     },
     {
       label: 'DISCO HALL',
       hotspot: { x: 902, y: 826, width: 292, height: 52 },
-      // wired to latam-disco-hall when that Room lands
-      targetRoomId: null,
-      entryTile: { col: 0, row: 0 },
+      targetRoomId: 'latam-disco-hall',
+      // The target's own spawn tile: every LATAM pill sits on the bottom edge.
+      entryTile: { col: 5, row: 7 },
     },
   ],
   npcSlots: [
