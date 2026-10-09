@@ -99,6 +99,10 @@ export type NpcId =
   | 'abby-rivera'
   | 'adam-wilson-hwang'
   | 'bryan-sambrook'
+  // Linda Martin, placed in The Icebox by an explicit owner exception to the
+  // "don't place unplaced Characters-sheet people" rule (owner request,
+  // 2026-10-09): she walks laps of the open floor.
+  | 'linda-martin'
   // The Remote Lounge's JGers (`remote-lounge-npcs.ts`).
   | RemoteLoungeNpcId;
 
@@ -1550,6 +1554,23 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     still: true,
     dialog: LINE_DIALOG,
     figure: { card: 'gregWestover' },
+  },
+  // Linda Martin (`design/Characters.dc.html` card 02: CSO, "QUEST GIVER ·
+  // CLOSER"), placed in The Icebox walking laps of the open floor by an
+  // explicit owner exception to the "don't place unplaced Characters-sheet
+  // people" rule (owner request, 2026-10-09).
+  'linda-martin': {
+    id: 'linda-martin',
+    name: 'Linda Martin',
+    title: 'CSO',
+    roomId: 'the-icebox',
+    kind: 'human',
+    tagName: 'Linda',
+    dialogLines: ['Every room is a pitch. Smile.'],
+    idleLines: [{ text: 'Every room is a pitch. Smile.', periodS: 21, delayS: -9 }],
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'lindaMartin' },
   },
   'darrin-icebox': {
     id: 'darrin-icebox',
