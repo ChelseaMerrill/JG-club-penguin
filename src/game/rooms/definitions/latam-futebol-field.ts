@@ -18,13 +18,27 @@ import { createStandardRoomGrid } from '../grid';
 // Room's walls (the row=0 and col=0 faces), not floor fixtures, so they
 // block nothing; the four training cones and three corner-kick flags are
 // flat floor decoration well under a quarter of their tile.
+//
+// The Penalty Kick minigame's bouncing ball (owner request, 2026-10-09: now
+// baked into the exported art, see `scripts/export-room-art.ts`'s own
+// comment) rests at design (855,546) -- `screenToTile` inverts that to tile
+// (6,5) -- so that tile is blocked too, the same "floor-contact point"
+// convention `latam-disco-hall.ts` uses for its speaker stacks. None of the
+// six JGers' own `npcSlots` tiles land on (6,5) (closest are Chrystian's
+// (4,3) and Washington's (6,2)), so no NPC rests on the ball; each one's
+// scripted ping-pong walk (`src/npcs/motions/latam-futebol-field.ts`) is a
+// continuous path across the open pitch rather than a tile hop, and three of
+// the six (Bruno, Washington, Chrystian) pass within the ball's own glow-ring
+// radius at one point in their loop -- a transient crossing, not a resting
+// overlap, and left as-is (reviewable; narrowing would mean hand-tuning
+// paths ported directly from the design's own SMIL).
 const WALKABLE: readonly (readonly boolean[])[] = [
   [true, true, true, true, true, true, true, true, true, true, true, true],
   [true, true, true, true, true, true, true, true, true, true, true, true],
   [true, true, true, true, true, true, false, true, true, true, true, true],
   [true, true, true, false, false, true, true, true, true, true, true, true],
   [false, false, true, true, true, true, true, true, true, false, false, false],
-  [false, false, true, true, true, true, true, true, true, true, false, false],
+  [false, false, true, true, true, true, false, true, true, true, false, false],
   [false, false, true, true, true, true, true, true, true, true, false, false],
   [true, true, true, false, true, true, true, true, true, true, true, true],
   [true, true, true, true, true, true, true, true, true, false, true, true],

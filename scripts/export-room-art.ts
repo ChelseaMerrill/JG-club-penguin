@@ -1197,24 +1197,25 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
   // unique selectors for texture that is neither "people" nor "the ball" (a
   // reviewable judgment call; the four orange training cones are likewise
   // static, un-animated floor decoration and were never a candidate).
+  //
+  // The Penalty Kick minigame's bouncing ball (`a[href="Minigame Penalty
+  // Kick.dc.html"]`, with its pulsing glow ring and "KICK IT · PENALTY
+  // SHOOTOUT" callout) and its own ground shadow
+  // (`ellipse[cx="855"][cy="562"]`) are left un-hidden too (owner request,
+  // 2026-10-09: the ball was missing from the exported art). `freezeSmil
+  // Animations` resets both the bounce (`translate` 0/-34/0) and the shadow's
+  // pulsing `rx` to their 0% rest frame before the screenshot, so the ball
+  // bakes in sitting on the pitch at (855,546) rather than mid-bounce --
+  // exactly the Disco Hall's own precedent for keeping its "SPIN IT ·
+  // CARNAVAL PARADE" sign baked into the art instead of hidden. The minigame
+  // itself is not built yet (see `src/game/rooms/definitions/
+  // latam-futebol-field.ts`'s own comment, and tickets #218/#219/#220).
   'latam-futebol-field': [
     {
       kind: 'selector',
       selectors: ['#latam-people'],
       comment:
         "The six LATAM Futebol Field JGers (Thalles Stakonski, Bruno Amado, Washington Marino, Chrystian Rissoli, Paulo Ponciano, Gustavo Barska), each a wandering figure with its own nested ground shadow and nameplate -- hidden as one group, like Remote Lounge's `#figs`.",
-    },
-    {
-      kind: 'selector',
-      selectors: ['a[href="Minigame Penalty Kick.dc.html"]'],
-      comment:
-        'The Penalty Kick minigame\'s bouncing ball icon, pulsing glow ring and "KICK IT · PENALTY SHOOTOUT" callout label -- a live link, not floor art. The minigame itself is not built yet (see `src/game/rooms/definitions/latam-futebol-field.ts`\'s own comment).',
-    },
-    {
-      kind: 'selector',
-      selectors: ['ellipse[cx="855"][cy="562"]'],
-      comment:
-        'The bouncing ball\'s own ground shadow, pulsing in sync with it (`<animate attributeName="rx">`), drawn as a sibling just outside the `<a>` link above rather than nested inside it.',
     },
   ],
 };
