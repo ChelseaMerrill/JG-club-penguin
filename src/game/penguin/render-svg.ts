@@ -394,39 +394,136 @@ function renderPattern(
 }
 
 /**
+ * The single point every #47 Emote-only pose's held prop plate centres on
+ * (#160), in the design's own 120x130 coordinate space: beside the body's
+ * right flipper, clear of the head/cap and the torso silhouette (whose
+ * widest point is x=98). Every `renderProp` case below draws its plate at
+ * this exact same anchor -- one named constant, never a per-prop position --
+ * so picking any of the four no longer reads as "nothing happened" simply
+ * because the previous prop left the eye somewhere else.
+ *
+ * `facing` never moves this anchor (#147): a left-facing frame mirrors the
+ * *whole* rendered sprite via Phaser's `setFlipX` (`penguin-sprite.ts`), not
+ * this SVG's own markup (`render-svg.test.ts`'s facing suite proves every
+ * shape's coordinates are facing-independent, lettering aside) -- so one
+ * right-side constant already lands correctly on a left-facing Penguin's
+ * mirrored left side without this file doing anything extra.
+ */
+export const PROP_ANCHOR = { x: 104, y: 50 };
+
+/** The plate's radius (#160 decision: ~1.4x the pre-#160 props' own rough half-size, so it reads at Room scale). */
+export const PROP_PLATE_RADIUS = 17;
+
+/** The plate's outline width, matching the figure's own stroke weight (#160 decision: "~2.5 units in figure space"). */
+export const PROP_PLATE_STROKE_WIDTH = 2.5;
+
+/** How far below the plate's own centre the darker shadow disc sits (#160 decision's "darker offset disc" option, chosen over an SVG filter for parity with this file's filter-free style). */
+export const PROP_PLATE_SHADOW_OFFSET = 1.5;
+
+/**
+ * THUMBS_UP/BRB/SHIP_IT's glyphs below are each centred on this point at
+ * `PROP_GLYPH_SCALE` (#160): the HUD-EMOTE picker icon's own `viewBox="0 0 40
+ * 36"` centre (`design/Club JenGuin HUD Menus.dc.html`), so every glyph
+ * authored in that same 40x36 space drops in and scales identically. The
+ * scale fits that 40-wide box inside the plate's own diameter with a clear
+ * margin (`2 * PROP_PLATE_RADIUS` = 34; `40 * PROP_GLYPH_SCALE` = 24).
+ */
+const PROP_GLYPH_VIEWBOX_CENTER = { x: 20, y: 18 };
+const PROP_GLYPH_SCALE = 0.6;
+
+/**
+ * JG_FLASH's hex-and-"JG" badge is shared with the belly's JG LOGO pattern
+ * (`renderPattern`'s 'JG LOGO' case) and authored around its own centre, not
+ * the HUD icon's 40x36 box -- so it gets its own centre/scale pair, chosen to
+ * fit the same hex comfortably inside the plate (its own bounding box is
+ * 28x32; scaled by `PROP_FLASH_SCALE`, about 24x27).
+ */
+const PROP_FLASH_CENTER = { x: 60, y: 80 };
+const PROP_FLASH_SCALE = 0.85;
+
+/** JG_FLASH's radiating burst lines sit just outside the plate's own edge, not the old fixed hex-relative offsets, so they scale with the plate. */
+const PROP_BURST_INNER_RADIUS = PROP_PLATE_RADIUS + 3;
+const PROP_BURST_OUTER_RADIUS = PROP_PLATE_RADIUS + 9;
+
+/** Positions and scales one `PROP_ANCHOR`-centred glyph, authored around `center` in its own native coordinates, onto the plate. */
+function propGlyphTransform(center: { x: number; y: number }, scale: number): string {
+  return `translate(${PROP_ANCHOR.x} ${PROP_ANCHOR.y}) scale(${scale}) translate(${-center.x} ${-center.y})`;
+}
+
+/**
+ * Wraps `glyph` in #160's stand-out treatment: a soft drop shadow (a darker
+ * disc, offset down), an off-white plate with a navy outline matching the
+ * figure's own stroke weight, then the glyph itself on top -- so every held
+ * prop lifts off a Room's floor/wall art instead of blending into it.
+ */
+function renderPropPlate(glyph: string): string {
+  const { x, y } = PROP_ANCHOR;
+  return (
+    `<circle cx="${x}" cy="${y + PROP_PLATE_SHADOW_OFFSET}" r="${PROP_PLATE_RADIUS}" fill="#000000" opacity=".25"></circle>` +
+    `<circle cx="${x}" cy="${y}" r="${PROP_PLATE_RADIUS}" fill="${EYE_WHITE}" stroke="${STROKE}" stroke-width="${PROP_PLATE_STROKE_WIDTH}"></circle>` +
+    glyph
+  );
+}
+
+/** JG_FLASH's radiating burst lines (#160), five ticks spaced 72° apart starting straight up, just outside the plate's own edge. */
+function renderPropFlashBurst(): string {
+  const lines = Array.from({ length: 5 }, (_, i) => {
+    const angleDeg = -90 + i * 72;
+    const angleRad = (angleDeg * Math.PI) / 180;
+    const cos = Math.cos(angleRad);
+    const sin = Math.sin(angleRad);
+    const x1 = (PROP_ANCHOR.x + PROP_BURST_INNER_RADIUS * cos).toFixed(2);
+    const y1 = (PROP_ANCHOR.y + PROP_BURST_INNER_RADIUS * sin).toFixed(2);
+    const x2 = (PROP_ANCHOR.x + PROP_BURST_OUTER_RADIUS * cos).toFixed(2);
+    const y2 = (PROP_ANCHOR.y + PROP_BURST_OUTER_RADIUS * sin).toFixed(2);
+    return `<line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}"></line>`;
+  }).join('');
+  return `<g stroke="${ACCENT}" stroke-width="2" stroke-linecap="round">${lines}</g>`;
+}
+
+/**
  * The held prop for one of #47's four Emote-only poses (`resolvePenguinFramePose`'s
  * `prop` field), or `''` for every other pose. Pure `<path>`/`<circle>`/`<line>`/
- * `<polygon>` shapes only, positioned near the figure rather than inside its
- * rotated arm groups (simpler than tracking each arm's rotated tip, and
- * still reads as "held"); never `<text>` (render-svg.test.ts's "never draws
- * a <text> element" check, #62 D3, covers every `PENGUIN_ANIMS` frame,
- * including these).
+ * `<polygon>` shapes only, each now drawn on a shared `PROP_ANCHOR` plate
+ * (#160) rather than at its own one-off position, and positioned near the
+ * figure rather than inside its rotated arm groups (simpler than tracking
+ * each arm's rotated tip, and still reads as "held"); never `<text>`
+ * (render-svg.test.ts's "never draws a <text> element" check, #62 D3, covers
+ * every `PENGUIN_ANIMS` frame, including these).
  *
- * - THUMBS_UP reuses the picker icon's own thumb outline
+ * - THUMBS_UP reuses the picker icon's own thumb outline verbatim
  *   (`design/Club JenGuin HUD Menus.dc.html`'s HUD-EMOTE THUMBS UP tile),
- *   scaled down near the raised right shoulder.
- * - BRB has no picker icon beyond its own lettered tile; a small clock face
- *   reads "be right back" without needing a baked text outline.
+ *   recoloured navy for the plate.
+ * - BRB has no picker icon beyond its own lettered ("BRB") tile, and baking a
+ *   new lettering path for it is out of #160's scope (#62 D3 forbids `<text>`
+ *   here); a small clock face keeps reading "be right back" without one,
+ *   just recoloured navy and moved onto the shared plate.
  * - JG_FLASH reuses the JG LOGO belly pattern's own hex + `PENGUIN_TEXT_PATHS.jgLogo`
- *   path (`renderPattern`'s 'JG LOGO' case), flashed in front of the chest
- *   with radiating burst lines that blink out on the pose's second frame.
- * - SHIP_IT reuses the picker icon's own hull-and-sail outline, near the
- *   Penguin's lowered right flipper, as if just launched.
+ *   path (`renderPattern`'s 'JG LOGO' case) at its own fit-to-plate scale,
+ *   with radiating burst lines (now anchored off the plate's own edge) that
+ *   blink out on the pose's second frame.
+ * - SHIP_IT reuses the picker icon's own hull-and-sail outline verbatim,
+ *   recoloured navy for the plate.
  */
 function renderProp(prop: PenguinFramePose['prop'], flashBurst: boolean, facing: Facing): string {
   switch (prop) {
-    case 'THUMBS_UP':
-      return `<g transform="translate(78 10) scale(0.9)"><path d="M9 17 h5 v11 h-5 z M14 18 l5 -11 c3 0 4 2 3 5 l-1 4 h7 c2 0 3 2 2 4 l-2 7 c0 1 -1 2 -3 2 h-11" fill="${STROKE}"></path></g>`;
-    case 'BRB':
-      return `<g transform="translate(18 26)"><circle r="9" fill="${SEAT_FILL}" stroke="${STROKE}" stroke-width="2"></circle><path d="M0 -5 V0 L4 3" fill="none" stroke="${STROKE}" stroke-width="2" stroke-linecap="round"></path></g>`;
-    case 'JG_FLASH': {
-      const burst = flashBurst
-        ? `<g stroke="${ACCENT}" stroke-width="2" stroke-linecap="round"><line x1="60" y1="55" x2="60" y2="47"></line><line x1="38" y1="68" x2="30" y2="62"></line><line x1="82" y1="68" x2="90" y2="62"></line><line x1="38" y1="92" x2="30" y2="98"></line><line x1="82" y1="92" x2="90" y2="98"></line></g>`
-        : '';
-      return `<g>${burst}<polygon points="60,64 74,72 74,88 60,96 46,88 46,72" fill="${STROKE}"></polygon>${renderLettering(PENGUIN_TEXT_PATHS.jgLogo.d, PENGUIN_TEXT_PATHS.jgLogo.fill, facing)}</g>`;
+    case 'THUMBS_UP': {
+      const glyph = `<g transform="${propGlyphTransform(PROP_GLYPH_VIEWBOX_CENTER, PROP_GLYPH_SCALE)}"><path d="M9 17 h5 v11 h-5 z M14 18 l5 -11 c3 0 4 2 3 5 l-1 4 h7 c2 0 3 2 2 4 l-2 7 c0 1 -1 2 -3 2 h-11" fill="${STROKE}"></path></g>`;
+      return `<g>${renderPropPlate(glyph)}</g>`;
     }
-    case 'SHIP_IT':
-      return `<g transform="translate(70 90)"><path d="M8 22 h24 l-4 6 h-16 z M14 22 v-9 h8 v9 M22 13 l8 4" fill="none" stroke="${STROKE}" stroke-width="3" stroke-linejoin="round"></path></g>`;
+    case 'BRB': {
+      const glyph = `<g transform="${propGlyphTransform(PROP_GLYPH_VIEWBOX_CENTER, PROP_GLYPH_SCALE)}"><circle cx="20" cy="18" r="9" fill="none" stroke="${STROKE}" stroke-width="2.5"></circle><path d="M20 11 V18 L25 22" fill="none" stroke="${STROKE}" stroke-width="2.5" stroke-linecap="round"></path></g>`;
+      return `<g>${renderPropPlate(glyph)}</g>`;
+    }
+    case 'JG_FLASH': {
+      const burst = flashBurst ? renderPropFlashBurst() : '';
+      const glyph = `<g transform="${propGlyphTransform(PROP_FLASH_CENTER, PROP_FLASH_SCALE)}"><polygon points="60,64 74,72 74,88 60,96 46,88 46,72" fill="${STROKE}"></polygon>${renderLettering(PENGUIN_TEXT_PATHS.jgLogo.d, PENGUIN_TEXT_PATHS.jgLogo.fill, facing)}</g>`;
+      return `<g>${burst}${renderPropPlate(glyph)}</g>`;
+    }
+    case 'SHIP_IT': {
+      const glyph = `<g transform="${propGlyphTransform(PROP_GLYPH_VIEWBOX_CENTER, PROP_GLYPH_SCALE)}"><path d="M8 22 h24 l-4 6 h-16 z M14 22 v-9 h8 v9 M22 13 l8 4" fill="none" stroke="${STROKE}" stroke-width="3" stroke-linejoin="round"></path></g>`;
+      return `<g>${renderPropPlate(glyph)}</g>`;
+    }
     case null:
     default:
       return '';
