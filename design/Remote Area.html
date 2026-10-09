@@ -218,6 +218,9 @@ const landP=body.append('path').attr('fill','#d3ebf3').attr('stroke','#0C4B5F').
 const statesP=body.append('path').attr('fill','none').attr('stroke','#0C4B5F').attr('stroke-opacity',.35).attr('stroke-width',.8);
 const arcs=body.append('g');
 const pinsG=body.append('g');
+const latamG=body.append('g').style('cursor','pointer').on('click',()=>{window.location.href='Latam Cafe.dc.html';});
+latamG.html('<g class="lm"><circle r="26" fill="#C9A8FF" opacity="0"><animate attributeName="r" values="8;30" dur="1.4s" repeatCount="indefinite"/><animate attributeName="opacity" values=".6;0" dur="1.4s" repeatCount="indefinite"/></circle><g><animate attributeName="opacity" values="1;.25;1" dur="1s" repeatCount="indefinite"/><circle r="12" fill="#C9A8FF" stroke="#161719" stroke-width="3"/><circle r="8" fill="#F4F4F4" stroke="#161719" stroke-width="1.5"/><polygon points="0,-4 3.8,-1.2 2.4,3.2 -2.4,3.2 -3.8,-1.2" fill="#161719"/><path d="M0 -4 V-8 M3.8 -1.2 L7.5 -2.5 M2.4 3.2 L4.6 6.4 M-2.4 3.2 L-4.6 6.4 M-3.8 -1.2 L-7.5 -2.5" stroke="#161719" stroke-width="1.2"/></g><circle r="26" fill="transparent"/></g><g class="ll"><rect x="-34" y="0" width="68" height="20" rx="10" fill="#161719" stroke="#C9A8FF" stroke-width="2"/><text x="0" y="14" text-anchor="middle" font-family="Libre Franklin, sans-serif" font-weight="700" font-size="11" fill="#F4F4F4">LATAM</text></g>');
+const RIO=[-43.173,-22.907];
 gG.append('circle').attr('cx',GC[0]).attr('cy',GC[1]).attr('r',R).attr('fill','url(#shine)').attr('pointer-events','none');
 gG.append('circle').attr('cx',GC[0]).attr('cy',GC[1]).attr('r',R).attr('fill','none').attr('stroke','#00BDFF').attr('stroke-width',4);
 // meridian ring
@@ -267,6 +270,15 @@ function draw(){
       L.html('<rect x="'+(x-tw/2)+'" y="'+(y-h*3.2-18)+'" width="'+tw+'" height="20" rx="10" fill="'+(on?'#00BDFF':'#161719')+'" stroke="#0C4B5F" stroke-width="2"/><text x="'+x+'" y="'+(y-h*3.2-4)+'" text-anchor="middle" font-family="Libre Franklin, sans-serif" font-weight="700" font-size="11" fill="'+(on?'#161719':'#F4F4F4')+'">'+t+'</text>');
     } else L.html('');
   });
+  {
+    const vis=d3.geoDistance(RIO,c)<Math.PI/2-.02;
+    latamG.attr('display',vis?null:'none');
+    if(vis){
+      const [x,y]=proj(RIO),s=zoomed?1.4:1,ly=y-(zoomed?46:38);
+      latamG.select('.lm').attr('transform','translate('+x+' '+y+') scale('+s+')');
+      latamG.select('.ll').attr('transform','translate('+x+' '+ly+')');
+    }
+  }
   if(sel>=0)pins.filter(d=>d.i===sel).raise();
 }
 
