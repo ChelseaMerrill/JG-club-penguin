@@ -63,8 +63,15 @@ describe('MAP_ROOMS', () => {
     expect(isMapTileClickable(COMING_SOON_TILE)).toBe(false);
   });
 
-  it('gives every registered RoomDefinition exactly one clickable Map tile', () => {
+  it('gives every registered RoomDefinition exactly one clickable Map tile, except the LATAM Rooms', () => {
+    // LATAM Disco Hall (and its sibling LATAM Rooms) are reached from the
+    // LATAM Café, not the Map, unlike the Remote Lounge above.
+    const NO_MAP_TILE = new Set(['latam-disco-hall']);
     for (const room of ROOM_DEFINITIONS) {
+      if (NO_MAP_TILE.has(room.id)) {
+        expect(MAP_ROOMS.some((tile) => tile.roomId === room.id)).toBe(false);
+        continue;
+      }
       const matches = MAP_ROOMS.filter((tile) => tile.roomId === room.id);
       expect(matches).toHaveLength(1);
       expect(isMapTileClickable(matches[0]!)).toBe(true);
