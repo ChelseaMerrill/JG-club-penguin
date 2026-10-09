@@ -113,6 +113,16 @@ export type NpcId =
   | 'sander-nonaka'
   | 'vinicius-martins'
   | 'ygor-azevedo'
+  // LATAM Disco Hall's six dancers (`design/Characters LATAM.dc.html`'s
+  // cards whose location line reads "LATAM Disco Hall"), ids first+last
+  // name since none has a bare id elsewhere. Reached from the LATAM Café,
+  // not the Map (#<issue>).
+  | 'lucas-varani'
+  | 'hector-grecco'
+  | 'jose-acosta'
+  | 'fernando-possebon'
+  | 'fernando-garagnani'
+  | 'ricardo-cordeiro'
   // The Remote Lounge's JGers (`remote-lounge-npcs.ts`).
   | RemoteLoungeNpcId;
 
@@ -2151,6 +2161,105 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
   // PR #133) -- dropped here and from the Bathroom's own npcSlots. Spelled
   // "Jessie" there, unlike The Melt's "Jesse" (see that entry's own
   // comment), which remains.
+  // LATAM Disco Hall's six dancers (#<issue>), from
+  // `design/Characters LATAM.dc.html`. Unlike `design/Characters.dc.html`,
+  // that sheet gives each card only a name and a "LATAM Disco Hall" location
+  // line -- no title, no quote -- so `title: null` here is the same "nothing
+  // to resolve" case as the original sheet's "TITLE TBD" cards, and every
+  // one of the five below needs `dialog-lines.test.ts`'s AWAITING_BA_LINE
+  // list (judgment call: their one line each is the design's own "dancing in
+  // the Salão LATAM" fact, not an invented personal quote). `tagName` is
+  // each one's full name, the Room design's own nameplate text. Hector
+  // Grecco hosts the Carnaval Parade minigame (`design/Minigame Carnaval
+  // Parade.dc.html`'s "MESTRE DE BATERIA" intro card: its figure is his own
+  // head/hair/face/glasses/beard, just in a pink parade shirt instead of his
+  // black one) -- that minigame isn't built yet, so his dialog stays a plain
+  // line, his card's own intro quote, with a `dialog: { kind: 'minigame' }`
+  // follow-up once #<issue-tbd> builds it.
+  'lucas-varani': {
+    id: 'lucas-varani',
+    name: 'Lucas Varani',
+    title: null,
+    roomId: 'latam-disco-hall',
+    kind: 'human',
+    tagName: 'Lucas Varani',
+    dialogLines: ['Salão LATAM never stops.'],
+    idleLines: [],
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'lucasVarani' },
+  },
+  'hector-grecco': {
+    id: 'hector-grecco',
+    name: 'Hector Grecco',
+    title: null,
+    roomId: 'latam-disco-hall',
+    kind: 'human',
+    tagName: 'Hector Grecco',
+    // His own "MESTRE DE BATERIA" intro card quote from
+    // `design/Minigame Carnaval Parade.dc.html`, verbatim: the Carnaval
+    // Parade minigame isn't built this pass, so this is just his line, not
+    // yet a `kind: 'minigame'` trigger dialog.
+    dialogLines: [
+      'Vem pro desfile! Grab the feathers, dodge the barriers and keep the beat going. Score 400 and you earn the Passista badge.',
+    ],
+    idleLines: [],
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'hectorGrecco' },
+  },
+  'jose-acosta': {
+    id: 'jose-acosta',
+    name: 'Jose Acosta',
+    title: null,
+    roomId: 'latam-disco-hall',
+    kind: 'human',
+    tagName: 'Jose Acosta',
+    dialogLines: ['Lights down, feet moving.'],
+    idleLines: [],
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'joseAcosta' },
+  },
+  'fernando-possebon': {
+    id: 'fernando-possebon',
+    name: 'Fernando Possebon',
+    title: null,
+    roomId: 'latam-disco-hall',
+    kind: 'human',
+    tagName: 'Fernando Possebon',
+    dialogLines: ['This floor was made for dancing.'],
+    idleLines: [],
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'fernandoPossebon' },
+  },
+  'fernando-garagnani': {
+    id: 'fernando-garagnani',
+    name: 'Fernando Garagnani',
+    title: null,
+    roomId: 'latam-disco-hall',
+    kind: 'human',
+    tagName: 'Fernando Garagnani',
+    dialogLines: ['Carnaval energy, every night.'],
+    idleLines: [],
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'fernandoGaragnani' },
+  },
+  'ricardo-cordeiro': {
+    id: 'ricardo-cordeiro',
+    name: 'Ricardo Cordeiro',
+    title: null,
+    roomId: 'latam-disco-hall',
+    kind: 'human',
+    tagName: 'Ricardo Cordeiro',
+    dialogLines: ['Keep the beat going.'],
+    idleLines: [],
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'ricardoCordeiro' },
+  },
   // The Remote Lounge's JGers, built from its design's own people list
   // (`remote-lounge-npcs.ts`).
   ...remoteLoungeNpcs({ kind: 'remote-card' }),

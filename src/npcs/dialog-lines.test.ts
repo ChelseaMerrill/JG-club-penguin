@@ -47,6 +47,17 @@ const AWAITING_BA_LINE: readonly string[] = [
   'sander-nonaka',
   'vinicius-martins',
   'ygor-azevedo',
+  // LATAM Disco Hall's six dancers (#<issue>): unlike `design/
+  // Characters.dc.html`, `design/Characters LATAM.dc.html` gives each card
+  // no quote at all (just a name and a location line), so every one of
+  // these has only its single placeholder/minigame-card line, awaiting real
+  // BA copy.
+  'lucas-varani',
+  'hector-grecco',
+  'jose-acosta',
+  'fernando-possebon',
+  'fernando-garagnani',
+  'ricardo-cordeiro',
 ];
 
 /**

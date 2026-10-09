@@ -73,6 +73,7 @@ type RoomId =
   | 'the-mullet'
   | 'remote-lounge'
   | 'latam-cafe';
+  | 'latam-disco-hall';
 
 // Per-Room overrides of STAGE_SELECTOR (#51 D3), for a design file whose
 // first `data-screen-label` element isn't the Stage this Room exports (e.g.
@@ -104,6 +105,7 @@ const ROOM_FILES: Record<RoomId, string> = {
   'remote-lounge': 'Remote Area.html',
   // The LATAM section (owner request, 2026-10-09).
   'latam-cafe': 'Latam Cafe.dc.html',
+  'latam-disco-hall': 'Latam Disco Hall.dc.html',
 };
 
 // Per-Room overrides of the element `openRoomStage` waits for before it
@@ -1155,6 +1157,25 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
       selectors: ['a[href="Minigame Pao de Queijo Memory.dc.html"]'],
       comment:
         'Sander Nonaka\'s nameplate, pulsing highlight glow and "MATCH THE TREATS" minigame-trigger bubble, drawn together in this second, separate group at his same point (his figure itself is the `title-group` rule above).',
+    },
+  ],
+  // `design/Latam Disco Hall.dc.html` draws no top-right MENU/presence
+  // cluster and no bottom EMOTE toolbar at all (a leaner design than the HQ
+  // Rooms'), and its "← MAP / 18 · LATAM DISCO HALL" breadcrumb sits above
+  // the Stage element in normal document flow (measured: breadcrumb bottom
+  // edge at viewport y=56, Stage top at y=70), so it's already outside the
+  // captured screenshot with no hide rule needed. The three MAP/CAFE
+  // LOUNGE/FUTEBOL FIELD exit pills and the DJ booth's "SPIN IT · CARNAVAL
+  // PARADE" sign are static, non-NPC design furniture (`RoomScene.drawDoors`
+  // only adds an invisible click Zone over image-background art, #16 fix 2),
+  // so they stay in the exported art like every other Room's door/hotspot
+  // signage.
+  'latam-disco-hall': [
+    {
+      kind: 'selector',
+      selectors: ['#latam-people'],
+      comment:
+        "The six dancers (Lucas Varani, Hector Grecco, Jose Acosta, Fernando Possebon, Fernando Garagnani, Ricardo Cordeiro): each one's ground shadow, nameplate and bouncing/swaying figure.",
     },
   ],
 };
