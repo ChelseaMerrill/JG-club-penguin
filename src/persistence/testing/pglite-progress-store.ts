@@ -28,6 +28,8 @@ import {
   type IglooSlot,
   type LeaderboardEntry,
   type Placement,
+  type PitchRun,
+  type PitchSubmitResult,
   type ProgressSnapshot,
   type ProgressStore,
   type PurchaseResult,
@@ -55,6 +57,7 @@ export const MIGRATIONS = [
   ['quest-registry', '20261006000000_quest_registry.sql'],
   ['quest-igloo-badge', '20261006010000_quest_igloo_badge.sql'],
   ['quest-nicole-coffee', '20261006020000_quest_nicole_coffee.sql'],
+  ['quest-pitch-hack', '20261009010000_quest_pitch_hack.sql'],
 ] as const;
 
 export type MigrationName = (typeof MIGRATIONS)[number][0];
@@ -410,6 +413,28 @@ function createSqlProgressStore(db: PGliteInterface, playerId: string): Progress
     });
   }
 
+  // #142: Linda's pitch Quest's read/no-argument RPCs.
+  async function pitchRpc(fn: string): Promise<PitchRun> {
+    return runAsPlayer(async (tx) => {
+      const res = await tx.query<{ result: PitchRun }>(`select public.${fn}() as result`);
+      return res.rows[0].result;
+    });
+  }
+
+  async function submitPitch(
+    problem: number,
+    solution: number,
+    ask: number,
+  ): Promise<PitchSubmitResult> {
+    return runAsPlayer(async (tx) => {
+      const res = await tx.query<{ result: PitchSubmitResult }>(
+        'select public.submit_pitch($1, $2, $3) as result',
+        [problem, solution, ask],
+      );
+      return res.rows[0].result;
+    });
+  }
+
   return {
     loadAll,
     saveLook,
@@ -427,6 +452,10 @@ function createSqlProgressStore(db: PGliteInterface, playerId: string): Progress
     markKitchenVisited: () => coffeeRpc('mark_kitchen_visited'),
     askTomForCoffee: () => coffeeRpc('ask_tom_for_coffee'),
     deliverCoffee: () => coffeeRpc('deliver_coffee'),
+    pitchRun: () => pitchRpc('pitch_run'),
+    markLindaTalked: () => pitchRpc('mark_linda_talked'),
+    startPitch: () => pitchRpc('start_pitch'),
+    submitPitch,
   };
 }
 
@@ -483,6 +512,12 @@ export async function createPgliteProgressStoreHarness(): Promise<
       await db.query(
         `update public.player_coffee_runs set handed_over_at = now() - make_interval(secs => $1)
          where player_id = $2 and handed_over_at is not null`,
+        [seconds, playerId],
+      );
+      // #142: the same for Linda's latest pitch start.
+      await db.query(
+        `update public.player_pitch_runs set started_at = now() - make_interval(secs => $1)
+         where player_id = $2 and started_at is not null`,
         [seconds, playerId],
       );
     },

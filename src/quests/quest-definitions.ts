@@ -255,6 +255,31 @@ export const QUEST_DEFINITIONS: readonly QuestDefinition[] = [
       },
     ],
   },
+  // #142: Linda Martin's pitch, steps in the ticket's order. Linda's
+  // reaction to a sub-20 s pitch is shown as part of passing step 2, not a
+  // separate server step (20261009010000_quest_pitch_hack.sql P4). The
+  // overlay's own 60 s countdown is `src/quests/pitch-overlay.ts`'s.
+  {
+    kind: 'steps',
+    id: 'pitch-hack',
+    title: 'Pitch your hack in under 60 seconds',
+    location: 'THE ICEBOX · TALK TO LINDA',
+    rewardTokens: 75,
+    steps: [
+      {
+        id: 'talk-to-linda',
+        label: 'Talk to Linda in The Icebox',
+        hint: 'Talk to Linda',
+        roomId: 'the-icebox',
+      },
+      {
+        id: 'pitch-under-60',
+        label: 'Pitch Linda in under 60 seconds',
+        hint: 'Pitch Linda',
+        roomId: 'the-icebox',
+      },
+    ],
+  },
 ];
 
 /**

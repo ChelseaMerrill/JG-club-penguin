@@ -34,6 +34,9 @@ const AWAITING_BA_LINE: readonly string[] = [
   'abby-rivera',
   'adam-wilson-hwang',
   'bryan-sambrook',
+  // Linda Martin, placed in The Icebox with one card line (owner request,
+  // 2026-10-09).
+  'linda-martin',
 ];
 
 /**

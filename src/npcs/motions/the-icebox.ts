@@ -92,4 +92,23 @@ export const THE_ICEBOX_MOTIONS: Partial<Record<NpcId, NpcMotionSpec>> = {
       animation: 'bobWestover 2.1s ease-in-out infinite',
     },
   },
+  // Linda Martin (owner request, 2026-10-09): walks a lap of the open
+  // floor near the front of the Room, clear of the conference table (cols
+  // 3-8), Nicole's (1,7) and Jethro's (4,9) roams -- from her (9,8) slot,
+  // north to (9,7), east two tiles to (11,7), south to (11,8) and west two
+  // tiles home, each leg a `tileToScreen` delta (100/50 tiles, the Mullet's
+  // `adamLap`/`bryanLap` precedent), paused briefly at each corner, on her
+  // card's own 2.72s bob. Authored, not from a Room design.
+  'linda-martin': {
+    path: {
+      keyframes:
+        '@keyframes lindaLap { 0%,3% { transform: translate(0,0);} 17.7%,20.7% { transform: translate(50px,-25px);} 50%,53% { transform: translate(150px,25px);} 67.7%,70.7% { transform: translate(100px,50px);} 100% { transform: translate(0,0);} }',
+      animation: 'lindaLap 18s ease-in-out infinite',
+    },
+    figure: {
+      keyframes:
+        '@keyframes bobLinda { 0%,100% { transform: translateY(0);} 50% { transform: translateY(-3.41px);} }',
+      animation: 'bobLinda 2.72s ease-in-out infinite',
+    },
+  },
 };

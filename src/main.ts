@@ -96,6 +96,8 @@ import { createNpcDialog } from './ui/npc-dialog/npc-dialog';
 import { hasQuestStarter, registerQuestStarter, startQuest } from './npcs/quest-giver';
 import { createCoffeeRunController, TOM_COFFEE_ACTION_LABEL } from './quests/coffee-run';
 import { NICOLE_COFFEE_QUEST_ID } from './persistence/coffee-run-rules';
+import { createPitchOverlay } from './quests/pitch-overlay';
+import { PITCH_HACK_QUEST_ID } from './persistence/pitch-run-rules';
 import { recordNpcTalked, recordOpenStall } from './game/rooms/dev-room-hook';
 import { createTrophyCase, TROPHY_CASE_OVERLAY_ID } from './ui/trophy-case';
 import { createMapScreen } from './ui/map-screen';
@@ -912,6 +914,10 @@ const questAwareStore: ProgressStore = {
   purchase: (itemId) => refreshQuestsAfter(progressStore.purchase(itemId)),
   // #143: the Igloo Badge Quest's "talk to Casey" step.
   markCaseyTalked: () => refreshQuestsAfter(progressStore.markCaseyTalked()),
+  // #142: Linda's pitch Quest's "talk to Linda" step.
+  markLindaTalked: () => refreshQuestsAfter(progressStore.markLindaTalked()),
+  submitPitch: (problem, solution, ask) =>
+    refreshQuestsAfter(progressStore.submitPitch(problem, solution, ask)),
 };
 
 // #143: Casey's "Got any work for me?" starts the Igloo Badge Quest by
@@ -1079,6 +1085,27 @@ function stopCoffee(): void {
   showCoffee(false, null);
 }
 
+// #142: "Pitch your hack in under 60 seconds". Linda's "Got any work for
+// me?" marks the "talk to Linda" step and shows her card quote; her dialog's
+// own "Pitch Linda" action (below) then opens the overlay, which drives the
+// rest of the Quest itself.
+registerQuestStarter(PITCH_HACK_QUEST_ID, () => {
+  quests.track(PITCH_HACK_QUEST_ID);
+  void questAwareStore.markLindaTalked();
+});
+const pitchOverlay = createPitchOverlay(uiLayer, {
+  overlays: hud.overlays,
+  start: () => progressStore.startPitch().then(() => undefined),
+  submit: (problem, solution, ask) => questAwareStore.submitPitch(problem, solution, ask),
+  now: e2eHooksEnabled ? devNow : undefined,
+});
+/** Whether Linda's dialog should offer "Pitch Linda": only once the Quest's
+ *  "talk to Linda" step is met (replay after passing stays offered, #142). */
+function canPitchLinda(): boolean {
+  const status = quests.view()?.statuses.find((s) => s.quest.id === PITCH_HACK_QUEST_ID);
+  return (status?.progress ?? 0) >= 1;
+}
+
 declare global {
   interface Window {
     /** Test-only (#46); see `src/quests/quests-test-handle.ts`. */
@@ -1121,6 +1148,12 @@ if (e2eHooksEnabled) {
       await coffee.askTom();
       await progressStore.deliverCoffee();
       await coffee.start();
+      await quests.refresh();
+    },
+    async finishPitchHack() {
+      await progressStore.markLindaTalked();
+      await progressStore.startPitch();
+      await progressStore.submitPitch(0, 0, 0);
       await quests.refresh();
     },
   };
@@ -1195,11 +1228,17 @@ createNpcDialog(getUiLayer(), {
     canStart: hasQuestStarter,
   },
   // #141: Tom's "Nicole's coffee" option while that Quest needs it, next to
-  // (never instead of) Coffee Rush.
-  extraActions: (npcId) =>
-    npcId === 'tom' && coffee.canAskTom()
-      ? [{ label: TOM_COFFEE_ACTION_LABEL, run: () => void coffee.askTom() }]
-      : [],
+  // (never instead of) Coffee Rush. #142: Linda's "Pitch Linda" option once
+  // the Player has talked to her.
+  extraActions: (npcId) => {
+    if (npcId === 'tom' && coffee.canAskTom()) {
+      return [{ label: TOM_COFFEE_ACTION_LABEL, run: () => void coffee.askTom() }];
+    }
+    if (npcId === 'linda-martin' && canPitchLinda()) {
+      return [{ label: 'Pitch Linda', run: () => pitchOverlay.open() }];
+    }
+    return [];
+  },
 });
 gameEvents.on('npc:talked', ({ npcId }) => {
   recordNpcTalked(npcId);

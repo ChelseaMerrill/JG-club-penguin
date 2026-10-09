@@ -46,8 +46,9 @@ describe('questsInBuild', () => {
       'igloo-badge',
       'bug-squash',
       'pancake-flip',
-      // #141: a steps Quest is always in the build.
+      // #141/#142: a steps Quest is always in the build.
       'nicole-coffee',
+      'pitch-hack',
     ]);
   });
 
@@ -140,6 +141,57 @@ describe('the Nicole coffee Quest (#141)', () => {
     expect(questTransitions([carrying], [delivered]).map(stepToastMessage)).toEqual([
       'Quest: Carry it back before it goes cold ✓ (5 / 5)',
       'Quest: Hand it to Nicole in The Icebox ✓ (5 / 5)',
+      '',
+    ]);
+  });
+});
+
+describe('the pitch Quest (#142)', () => {
+  const NONE = { 'talk-to-linda': false, 'pitch-under-60': false };
+
+  function pitch(steps: Record<string, boolean>): QuestStatus {
+    return status(
+      evaluateQuests(QUEST_DEFINITIONS, freshPlayer({ questSteps: { 'pitch-hack': steps } })),
+      'pitch-hack',
+    );
+  }
+
+  it("is a 75-Token steps Quest in The Icebox with the ticket's two steps", () => {
+    const quest = QUEST_DEFINITIONS.find((q) => q.id === 'pitch-hack') as StepsQuestDefinition;
+
+    expect(quest).toMatchObject({
+      kind: 'steps',
+      title: 'Pitch your hack in under 60 seconds',
+      location: 'THE ICEBOX · TALK TO LINDA',
+      rewardTokens: 75,
+    });
+    expect(quest.steps.map((s) => [s.id, s.label, s.roomId])).toEqual([
+      ['talk-to-linda', 'Talk to Linda in The Icebox', 'the-icebox'],
+      ['pitch-under-60', 'Pitch Linda in under 60 seconds', 'the-icebox'],
+    ]);
+  });
+
+  it('starts at 0 / 2 pointing at Linda in The Icebox', () => {
+    const run = pitch(NONE);
+
+    expect(run.progress).toBe(0);
+    expect(run.nextHint).toEqual({ text: 'Talk to Linda', location: 'THE ICEBOX' });
+  });
+
+  it('after talking, points at pitching Linda', () => {
+    const run = pitch({ ...NONE, 'talk-to-linda': true });
+
+    expect(run.progress).toBe(1);
+    expect(run.nextHint).toEqual({ text: 'Pitch Linda', location: 'THE ICEBOX' });
+  });
+
+  it('is done once both steps are met, and toasts the second', () => {
+    const talked = pitch({ ...NONE, 'talk-to-linda': true });
+    const pitched = pitch({ 'talk-to-linda': true, 'pitch-under-60': true });
+
+    expect(pitched.done).toBe(true);
+    expect(questTransitions([talked], [pitched]).map(stepToastMessage)).toEqual([
+      'Quest: Pitch Linda in under 60 seconds ✓ (2 / 2)',
       '',
     ]);
   });
