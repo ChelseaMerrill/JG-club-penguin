@@ -226,7 +226,13 @@ export function createRemoteLounge(uiLayer: HTMLElement, deps: RemoteLoungeDeps)
   function enter(): void {
     root.hidden = false;
     if (!globe) {
-      globe = createGlobe(HQ_LOCATION, REMOTE_JGERS, { onPinClick: select, reducedMotion });
+      globe = createGlobe(HQ_LOCATION, REMOTE_JGERS, {
+        onPinClick: select,
+        // The LATAM pin (owner request, 2026-10-09): straight to the LATAM
+        // Café, the same Room change BACK TO HQ makes, not `flyTo`/a card.
+        onLatamPinClick: () => deps.goToRoom('latam-cafe'),
+        reducedMotion,
+      });
       globeLayer.appendChild(globe.element);
       if (map) globe.setMap(map);
     }

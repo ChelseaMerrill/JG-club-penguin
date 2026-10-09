@@ -137,3 +137,33 @@ test('Remote Lounge: BACK TO HQ goes straight to Town Center and hides the loung
 
   expect(errors).toEqual([]);
 });
+
+test('Remote Lounge: the LATAM pin opens the LATAM Café (owner request, 2026-10-09)', async ({
+  page,
+}) => {
+  // A Room change needs a Session: the dev fake Player's, as BACK TO HQ's own test uses.
+  const errors = collectErrors(page);
+  await page.goto('/?asPlayer');
+  await expect
+    .poll(async () => (await debugInfo(page))?.roomId, { timeout: BOOT_TIMEOUT })
+    .toBe('town-center');
+  await page.evaluate(() => window.__roomDebug?.changeRoom?.('remote-lounge'));
+  await expect
+    .poll(async () => (await debugInfo(page))?.roomId, { timeout: BOOT_TIMEOUT })
+    .toBe('remote-lounge');
+
+  // The LATAM pin, unlike a roster row, has no `flyTo` shortcut: it only
+  // shows once the globe's continuous spin (#116's own 0.12°/frame, a ~50s
+  // full rotation) brings Rio onto the visible hemisphere, so this waits out
+  // part of that spin rather than asserting it immediately.
+  const latamPin = page.locator('.globe__latam-pin');
+  await expect(latamPin).toBeVisible({ timeout: 30_000 });
+  await latamPin.click();
+
+  await expect
+    .poll(async () => (await debugInfo(page))?.roomId, { timeout: BOOT_TIMEOUT })
+    .toBe('latam-cafe');
+  await expect(page.locator('.remote-lounge')).toBeHidden();
+
+  expect(errors).toEqual([]);
+});

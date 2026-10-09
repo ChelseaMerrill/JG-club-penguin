@@ -36,6 +36,15 @@ const FLY_ZOOM = 14;
 const FLY_MS = 1400;
 const WORLD_MS = 1100;
 
+/**
+ * Rio de Janeiro, where the LATAM section's own globe marker sits (`design/
+ * Remote Area.html`'s `RIO` constant, added by the design resync that
+ * introduced the LATAM section, owner request, 2026-10-09). Not a
+ * `GlobePin`: it never flies the globe in, has no roster row or person card,
+ * and its click goes straight to the LATAM Café (`onLatamPinClick`) instead.
+ */
+export const RIO_LOCATION = { lon: -43.173, lat: -22.907 };
+
 export interface GlobePin {
   name: string;
   lon: number;
@@ -91,7 +100,12 @@ export function milesBetween(a: GlobePin, b: { lon: number; lat: number }): numb
 export function createGlobe(
   hq: { lon: number; lat: number },
   pins: readonly GlobePin[],
-  opts: { onPinClick: (index: number) => void; reducedMotion: boolean },
+  opts: {
+    onPinClick: (index: number) => void;
+    /** Clicking the LATAM pin (`RIO_LOCATION`): straight to the LATAM Café, never a `flyTo`. */
+    onLatamPinClick: () => void;
+    reducedMotion: boolean;
+  },
 ): Globe {
   const [cx, cy] = GLOBE_CENTER;
   const R = GLOBE_RADIUS;
@@ -146,6 +160,81 @@ export function createGlobe(
   );
   const arcsG = el('g', {}, body);
   const pinsG = el('g', {}, body);
+  // The LATAM pin (`design/Remote Area.html`'s own `latamG`/`.lm`/`.ll`
+  // markup, verbatim): a purple pulsing marker at Rio with a "LATAM" pill
+  // label above it, a sibling of `pinsG`'s JGer pins rather than one of them
+  // -- it carries no roster row or city card, and its click opens the LATAM
+  // Café directly (`onLatamPinClick`), not `flyTo`.
+  const latamPin = el('g', { class: 'globe__latam-pin' }, body);
+  latamPin.style.cursor = 'pointer';
+  latamPin.addEventListener('click', (event) => {
+    event.stopPropagation();
+    opts.onLatamPinClick();
+  });
+  const latamMarker = el('g', {}, latamPin);
+  const latamPulse = el('circle', { r: 8, fill: '#C9A8FF', opacity: 0 }, latamMarker);
+  el(
+    'animate',
+    { attributeName: 'r', values: '8;30', dur: '1.4s', repeatCount: 'indefinite' },
+    latamPulse,
+  );
+  el(
+    'animate',
+    { attributeName: 'opacity', values: '.6;0', dur: '1.4s', repeatCount: 'indefinite' },
+    latamPulse,
+  );
+  const latamPinBody = el('g', {}, latamMarker);
+  el(
+    'animate',
+    { attributeName: 'opacity', values: '1;.25;1', dur: '1s', repeatCount: 'indefinite' },
+    latamPinBody,
+  );
+  el('circle', { r: 12, fill: '#C9A8FF', stroke: '#161719', 'stroke-width': 3 }, latamPinBody);
+  el('circle', { r: 8, fill: '#F4F4F4', stroke: '#161719', 'stroke-width': 1.5 }, latamPinBody);
+  el(
+    'polygon',
+    { points: '0,-4 3.8,-1.2 2.4,3.2 -2.4,3.2 -3.8,-1.2', fill: '#161719' },
+    latamPinBody,
+  );
+  el(
+    'path',
+    {
+      d: 'M0 -4 V-8 M3.8 -1.2 L7.5 -2.5 M2.4 3.2 L4.6 6.4 M-2.4 3.2 L-4.6 6.4 M-3.8 -1.2 L-7.5 -2.5',
+      stroke: '#161719',
+      'stroke-width': 1.2,
+    },
+    latamPinBody,
+  );
+  el('circle', { r: 26, fill: 'transparent' }, latamMarker);
+  const latamLabel = el('g', {}, latamPin);
+  el(
+    'rect',
+    {
+      x: -34,
+      y: 0,
+      width: 68,
+      height: 20,
+      rx: 10,
+      fill: '#161719',
+      stroke: '#C9A8FF',
+      'stroke-width': 2,
+    },
+    latamLabel,
+  );
+  const latamText = el(
+    'text',
+    {
+      x: 0,
+      y: 14,
+      'text-anchor': 'middle',
+      'font-family': 'Libre Franklin, sans-serif',
+      'font-weight': 700,
+      'font-size': 11,
+      fill: '#F4F4F4',
+    },
+    latamLabel,
+  );
+  latamText.textContent = 'LATAM';
   el('circle', { cx, cy, r: R, fill: 'url(#globe-shine)', 'pointer-events': 'none' }, svg);
   el('circle', { cx, cy, r: R, fill: 'none', stroke: '#00BDFF', 'stroke-width': 4 }, svg);
   el(
@@ -261,6 +350,21 @@ export function createGlobe(
       }
     });
     if (selected >= 0) pinsG.appendChild(pinEls[selected + 1]!.g);
+
+    // The LATAM pin (`design/Remote Area.html`'s own visibility rule,
+    // verbatim: `d3.geoDistance(RIO, c) < Math.PI/2 - .02`), shown only when
+    // Rio is on the visible hemisphere, scaled 1.4x and its label lifted
+    // further once zoomed in.
+    const latamVisible =
+      geoDistance([RIO_LOCATION.lon, RIO_LOCATION.lat], center) < Math.PI / 2 - 0.02;
+    latamPin.style.display = latamVisible ? '' : 'none';
+    if (latamVisible) {
+      const [lx, ly] = projection([RIO_LOCATION.lon, RIO_LOCATION.lat])!;
+      const scale = zoomed ? 1.4 : 1;
+      const labelY = ly - (zoomed ? 46 : 38);
+      latamMarker.setAttribute('transform', `translate(${lx} ${ly}) scale(${scale})`);
+      latamLabel.setAttribute('transform', `translate(${lx} ${labelY})`);
+    }
   }
 
   let tween: {
