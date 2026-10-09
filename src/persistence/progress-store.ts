@@ -184,6 +184,25 @@ export interface BadgeCheckResult {
 }
 
 /**
+ * The Player's run at Linda's pitch Quest (#142), as the server's
+ * `pitch_run_state` reports it (20261009010000_quest_pitch_hack.sql P6).
+ * There is no "an attempt is running" flag: the overlay's own countdown
+ * (started by its own call to `startPitch`) is the only place that state is
+ * shown, so there is nothing to resume across a reload.
+ */
+export interface PitchRun {
+  talkedToLinda: boolean;
+  passed: boolean;
+  /** The fastest accepted pitch's whole seconds, kept across replays, or `null`. */
+  bestSeconds: number | null;
+}
+
+/** `submitPitch`'s success reply (P7): the accepted attempt's whole seconds, by the server's clock. */
+export interface PitchSubmitResult {
+  seconds: number;
+}
+
+/**
  * The main Quest's reward, paid once by `complete_quest` (#46;
  * `public.quests`' 'main' row since 20261006000000_quest_registry.sql).
  */
@@ -243,6 +262,14 @@ export const PROGRESS_ERROR_CODES = [
   'coffee_not_started',
   'coffee_not_carrying',
   'coffee_cold',
+  // #142: Linda's pitch Quest's RPCs (20261009010000_quest_pitch_hack.sql
+  // P8). A start or a submission before talking to Linda, or a submission
+  // before starting; an out-of-range Problem/Solution/Ask choice; a
+  // submission more than 65 s (60 s plus 5 s of grace) after the start, by
+  // the server's clock.
+  'pitch_not_started',
+  'invalid_pitch',
+  'pitch_timeout',
 ] as const;
 
 export type ProgressErrorCode = (typeof PROGRESS_ERROR_CODES)[number];
@@ -483,4 +510,31 @@ export interface ProgressStore {
    * delivered, a repeat changes nothing. Paying is still `completeQuest`'s.
    */
   deliverCoffee(): Promise<CoffeeRun>;
+
+  /**
+   * #142, Linda's pitch Quest (20261009010000_quest_pitch_hack.sql). The
+   * Player's pitch run. Read-only: a failure never emits `ui:toast`.
+   */
+  pitchRun(): Promise<PitchRun>;
+
+  /** Talking to Linda marks the step; a repeat keeps the first talk. Rejects with `no_player`. */
+  markLindaTalked(): Promise<PitchRun>;
+
+  /**
+   * Opens the overlay's 60 s clock. Each call resets it, so a replay after
+   * passing (allowed, for practice) starts a fresh attempt. Rejects with
+   * `pitch_not_started` before `markLindaTalked`.
+   */
+  startPitch(): Promise<PitchRun>;
+
+  /**
+   * Linda hears the pitch. `problem`/`solution`/`ask` must each be 0, 1 or 2
+   * (the overlay's three choices per row), else this rejects with
+   * `invalid_pitch`. Accepted only up to 65 s (60 s plus 5 s of grace) after
+   * `startPitch`, by the server's clock; later it rejects with
+   * `pitch_timeout` and writes nothing. Rejects with `pitch_not_started`
+   * before `startPitch`. Resolves the accepted attempt's whole seconds.
+   * Paying is still `completeQuest`'s.
+   */
+  submitPitch(problem: number, solution: number, ask: number): Promise<PitchSubmitResult>;
 }

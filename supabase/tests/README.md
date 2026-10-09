@@ -448,3 +448,43 @@ arguments, and the grants.
    including the final `ALL` row. It changes nothing and prints only
    booleans, error codes and Token amounts. Then rerun
    `quest_registry_proof.sql`: it still passes.
+
+## Pitch Linda Quest (reviewer gate; #142)
+
+`quest_pitch_hack_proof.sql` proves `20261009010000_quest_pitch_hack.sql`
+(decisions P1-P8 in its header) against the same #9 H1 fixture Player. As
+postgres it checks the `('pitch-hack', 75)` registry row and that
+`public.player_pitch_runs` is RLS-on, SELECT-only for its owner and closed to
+anon. As the fixture signed in: the internal functions are denied (`42501`);
+`start_pitch` and `submit_pitch` are refused (`pitch_not_started`) before
+`mark_linda_talked`, and `submit_pitch` is refused the same way before
+`start_pitch`; an out-of-range Problem/Solution/Ask choice is refused
+(`invalid_pitch`) without touching `started_at`; the Quest is refused
+(`quest_incomplete`) until a pitch lands. Time is controlled by setting the
+stored start time into the past, as postgres, relative to the database's own
+`now()` -- the only clock the server reads, and a write the fixture is shown
+to be denied. So: a submission 66 s after `start_pitch` is refused
+(`pitch_timeout`, nothing written, `started_at` left untouched); a fresh
+`start_pitch` resets the clock; 64 s (inside the 5 s grace) is accepted and
+reports its seconds; a submission under 20 s completes both steps and
+`complete_quest('pitch-hack')` pays 75 once; a replay (another `start_pitch`
+then a faster `submit_pitch`) improves `best_seconds` but never pays again. As
+anon every RPC is denied. It also checks `security definer`/`search_path =
+''`/one overload each, that the RPCs take only their stated arguments, and
+the grants.
+
+**Apply it before the client that calls its RPCs merges or deploys**, after
+`20261006000000_quest_registry.sql`. A sibling Quest's migration (#140,
+`20261009000000_quest_pair_flaky_test.sql`) may sort between the two; neither
+depends on the other.
+
+1. Local: covered automatically by `sql-quest-pitch-hack.test.ts`'s PGlite
+   run in `npm test`, including a rerun, a 70 s refusal, and a two-Player
+   isolation check.
+2. Real Postgres/Supabase: apply `20261009010000_quest_pitch_hack.sql` in the
+   SQL editor, then open `quest_pitch_hack_proof.sql`, replace every
+   occurrence of `00000000-0000-0000-0000-00000000f1f0` with the real fixture
+   Player's id, and run it. Expect every row's `pass` column to read `true`,
+   including the final `ALL` row. It changes nothing and prints only
+   booleans, error codes and Token amounts. Then rerun
+   `quest_registry_proof.sql`: it still passes.

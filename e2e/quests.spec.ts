@@ -108,12 +108,12 @@ test('the widget tracks the main Quest and opens the Quests panel; TRACK and BAD
   const panel = page.locator('.quests');
   await expect(panel).toBeVisible();
   await expect(widget).toBeHidden();
-  // Main, the Igloo Badge Quest (#143), Nicole's coffee (#141) + one per
-  // registered Minigame (Bug Squash, Pancake Flip, Snow Cone Stand, Coffee
-  // Rush, Beystadium).
-  await expect(panel.locator('[data-quests-tab="active"]')).toHaveText('ACTIVE · 8');
+  // Main, the Igloo Badge Quest (#143), Nicole's coffee (#141), Linda's
+  // pitch (#142) + one per registered Minigame (Bug Squash, Pancake Flip,
+  // Snow Cone Stand, Coffee Rush, Beystadium).
+  await expect(panel.locator('[data-quests-tab="active"]')).toHaveText('ACTIVE · 9');
   await expect(panel.locator('[data-quests-tab="done"]')).toHaveText('DONE · 0');
-  await expect(panel.locator('.quests__row')).toHaveCount(8);
+  await expect(panel.locator('.quests__row')).toHaveCount(9);
   const bey = panel.locator('[data-quest-id="beystadium"]');
   await expect(bey.locator('.quests__row-title')).toHaveText('LET IT RIP · WIN 3 MATCHES');
   await expect(bey.locator('.quests__row-location')).toHaveText('TEAM ROOM 4 · TALK TO MICHAEL');
@@ -136,6 +136,13 @@ test('the widget tracks the main Quest and opens the Quests panel; TRACK and BAD
   );
   await expect(pancake.locator('.quests__row-progress')).toHaveText('0 / 20');
   await expect(pancake.locator('.quests__row-reward')).toHaveText('BADGE · +50');
+  const pitchHack = panel.locator('[data-quest-id="pitch-hack"]');
+  await expect(pitchHack.locator('.quests__row-title')).toHaveText(
+    'Pitch your hack in under 60 seconds',
+  );
+  await expect(pitchHack.locator('.quests__row-location')).toHaveText('THE ICEBOX · TALK TO LINDA');
+  await expect(pitchHack.locator('.quests__row-progress')).toHaveText('0 / 2');
+  await expect(pitchHack.locator('.quests__row-reward')).toHaveText('75');
   await shot(page, 'panel');
 
   // TRACK: the choice moves the widget and survives a reload (device only).
@@ -295,6 +302,8 @@ test('every Quest done: the widget shows ALL QUESTS DONE with a line and opens t
     await t.setSlot(7, 'award-bptw');
     // #141: Nicole's coffee, delivered in time.
     await t.finishCoffeeRun();
+    // #142: Linda's pitch, talked, started and submitted in time.
+    await t.finishPitchHack();
   });
   // Beystadium's Quest is three match wins, and record_round's anti-farm
   // rule refuses a round less than 10 s after the previous one of the same
@@ -319,9 +328,9 @@ test('every Quest done: the widget shows ALL QUESTS DONE with a line and opens t
   await widget.click();
   const panel = page.locator('.quests');
   await expect(panel).toBeVisible();
-  await expect(panel.locator('[data-quests-tab="done"]')).toHaveText('DONE · 8');
+  await expect(panel.locator('[data-quests-tab="done"]')).toHaveText('DONE · 9');
   await expect(panel.locator('[data-quests-tab="done"]')).toHaveAttribute('aria-pressed', 'true');
-  await expect(panel.locator('.quests__row')).toHaveCount(8);
+  await expect(panel.locator('.quests__row')).toHaveCount(9);
 
   expect(errors).toEqual([]);
 });

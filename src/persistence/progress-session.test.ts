@@ -64,6 +64,17 @@ const UNUSED_COFFEE_METHODS: Pick<
   deliverCoffee: () => Promise.reject(new Error('unused in this test')),
 };
 
+/** #142's pitch-run methods, for a stub store whose test never calls them. */
+const UNUSED_PITCH_METHODS: Pick<
+  ProgressStore,
+  'pitchRun' | 'markLindaTalked' | 'startPitch' | 'submitPitch'
+> = {
+  pitchRun: () => Promise.reject(new Error('unused in this test')),
+  markLindaTalked: () => Promise.reject(new Error('unused in this test')),
+  startPitch: () => Promise.reject(new Error('unused in this test')),
+  submitPitch: () => Promise.reject(new Error('unused in this test')),
+};
+
 function deferredStore(): { store: ProgressStore; resolve: (snapshot: ProgressSnapshot) => void } {
   let resolveFn!: (snapshot: ProgressSnapshot) => void;
   const promise = new Promise<ProgressSnapshot>((resolve) => {
@@ -83,6 +94,7 @@ function deferredStore(): { store: ProgressStore; resolve: (snapshot: ProgressSn
       completeQuest: () => Promise.reject(new Error('unused in this test')),
       checkBadges: () => Promise.reject(new Error('unused in this test')),
       ...UNUSED_COFFEE_METHODS,
+      ...UNUSED_PITCH_METHODS,
     },
     resolve: resolveFn,
   };
@@ -103,6 +115,7 @@ function failingStore(): ProgressStore {
     completeQuest: () => Promise.reject(new Error('unused in this test')),
     checkBadges: () => Promise.reject(new Error('unused in this test')),
     ...UNUSED_COFFEE_METHODS,
+    ...UNUSED_PITCH_METHODS,
   };
 }
 
@@ -281,6 +294,7 @@ describe('createProgressSession', () => {
         completeQuest: () => Promise.reject(new Error('unused in this test')),
         checkBadges: () => Promise.reject(new Error('unused in this test')),
         ...UNUSED_COFFEE_METHODS,
+        ...UNUSED_PITCH_METHODS,
       };
       await session.start(PLAYER, store);
       const wrapped = registry.get(PROGRESS_STORE_KEY) as ProgressStore;

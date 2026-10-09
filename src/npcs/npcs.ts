@@ -1567,6 +1567,13 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     kind: 'human',
     tagName: 'Linda',
     dialogLines: ['Every room is a pitch. Smile.'],
+    // #142: the pitch Quest's giver; "talk to Linda" starts it. Her own card
+    // quote doubles as her start line, as Nicole's does.
+    questGiver: {
+      questId: 'pitch-hack',
+      startStepId: 'talk-to-linda',
+      startLine: 'Every room is a pitch. Smile.',
+    },
     idleLines: [{ text: 'Every room is a pitch. Smile.', periodS: 21, delayS: -9 }],
     still: true,
     dialog: LINE_DIALOG,

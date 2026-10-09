@@ -24,6 +24,8 @@ import {
   type IglooSlot,
   type LeaderboardEntry,
   type Placement,
+  type PitchRun,
+  type PitchSubmitResult,
   type ProgressErrorCode,
   type ProgressSnapshot,
   type ProgressStore,
@@ -221,7 +223,9 @@ export interface ProgressClient {
       | 'mark_casey_talked'
       | 'complete_quest'
       | 'check_session_badges'
-      | CoffeeRpcName,
+      | CoffeeRpcName
+      | PitchRpcName
+      | 'submit_pitch',
     args: Record<string, unknown>,
   ): PromiseLike<RpcResult>;
 }
@@ -259,6 +263,36 @@ function toCoffeeRun(value: unknown): CoffeeRun {
     handedOverAt: carrying ? handedOverAt : null,
     secondsLeft: carrying ? Math.min(Math.max(secondsLeft, 0), 60) : null,
   };
+}
+
+/** #142: Linda's pitch Quest's RPCs that return the run (20261009010000_quest_pitch_hack.sql P5). */
+export type PitchRpcName = 'pitch_run' | 'mark_linda_talked' | 'start_pitch';
+
+/**
+ * A pitch-run RPC's result (P6). A reply without the expected shape rejects
+ * with `invalid_response` rather than reading as a run the client would act on.
+ */
+function toPitchRun(value: unknown): PitchRun {
+  if (!isPlainObject(value)) throw new ProgressStoreError('invalid_response');
+  const { talkedToLinda, passed, bestSeconds } = value;
+  if (
+    typeof talkedToLinda !== 'boolean' ||
+    typeof passed !== 'boolean' ||
+    !(bestSeconds === null || (typeof bestSeconds === 'number' && Number.isFinite(bestSeconds)))
+  ) {
+    throw new ProgressStoreError('invalid_response');
+  }
+  return { talkedToLinda, passed, bestSeconds };
+}
+
+/** `submit_pitch`'s result (P7). A reply without the expected shape rejects with `invalid_response`. */
+function toPitchSubmitResult(value: unknown): PitchSubmitResult {
+  if (!isPlainObject(value)) throw new ProgressStoreError('invalid_response');
+  const { seconds } = value;
+  if (typeof seconds !== 'number' || !Number.isFinite(seconds)) {
+    throw new ProgressStoreError('invalid_response');
+  }
+  return { seconds };
 }
 
 /** `public.leaderboard`'s row shape, straight off PostgREST. */
@@ -388,6 +422,10 @@ const TOAST_MESSAGES: Record<ProgressErrorCode, string> = {
   coffee_not_carrying: "You don't have Nicole's coffee",
   // #141: the ticket's own copy.
   coffee_cold: 'Your coffee went cold.',
+  // #142: Linda's pitch Quest's own copy.
+  pitch_not_started: 'Talk to Linda first',
+  invalid_pitch: "That pitch doesn't add up",
+  pitch_timeout: "Every room is a pitch. That one wasn't.",
 };
 
 /** Anything that isn't a typed `ProgressStoreError`: network failures, unrecognized errors. */
@@ -787,6 +825,30 @@ export function createSupabaseProgressStore(
     return toCoffeeRun(data);
   }
 
+  // #142: Linda's pitch Quest. `pitchRun` is a read (no toast, like
+  // `questProgress`); the writes toast a failure like `markDevPitVisited`.
+  async function readPitchRun(fn: PitchRpcName): Promise<PitchRun> {
+    const { data, error } = await client.rpc(fn, {});
+    if (error) {
+      throw toProgressError(error);
+    }
+    return toPitchRun(data);
+  }
+
+  async function submitPitch(
+    problem: number,
+    solution: number,
+    ask: number,
+  ): Promise<PitchSubmitResult> {
+    return guarded(async () => {
+      const { data, error } = await client.rpc('submit_pitch', { problem, solution, ask });
+      if (error) {
+        throw toProgressError(error);
+      }
+      return toPitchSubmitResult(data);
+    });
+  }
+
   return {
     loadAll,
     saveLook,
@@ -804,6 +866,10 @@ export function createSupabaseProgressStore(
     markKitchenVisited: () => guarded(() => readCoffeeRun('mark_kitchen_visited')),
     askTomForCoffee: () => guarded(() => readCoffeeRun('ask_tom_for_coffee')),
     deliverCoffee: () => guarded(() => readCoffeeRun('deliver_coffee')),
+    pitchRun: () => readPitchRun('pitch_run'),
+    markLindaTalked: () => guarded(() => readPitchRun('mark_linda_talked')),
+    startPitch: () => guarded(() => readPitchRun('start_pitch')),
+    submitPitch,
   };
 }
 
