@@ -37,6 +37,13 @@
   pointer-events: auto;
 }
 
+/* The LATAM pin opens the LATAM Café, so it opts back in to clicks too (the
+   lounge layer above lets them through to the Room). */
+.globe__latam-pin {
+  cursor: pointer;
+  pointer-events: auto;
+}
+
 /* The design's roster: a 268px column under the Room title. */
 .remote-lounge__roster {
   position: absolute;
