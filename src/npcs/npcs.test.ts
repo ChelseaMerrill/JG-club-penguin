@@ -583,7 +583,7 @@ describe('NPCS', () => {
         throw new Error(`expected ${repeat} and ${first} to be Human NPCs`);
       }
       expect(again.figure, repeat).toBe(original.figure);
-      expect(again.dialogLines[0], repeat).toBe(original.dialogLines[0]);
+      expect(again.dialogLines![0], repeat).toBe(original.dialogLines![0]);
     }
   });
 
@@ -614,7 +614,7 @@ describe('NPCS', () => {
         throw new Error(`expected ${roomOwn} and ${other} to be Human NPCs`);
       }
       expect(withOverride.figure, roomOwn).toEqual({ ...plain.figure, ...added });
-      expect(withOverride.dialogLines[0], roomOwn).toBe(plain.dialogLines[0]);
+      expect(withOverride.dialogLines![0], roomOwn).toBe(plain.dialogLines![0]);
     }
 
     // Team Room 1's design wins for its own two NPCs (owner request,
@@ -636,11 +636,11 @@ describe('NPCS', () => {
       collar: undefined,
       runner: true,
     });
-    expect(domTeamRoom1.dialogLines[0]).toBe(dom.dialogLines[0]);
+    expect(domTeamRoom1.dialogLines![0]).toBe(dom.dialogLines![0]);
     expect(jethro.figure.cameraRig).toBeUndefined();
     expect(jethroTeamRoom1.figure).toEqual(jethro.figure);
     expect(jethroTeamRoom1.figure).toMatchObject({ prop: undefined, cameraRaise: 'lowered' });
-    expect(jethroTeamRoom1.dialogLines[0]).toBe(jethro.dialogLines[0]);
+    expect(jethroTeamRoom1.dialogLines![0]).toBe(jethro.dialogLines![0]);
   });
 
   it('gives Front Desk a single static (periodS: 0) idle line', () => {
@@ -763,6 +763,7 @@ describe('NPCS', () => {
       'michael',
       'anthony',
     ];
+    const latamNpcIds: NpcId[] = [];
     for (const npc of Object.values(NPCS)) {
       if (talkers.includes(npc.id)) continue;
       // The Remote Lounge's JGers open their person card instead.
@@ -770,8 +771,20 @@ describe('NPCS', () => {
         expect(npc.dialog).toEqual({ kind: 'remote-card' });
         continue;
       }
+      // The 19 LATAM JGers carry no dialog at all (owner request, 2026-10-09):
+      // their character sheet gives no quote.
+      if (
+        npc.roomId === 'latam-cafe' ||
+        npc.roomId === 'latam-disco-hall' ||
+        npc.roomId === 'latam-futebol-field'
+      ) {
+        latamNpcIds.push(npc.id);
+        expect(npc.dialog).toEqual({ kind: 'none' });
+        continue;
+      }
       expect(npc.dialog).toMatchObject({ kind: 'line' });
     }
+    expect(latamNpcIds).toHaveLength(19);
   });
 
   it('gives a human NPC a figure spec and a penguin-kind NPC a fixed look', () => {

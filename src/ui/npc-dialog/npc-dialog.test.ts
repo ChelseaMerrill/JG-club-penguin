@@ -110,6 +110,16 @@ describe('createNpcDialog', () => {
     expect(titleEl.hidden).toBe(true);
   });
 
+  it("opens no dialog for a dialog.kind === 'none' NPC (the LATAM JGers, owner request, 2026-10-09)", () => {
+    const { root } = setup();
+    expect(NPCS['sander-nonaka'].dialog).toEqual({ kind: 'none' });
+
+    gameEvents.emit('npc:arrived', { npcId: 'sander-nonaka' });
+
+    expect(panel(root).hidden).toBe(true);
+    expect(overlays!.current()).toBeNull();
+  });
+
   it('emits npc:talked exactly once per dialog opened: open, close, reopen = two emits, no emit on re-render', () => {
     const { root } = setup();
     const talked = vi.fn();

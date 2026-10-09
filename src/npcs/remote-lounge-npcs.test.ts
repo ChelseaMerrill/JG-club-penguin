@@ -28,7 +28,7 @@ describe('Remote Lounge NPCs', () => {
         figure: { card: person.card },
       });
     }
-    expect(NPCS['joshua-jameson'].dialogLines[0]).toBe(
+    expect(NPCS['joshua-jameson'].dialogLines![0]).toBe(
       'In Florida, a gator in the pool counts as a standup.',
     );
   });
