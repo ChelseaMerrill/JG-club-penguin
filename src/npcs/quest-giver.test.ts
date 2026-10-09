@@ -150,6 +150,7 @@ describe('quest-giver data (#144 D5, Q17)', () => {
         'linda-martin',
         'michael',
         'nicole',
+        'paul-carnival',
         'sydney-team-room-3',
       ].sort(),
     );

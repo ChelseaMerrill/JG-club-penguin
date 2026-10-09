@@ -41,6 +41,17 @@ export interface InMemoryQuestState {
   coffeeRun: Readonly<CoffeeRunRecord> | null;
   /** #142: the fake's `player_pitch_runs` row, `null` before talking to Linda. */
   pitchRun: Readonly<PitchRunRecord> | null;
+  /** #140: the "pair with a JGer" Quest's four client-asserted/checked flags
+   *  (`player_quest_state.paul_talked_at`/`ci_board_checked_at`/`paired_at`/
+   *  `paul_reported_at`). */
+  paulTalked: boolean;
+  ciBoardChecked: boolean;
+  paired: boolean;
+  paulReported: boolean;
+  /** #140: whether any recorded `bug-squash` round's `flakyHits` stat
+   *  reached 3 (`squash-flakes`). Sticky once true, mirroring the server's
+   *  `exists (...)` check over every recorded round. */
+  bugSquashFlakyHitsMet: boolean;
   /** The fake's clock (the server's `now()`), for time-limited steps. */
   nowMs: number;
 }
@@ -108,4 +119,17 @@ registerInMemoryStepsQuest(NICOLE_COFFEE_QUEST_ID, {
 registerInMemoryStepsQuest(PITCH_HACK_QUEST_ID, {
   rewardTokens: PITCH_HACK_REWARD,
   steps: (state) => pitchQuestSteps(state.pitchRun),
+});
+
+// #140 "Pair with a JGer and fix the flaky test":
+// `public.quest_steps__pair_flaky_test` (20261009000000_quest_pair_flaky_test.sql P3).
+registerInMemoryStepsQuest('pair-flaky-test', {
+  rewardTokens: 150,
+  steps: (state) => ({
+    'talk-to-paul': state.paulTalked,
+    'check-ci-board': state.ciBoardChecked,
+    'pair-with-jger': state.paired,
+    'squash-flakes': state.bugSquashFlakyHitsMet,
+    'report-to-paul': state.paulReported,
+  }),
 });

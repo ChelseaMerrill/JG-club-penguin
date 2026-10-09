@@ -99,6 +99,11 @@ export interface FakeResponses {
   pitchRun?: FakeResult<unknown>;
   /** #142: `submit_pitch` answers with this. */
   submitPitch?: FakeResult<unknown>;
+  /** #140 */
+  markPaulTalked?: FakeResult<unknown>;
+  markCiBoardChecked?: FakeResult<unknown>;
+  markPaired?: FakeResult<unknown>;
+  reportToPaul?: FakeResult<unknown>;
 }
 
 export type LoggedCall = [op: string, ...args: unknown[]];
@@ -170,6 +175,14 @@ export function makeFakeClient(responses: FakeResponses = {}): {
     responses.markDevPitVisited ?? ({ data: null, error: null } satisfies FakeResult<unknown>);
   const markCaseyTalked =
     responses.markCaseyTalked ?? ({ data: null, error: null } satisfies FakeResult<unknown>);
+  const markPaulTalked =
+    responses.markPaulTalked ?? ({ data: null, error: null } satisfies FakeResult<unknown>);
+  const markCiBoardChecked =
+    responses.markCiBoardChecked ?? ({ data: null, error: null } satisfies FakeResult<unknown>);
+  const markPaired =
+    responses.markPaired ?? ({ data: null, error: null } satisfies FakeResult<unknown>);
+  const reportToPaul =
+    responses.reportToPaul ?? ({ data: null, error: null } satisfies FakeResult<unknown>);
   const completeQuest =
     responses.completeQuest ??
     ({
@@ -358,6 +371,18 @@ export function makeFakeClient(responses: FakeResponses = {}): {
       }
       if (fn === 'mark_casey_talked') {
         return Promise.resolve(markCaseyTalked);
+      }
+      if (fn === 'mark_paul_talked') {
+        return Promise.resolve(markPaulTalked);
+      }
+      if (fn === 'mark_ci_board_checked') {
+        return Promise.resolve(markCiBoardChecked);
+      }
+      if (fn === 'mark_paired') {
+        return Promise.resolve(markPaired);
+      }
+      if (fn === 'report_to_paul') {
+        return Promise.resolve(reportToPaul);
       }
       if (fn === 'complete_quest') {
         return Promise.resolve(completeQuest);

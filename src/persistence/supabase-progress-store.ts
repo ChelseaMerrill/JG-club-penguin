@@ -221,6 +221,10 @@ export interface ProgressClient {
       | 'quest_progress'
       | 'mark_dev_pit_visited'
       | 'mark_casey_talked'
+      | 'mark_paul_talked'
+      | 'mark_ci_board_checked'
+      | 'mark_paired'
+      | 'report_to_paul'
       | 'complete_quest'
       | 'check_session_badges'
       | CoffeeRpcName
@@ -426,6 +430,8 @@ const TOAST_MESSAGES: Record<ProgressErrorCode, string> = {
   pitch_not_started: 'Talk to Linda first',
   invalid_pitch: "That pitch doesn't add up",
   pitch_timeout: "Every room is a pitch. That one wasn't.",
+  // #140: report_to_paul() before steps 1-4 are all met.
+  quest_steps_incomplete: "You're not done yet",
 };
 
 /** Anything that isn't a typed `ProgressStoreError`: network failures, unrecognized errors. */
@@ -776,6 +782,44 @@ export function createSupabaseProgressStore(
     });
   }
 
+  // #140: the "pair with a JGer" Quest's three client-asserted flags and its
+  // report-back RPC.
+  function markPaulTalked(): Promise<void> {
+    return guarded(async () => {
+      const { error } = await client.rpc('mark_paul_talked', {});
+      if (error) {
+        throw toProgressError(error);
+      }
+    });
+  }
+
+  function markCiBoardChecked(): Promise<void> {
+    return guarded(async () => {
+      const { error } = await client.rpc('mark_ci_board_checked', {});
+      if (error) {
+        throw toProgressError(error);
+      }
+    });
+  }
+
+  function markPaired(): Promise<void> {
+    return guarded(async () => {
+      const { error } = await client.rpc('mark_paired', {});
+      if (error) {
+        throw toProgressError(error);
+      }
+    });
+  }
+
+  function reportToPaul(): Promise<void> {
+    return guarded(async () => {
+      const { error } = await client.rpc('report_to_paul', {});
+      if (error) {
+        throw toProgressError(error);
+      }
+    });
+  }
+
   function completeQuest(questId: string): Promise<CompleteQuestResult> {
     return guarded(async () => {
       const { data, error } = await client.rpc('complete_quest', { quest_id: questId });
@@ -859,6 +903,10 @@ export function createSupabaseProgressStore(
     questProgress,
     markDevPitVisited,
     markCaseyTalked,
+    markPaulTalked,
+    markCiBoardChecked,
+    markPaired,
+    reportToPaul,
     completeQuest,
     checkBadges,
     coffeeRun: () => readCoffeeRun('coffee_run'),

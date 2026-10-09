@@ -98,6 +98,8 @@ import { createCoffeeRunController, TOM_COFFEE_ACTION_LABEL } from './quests/cof
 import { NICOLE_COFFEE_QUEST_ID } from './persistence/coffee-run-rules';
 import { createPitchOverlay } from './quests/pitch-overlay';
 import { PITCH_HACK_QUEST_ID } from './persistence/pitch-run-rules';
+import { createPairingTracker, type PairingCandidate } from './quests/pairing';
+import { theIcebox } from './game/rooms/definitions/the-icebox';
 import { recordNpcTalked, recordOpenStall } from './game/rooms/dev-room-hook';
 import { createTrophyCase, TROPHY_CASE_OVERLAY_ID } from './ui/trophy-case';
 import { createMapScreen } from './ui/map-screen';
@@ -918,6 +920,11 @@ const questAwareStore: ProgressStore = {
   markLindaTalked: () => refreshQuestsAfter(progressStore.markLindaTalked()),
   submitPitch: (problem, solution, ask) =>
     refreshQuestsAfter(progressStore.submitPitch(problem, solution, ask)),
+  // #140: the "pair with a JGer" Quest's four steps.
+  markPaulTalked: () => refreshQuestsAfter(progressStore.markPaulTalked()),
+  markCiBoardChecked: () => refreshQuestsAfter(progressStore.markCiBoardChecked()),
+  markPaired: () => refreshQuestsAfter(progressStore.markPaired()),
+  reportToPaul: () => refreshQuestsAfter(progressStore.reportToPaul()),
 };
 
 // #143: Casey's "Got any work for me?" starts the Igloo Badge Quest by
@@ -925,6 +932,13 @@ const questAwareStore: ProgressStore = {
 // once every step (this one, the purchase and the wall placement) is met.
 registerQuestStarter('igloo-badge', () => {
   void questAwareStore.markCaseyTalked();
+});
+
+// #140: Paul's "Got any work for me?" starts "Pair with a JGer and fix the
+// flaky test" by recording the "talk to Paul" step; the engine claims the
+// Quest itself once every step is met.
+registerQuestStarter('pair-flaky-test', () => {
+  void questAwareStore.markPaulTalked();
 });
 
 const minigameLauncher = createMinigameLauncher({
@@ -962,6 +976,16 @@ gameEvents.on('hotspot:click', ({ hotspotId }) => {
   if (hotspotId !== 'igloo-gear-stall') return;
   hud.overlays.open(MARKET_OVERLAY_ID, () => market.close());
   void market.open();
+});
+
+// #140: the Dev Pit's CI board, "Check the CI board in the Dev Pit" step.
+// No overlay of its own: a click records the step and shows a short toast
+// about the state of the builds, the same "quick flavor, no panel" shape as
+// a line NPC's dialog without any action buttons.
+gameEvents.on('hotspot:click', ({ hotspotId }) => {
+  if (hotspotId !== 'ci-board') return;
+  gameEvents.emit('ui:toast', { message: 'Half the builds are red. Typical.' });
+  void questAwareStore.markCiBoardChecked();
 });
 
 /**
@@ -1106,6 +1130,54 @@ function canPitchLinda(): boolean {
   return (status?.progress ?? 0) >= 1;
 }
 
+/** #140: whether Paul's "Report back" option should show (the Quest is active and not yet done). */
+function canReportToPaul(): boolean {
+  const status = quests.view()?.statuses.find((s) => s.quest.id === 'pair-flaky-test');
+  return status !== undefined && !status.done;
+}
+
+// #140: "Pair with a JGer and fix the flaky test"'s "pair-with-jger" step.
+// Presence positions are live-only (never recorded), so this is entirely
+// client-side: while in The Icebox and the step isn't yet met, poll the
+// local Penguin's tile against every other Penguin shown there (or, solo,
+// against Paul Carnival's own tile -- the ticket's fallback), and mark the
+// step the instant `src/quests/pairing.ts` reports 10 continuous seconds
+// near someone.
+const PAUL_ICEBOX_TILE = theIcebox.npcSlots.find((slot) => slot.npcId === 'paul-carnival')!.tile;
+const pairingTracker = createPairingTracker();
+let pairingStepMet = false;
+let pairingMarkInFlight = false;
+const PAIRING_POLL_MS = 500;
+
+function pairingTick(): void {
+  if (pairingStepMet || pairingMarkInFlight) return;
+  if (!roomScene || roomScene.currentRoomId !== 'the-icebox') return;
+  const localTile = roomScene.localTile();
+  if (!localTile) return;
+
+  const others = roomScene.remotePenguinTiles();
+  const candidates: PairingCandidate[] =
+    others.length > 0
+      ? others.map((p) => ({ id: p.playerId, tile: p.tile }))
+      : [{ id: 'paul-carnival', tile: PAUL_ICEBOX_TILE }];
+
+  const now = e2eHooksEnabled ? devNow() : Date.now();
+  if (!pairingTracker.tick(localTile, candidates, now)) return;
+
+  pairingMarkInFlight = true;
+  void questAwareStore.markPaired().finally(() => {
+    pairingMarkInFlight = false;
+  });
+}
+window.setInterval(pairingTick, PAIRING_POLL_MS);
+gameEvents.on('room:leave', () => pairingTracker.reset());
+quests.onChange((view) => {
+  pairingStepMet =
+    view.statuses
+      .find((s) => s.quest.id === 'pair-flaky-test')
+      ?.steps.find((step) => step.step.id === 'pair-with-jger')?.done ?? false;
+});
+
 declare global {
   interface Window {
     /** Test-only (#46); see `src/quests/quests-test-handle.ts`. */
@@ -1155,6 +1227,21 @@ if (e2eHooksEnabled) {
       await progressStore.startPitch();
       await progressStore.submitPitch(0, 0, 0);
       await quests.refresh();
+    },
+    async markPaulTalked() {
+      await questAwareStore.markPaulTalked();
+    },
+    async markCiBoardChecked() {
+      await questAwareStore.markCiBoardChecked();
+    },
+    async markPaired() {
+      await questAwareStore.markPaired();
+    },
+    async reportToPaul() {
+      await questAwareStore.reportToPaul();
+    },
+    async pairFlakyTestSteps() {
+      return (await progressStore.questProgress()).questSteps['pair-flaky-test'] ?? {};
     },
   };
 }
@@ -1229,13 +1316,20 @@ createNpcDialog(getUiLayer(), {
   },
   // #141: Tom's "Nicole's coffee" option while that Quest needs it, next to
   // (never instead of) Coffee Rush. #142: Linda's "Pitch Linda" option once
-  // the Player has talked to her.
+  // the Player has talked to her. #140: Paul's "Report back" option while
+  // "Pair with a JGer and fix the flaky test" is active; `reportToPaul`
+  // itself refuses (toasting) until steps 1-4 are met, so this shows
+  // whenever the Quest is in progress rather than re-deriving step
+  // completeness here.
   extraActions: (npcId) => {
     if (npcId === 'tom' && coffee.canAskTom()) {
       return [{ label: TOM_COFFEE_ACTION_LABEL, run: () => void coffee.askTom() }];
     }
     if (npcId === 'linda-martin' && canPitchLinda()) {
       return [{ label: 'Pitch Linda', run: () => pitchOverlay.open() }];
+    }
+    if (npcId === 'paul-carnival' && canReportToPaul()) {
+      return [{ label: 'Report back', run: () => void questAwareStore.reportToPaul() }];
     }
     return [];
   },

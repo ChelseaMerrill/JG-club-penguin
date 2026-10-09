@@ -75,6 +75,17 @@ const UNUSED_PITCH_METHODS: Pick<
   submitPitch: () => Promise.reject(new Error('unused in this test')),
 };
 
+/** #140's "pair with a JGer" methods, for a stub store whose test never calls them. */
+const UNUSED_PAIR_FLAKY_TEST_METHODS: Pick<
+  ProgressStore,
+  'markPaulTalked' | 'markCiBoardChecked' | 'markPaired' | 'reportToPaul'
+> = {
+  markPaulTalked: () => Promise.reject(new Error('unused in this test')),
+  markCiBoardChecked: () => Promise.reject(new Error('unused in this test')),
+  markPaired: () => Promise.reject(new Error('unused in this test')),
+  reportToPaul: () => Promise.reject(new Error('unused in this test')),
+};
+
 function deferredStore(): { store: ProgressStore; resolve: (snapshot: ProgressSnapshot) => void } {
   let resolveFn!: (snapshot: ProgressSnapshot) => void;
   const promise = new Promise<ProgressSnapshot>((resolve) => {
@@ -95,6 +106,7 @@ function deferredStore(): { store: ProgressStore; resolve: (snapshot: ProgressSn
       checkBadges: () => Promise.reject(new Error('unused in this test')),
       ...UNUSED_COFFEE_METHODS,
       ...UNUSED_PITCH_METHODS,
+      ...UNUSED_PAIR_FLAKY_TEST_METHODS,
     },
     resolve: resolveFn,
   };
@@ -116,6 +128,7 @@ function failingStore(): ProgressStore {
     checkBadges: () => Promise.reject(new Error('unused in this test')),
     ...UNUSED_COFFEE_METHODS,
     ...UNUSED_PITCH_METHODS,
+    ...UNUSED_PAIR_FLAKY_TEST_METHODS,
   };
 }
 
@@ -295,6 +308,7 @@ describe('createProgressSession', () => {
         checkBadges: () => Promise.reject(new Error('unused in this test')),
         ...UNUSED_COFFEE_METHODS,
         ...UNUSED_PITCH_METHODS,
+        ...UNUSED_PAIR_FLAKY_TEST_METHODS,
       };
       await session.start(PLAYER, store);
       const wrapped = registry.get(PROGRESS_STORE_KEY) as ProgressStore;

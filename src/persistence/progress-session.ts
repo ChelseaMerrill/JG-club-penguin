@@ -319,6 +319,12 @@ function wrapStore(
       markLindaTalked: () => store.markLindaTalked(),
       startPitch: () => store.startPitch(),
       submitPitch: (problem, solution, ask) => store.submitPitch(problem, solution, ask),
+      // #140: the "pair with a JGer" Quest's steps change nothing the
+      // snapshot holds either.
+      markPaulTalked: () => store.markPaulTalked(),
+      markCiBoardChecked: () => store.markCiBoardChecked(),
+      markPaired: () => store.markPaired(),
+      reportToPaul: () => store.reportToPaul(),
     },
     loadInitial: loadAll,
   };
@@ -446,5 +452,9 @@ export function createActiveProgressStore(
     markLindaTalked: async () => current().markLindaTalked(),
     startPitch: async () => current().startPitch(),
     submitPitch: async (problem, solution, ask) => current().submitPitch(problem, solution, ask),
+    markPaulTalked: async () => current().markPaulTalked(),
+    markCiBoardChecked: async () => current().markCiBoardChecked(),
+    markPaired: async () => current().markPaired(),
+    reportToPaul: async () => current().reportToPaul(),
   };
 }

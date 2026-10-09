@@ -34,4 +34,21 @@ export interface QuestsTestHandle {
    * waiting a real minute.
    */
   finishPitchHack(): Promise<void>;
+  /** #140: the "pair with a JGer" Quest's "talk to Paul" step, without driving his dialog. */
+  markPaulTalked(): Promise<void>;
+  /** #140: the "check the CI board" step, without clicking the Dev Pit hotspot. */
+  markCiBoardChecked(): Promise<void>;
+  /** #140: the "pair-with-jger" step, without waiting out the real 10 s next to anyone. */
+  markPaired(): Promise<void>;
+  /** #140: "report back to Paul"; rejects with `quest_steps_incomplete` unless steps 1-4 are already met. */
+  reportToPaul(): Promise<void>;
+  /**
+   * #140: the "pair with a JGer" Quest's saved steps right now (step id ->
+   * met), straight from `ProgressStore.questProgress()` -- so a two-browser
+   * spec can assert the real, Presence-driven pairing detection flipped
+   * `pair-with-jger` without caring whether a step toast fired this run (a
+   * shared, persistent real-account test user may already have it set from
+   * an earlier run).
+   */
+  pairFlakyTestSteps(): Promise<Record<string, boolean>>;
 }

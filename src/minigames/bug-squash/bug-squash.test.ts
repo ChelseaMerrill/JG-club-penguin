@@ -47,7 +47,7 @@ function createFakeEngine(): FakeEngine {
       ended: false,
       cells: emptyCells(),
     },
-    stats: { score: 0, squashed: 0, bestCombo: 1, escaped: 0 },
+    stats: { score: 0, squashed: 0, bestCombo: 1, escaped: 0, flakyHits: 0 },
     nextHitResult: { kind: 'miss' },
     escapesThisTick: 0,
     hitCalls: [],

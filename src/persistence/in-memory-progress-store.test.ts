@@ -311,3 +311,90 @@ describe('createInMemoryProgressStore igloo-badge Quest (#143)', () => {
     });
   });
 });
+
+// #140: "Pair with a JGer and fix the flaky test", registered permanently by
+// in-memory-steps-quests.ts's own module load.
+describe('createInMemoryProgressStore pair-flaky-test Quest (#140)', () => {
+  it('seeds the pair-flaky-test Quest with its 150-Token reward', () => {
+    expect(IN_MEMORY_STEPS_QUESTS.get('pair-flaky-test')?.rewardTokens).toBe(150);
+  });
+
+  it('marks talk-to-paul, check-ci-board and pair-with-jger idempotently', async () => {
+    const store = createInMemoryProgressStore({ completedLook: DEFAULT_LOOK });
+
+    await store.markPaulTalked();
+    await store.markPaulTalked();
+    await store.markCiBoardChecked();
+    await store.markPaired();
+
+    expect((await store.questProgress()).questSteps['pair-flaky-test']).toEqual({
+      'talk-to-paul': true,
+      'check-ci-board': true,
+      'pair-with-jger': true,
+      'squash-flakes': false,
+      'report-to-paul': false,
+    });
+  });
+
+  it('squash-flakes needs a bug-squash round with flakyHits >= 3; 2 does not count', async () => {
+    // An injectable clock, so the second round clears `record_round`'s own
+    // 10 s anti-farm rule (`MIN_ROUND_INTERVAL_SECONDS`) without a real wait.
+    let nowMs = Date.parse('2026-09-24T16:00:00.000Z');
+    const store = createInMemoryProgressStore({ completedLook: DEFAULT_LOOK, now: () => nowMs });
+
+    await store.recordRound('bug-squash', 100, {
+      score: 100,
+      squashed: 10,
+      bestCombo: 1,
+      escaped: 0,
+      flakyHits: 2,
+    });
+    expect((await store.questProgress()).questSteps['pair-flaky-test']['squash-flakes']).toBe(
+      false,
+    );
+
+    nowMs += 11_000;
+    await store.recordRound('bug-squash', 100, {
+      score: 100,
+      squashed: 10,
+      bestCombo: 1,
+      escaped: 0,
+      flakyHits: 3,
+    });
+    expect((await store.questProgress()).questSteps['pair-flaky-test']['squash-flakes']).toBe(true);
+  });
+
+  it('reportToPaul refuses with quest_steps_incomplete until steps 1-4 are met, writing nothing', async () => {
+    const store = createInMemoryProgressStore({ completedLook: DEFAULT_LOOK });
+    await store.markPaulTalked();
+    await store.markCiBoardChecked();
+    // pair-with-jger still unmet.
+
+    await expect(store.reportToPaul()).rejects.toMatchObject({ code: 'quest_steps_incomplete' });
+    expect((await store.questProgress()).questSteps['pair-flaky-test']['report-to-paul']).toBe(
+      false,
+    );
+  });
+
+  it('pays 150 Tokens once all five steps are met, and nothing again after', async () => {
+    const store = createInMemoryProgressStore({ completedLook: DEFAULT_LOOK });
+    await store.markPaulTalked();
+    await store.markCiBoardChecked();
+    await store.markPaired();
+    await store.recordRound('bug-squash', 100, {
+      score: 100,
+      squashed: 10,
+      bestCombo: 1,
+      escaped: 0,
+      flakyHits: 3,
+    });
+    await store.reportToPaul();
+    await store.reportToPaul(); // idempotent
+
+    const first = await store.completeQuest('pair-flaky-test');
+    const second = await store.completeQuest('pair-flaky-test');
+
+    expect(first).toMatchObject({ tokensAwarded: 150, alreadyCompleted: false, badgesEarned: [] });
+    expect(second).toMatchObject({ tokensAwarded: 0, alreadyCompleted: true, badgesEarned: [] });
+  });
+});

@@ -280,6 +280,49 @@ export const QUEST_DEFINITIONS: readonly QuestDefinition[] = [
       },
     ],
   },
+  // #140: "Pair with a JGer and fix the flaky test", steps in the ticket's
+  // order. The server's `quest_steps__pair_flaky_test`
+  // (20261009000000_quest_pair_flaky_test.sql P3) reports them; steps 1-4
+  // may be done in any order, and step 5 only once all four are.
+  {
+    kind: 'steps',
+    id: 'pair-flaky-test',
+    title: 'Pair with a JGer and fix the flaky test',
+    location: 'THE ICEBOX · TALK TO PAUL',
+    rewardTokens: 150,
+    steps: [
+      {
+        id: 'talk-to-paul',
+        label: 'Talk to Paul in The Icebox',
+        hint: 'Talk to Paul',
+        roomId: 'the-icebox',
+      },
+      {
+        id: 'check-ci-board',
+        label: 'Check the CI board in the Dev Pit',
+        hint: 'Check the CI board',
+        roomId: 'dev-pit',
+      },
+      {
+        id: 'pair-with-jger',
+        label: 'Pair with a JGer in The Icebox',
+        hint: 'Pair up in The Icebox',
+        roomId: 'the-icebox',
+      },
+      {
+        id: 'squash-flakes',
+        label: 'Squash 3 flaky bugs in one Bug Squash round',
+        hint: 'Squash 3 flaky bugs',
+        roomId: 'dev-pit',
+      },
+      {
+        id: 'report-to-paul',
+        label: 'Report back to Paul',
+        hint: 'Report back to Paul',
+        roomId: 'the-icebox',
+      },
+    ],
+  },
 ];
 
 /**
