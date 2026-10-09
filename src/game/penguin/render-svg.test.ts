@@ -24,6 +24,10 @@ import {
   PENGUIN_VIEWBOX_HEIGHT,
   PENGUIN_VIEWBOX_WIDTH,
   preContrastFixColors,
+  PROP_ANCHOR,
+  PROP_PLATE_RADIUS,
+  PROP_PLATE_SHADOW_OFFSET,
+  PROP_PLATE_STROKE_WIDTH,
   renderPenguinSvg,
   renderPenguinSvgWithColors,
   resolvePenguinColors,
@@ -812,4 +816,72 @@ describe('renderPenguinSvg neutralBody (#68)', () => {
     );
     expect(renderPenguinSvg(DEFAULT_LOOK, pose)).toContain('rotate(4 60 130)');
   });
+});
+
+// #160: the four #47 Emote-only poses' held props (THUMBS_UP, BRB, JG_FLASH,
+// SHIP_IT) each draw on a shared off-white/navy plate at one shared anchor
+// (`PROP_ANCHOR`), instead of blending into the Room art at four different,
+// inconsistent positions.
+describe('held prop plate (#160)', () => {
+  const PROP_ANIMS = ['THUMBS_UP', 'BRB', 'JG_FLASH', 'SHIP_IT'] as const;
+
+  // The plate circle `renderPropPlate` draws, independent of which glyph
+  // sits on top -- same cx/cy/r/fill/stroke/stroke-width for every prop.
+  const PLATE_CIRCLE = `<circle cx="${PROP_ANCHOR.x}" cy="${PROP_ANCHOR.y}" r="${PROP_PLATE_RADIUS}" fill="${EYE_WHITE}" stroke="${STROKE}" stroke-width="${PROP_PLATE_STROKE_WIDTH}">`;
+  const SHADOW_CIRCLE = `<circle cx="${PROP_ANCHOR.x}" cy="${PROP_ANCHOR.y + PROP_PLATE_SHADOW_OFFSET}" r="${PROP_PLATE_RADIUS}" fill="#000000"`;
+
+  it.each(PROP_ANIMS)(
+    '%s draws the off-white/navy plate, a shadow disc behind it, and a glyph on top',
+    (anim) => {
+      const svg = renderPenguinSvg(DEFAULT_LOOK, { anim, frame: 0 });
+
+      const shadowIndex = svg.indexOf(SHADOW_CIRCLE);
+      const plateIndex = svg.indexOf(PLATE_CIRCLE);
+      expect(shadowIndex).toBeGreaterThanOrEqual(0);
+      expect(plateIndex).toBeGreaterThan(shadowIndex);
+
+      // Something is painted after the plate circle closes, before this
+      // prop's own wrapping `<g>` ends -- i.e. a glyph, not just a bare disc.
+      const afterPlate = svg.slice(plateIndex + PLATE_CIRCLE.length);
+      expect(afterPlate).toMatch(/^[^<]*<\/circle><g transform="translate/);
+    },
+  );
+
+  it('every one of the four props draws the exact same plate circle -- one shared anchor, radius and outline', () => {
+    const plateMarkup = PROP_ANIMS.map((anim) => {
+      const svg = renderPenguinSvg(DEFAULT_LOOK, { anim, frame: 0 });
+      expect(svg).toContain(PLATE_CIRCLE);
+      return PLATE_CIRCLE;
+    });
+    expect(new Set(plateMarkup).size).toBe(1);
+  });
+
+  it('never draws the plate for a non-prop pose', () => {
+    const svg = renderPenguinSvg(DEFAULT_LOOK, { anim: 'WADDLE', frame: 0 });
+    expect(svg).not.toContain(`r="${PROP_PLATE_RADIUS}"`);
+  });
+
+  // Mirrors render-svg.test.ts's own #147 facing suite (above): this file
+  // never mirrors geometry for `facing: 'left'` itself (Phaser's `setFlipX`
+  // mirrors the whole rendered sprite instead), so the shared plate's own
+  // markup -- anchor included -- is facing-independent for every prop that
+  // draws no lettering, and only JG_FLASH's baked "JG" differs. `hat: 'NONE'`
+  // here, overriding `DEFAULT_LOOK`'s own `'JG CAP'`, isolates that claim from
+  // the JG CAP crown's own baked "JG" lettering (already covered by the #147
+  // suite above), which would otherwise also legitimately differ here.
+  const NO_HAT_LOOK: PenguinLook = { ...DEFAULT_LOOK, hat: 'NONE' };
+
+  it.each(PROP_ANIMS)(
+    "%s's plate position is identical for 'right' and 'left' (the sprite flip does the mirroring, #147), and only JG_FLASH's lettering differs",
+    (anim) => {
+      const right = renderPenguinSvg(NO_HAT_LOOK, { anim, frame: 0 });
+      const left = renderPenguinSvg(NO_HAT_LOOK, { anim, frame: 0 }, {}, 'left');
+      expect(left).toContain(PLATE_CIRCLE);
+      if (anim === 'JG_FLASH') {
+        expect(left).not.toBe(right);
+      } else {
+        expect(left).toBe(right);
+      }
+    },
+  );
 });
