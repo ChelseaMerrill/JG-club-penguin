@@ -129,4 +129,10 @@ describe('createRemoteLounge', () => {
     q<HTMLButtonElement>('.remote-lounge__exit').click();
     expect(goToRoom).toHaveBeenCalledWith('town-center');
   });
+
+  it("clicking the globe's LATAM pin opens the LATAM Café (owner request, 2026-10-09)", () => {
+    const { q, goToRoom } = setup();
+    q<SVGGElement>('.globe__latam-pin').dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    expect(goToRoom).toHaveBeenCalledWith('latam-cafe');
+  });
 });

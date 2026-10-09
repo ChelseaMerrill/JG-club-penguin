@@ -137,3 +137,37 @@ test('Remote Lounge: BACK TO HQ goes straight to Town Center and hides the loung
 
   expect(errors).toEqual([]);
 });
+
+test('Remote Lounge: the LATAM pin opens the LATAM Café (owner request, 2026-10-09)', async ({
+  page,
+}) => {
+  // A Room change needs a Session: the dev fake Player's, as BACK TO HQ's own test uses.
+  const errors = collectErrors(page);
+  await page.goto('/?asPlayer');
+  await expect
+    .poll(async () => (await debugInfo(page))?.roomId, { timeout: BOOT_TIMEOUT })
+    .toBe('town-center');
+  await page.evaluate(() => window.__roomDebug?.changeRoom?.('remote-lounge'));
+  await expect
+    .poll(async () => (await debugInfo(page))?.roomId, { timeout: BOOT_TIMEOUT })
+    .toBe('remote-lounge');
+
+  // The LATAM pin has no roster row of its own, and closing a card tweens the
+  // globe back to where it was, so the only way to it is the globe's own
+  // spin. That spin advances a fixed step per frame, so a slow headless
+  // browser (~20 fps here) takes about 2.5 min a turn; Rio is on the visible
+  // half for half of it. The pin never holds still to be "stable", so the
+  // click is dispatched on it directly.
+  test.setTimeout(180_000);
+  const latamPin = page.locator('.globe__latam-pin');
+  await expect(latamPin).toBeVisible({ timeout: 150_000 });
+  await page.screenshot({ path: 'test-results/remote-lounge/latam-pin.png' });
+  await latamPin.dispatchEvent('click');
+
+  await expect
+    .poll(async () => (await debugInfo(page))?.roomId, { timeout: BOOT_TIMEOUT })
+    .toBe('latam-cafe');
+  await expect(page.locator('.remote-lounge')).toBeHidden();
+
+  expect(errors).toEqual([]);
+});

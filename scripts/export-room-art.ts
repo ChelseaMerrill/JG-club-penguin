@@ -71,7 +71,10 @@ type RoomId =
   | 'team-room-4'
   | 'bathroom'
   | 'the-mullet'
-  | 'remote-lounge';
+  | 'remote-lounge'
+  | 'latam-cafe'
+  | 'latam-disco-hall'
+  | 'latam-futebol-field';
 
 // Per-Room overrides of STAGE_SELECTOR (#51 D3), for a design file whose
 // first `data-screen-label` element isn't the Stage this Room exports (e.g.
@@ -101,6 +104,10 @@ const ROOM_FILES: Record<RoomId, string> = {
   'the-mullet': 'The Mullet.dc.html', // #51 slice 3: THE MULLET (MEZZANINE).
   // Not `Remote Area.dc.html`: that file only redirects here.
   'remote-lounge': 'Remote Area.html',
+  // The LATAM section (owner request, 2026-10-09).
+  'latam-cafe': 'Latam Cafe.dc.html',
+  'latam-disco-hall': 'Latam Disco Hall.dc.html',
+  'latam-futebol-field': 'Latam Futebol Field.dc.html',
 };
 
 // Per-Room overrides of the element `openRoomStage` waits for before it
@@ -139,6 +146,15 @@ type HideRule =
   // go with it. `labels` can't reach these: its sibling walk stops at the
   // <g> wrapping the figure, leaving the shadow ellipse baked in.
   | { kind: 'label-group'; texts: string[]; comment: string }
+  // Like `label-group`, but for a character whose name is an SVG `<title>`
+  // (an accessible/hover name, not a baked glyph run) rather than a `<text>`
+  // (`design/Latam Cafe.dc.html`'s own figures, the LATAM section): hides
+  // the plain `<g>` the exact-matching `<title>` is a direct child of, which
+  // for this design's figures is the same group that also holds the
+  // nameplate, shadow and bob/walk animation -- so one rule removes the
+  // whole character. Fails loudly, like `label-group`, if a name matches no
+  // `<title>` or more than one, or sits outside a `<g>`.
+  | { kind: 'title-group'; texts: string[]; comment: string }
   // Exact-matching <text> elements only (#77): unlike `labels`, this never
   // touches preceding siblings, so a backing shape the <text> sits inside
   // (a hexagon badge, a banner plate) stays in the exported art -- only the
@@ -1112,6 +1128,95 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
       comment: 'Bottom chat/action toolbar (HUD).',
     },
   ],
+  // `design/Latam Cafe.dc.html` (the LATAM section, owner request,
+  // 2026-10-09) draws no HUD chrome at all (no title/subtitle banner, no
+  // token/presence cluster, no chat/action toolbar -- confirmed, nothing in
+  // the file matches MENU/ONLINE/EMOTE/SNOWBALL/QUESTS/TOKENS): its only live
+  // elements are its seven JGers. The design's three door pills (MAP,
+  // FUTEBOL FIELD, DISCO HALL) are plain, unanimated signage -- the Remote
+  // Lounge's own precedent for a door pill that stays baked into the art --
+  // so they are left in.
+  'latam-cafe': [
+    {
+      kind: 'title-group',
+      texts: [
+        'ALEXANDRE NUNES',
+        'YGOR AZEVEDO',
+        'FERNANDA GIOIOSA',
+        'JEAN RODRIGUES',
+        'JOAO VITOR AMORIM',
+        'VINICIUS MARTINS',
+        // Sander Nonaka's actual figure (body, shadow, bob): drawn once here,
+        // separately from his nameplate/glow/minigame-bubble group below
+        // (the design repeats his `translate(1095.0 402.5)` in two places).
+        'SANDER NONAKA',
+      ],
+      comment:
+        "The Room's seven JGers: each a <title>-named <g> holding its own figure, shadow and bob/walk animation. Six also carry their nameplate in the same group; Sander Nonaka's is drawn separately (see the `selector` rule below).",
+    },
+    {
+      kind: 'selector',
+      selectors: ['a[href="Minigame Pao de Queijo Memory.dc.html"]'],
+      comment:
+        'Sander Nonaka\'s nameplate, pulsing highlight glow and "MATCH THE TREATS" minigame-trigger bubble, drawn together in this second, separate group at his same point (his figure itself is the `title-group` rule above).',
+    },
+  ],
+  // `design/Latam Disco Hall.dc.html` draws no top-right MENU/presence
+  // cluster and no bottom EMOTE toolbar at all (a leaner design than the HQ
+  // Rooms'), and its "← MAP / 18 · LATAM DISCO HALL" breadcrumb sits above
+  // the Stage element in normal document flow (measured: breadcrumb bottom
+  // edge at viewport y=56, Stage top at y=70), so it's already outside the
+  // captured screenshot with no hide rule needed. The three MAP/CAFE
+  // LOUNGE/FUTEBOL FIELD exit pills and the DJ booth's "SPIN IT · CARNAVAL
+  // PARADE" sign are static, non-NPC design furniture (`RoomScene.drawDoors`
+  // only adds an invisible click Zone over image-background art, #16 fix 2),
+  // so they stay in the exported art like every other Room's door/hotspot
+  // signage.
+  'latam-disco-hall': [
+    {
+      kind: 'selector',
+      selectors: ['#latam-people'],
+      comment:
+        "The six dancers (Lucas Varani, Hector Grecco, Jose Acosta, Fernando Possebon, Fernando Garagnani, Ricardo Cordeiro): each one's ground shadow, nameplate and bouncing/swaying figure.",
+    },
+  ],
+  // `design/Latam Futebol Field.dc.html` draws no in-canvas HUD banner or
+  // toolbar at all (unlike every indoor `.dc.html` Room), and its breadcrumb
+  // sits outside the exported `[data-screen-label]` Stage, so neither needs a
+  // rule here. Its whole scene is native SMIL (`<animate>`/`<animateTransform>`),
+  // not CSS `@keyframes`, so `kind: 'animation'` never matches here; every
+  // rule below is a `selector` instead, exactly like Remote Lounge's.
+  //
+  // The stadium's ~126 bobbing crowd dots and 3 animated corner-kick flags
+  // are deliberately left as static Room art, not hidden: `openRoomStage`'s
+  // `freezeSmilAnimations` already resets every `<animate>` to its rest frame
+  // before the screenshot, so they bake in looking like a normal seated
+  // crowd and planted flags, not a jarring mid-motion pose; and
+  // `hideSelectors` requires each selector to match exactly one element, so
+  // hiding ~126 individual unlabelled dots would need ~126 individually
+  // unique selectors for texture that is neither "people" nor "the ball" (a
+  // reviewable judgment call; the four orange training cones are likewise
+  // static, un-animated floor decoration and were never a candidate).
+  'latam-futebol-field': [
+    {
+      kind: 'selector',
+      selectors: ['#latam-people'],
+      comment:
+        "The six LATAM Futebol Field JGers (Thalles Stakonski, Bruno Amado, Washington Marino, Chrystian Rissoli, Paulo Ponciano, Gustavo Barska), each a wandering figure with its own nested ground shadow and nameplate -- hidden as one group, like Remote Lounge's `#figs`.",
+    },
+    {
+      kind: 'selector',
+      selectors: ['a[href="Minigame Penalty Kick.dc.html"]'],
+      comment:
+        'The Penalty Kick minigame\'s bouncing ball icon, pulsing glow ring and "KICK IT · PENALTY SHOOTOUT" callout label -- a live link, not floor art. The minigame itself is not built yet (see `src/game/rooms/definitions/latam-futebol-field.ts`\'s own comment).',
+    },
+    {
+      kind: 'selector',
+      selectors: ['ellipse[cx="855"][cy="562"]'],
+      comment:
+        'The bouncing ball\'s own ground shadow, pulsing in sync with it (`<animate attributeName="rx">`), drawn as a sibling just outside the `<a>` link above rather than nested inside it.',
+    },
+  ],
 };
 
 // Art fixes: geometry corrections applied to the rendered design before
@@ -1684,6 +1789,29 @@ function hideLiveElements(rules: HideRule[]): void {
     }
   }
 
+  // Like `hideLabelGroups`, but for a character whose name is an SVG
+  // `<title>` rather than a baked `<text>` glyph run (`design/Latam
+  // Cafe.dc.html`'s figures): hides the plain `<g>` the exact-matching
+  // `<title>` is a direct child of, failing the export loudly if a name
+  // matches no `<title>`, more than one, or sits outside a `<g>`.
+  function hideTitleGroups(texts: string[]): void {
+    for (const text of texts) {
+      const matches = Array.from(document.querySelectorAll('title')).filter(
+        (title) => title.textContent?.trim() === text,
+      );
+      if (matches.length !== 1) {
+        throw new Error(
+          `title-group hide rule expected exactly one <title> "${text}", found ${matches.length}`,
+        );
+      }
+      const group: Element | null = matches[0]!.parentElement;
+      if (!group || group.tagName.toLowerCase() !== 'g') {
+        throw new Error(`title-group hide rule found no <g>-wrapped <title> for "${text}"`);
+      }
+      (group as SVGElement).style.setProperty('display', 'none', 'important');
+    }
+  }
+
   // #51: hides exactly one element per selector, failing the export loudly
   // when a selector matches none or several (a design resync that moved or
   // duplicated the element), rather than leaving a character baked in.
@@ -1733,6 +1861,7 @@ function hideLiveElements(rules: HideRule[]): void {
     if (rule.kind === 'animation') hideAnimationNames(rule.names, rule.except);
     else if (rule.kind === 'labels') hideLabels(rule.texts);
     else if (rule.kind === 'label-group') hideLabelGroups(rule.texts);
+    else if (rule.kind === 'title-group') hideTitleGroups(rule.texts);
     else if (rule.kind === 'text-only') hideTextOnly(rule.entries);
     else if (rule.kind === 'selector') hideSelectors(rule.selectors);
     else hideCluster(rule.anchor, rule.companions);

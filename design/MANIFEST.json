@@ -2,14 +2,18 @@
   "tool": "claude-design",
   "source": "6050d967-ba2e-4edd-819f-f7dcf4ed9d61",
   "source_url": "https://claude.ai/design/p/6050d967-ba2e-4edd-819f-f7dcf4ed9d61",
-  "synced": "2026-10-06",
+  "synced": "2026-10-09",
   "synced_by": "Chelsea Merrill",
-  "snapshot": "snap3",
-  "plan_id": "959f6851cd75",
+  "snapshot": "latam-snap",
+  "plan_id": "3a67a4d134ee",
   "files": {
     "Canvas.dc.html": {
       "sha256": "d3a65cc8ce0e759849eaa1ca985d0fbc49bafb3212f9029731ca08d1bda42293",
       "bytes": 206
+    },
+    "Characters LATAM.dc.html": {
+      "sha256": "dc9d0373a8efc5145eb63c376963684037b405647c40893a7cf5b05133a356f7",
+      "bytes": 75471
     },
     "Characters.dc.html": {
       "sha256": "694e4f5b8df1079b094527512cfbbb200c92dfb67638a3dac0232c771a6e1e69",
@@ -51,6 +55,18 @@
       "sha256": "60f2f3c99cf11b5229b76f547da45ea37f9620a3e11ed33c976441302992174e",
       "bytes": 53391
     },
+    "Latam Cafe.dc.html": {
+      "sha256": "766f4a99721bd32eec926d895607da3e7ce1cf0de8de4e20dcd80c5d3337b4c3",
+      "bytes": 61435
+    },
+    "Latam Disco Hall.dc.html": {
+      "sha256": "ad1d79cd230fd33380d7a8b3dc702b8525064c067a43578dfeba20177854bfcb",
+      "bytes": 61776
+    },
+    "Latam Futebol Field.dc.html": {
+      "sha256": "996c6c512bbab0ee2aab1e18ab7c285f664d439e8a6a7465e331561f99499d33",
+      "bytes": 67375
+    },
     "Minigame Beystadium.dc.html": {
       "sha256": "0f69a4ce1637f43ff1a6319dee200ac4019eb58d94d3994da861bd1b8127c3ae",
       "bytes": 88207
@@ -59,6 +75,10 @@
       "sha256": "588bb7e76dc9c2337026e199efccb5c1007ef936e328cdb05470ea0fcc1a66b6",
       "bytes": 49830
     },
+    "Minigame Carnaval Parade.dc.html": {
+      "sha256": "7e0c353b1dd87a2871dd2b4b15b95f6241512066bb9d66c9f7922c6734c6f6be",
+      "bytes": 70254
+    },
     "Minigame Coffee Rush.dc.html": {
       "sha256": "1329905767784317eebb5f6f1172b2048815bbe1893446bd608df71383cb5944",
       "bytes": 53622
@@ -66,6 +86,10 @@
     "Minigame Pancake Flip.dc.html": {
       "sha256": "a9c46fcbf7df196567b2693ab6d15aaa6044220656796454ab54126eb85b5d3e",
       "bytes": 53326
+    },
+    "Minigame Penalty Kick.dc.html": {
+      "sha256": "9bf3aafb84119022aaa9161a862116c9aec48b9040f75e2355fbd8c39d34914a",
+      "bytes": 48129
     },
     "Minigame Phishing Quiz.dc.html": {
       "sha256": "39fca2edfdd27cee5aa4f2630ae0cbc80f72987870db4f3b838fdb8f8ad346fe",
@@ -84,8 +108,8 @@
       "bytes": 604
     },
     "Remote Area.html": {
-      "sha256": "65fa391b0ee3284d8cfadd5931d28a92cb44c69407f98be630dfa7689eeff018",
-      "bytes": 77365
+      "sha256": "b7bc337fe68d44a62cabda8d264dfa0e726d65b5e2804bad673e50ff9ea88360",
+      "bytes": 78832
     },
     "Room 00 JGHQ Lobby.dc.html": {
       "sha256": "7e8afd0c908f31c4997273338b6af50163a474a3b7b32ef7948ac2c9b9d503f6",

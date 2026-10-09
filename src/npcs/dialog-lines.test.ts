@@ -37,6 +37,36 @@ const AWAITING_BA_LINE: readonly string[] = [
   // Linda Martin, placed in The Icebox with one card line (owner request,
   // 2026-10-09).
   'linda-martin',
+  // The LATAM Café's seven JGers (owner request, 2026-10-09): their sheet
+  // card carries no quote at all (confirmed), so each one's single line is
+  // placeholder flavor text pending real BA copy, not a sourced quote.
+  'alexandre-nunes',
+  'fernanda-gioiosa',
+  'jean-rodrigues',
+  'joao-vitor-amorim',
+  'sander-nonaka',
+  'vinicius-martins',
+  'ygor-azevedo',
+  // LATAM Disco Hall's six dancers (#<issue>): unlike `design/
+  // Characters.dc.html`, `design/Characters LATAM.dc.html` gives each card
+  // no quote at all (just a name and a location line), so every one of
+  // these has only its single placeholder/minigame-card line, awaiting real
+  // BA copy.
+  'lucas-varani',
+  'hector-grecco',
+  'jose-acosta',
+  'fernando-possebon',
+  'fernando-garagnani',
+  'ricardo-cordeiro',
+  // The LATAM Futebol Field's six JGers (owner request, 2026-10-09): their
+  // Characters LATAM.dc.html cards carry no quote at all (unlike Linda's),
+  // so each shares one placeholder line awaiting BA copy.
+  'thalles-stakonski',
+  'bruno-amado',
+  'washington-marino',
+  'chrystian-rissoli',
+  'paulo-ponciano',
+  'gustavo-barska',
 ];
 
 /**

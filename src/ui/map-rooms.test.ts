@@ -63,8 +63,19 @@ describe('MAP_ROOMS', () => {
     expect(isMapTileClickable(COMING_SOON_TILE)).toBe(false);
   });
 
-  it('gives every registered RoomDefinition exactly one clickable Map tile', () => {
+  it('gives every registered RoomDefinition exactly one clickable Map tile, except the LATAM section', () => {
+    // The LATAM section (owner request, 2026-10-09) is reached only from the
+    // Remote Lounge globe's LATAM pin and the Café's doors, never the Map -- unlike the Remote
+    // Lounge itself, which does get a Map tile (`16 · REMOTE LOUNGE`, above).
+    const NOT_ON_THE_MAP = ['latam-cafe', 'latam-disco-hall', 'latam-futebol-field'];
     for (const room of ROOM_DEFINITIONS) {
+      if (NOT_ON_THE_MAP.includes(room.id)) {
+        expect(
+          MAP_ROOMS.some((tile) => tile.roomId === room.id),
+          room.id,
+        ).toBe(false);
+        continue;
+      }
       const matches = MAP_ROOMS.filter((tile) => tile.roomId === room.id);
       expect(matches).toHaveLength(1);
       expect(isMapTileClickable(matches[0]!)).toBe(true);
