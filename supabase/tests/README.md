@@ -449,6 +449,43 @@ arguments, and the grants.
    booleans, error codes and Token amounts. Then rerun
    `quest_registry_proof.sql`: it still passes.
 
+## "Pair with a JGer" Quest (reviewer gate; #140)
+
+`quest_pair_flaky_test_proof.sql` proves
+`20261009000000_quest_pair_flaky_test.sql` (decisions P1-P8 in its header)
+against the same #9 H1 fixture Player. As postgres it checks the
+`('pair-flaky-test', 150)` registry row and its
+`quest_steps__pair_flaky_test(uuid)` function. As the fixture signed in:
+`report_to_paul()` refuses with `quest_steps_incomplete` (writing nothing)
+before any step, and again once talk-to-paul/check-ci-board/pair-with-jger
+are met but squash-flakes isn't; `mark_paul_talked()`, `mark_ci_board_checked()`
+and `mark_paired()` each keep their own first time on a second call; a
+`bug-squash` round with `flakyHits: 2` never meets `squash-flakes`, one with
+`flakyHits: 3` does, and a round whose `flakyHits` isn't a JSON number is
+rejected outright by `record_round`'s own stats validation (#27, unchanged by
+this migration); `report_to_paul()` then succeeds and keeps its own first
+time; `complete_quest('pair-flaky-test')` pays 150 once, with no Badge, and a
+second call pays nothing. A second Player shows the three `mark_*` functions
+only ever touch the caller's own row. As anon every function is denied
+(`42501`). It also checks `security definer`/`search_path = ''`/one overload
+each and the grants.
+
+**Apply it before the client that lists this Quest merges or deploys**, after
+`20261006000000_quest_registry.sql`. A sibling Quest's own migration (#141,
+#143, or #142's `20261009010000_quest_pitch_hack.sql`) may sort before or
+after this one; neither depends on the other.
+
+1. Local: covered automatically by `sql-quest-pair-flaky-test.test.ts`'s
+   PGlite run in `npm test`, including a rerun.
+2. Real Postgres/Supabase: apply `20261009000000_quest_pair_flaky_test.sql` in
+   the SQL editor, then open `quest_pair_flaky_test_proof.sql`, replace every
+   occurrence of `00000000-0000-0000-0000-00000000f1f0` with the real fixture
+   Player's id, and run it. Expect every row's `pass` column to read `true`,
+   including the final `ALL` row. It changes nothing (everything, including
+   Player B, is rolled back) and prints only booleans, counts and Token
+   amounts. Then rerun `quest_registry_proof.sql`: it still passes, and now
+   also checks this Quest's steps function.
+
 ## Pitch Linda Quest (reviewer gate; #142)
 
 `quest_pitch_hack_proof.sql` proves `20261009010000_quest_pitch_hack.sql`
@@ -458,7 +495,7 @@ postgres it checks the `('pitch-hack', 75)` registry row and that
 anon. As the fixture signed in: the internal functions are denied (`42501`);
 `start_pitch` and `submit_pitch` are refused (`pitch_not_started`) before
 `mark_linda_talked`, and `submit_pitch` is refused the same way before
-`start_pitch`; an out-of-range Problem/Solution/Ask choice is refused
+`start_pitch`; an out-of-range or null Problem/Solution/Ask choice is refused
 (`invalid_pitch`) without touching `started_at`; the Quest is refused
 (`quest_incomplete`) until a pitch lands. Time is controlled by setting the
 stored start time into the past, as postgres, relative to the database's own
