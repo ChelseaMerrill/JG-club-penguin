@@ -157,12 +157,14 @@ test('Remote Lounge: the LATAM pin opens the LATAM Café (owner request, 2026-10
   // spin. That spin advances a fixed step per frame, so a slow headless
   // browser (~20 fps here) takes about 2.5 min a turn; Rio is on the visible
   // half for half of it. The pin never holds still to be "stable", so the
-  // click is dispatched on it directly.
+  // click is forced: a real mouse click at the pin, skipping only the
+  // stability wait, so it still proves the pin takes the click (a dispatched
+  // event would pass even with the pin's pointer events off).
   test.setTimeout(180_000);
   const latamPin = page.locator('.globe__latam-pin');
   await expect(latamPin).toBeVisible({ timeout: 150_000 });
   await page.screenshot({ path: 'test-results/remote-lounge/latam-pin.png' });
-  await latamPin.dispatchEvent('click');
+  await latamPin.click({ force: true });
 
   await expect
     .poll(async () => (await debugInfo(page))?.roomId, { timeout: BOOT_TIMEOUT })
