@@ -22,6 +22,7 @@ export const ROOM_IDS = [
   // reached from the Café's doors.
   'latam-cafe',
   'latam-disco-hall',
+  'latam-futebol-field',
 ] as const;
 
 /**

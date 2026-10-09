@@ -4,6 +4,7 @@ import { devPit } from './definitions/dev-pit';
 import { igloo } from './definitions/igloo';
 import { latamCafe } from './definitions/latam-cafe';
 import { latamDiscoHall } from './definitions/latam-disco-hall';
+import { latamFutebolField } from './definitions/latam-futebol-field';
 import { officeHallway } from './definitions/office-hallway';
 import { remoteLounge } from './definitions/remote-lounge';
 import { roofDeck } from './definitions/roof-deck';
@@ -36,6 +37,7 @@ export const ROOM_DEFINITIONS: readonly RoomDefinition[] = [
   remoteLounge,
   latamCafe,
   latamDiscoHall,
+  latamFutebolField,
 ];
 
 // Fails fast on a broken RoomDefinition in dev (`npm run dev`) and test

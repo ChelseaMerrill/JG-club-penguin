@@ -73,7 +73,8 @@ type RoomId =
   | 'the-mullet'
   | 'remote-lounge'
   | 'latam-cafe';
-  | 'latam-disco-hall';
+  | 'latam-disco-hall'
+  | 'latam-futebol-field';
 
 // Per-Room overrides of STAGE_SELECTOR (#51 D3), for a design file whose
 // first `data-screen-label` element isn't the Stage this Room exports (e.g.
@@ -106,6 +107,7 @@ const ROOM_FILES: Record<RoomId, string> = {
   // The LATAM section (owner request, 2026-10-09).
   'latam-cafe': 'Latam Cafe.dc.html',
   'latam-disco-hall': 'Latam Disco Hall.dc.html',
+  'latam-futebol-field': 'Latam Futebol Field.dc.html',
 };
 
 // Per-Room overrides of the element `openRoomStage` waits for before it
@@ -1443,6 +1445,43 @@ const ART_FIXES: Partial<Record<RoomId, ArtFix[]>> = {
       dx: 54,
       dy: 27,
       comment: "The oven/stove at the back counter's left end, which poked through the left wall.",
+    },
+  ],
+  // `design/Latam Futebol Field.dc.html` draws no in-canvas HUD banner or
+  // toolbar at all (unlike every indoor `.dc.html` Room), and its breadcrumb
+  // sits outside the exported `[data-screen-label]` Stage, so neither needs a
+  // rule here. Its whole scene is native SMIL (`<animate>`/`<animateTransform>`),
+  // not CSS `@keyframes`, so `kind: 'animation'` never matches here; every
+  // rule below is a `selector` instead, exactly like Remote Lounge's.
+  //
+  // The stadium's ~126 bobbing crowd dots and 3 animated corner-kick flags
+  // are deliberately left as static Room art, not hidden: `openRoomStage`'s
+  // `freezeSmilAnimations` already resets every `<animate>` to its rest frame
+  // before the screenshot, so they bake in looking like a normal seated
+  // crowd and planted flags, not a jarring mid-motion pose; and
+  // `hideSelectors` requires each selector to match exactly one element, so
+  // hiding ~126 individual unlabelled dots would need ~126 individually
+  // unique selectors for texture that is neither "people" nor "the ball" (a
+  // reviewable judgment call; the four orange training cones are likewise
+  // static, un-animated floor decoration and were never a candidate).
+  'latam-futebol-field': [
+    {
+      kind: 'selector',
+      selectors: ['#latam-people'],
+      comment:
+        "The six LATAM Futebol Field JGers (Thalles Stakonski, Bruno Amado, Washington Marino, Chrystian Rissoli, Paulo Ponciano, Gustavo Barska), each a wandering figure with its own nested ground shadow and nameplate -- hidden as one group, like Remote Lounge's `#figs`.",
+    },
+    {
+      kind: 'selector',
+      selectors: ['a[href="Minigame Penalty Kick.dc.html"]'],
+      comment:
+        'The Penalty Kick minigame\'s bouncing ball icon, pulsing glow ring and "KICK IT · PENALTY SHOOTOUT" callout label -- a live link, not floor art. The minigame itself is not built yet (see `src/game/rooms/definitions/latam-futebol-field.ts`\'s own comment).',
+    },
+    {
+      kind: 'selector',
+      selectors: ['ellipse[cx="855"][cy="562"]'],
+      comment:
+        'The bouncing ball\'s own ground shadow, pulsing in sync with it (`<animate attributeName="rx">`), drawn as a sibling just outside the `<a>` link above rather than nested inside it.',
     },
   ],
 };

@@ -612,6 +612,10 @@ describe('ROOM_DEFINITIONS registry', () => {
       // Reached only from the LATAM Café (not built on this branch); its own
       // CAFE LOUNGE/FUTEBOL FIELD pills stay disabled until those Rooms land.
       'latam-disco-hall': [],
+      // Reached only from the LATAM Cafe, not the Map; its CAFE LOUNGE and
+      // DISCO HALL pills are both disabled (neither sibling Room exists on
+      // this branch).
+      'latam-futebol-field': [],
     });
   });
 

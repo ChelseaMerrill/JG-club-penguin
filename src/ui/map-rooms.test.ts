@@ -67,7 +67,7 @@ describe('MAP_ROOMS', () => {
     // The LATAM section (owner request, 2026-10-09) is reached only from the
     // Remote Lounge globe's LATAM pin and the Café's doors, never the Map -- unlike the Remote
     // Lounge itself, which does get a Map tile (`16 · REMOTE LOUNGE`, above).
-    const NOT_ON_THE_MAP = ['latam-cafe', 'latam-disco-hall'];
+    const NOT_ON_THE_MAP = ['latam-cafe', 'latam-disco-hall', 'latam-futebol-field'];
     for (const room of ROOM_DEFINITIONS) {
       if (NOT_ON_THE_MAP.includes(room.id)) {
         expect(

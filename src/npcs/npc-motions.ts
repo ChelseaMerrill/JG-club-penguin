@@ -2,6 +2,7 @@ import type { NpcId } from './npcs';
 import { DEV_PIT_MOTIONS } from './motions/dev-pit';
 import { LATAM_CAFE_MOTIONS } from './motions/latam-cafe';
 import { LATAM_DISCO_HALL_MOTIONS } from './motions/latam-disco-hall';
+import { LATAM_FUTEBOL_FIELD_MOTIONS } from './motions/latam-futebol-field';
 import { OFFICE_HALLWAY_MOTIONS } from './motions/office-hallway';
 import { REMOTE_LOUNGE_MOTIONS } from './motions/remote-lounge';
 import { ROOF_DECK_MOTIONS } from './motions/roof-deck';
@@ -37,6 +38,7 @@ const NPC_MOTIONS: Partial<Record<NpcId, NpcMotionSpec>> = {
   ...REMOTE_LOUNGE_MOTIONS,
   ...LATAM_CAFE_MOTIONS,
   ...LATAM_DISCO_HALL_MOTIONS,
+  ...LATAM_FUTEBOL_FIELD_MOTIONS,
 };
 
 /** The NPC's designed motion, looked up by a Room slot's loosely-typed `npcId`. */

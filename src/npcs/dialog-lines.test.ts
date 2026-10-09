@@ -58,6 +58,15 @@ const AWAITING_BA_LINE: readonly string[] = [
   'fernando-possebon',
   'fernando-garagnani',
   'ricardo-cordeiro',
+  // The LATAM Futebol Field's six JGers (owner request, 2026-10-09): their
+  // Characters LATAM.dc.html cards carry no quote at all (unlike Linda's),
+  // so each shares one placeholder line awaiting BA copy.
+  'thalles-stakonski',
+  'bruno-amado',
+  'washington-marino',
+  'chrystian-rissoli',
+  'paulo-ponciano',
+  'gustavo-barska',
 ];
 
 /**
