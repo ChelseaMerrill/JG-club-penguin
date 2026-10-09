@@ -601,6 +601,14 @@ describe('ROOM_DEFINITIONS registry', () => {
       // Reached only from the Map; its BACK TO HQ pill (a HUD button, not a
       // door) is its one exit.
       'remote-lounge': [],
+      // Reached only from the Remote Lounge globe's LATAM pin. Both of its
+      // in-scene door pills (FUTEBOL FIELD, DISCO HALL) stay disabled: the
+      // sibling LATAM Rooms land on their own branches. Its third pill, MAP,
+      // isn't a `RoomDoor` (nothing in this contract can open the Map
+      // screen), so it isn't represented here at all; the Room has no
+      // dedicated exit to HQ of its own (the HUD's persistent MAP button is
+      // the way back).
+      'latam-cafe': [],
     });
   });
 

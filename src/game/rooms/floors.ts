@@ -43,6 +43,10 @@ export const ROOM_FLOORS: Record<RoomId, FloorId | null> = {
   // 108 State St, so like the Igloo it has no floor and never shows the
   // Elevator.
   'remote-lounge': null,
+  // The LATAM Café (owner request, 2026-10-09): reached from the Remote
+  // Lounge globe's LATAM pin, not a Room in 108 State St, so like the Remote
+  // Lounge it has no floor and never shows the Elevator.
+  'latam-cafe': null,
 };
 
 /** Whether `a` and `b` are both real (non-null) floors and differ -- the Elevator's own show condition (#52 D3). */

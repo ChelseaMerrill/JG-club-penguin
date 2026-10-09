@@ -103,6 +103,16 @@ export type NpcId =
   // "don't place unplaced Characters-sheet people" rule (owner request,
   // 2026-10-09): she walks laps of the open floor.
   | 'linda-martin'
+  // The LATAM Café's seven JGers (`design/Characters LATAM.dc.html`'s cards
+  // whose location reads "LATAM Café Lounge"; owner request, 2026-10-09),
+  // placed where `design/Latam Cafe.dc.html` draws them.
+  | 'alexandre-nunes'
+  | 'fernanda-gioiosa'
+  | 'jean-rodrigues'
+  | 'joao-vitor-amorim'
+  | 'sander-nonaka'
+  | 'vinicius-martins'
+  | 'ygor-azevedo'
   // The Remote Lounge's JGers (`remote-lounge-npcs.ts`).
   | RemoteLoungeNpcId;
 
@@ -1578,6 +1588,135 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     still: true,
     dialog: LINE_DIALOG,
     figure: { card: 'lindaMartin' },
+  },
+  // The LATAM Café's seven JGers (`design/Characters LATAM.dc.html`'s cards
+  // whose location reads "LATAM Café Lounge"; owner request, 2026-10-09), at
+  // the positions `design/Latam Cafe.dc.html` draws them
+  // (`rooms/definitions/latam-cafe.ts`). That sheet's cards carry no job
+  // title and no quote at all (confirmed: just a name, a "REMOTE · LATAM"
+  // tag and a location), unlike `Characters.dc.html`'s cards, and the Room
+  // design draws no speech bubble for any of them either -- so `title` is
+  // `null` for all seven (the sheet's own "TBD" precedent, e.g. Casey/Millie
+  // on the Remote Lounge), and each `dialogLines` entry below is placeholder
+  // flavor text, not a sourced quote, pending real BA copy (added to
+  // `dialog-lines.test.ts`'s `AWAITING_BA_LINE`). Alexandre Nunes, Ygor
+  // Azevedo, Fernanda Gioiosa and Jean Rodrigues stand still; Sander Nonaka
+  // stands still at the register; Joao Vitor Amorim and Vinicius Martins
+  // walk (`motions/latam-cafe.ts`) -- all seven keep their own designed
+  // motion instead of the default bob (`still: true`). The design draws
+  // every one of them at scale 0.58 (Sander at 0.72, behind the counter),
+  // not the Human default 0.62.
+  'alexandre-nunes': {
+    id: 'alexandre-nunes',
+    name: 'Alexandre Nunes',
+    title: null,
+    roomId: 'latam-cafe',
+    kind: 'human',
+    tagName: 'Alexandre Nunes',
+    dialogLines: ['Café Latam. Best seat is the corner table.'],
+    idleLines: staticLine('Café Latam. Best seat is the corner table.'),
+    still: true,
+    dialog: LINE_DIALOG,
+    scale: 0.58,
+    // Clear of Joao Vitor Amorim's nameplate at his own (1,2) home slot
+    // (`npcs.test.ts`'s time-aware bubble check).
+    bubbleOffsetY: 10,
+    figure: { card: 'alexandreNunes' },
+  },
+  'fernanda-gioiosa': {
+    id: 'fernanda-gioiosa',
+    name: 'Fernanda Gioiosa',
+    title: null,
+    roomId: 'latam-cafe',
+    kind: 'human',
+    tagName: 'Fernanda Gioiosa',
+    dialogLines: ['Best five minutes of the day, right here.'],
+    idleLines: staticLine('Best five minutes of the day, right here.'),
+    still: true,
+    dialog: LINE_DIALOG,
+    scale: 0.58,
+    // Clear of Ygor Azevedo's nameplate at (3,6) (`npcs.test.ts`'s
+    // time-aware bubble check).
+    bubbleOffsetY: 10,
+    figure: { card: 'fernandaGioiosa' },
+  },
+  'jean-rodrigues': {
+    id: 'jean-rodrigues',
+    name: 'Jean Rodrigues',
+    title: null,
+    roomId: 'latam-cafe',
+    kind: 'human',
+    tagName: 'Jean Rodrigues',
+    dialogLines: ['Grab a seat, the order is coming right up.'],
+    idleLines: staticLine('Grab a seat, the order is coming right up.'),
+    still: true,
+    dialog: LINE_DIALOG,
+    scale: 0.58,
+    figure: { card: 'jeanRodrigues' },
+  },
+  'joao-vitor-amorim': {
+    id: 'joao-vitor-amorim',
+    name: 'Joao Vitor Amorim',
+    title: null,
+    roomId: 'latam-cafe',
+    kind: 'human',
+    tagName: 'Joao Vitor Amorim',
+    dialogLines: ['Coming through with your order.'],
+    idleLines: staticLine('Coming through with your order.'),
+    still: true,
+    dialog: LINE_DIALOG,
+    scale: 0.58,
+    figure: { card: 'joaoVitorAmorim' },
+  },
+  // At the register. The design's own "MATCH THE TREATS" bubble over him
+  // links to `Minigame Pao de Queijo Memory.dc.html`, triggered by clicking
+  // him at the register -- out of scope here (the packet is the Room and its
+  // cast, not the minigame), so he gets a normal line dialog instead; his
+  // line is his own menu board's items (`CAFEZINHO`, `ESPRESSO`, `PINGADO`,
+  // `COLD BREW`), the one piece of text the design ties to him specifically.
+  // TODO(#pao-de-queijo-memory): wire `dialog` to the minigame trigger (see
+  // `BUG_SQUASH_DIALOG` etc. above for the shape) when that minigame lands.
+  'sander-nonaka': {
+    id: 'sander-nonaka',
+    name: 'Sander Nonaka',
+    title: null,
+    roomId: 'latam-cafe',
+    kind: 'human',
+    tagName: 'Sander Nonaka',
+    dialogLines: ['Cafézinho, espresso, pingado, or cold brew — what will it be?'],
+    idleLines: staticLine('Cafézinho, espresso, pingado, or cold brew — what will it be?'),
+    still: true,
+    dialog: LINE_DIALOG,
+    scale: 0.72,
+    figure: { card: 'sanderNonaka' },
+  },
+  'vinicius-martins': {
+    id: 'vinicius-martins',
+    name: 'Vinicius Martins',
+    title: null,
+    roomId: 'latam-cafe',
+    kind: 'human',
+    tagName: 'Vinicius Martins',
+    dialogLines: ['Fresh tray, coming through.'],
+    idleLines: staticLine('Fresh tray, coming through.'),
+    still: true,
+    dialog: LINE_DIALOG,
+    scale: 0.58,
+    figure: { card: 'viniciusMartins' },
+  },
+  'ygor-azevedo': {
+    id: 'ygor-azevedo',
+    name: 'Ygor Azevedo',
+    title: null,
+    roomId: 'latam-cafe',
+    kind: 'human',
+    tagName: 'Ygor Azevedo',
+    dialogLines: ["Pull up a stool, the cafézinho's hot."],
+    idleLines: staticLine("Pull up a stool, the cafézinho's hot."),
+    still: true,
+    dialog: LINE_DIALOG,
+    scale: 0.58,
+    figure: { card: 'ygorAzevedo' },
   },
   'darrin-icebox': {
     id: 'darrin-icebox',

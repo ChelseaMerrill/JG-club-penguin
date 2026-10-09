@@ -37,6 +37,16 @@ const AWAITING_BA_LINE: readonly string[] = [
   // Linda Martin, placed in The Icebox with one card line (owner request,
   // 2026-10-09).
   'linda-martin',
+  // The LATAM Café's seven JGers (owner request, 2026-10-09): their sheet
+  // card carries no quote at all (confirmed), so each one's single line is
+  // placeholder flavor text pending real BA copy, not a sourced quote.
+  'alexandre-nunes',
+  'fernanda-gioiosa',
+  'jean-rodrigues',
+  'joao-vitor-amorim',
+  'sander-nonaka',
+  'vinicius-martins',
+  'ygor-azevedo',
 ];
 
 /**
