@@ -77,6 +77,7 @@ for (const roomId of [
   'bathroom',
   'the-mullet',
   'remote-lounge',
+  'latam-futebol-field',
 ] as const) {
   test(`npcs-${roomId}: NPCs show at their designed positions`, async ({ page }) => {
     const errors = await bootRoom(page, roomId);

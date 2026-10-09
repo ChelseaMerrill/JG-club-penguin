@@ -103,6 +103,16 @@ export type NpcId =
   // "don't place unplaced Characters-sheet people" rule (owner request,
   // 2026-10-09): she walks laps of the open floor.
   | 'linda-martin'
+  // The LATAM Futebol Field's six JGers (`design/Characters LATAM.dc.html`,
+  // cards 01/04/05/10/18/19): Thalles Stakonski, Bruno Amado, Washington
+  // Marino, Chrystian Rissoli, Paulo Ponciano, Gustavo Barska, each walking a
+  // ping-pong loop of `design/Latam Futebol Field.dc.html`'s own floor.
+  | 'thalles-stakonski'
+  | 'bruno-amado'
+  | 'washington-marino'
+  | 'chrystian-rissoli'
+  | 'paulo-ponciano'
+  | 'gustavo-barska'
   // The Remote Lounge's JGers (`remote-lounge-npcs.ts`).
   | RemoteLoungeNpcId;
 
@@ -2012,6 +2022,99 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
   // PR #133) -- dropped here and from the Bathroom's own npcSlots. Spelled
   // "Jessie" there, unlike The Melt's "Jesse" (see that entry's own
   // comment), which remains.
+  // The LATAM Futebol Field's six JGers (`design/Characters LATAM.dc.html`,
+  // cards 01/04/05/10/18/19, each a whole inline-SVG card drawing --
+  // `card-figures.ts`'s LATAM comment), placed at their own position in
+  // `design/Latam Futebol Field.dc.html` (owner request, 2026-10-09). None of
+  // the 19 LATAM cards carries a title or a quote (confirmed by inspection),
+  // so `title` is `null` and every `dialogLines` entry below is one shared
+  // placeholder line awaiting BA copy (`dialog-lines.test.ts`'s
+  // `AWAITING_BA_LINE`), not an invented personal quote. Each walks the
+  // design's own ping-pong `<animateTransform>` path on its shared .6s/4px
+  // walk bob, ported in `src/npcs/motions/latam-futebol-field.ts`, at the
+  // design's own 0.58 draw scale (Team Room 3's precedent). Chrystian
+  // Rissoli stands closest to the design's "KICK IT · PENALTY SHOOTOUT" ball
+  // icon (90 Stage px away, the next-closest 147), so he is the Penalty Kick
+  // minigame's host for dialog purposes; the minigame itself is not built yet
+  // (see `latam-futebol-field.ts`'s own comment).
+  'thalles-stakonski': {
+    id: 'thalles-stakonski',
+    name: 'Thalles Stakonski',
+    title: null,
+    roomId: 'latam-futebol-field',
+    kind: 'human',
+    tagName: 'Thalles Stakonski',
+    dialogLines: ['Bora, LATAM!'],
+    idleLines: [],
+    dialog: LINE_DIALOG,
+    scale: 0.58,
+    figure: { card: 'thallesStakonski' },
+  },
+  'bruno-amado': {
+    id: 'bruno-amado',
+    name: 'Bruno Amado',
+    title: null,
+    roomId: 'latam-futebol-field',
+    kind: 'human',
+    tagName: 'Bruno Amado',
+    dialogLines: ['Bora, LATAM!'],
+    idleLines: [],
+    dialog: LINE_DIALOG,
+    scale: 0.58,
+    figure: { card: 'brunoAmado' },
+  },
+  'washington-marino': {
+    id: 'washington-marino',
+    name: 'Washington Marino',
+    title: null,
+    roomId: 'latam-futebol-field',
+    kind: 'human',
+    tagName: 'Washington Marino',
+    dialogLines: ['Bora, LATAM!'],
+    idleLines: [],
+    dialog: LINE_DIALOG,
+    scale: 0.58,
+    figure: { card: 'washingtonMarino' },
+  },
+  'chrystian-rissoli': {
+    id: 'chrystian-rissoli',
+    name: 'Chrystian Rissoli',
+    title: null,
+    roomId: 'latam-futebol-field',
+    kind: 'human',
+    tagName: 'Chrystian Rissoli',
+    dialogLines: ['Bora, LATAM!'],
+    idleLines: [],
+    dialog: LINE_DIALOG,
+    scale: 0.58,
+    figure: { card: 'chrystianRissoli' },
+  },
+  'paulo-ponciano': {
+    id: 'paulo-ponciano',
+    name: 'Paulo Ponciano',
+    title: null,
+    roomId: 'latam-futebol-field',
+    kind: 'human',
+    tagName: 'Paulo Ponciano',
+    dialogLines: ['Bora, LATAM!'],
+    idleLines: [],
+    dialog: LINE_DIALOG,
+    scale: 0.58,
+    figure: { card: 'pauloPonciano' },
+  },
+  'gustavo-barska': {
+    id: 'gustavo-barska',
+    name: 'Gustavo Barska',
+    title: null,
+    roomId: 'latam-futebol-field',
+    kind: 'human',
+    tagName: 'Gustavo Barska',
+    dialogLines: ['Bora, LATAM!'],
+    idleLines: [],
+    dialog: LINE_DIALOG,
+    scale: 0.58,
+    figure: { card: 'gustavoBarska' },
+  },
   // The Remote Lounge's JGers, built from its design's own people list
   // (`remote-lounge-npcs.ts`).
   ...remoteLoungeNpcs({ kind: 'remote-card' }),

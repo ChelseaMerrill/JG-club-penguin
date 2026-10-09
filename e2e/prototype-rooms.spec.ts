@@ -3,6 +3,7 @@ import { computeDebugOverlay, type DebugOverlayMarker } from '../src/game/rooms/
 import { bathroom } from '../src/game/rooms/definitions/bathroom';
 import { devPit } from '../src/game/rooms/definitions/dev-pit';
 import { igloo } from '../src/game/rooms/definitions/igloo';
+import { latamFutebolField } from '../src/game/rooms/definitions/latam-futebol-field';
 import { officeHallway } from '../src/game/rooms/definitions/office-hallway';
 import { remoteLounge } from '../src/game/rooms/definitions/remote-lounge';
 import { roofDeck } from '../src/game/rooms/definitions/roof-deck';
@@ -39,6 +40,7 @@ const ROOM_DEFINITIONS: Record<RoomId, RoomDefinition> = {
   bathroom,
   'the-mullet': theMullet,
   'remote-lounge': remoteLounge,
+  'latam-futebol-field': latamFutebolField,
 };
 
 /** Fails the test on any uncaught page error or console error. */

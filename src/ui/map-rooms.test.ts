@@ -64,7 +64,15 @@ describe('MAP_ROOMS', () => {
   });
 
   it('gives every registered RoomDefinition exactly one clickable Map tile', () => {
+    // The LATAM Futebol Field is reached from the LATAM Cafe, not the Map
+    // (owner request, 2026-10-09), so unlike every other registered Room it
+    // has no Map tile at all.
+    const NO_MAP_TILE = new Set(['latam-futebol-field']);
     for (const room of ROOM_DEFINITIONS) {
+      if (NO_MAP_TILE.has(room.id)) {
+        expect(MAP_ROOMS.some((tile) => tile.roomId === room.id)).toBe(false);
+        continue;
+      }
       const matches = MAP_ROOMS.filter((tile) => tile.roomId === room.id);
       expect(matches).toHaveLength(1);
       expect(isMapTileClickable(matches[0]!)).toBe(true);

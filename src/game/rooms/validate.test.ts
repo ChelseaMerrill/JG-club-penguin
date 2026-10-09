@@ -601,6 +601,10 @@ describe('ROOM_DEFINITIONS registry', () => {
       // Reached only from the Map; its BACK TO HQ pill (a HUD button, not a
       // door) is its one exit.
       'remote-lounge': [],
+      // Reached only from the LATAM Cafe, not the Map; its CAFE LOUNGE and
+      // DISCO HALL pills are both disabled (neither sibling Room exists on
+      // this branch).
+      'latam-futebol-field': [],
     });
   });
 
