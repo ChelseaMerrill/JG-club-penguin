@@ -98,6 +98,9 @@ export interface BugSquashStats {
   squashed: number;
   bestCombo: number;
   escaped: number;
+  /** #140: flaky (white, two-hit) bugs fully squashed this round, for the
+   *  "Squash 3 flaky bugs in one Bug Squash round" Quest step. */
+  flakyHits: number;
 }
 
 export interface BugSquashEngineOptions {
@@ -162,6 +165,7 @@ export function createBugSquashEngine(options: BugSquashEngineOptions = {}): Bug
   let bestComboCount = 0;
   let lights = MAX_LIGHTS;
   let escaped = 0;
+  let flakyHits = 0;
   let ended = false;
   const bugs = new Map<number, Bug>();
 
@@ -194,7 +198,7 @@ export function createBugSquashEngine(options: BugSquashEngineOptions = {}): Bug
   }
 
   function getStats(): BugSquashStats {
-    return { score, squashed, bestCombo: deriveMultiplier(bestComboCount), escaped };
+    return { score, squashed, bestCombo: deriveMultiplier(bestComboCount), escaped, flakyHits };
   }
 
   /** One `STEP_MS` of simulation: ages/expires bugs, then maybe spawns one,
@@ -265,6 +269,10 @@ export function createBugSquashEngine(options: BugSquashEngineOptions = {}): Bug
     const points = (bug.flaky ? FLAKY_POINTS : CYAN_POINTS) * multiplier;
     score += points;
     squashed += 1;
+    // #140: a flaky bug reaches this branch only on its second hit (the
+    // first took it from hp 2 to 1 in the `partial` branch above), so this
+    // is exactly "fully squashed".
+    if (bug.flaky) flakyHits += 1;
     return { kind: 'squashed', points, multiplier };
   }
 

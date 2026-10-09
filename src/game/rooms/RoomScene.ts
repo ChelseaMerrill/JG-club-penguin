@@ -692,6 +692,26 @@ export class RoomScene extends Scene {
   }
 
   /**
+   * The signed-in Player's own current tile, or `null` before the local
+   * Penguin is placed (#140's pairing step feeds this into
+   * `src/quests/pairing.ts` a tick at a time). Mid-walk this is the tile it
+   * is walking toward, the same tile `publishRoomDebug`'s `localPenguin.tile`
+   * reports.
+   */
+  localTile(): Tile | null {
+    return this.controller?.state.tile ?? null;
+  }
+
+  /**
+   * Every other Penguin's current tile in this Room right now, never the
+   * local Penguin (#140's pairing step: the candidates to measure distance
+   * against). Empty while no one else is shown.
+   */
+  remotePenguinTiles(): { playerId: string; tile: Tile }[] {
+    return this.penguins.debugRemotePenguins().map(({ playerId, tile }) => ({ playerId, tile }));
+  }
+
+  /**
    * Restarts this scene to show `roomId` (a Room change). A no-op for the
    * Room already shown, unless `force` (#15 review round 1: `enterSpawnRoom`
    * passes `true` so a repeat Session-start still truly restarts and

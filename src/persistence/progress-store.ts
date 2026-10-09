@@ -270,6 +270,10 @@ export const PROGRESS_ERROR_CODES = [
   'pitch_not_started',
   'invalid_pitch',
   'pitch_timeout',
+  // #140: the "pair with a JGer" Quest's report_to_paul() RPC
+  // (20261009000000_quest_pair_flaky_test.sql P5/P6) before steps 1-4 (talk
+  // to Paul, check the CI board, pair up, squash 3 flaky bugs) are all met.
+  'quest_steps_incomplete',
 ] as const;
 
 export type ProgressErrorCode = (typeof PROGRESS_ERROR_CODES)[number];
@@ -459,6 +463,36 @@ export interface ProgressStore {
    * so no caller can ever mark it for someone else.
    */
   markCaseyTalked(): Promise<void>;
+
+  /**
+   * Records the Player's first "talk to Paul" moment for the "pair with a
+   * JGer" Quest (#140's `quest_steps__pair_flaky_test` 'talk-to-paul' step),
+   * the same client-asserted, idempotent shape as `markCaseyTalked`.
+   */
+  markPaulTalked(): Promise<void>;
+
+  /**
+   * Records the Player's first "checked the CI board" moment for #140's
+   * 'check-ci-board' step. Same shape as `markPaulTalked`.
+   */
+  markCiBoardChecked(): Promise<void>;
+
+  /**
+   * Records the Player's first "paired up for 10 continuous seconds" moment
+   * for #140's 'pair-with-jger' step, client-asserted (`src/quests/pairing.ts`
+   * decides when to call this; Presence positions are live-only and never
+   * recorded, so the server can't check it itself). Same idempotent shape as
+   * `markPaulTalked`.
+   */
+  markPaired(): Promise<void>;
+
+  /**
+   * Reports back to Paul for #140's 'report-to-paul' step. Rejects with
+   * `quest_steps_incomplete` unless 'talk-to-paul', 'check-ci-board',
+   * 'pair-with-jger' and 'squash-flakes' are all already met, and writes
+   * nothing in that case. Idempotent once reported.
+   */
+  reportToPaul(): Promise<void>;
 
   /**
    * Asks the server to pay the steps Quest `questId` (any `kind: 'steps'`
