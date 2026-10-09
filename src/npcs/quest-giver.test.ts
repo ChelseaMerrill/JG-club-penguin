@@ -147,6 +147,7 @@ describe('quest-giver data (#144 D5, Q17)', () => {
         'ian',
         'jon-mullet',
         'jory',
+        'linda-martin',
         'michael',
         'nicole',
         'sydney-team-room-3',

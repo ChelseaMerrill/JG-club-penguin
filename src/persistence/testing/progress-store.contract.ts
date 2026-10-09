@@ -8,8 +8,9 @@ import { emptySlots, type IglooSlot, type ProgressStore, type ShopItem } from '.
 /** One fresh Player, wired to whichever `ProgressStore` implementation is under test. */
 export interface ProgressStoreHarness {
   store: ProgressStore;
-  /** Makes `seconds` seconds appear to have passed since every earlier round
-   *  and since Tom's latest coffee hand-over (#141). */
+  /** Makes `seconds` seconds appear to have passed since every earlier round,
+   *  since Tom's latest coffee hand-over (#141) and since Linda's latest
+   *  pitch start (#142). */
   advanceSeconds(seconds: number): Promise<void>;
   /** Adds Tokens directly, as the postgres role would (#138's Badge tests). */
   grantTokens(tokens: number): Promise<void>;
@@ -1159,6 +1160,170 @@ export function describeProgressStoreContract(
 
         expect(again).toMatchObject({ talkedToNicole: true, kitchenVisited: true });
         expect(again.secondsLeft).toBeCloseTo(60, 0);
+      });
+    });
+
+    // #142: "Pitch your hack in under 60 seconds". `advanceSeconds` moves the
+    // clock past `startPitch` (the fake's clock; the real store backdates the
+    // stored start time against the database's own now()).
+    describe("Linda's pitch Quest (#142)", () => {
+      const PITCH = 'pitch-hack';
+
+      async function pitchSteps(store: ProgressStore): Promise<Record<string, boolean>> {
+        return (await store.questProgress()).questSteps[PITCH];
+      }
+
+      it('starts a fresh Player with no pitch run and every step unmet', async () => {
+        const { store } = await makeHarness();
+
+        expect(await store.pitchRun()).toEqual({
+          talkedToLinda: false,
+          passed: false,
+          bestSeconds: null,
+        });
+        expect(await pitchSteps(store)).toEqual({
+          'talk-to-linda': false,
+          'pitch-under-60': false,
+        });
+      });
+
+      it('refuses starting or submitting before talking to Linda', async () => {
+        const { store } = await makeHarness();
+
+        await expect(store.startPitch()).rejects.toMatchObject({ code: 'pitch_not_started' });
+        await expect(store.submitPitch(0, 0, 0)).rejects.toMatchObject({
+          code: 'pitch_not_started',
+        });
+        await expect(store.completeQuest(PITCH)).rejects.toMatchObject({
+          code: 'quest_incomplete',
+        });
+      });
+
+      it('refuses submitting before starting', async () => {
+        const { store } = await makeHarness();
+        await store.markLindaTalked();
+
+        await expect(store.submitPitch(0, 0, 0)).rejects.toMatchObject({
+          code: 'pitch_not_started',
+        });
+      });
+
+      it.each([
+        [3, 0, 0],
+        [0, -1, 0],
+        [0, 0, 9],
+      ])('refuses an out-of-range choice (%o)', async (problem, solution, ask) => {
+        const { store } = await makeHarness();
+        await store.markLindaTalked();
+        await store.startPitch();
+
+        await expect(store.submitPitch(problem, solution, ask)).rejects.toMatchObject({
+          code: 'invalid_pitch',
+        });
+      });
+
+      it('talks, starts and submits in time, then pays 75 Tokens exactly once', async () => {
+        const { store, advanceSeconds } = await makeHarness();
+
+        expect(await store.markLindaTalked()).toMatchObject({ talkedToLinda: true });
+        expect(await store.startPitch()).toMatchObject({ talkedToLinda: true, passed: false });
+
+        await advanceSeconds(12);
+        expect(await store.submitPitch(0, 1, 2)).toEqual({ seconds: 12 });
+        expect(await pitchSteps(store)).toEqual({
+          'talk-to-linda': true,
+          'pitch-under-60': true,
+        });
+        expect(await store.pitchRun()).toEqual({
+          talkedToLinda: true,
+          passed: true,
+          bestSeconds: 12,
+        });
+
+        const before = (await store.loadAll()).tokens;
+        expect(await store.completeQuest(PITCH)).toEqual({
+          tokensAwarded: 75,
+          balance: before + 75,
+          alreadyCompleted: false,
+          badgesEarned: [],
+        });
+        expect(await store.completeQuest(PITCH)).toEqual({
+          tokensAwarded: 0,
+          balance: before + 75,
+          alreadyCompleted: true,
+          badgesEarned: [],
+        });
+        expect((await store.loadAll()).tokens).toBe(before + 75);
+        expect((await store.questProgress()).completedQuests).toEqual([PITCH]);
+      });
+
+      it('a submission past 65 s is refused as pitch_timeout and pays nothing', async () => {
+        const { store, advanceSeconds } = await makeHarness();
+        await store.markLindaTalked();
+        await store.startPitch();
+        const before = (await store.loadAll()).tokens;
+
+        await advanceSeconds(66);
+
+        await expect(store.submitPitch(0, 0, 0)).rejects.toMatchObject({
+          code: 'pitch_timeout',
+        });
+        expect((await store.pitchRun()).passed).toBe(false);
+        await expect(store.completeQuest(PITCH)).rejects.toMatchObject({
+          code: 'quest_incomplete',
+        });
+        expect((await store.loadAll()).tokens).toBe(before);
+
+        // A fresh start resets the clock.
+        await store.startPitch();
+        await advanceSeconds(10);
+        expect(await store.submitPitch(0, 0, 0)).toEqual({ seconds: 10 });
+        await expect(store.completeQuest(PITCH)).resolves.toMatchObject({ tokensAwarded: 75 });
+      });
+
+      it('accepts a submission inside the 5 s grace after the 60 s', async () => {
+        const { store, advanceSeconds } = await makeHarness();
+        await store.markLindaTalked();
+        await store.startPitch();
+
+        await advanceSeconds(64);
+
+        await expect(store.submitPitch(0, 0, 0)).resolves.toEqual({ seconds: 64 });
+      });
+
+      it('a replay after passing improves bestSeconds but never pays again', async () => {
+        const { store, advanceSeconds } = await makeHarness();
+        await store.markLindaTalked();
+        await store.startPitch();
+        await advanceSeconds(30);
+        await store.submitPitch(0, 0, 0);
+        await expect(store.completeQuest(PITCH)).resolves.toMatchObject({ tokensAwarded: 75 });
+        const before = (await store.loadAll()).tokens;
+
+        await store.startPitch();
+        await advanceSeconds(5);
+        expect(await store.submitPitch(1, 1, 1)).toEqual({ seconds: 5 });
+
+        expect(await store.pitchRun()).toEqual({
+          talkedToLinda: true,
+          passed: true,
+          bestSeconds: 5,
+        });
+        await expect(store.completeQuest(PITCH)).resolves.toMatchObject({
+          tokensAwarded: 0,
+          alreadyCompleted: true,
+        });
+        expect((await store.loadAll()).tokens).toBe(before);
+      });
+
+      it('talking to Linda again changes nothing', async () => {
+        const { store } = await makeHarness();
+        await store.markLindaTalked();
+        await store.startPitch();
+
+        const again = await store.markLindaTalked();
+
+        expect(again).toMatchObject({ talkedToLinda: true });
       });
     });
 

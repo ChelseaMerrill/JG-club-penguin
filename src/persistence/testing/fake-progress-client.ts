@@ -95,6 +95,10 @@ export interface FakeResponses {
   completeQuest?: FakeResult<unknown>;
   /** #141: every coffee RPC answers with this. */
   coffeeRun?: FakeResult<unknown>;
+  /** #142: `pitch_run`/`mark_linda_talked`/`start_pitch` answer with this. */
+  pitchRun?: FakeResult<unknown>;
+  /** #142: `submit_pitch` answers with this. */
+  submitPitch?: FakeResult<unknown>;
 }
 
 export type LoggedCall = [op: string, ...args: unknown[]];
@@ -185,6 +189,15 @@ export function makeFakeClient(responses: FakeResponses = {}): {
       },
       error: null,
     } satisfies FakeResult<unknown>);
+
+  const pitchRun =
+    responses.pitchRun ??
+    ({
+      data: { talkedToLinda: false, passed: false, bestSeconds: null },
+      error: null,
+    } satisfies FakeResult<unknown>);
+  const submitPitch =
+    responses.submitPitch ?? ({ data: { seconds: 0 }, error: null } satisfies FakeResult<unknown>);
 
   const client: ProgressClient = {
     from(table) {
@@ -362,6 +375,12 @@ export function makeFakeClient(responses: FakeResponses = {}): {
         ].includes(fn)
       ) {
         return Promise.resolve(coffeeRun);
+      }
+      if (['pitch_run', 'mark_linda_talked', 'start_pitch'].includes(fn)) {
+        return Promise.resolve(pitchRun);
+      }
+      if (fn === 'submit_pitch') {
+        return Promise.resolve(submitPitch);
       }
       throw new Error(`unexpected rpc ${fn}`);
     },

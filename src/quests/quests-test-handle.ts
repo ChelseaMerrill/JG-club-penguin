@@ -27,4 +27,11 @@ export interface QuestsTestHandle {
   balance(): Promise<number>;
   /** #141: talks to Nicole, asks Tom and delivers through the same store, for specs that only need the Quest done. */
   finishCoffeeRun(): Promise<void>;
+  /**
+   * #142: talks to Linda, starts and submits a pitch through the same store,
+   * for specs that only need the Quest done. `advanceClock` (shared with
+   * #141) lets a spec expire the pitch overlay's own 60 s countdown without
+   * waiting a real minute.
+   */
+  finishPitchHack(): Promise<void>;
 }

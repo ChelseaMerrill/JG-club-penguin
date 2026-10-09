@@ -314,6 +314,11 @@ function wrapStore(
       markKitchenVisited: () => store.markKitchenVisited(),
       askTomForCoffee: () => store.askTomForCoffee(),
       deliverCoffee: () => store.deliverCoffee(),
+      // #142: the pitch run likewise changes nothing the snapshot holds.
+      pitchRun: () => store.pitchRun(),
+      markLindaTalked: () => store.markLindaTalked(),
+      startPitch: () => store.startPitch(),
+      submitPitch: (problem, solution, ask) => store.submitPitch(problem, solution, ask),
     },
     loadInitial: loadAll,
   };
@@ -437,5 +442,9 @@ export function createActiveProgressStore(
     markKitchenVisited: async () => current().markKitchenVisited(),
     askTomForCoffee: async () => current().askTomForCoffee(),
     deliverCoffee: async () => current().deliverCoffee(),
+    pitchRun: async () => current().pitchRun(),
+    markLindaTalked: async () => current().markLindaTalked(),
+    startPitch: async () => current().startPitch(),
+    submitPitch: async (problem, solution, ask) => current().submitPitch(problem, solution, ask),
   };
 }

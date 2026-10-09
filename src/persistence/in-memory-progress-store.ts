@@ -32,6 +32,8 @@ import {
   validateLook,
   type IglooSlot,
   type LeaderboardEntry,
+  type PitchRun,
+  type PitchSubmitResult,
   type ProgressSnapshot,
   type ProgressStore,
   type PurchaseResult,
@@ -46,6 +48,13 @@ import {
   visitKitchen,
   type CoffeeRunRecord,
 } from './coffee-run-rules';
+import {
+  pitchRunView,
+  startPitch as applyStartPitch,
+  startPitchRun,
+  submitPitch as applySubmitPitch,
+  type PitchRunRecord,
+} from './pitch-run-rules';
 
 function defaultLook(): PenguinLook {
   return { ...DEFAULT_LOOK };
@@ -84,6 +93,8 @@ interface PlayerState {
   completedQuests: Set<string>;
   /** #141: the `player_coffee_runs` row, `null` before talking to Nicole. */
   coffeeRun: CoffeeRunRecord | null;
+  /** #142: the `player_pitch_runs` row, `null` before talking to Linda. */
+  pitchRun: PitchRunRecord | null;
 }
 
 /** One rival's Minigame best, for `InMemoryProgressStoreOptions.leaderboardRivals`. Test-only. */
@@ -158,6 +169,7 @@ export function createInMemoryProgressStoreWithControls(
     caseyTalked: false,
     completedQuests: new Set(),
     coffeeRun: null,
+    pitchRun: null,
   };
 
   async function loadAll(): Promise<ProgressSnapshot> {
@@ -450,6 +462,7 @@ export function createInMemoryProgressStoreWithControls(
       matchWins: { ...state.matchWins },
       caseyTalked: state.caseyTalked,
       coffeeRun: state.coffeeRun ? { ...state.coffeeRun } : null,
+      pitchRun: state.pitchRun ? { ...state.pitchRun } : null,
       nowMs: now(),
     };
   }
@@ -517,6 +530,27 @@ export function createInMemoryProgressStoreWithControls(
     return coffeeRunView(state.coffeeRun, nowMs);
   }
 
+  // #142: mirrors 20261009010000_quest_pitch_hack.sql's RPCs. A refused
+  // step throws before anything is written, as the SQL's raise rolls back.
+  function applyPitch(
+    step: (record: PitchRunRecord | null, nowMs: number) => PitchRunRecord,
+  ): PitchRun {
+    const nowMs = now();
+    state.pitchRun = step(state.pitchRun, nowMs);
+    return pitchRunView(state.pitchRun);
+  }
+
+  async function submitPitch(
+    problem: number,
+    solution: number,
+    ask: number,
+  ): Promise<PitchSubmitResult> {
+    const nowMs = now();
+    const { record, result } = applySubmitPitch(state.pitchRun, nowMs, problem, solution, ask);
+    state.pitchRun = record;
+    return result;
+  }
+
   // #138: mirrors `check_session_badges` / `evaluate_session_badges`, with
   // the injected clock standing in for the server's `now()`.
   async function checkBadges(): Promise<BadgeCheckResult> {
@@ -550,6 +584,10 @@ export function createInMemoryProgressStoreWithControls(
       markKitchenVisited: async () => applyCoffee(visitKitchen),
       askTomForCoffee: async () => applyCoffee(askTom),
       deliverCoffee: async () => applyCoffee(deliverCoffee),
+      pitchRun: async () => pitchRunView(state.pitchRun),
+      markLindaTalked: async () => applyPitch(startPitchRun),
+      startPitch: async () => applyPitch(applyStartPitch),
+      submitPitch,
     },
     grantTokens(tokens: number): void {
       state.tokens += tokens;

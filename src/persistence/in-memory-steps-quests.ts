@@ -7,6 +7,12 @@ import {
   NICOLE_COFFEE_REWARD,
   type CoffeeRunRecord,
 } from './coffee-run-rules';
+import {
+  pitchQuestSteps,
+  PITCH_HACK_QUEST_ID,
+  PITCH_HACK_REWARD,
+  type PitchRunRecord,
+} from './pitch-run-rules';
 
 /**
  * The in-memory fake's mirror of `public.quests` plus the
@@ -33,6 +39,8 @@ export interface InMemoryQuestState {
   caseyTalked: boolean;
   /** #141: the fake's `player_coffee_runs` row, `null` before talking to Nicole. */
   coffeeRun: Readonly<CoffeeRunRecord> | null;
+  /** #142: the fake's `player_pitch_runs` row, `null` before talking to Linda. */
+  pitchRun: Readonly<PitchRunRecord> | null;
   /** The fake's clock (the server's `now()`), for time-limited steps. */
   nowMs: number;
 }
@@ -93,4 +101,11 @@ registerInMemoryStepsQuest('igloo-badge', {
 registerInMemoryStepsQuest(NICOLE_COFFEE_QUEST_ID, {
   rewardTokens: NICOLE_COFFEE_REWARD,
   steps: (state) => coffeeQuestSteps(state.coffeeRun, state.nowMs),
+});
+
+// #142 "Pitch your hack in under 60 seconds": `public.quest_steps__pitch_hack`
+// (20261009010000_quest_pitch_hack.sql P4), timed by the fake's clock.
+registerInMemoryStepsQuest(PITCH_HACK_QUEST_ID, {
+  rewardTokens: PITCH_HACK_REWARD,
+  steps: (state) => pitchQuestSteps(state.pitchRun),
 });
