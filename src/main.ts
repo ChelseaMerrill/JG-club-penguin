@@ -105,6 +105,7 @@ import { createTrophyCase, TROPHY_CASE_OVERLAY_ID } from './ui/trophy-case';
 import { createMapScreen } from './ui/map-screen';
 import { createRemoteLounge } from './ui/remote-lounge/remote-lounge';
 import { createElevatorScreen } from './ui/elevator-screen';
+import type { ElevatorTestHandle } from './ui/elevator-test-handle';
 import { createMarket, MARKET_OVERLAY_ID } from './ui/market';
 import { createIglooEditor, type IglooEditor } from './ui/igloo-editor';
 import { wireBadgeToast } from './ui/badge-toast';
@@ -159,7 +160,19 @@ const uiLayer = getUiLayer();
  */
 const elevatorScreen = createElevatorScreen(uiLayer, {
   resolveFloor: (roomId) => ROOM_FLOORS[roomId],
+  // #163: the Player's own Look rides in the car.
+  resolveLook: () => (game.registry.get('player') as Player | undefined)?.look ?? null,
 });
+
+// Test-only (#163): drives the real Elevator screen with no Room change.
+if (HOOKS_ENABLED) {
+  const elevatorTest: ElevatorTestHandle = {
+    ride: (from, to) => elevatorScreen.previewRide(from, to),
+    freezeAt: (elapsedMs) => elevatorScreen.freezeAt(elapsedMs),
+    hide: () => elevatorScreen.cancel(),
+  };
+  window.__elevatorTest = elevatorTest;
+}
 
 /**
  * A stable `EmoteRoomChannel` (#47), unlike `ChatRoomChannel`: an Emote must
@@ -691,12 +704,14 @@ function wireSession(player: Player, view: Awaited<typeof sceneReady>): Promise<
  */
 function initDevAsPlayerHook(): boolean {
   if (!HOOKS_ENABLED) return false;
-  if (!new URLSearchParams(window.location.search).has('asPlayer')) return false;
+  const params = new URLSearchParams(window.location.search);
+  if (!params.has('asPlayer')) return false;
 
   const fixturePlayer: Player = {
     id: 'e2e-fixture-player',
     displayName: 'E2E Fixture Player',
-    look: DEFAULT_LOOK,
+    // #163: `?asPlayer=<name>` names the fixture Penguin (a bare `?asPlayer` stays unnamed).
+    look: { ...DEFAULT_LOOK, name: params.get('asPlayer') ?? '' },
   };
   bindPlayer(game.registry, fixturePlayer);
   // #162: the fixture's look is its saved look, so show it (and accept Stage
