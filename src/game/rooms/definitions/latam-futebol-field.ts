@@ -49,21 +49,20 @@ const WALKABLE: readonly (readonly boolean[])[] = [
  * Traced from `design/Latam Futebol Field.dc.html` ("17 · LATAM FUTEBOL
  * FIELD"). No HQ Room draws a door to it -- it is reached from the LATAM
  * Cafe, not the Map (owner request, 2026-10-09) -- so it has no
- * `map-rooms.ts` tile either. Its own three exit pills, in the design's own
- * bottom-of-stage row ("MAP" / "CAFE LOUNGE" / "DISCO HALL"), are measured
- * from the live design (`measure-pills` scratch script, not checked in):
- * MAP opens the Map screen, which this codebase already wires globally at
- * the HUD level (`main.ts`'s `createMapScreen`, self-wiring the HUD's own
- * MAP button) rather than through any `RoomDoor`/`RoomHotspot` -- there is no
- * door/hotspot mechanism that opens it, so it is left out of `doors` here
- * (reported, not invented). CAFE LOUNGE and DISCO HALL lead to those
- * sibling LATAM Rooms.
+ * `map-rooms.ts` tile either. `doors` is empty (owner request, 2026-10-09):
+ * the design's own three exit pills ("MAP" / "CAFE LOUNGE" / "DISCO HALL"),
+ * in its bottom-of-stage row, sat at y≈826, exactly where the HUD's own
+ * bottom action bar covers them, so those `RoomDoor` hotspots are gone along
+ * with the pills themselves (hidden from the exported art,
+ * `scripts/export-room-art.ts`). The HUD's own MAP button already opens the
+ * Map; `src/ui/latam-nav/latam-nav.ts` links the two sibling LATAM Rooms as
+ * small pills under the HUD's title instead.
  *
  * The design's six LATAM JGers (`design/Characters LATAM.dc.html`) each walk
  * a ping-pong path of the open pitch (`src/npcs/npcs.ts`,
  * `src/npcs/motions/latam-futebol-field.ts`). The "KICK IT · PENALTY
  * SHOOTOUT" ball-icon link to `Minigame Penalty Kick.dc.html` is not wired
- * up: the Penalty Kick minigame itself isn't built yet (follow-up).
+ * up: the Penalty Kick minigame itself isn't built yet (ticket #220).
  */
 export const latamFutebolField: RoomDefinition = {
   id: 'latam-futebol-field',
@@ -84,22 +83,9 @@ export const latamFutebolField: RoomDefinition = {
   walkable: WALKABLE,
   // Open floor at the pitch's near-middle, clear of every NPC and both goals.
   spawnTile: { col: 6, row: 8 },
-  doors: [
-    {
-      label: 'CAFE LOUNGE',
-      hotspot: { x: 557, y: 826, width: 331, height: 52 },
-      targetRoomId: 'latam-cafe',
-      // The target's own spawn tile: every LATAM pill sits on the bottom edge.
-      entryTile: { col: 5, row: 9 },
-    },
-    {
-      label: 'DISCO HALL',
-      hotspot: { x: 902, y: 826, width: 292, height: 52 },
-      targetRoomId: 'latam-disco-hall',
-      // The target's own spawn tile: every LATAM pill sits on the bottom edge.
-      entryTile: { col: 5, row: 7 },
-    },
-  ],
+  // The design's own bottom exit-pill bar and its `RoomDoor` hotspots are
+  // gone (owner request, 2026-10-09): see this file's own header comment.
+  doors: [],
   npcSlots: [
     // Each tile is the nearest whole tile to the design's own
     // `<animateTransform>` home position (a free-roaming mid-pitch point,

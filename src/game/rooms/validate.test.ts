@@ -602,12 +602,15 @@ describe('ROOM_DEFINITIONS registry', () => {
       // door) is its one exit.
       'remote-lounge': [],
       // The LATAM section (owner request, 2026-10-09): the Café is reached
-      // from the Remote Lounge globe's LATAM pin; its three Rooms link to each
-      // other. Their MAP pills aren't `RoomDoor`s (nothing in this contract
-      // opens the Map screen); the HUD's MAP button is the way back to HQ.
-      'latam-cafe': ['latam-disco-hall', 'latam-futebol-field'],
-      'latam-disco-hall': ['latam-cafe', 'latam-futebol-field'],
-      'latam-futebol-field': ['latam-cafe', 'latam-disco-hall'],
+      // from the Remote Lounge globe's LATAM pin. Their own door-pill bars
+      // (MAP and the two sibling links) sat at y≈826, exactly where the
+      // HUD's own bottom action bar covers them, so all three Rooms now have
+      // no `RoomDoor`s at all: `src/ui/latam-nav/latam-nav.ts` links the
+      // sibling LATAM Rooms as small pills under the HUD's title instead, and
+      // the HUD's MAP button is still the way back to HQ.
+      'latam-cafe': [],
+      'latam-disco-hall': [],
+      'latam-futebol-field': [],
     });
   });
 
