@@ -8,7 +8,7 @@
 -- internal functions are denied (42501); a fresh run reports nothing;
 -- start_pitch and submit_pitch are refused before talking to Linda
 -- (pitch_not_started); submit_pitch is refused before start_pitch
--- (pitch_not_started); an out-of-range choice is refused (invalid_pitch)
+-- (pitch_not_started); an out-of-range or null choice is refused (invalid_pitch)
 -- without touching started_at; the Quest is refused (quest_incomplete)
 -- until a pitch lands. Time is controlled the one way a client never can: as
 -- postgres, the stored start time is set into the past relative to the
@@ -209,7 +209,9 @@ begin
     foreach v_fn in array array[
       'select public.submit_pitch(3, 0, 0)',
       'select public.submit_pitch(0, -1, 0)',
-      'select public.submit_pitch(0, 0, 9)'
+      'select public.submit_pitch(0, 0, 9)',
+      'select public.submit_pitch(null, 0, 0)',
+      'select public.submit_pitch(0, 0, null)'
     ] loop
       v_err := null;
       begin

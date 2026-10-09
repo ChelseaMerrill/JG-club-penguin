@@ -292,7 +292,10 @@ begin
     raise exception 'not_authenticated' using errcode = '42501';
   end if;
 
-  if problem not in (0, 1, 2) or solution not in (0, 1, 2) or ask not in (0, 1, 2) then
+  -- coalesce: a null choice would make `not in` null, not true, and slip through.
+  if coalesce(problem, -1) not in (0, 1, 2)
+    or coalesce(solution, -1) not in (0, 1, 2)
+    or coalesce(ask, -1) not in (0, 1, 2) then
     raise exception 'invalid_pitch';
   end if;
 
