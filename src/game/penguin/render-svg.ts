@@ -411,8 +411,8 @@ function renderPattern(
  */
 export const PROP_ANCHOR = { x: 104, y: 50 };
 
-/** The plate's radius (#160 decision: ~1.4x the pre-#160 props' own rough half-size, so it reads at Room scale). */
-export const PROP_PLATE_RADIUS = 17;
+/** The plate's radius (#160): large enough that the glyph on it reads at Room scale (17 left the glyphs too small to recognise in the Room screenshots). */
+export const PROP_PLATE_RADIUS = 20;
 
 /** The plate's outline width, matching the figure's own stroke weight (#160 decision: "~2.5 units in figure space"). */
 export const PROP_PLATE_STROKE_WIDTH = 2.5;
@@ -425,21 +425,21 @@ export const PROP_PLATE_SHADOW_OFFSET = 1.5;
  * `PROP_GLYPH_SCALE` (#160): the HUD-EMOTE picker icon's own `viewBox="0 0 40
  * 36"` centre (`design/Club JenGuin HUD Menus.dc.html`), so every glyph
  * authored in that same 40x36 space drops in and scales identically. The
- * scale fits that 40-wide box inside the plate's own diameter with a clear
- * margin (`2 * PROP_PLATE_RADIUS` = 34; `40 * PROP_GLYPH_SCALE` = 24).
+ * glyphs themselves fill only about 24x26 of that box, so the scale sizes the
+ * glyph, not the box, to the plate: about 26x29 inside its 40-unit diameter.
  */
 const PROP_GLYPH_VIEWBOX_CENTER = { x: 20, y: 18 };
-const PROP_GLYPH_SCALE = 0.6;
+const PROP_GLYPH_SCALE = 1.1;
 
 /**
  * JG_FLASH's hex-and-"JG" badge is shared with the belly's JG LOGO pattern
  * (`renderPattern`'s 'JG LOGO' case) and authored around its own centre, not
  * the HUD icon's 40x36 box -- so it gets its own centre/scale pair, chosen to
  * fit the same hex comfortably inside the plate (its own bounding box is
- * 28x32; scaled by `PROP_FLASH_SCALE`, about 24x27).
+ * 28x32; scaled by `PROP_FLASH_SCALE`, about 29x34).
  */
 const PROP_FLASH_CENTER = { x: 60, y: 80 };
-const PROP_FLASH_SCALE = 0.85;
+const PROP_FLASH_SCALE = 1.05;
 
 /** JG_FLASH's radiating burst lines sit just outside the plate's own edge, not the old fixed hex-relative offsets, so they scale with the plate. */
 const PROP_BURST_INNER_RADIUS = PROP_PLATE_RADIUS + 3;
