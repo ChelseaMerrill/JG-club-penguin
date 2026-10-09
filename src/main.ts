@@ -935,9 +935,11 @@ registerQuestStarter('igloo-badge', () => {
 });
 
 // #140: Paul's "Got any work for me?" starts "Pair with a JGer and fix the
-// flaky test" by recording the "talk to Paul" step; the engine claims the
-// Quest itself once every step is met.
+// flaky test" by recording the "talk to Paul" step and tracks it in the HUD
+// widget, as Nicole's does; the engine claims the Quest itself once every
+// step is met.
 registerQuestStarter('pair-flaky-test', () => {
+  quests.track('pair-flaky-test');
   void questAwareStore.markPaulTalked();
 });
 
