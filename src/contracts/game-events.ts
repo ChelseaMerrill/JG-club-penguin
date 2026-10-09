@@ -41,7 +41,19 @@ export interface MinigameStatsMap {
    *  (and `end()`'s own `score` return) so a `stats`-only consumer (e.g. a
    *  future leaderboard) never needs the sibling field to make sense of a
    *  round. `bestCombo` is the best combo multiplier reached (1-4). */
-  'bug-squash': { score: number; squashed: number; bestCombo: number; escaped: number };
+  /** `flakyHits` (#140): how many flaky (white, two-hit) bugs were fully
+   *  squashed in the round -- the "Squash 3 flaky bugs in one Bug Squash
+   *  round" Quest step reads this. Producer: #38, extended by #140. */
+  'bug-squash': {
+    score: number;
+    squashed: number;
+    bestCombo: number;
+    escaped: number;
+    /** Optional: an older client (or an existing test fixture) that never
+     *  sends it reads as 0 everywhere this is read (the engine, the
+     *  in-memory fake, and `quest_steps__pair_flaky_test`'s own `coalesce`). */
+    flakyHits?: number;
+  };
   'pancake-flip': {
     golden: number;
     flipNow: number;

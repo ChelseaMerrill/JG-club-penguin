@@ -57,6 +57,7 @@ export const MIGRATIONS = [
   ['quest-registry', '20261006000000_quest_registry.sql'],
   ['quest-igloo-badge', '20261006010000_quest_igloo_badge.sql'],
   ['quest-nicole-coffee', '20261006020000_quest_nicole_coffee.sql'],
+  ['quest-pair-flaky-test', '20261009000000_quest_pair_flaky_test.sql'],
   ['quest-pitch-hack', '20261009010000_quest_pitch_hack.sql'],
 ] as const;
 
@@ -385,6 +386,23 @@ function createSqlProgressStore(db: PGliteInterface, playerId: string): Progress
     await runAsPlayer((tx) => tx.query('select public.mark_casey_talked()'));
   }
 
+  // #140: the "pair with a JGer" Quest's four client-asserted/checked RPCs.
+  async function markPaulTalked(): Promise<void> {
+    await runAsPlayer((tx) => tx.query('select public.mark_paul_talked()'));
+  }
+
+  async function markCiBoardChecked(): Promise<void> {
+    await runAsPlayer((tx) => tx.query('select public.mark_ci_board_checked()'));
+  }
+
+  async function markPaired(): Promise<void> {
+    await runAsPlayer((tx) => tx.query('select public.mark_paired()'));
+  }
+
+  async function reportToPaul(): Promise<void> {
+    await runAsPlayer((tx) => tx.query('select public.report_to_paul()'));
+  }
+
   async function completeQuest(questId: string): Promise<CompleteQuestResult> {
     return runAsPlayer(async (tx) => {
       const res = await tx.query<{ result: CompleteQuestResult }>(
@@ -445,6 +463,10 @@ function createSqlProgressStore(db: PGliteInterface, playerId: string): Progress
     questProgress,
     markDevPitVisited,
     markCaseyTalked,
+    markPaulTalked,
+    markCiBoardChecked,
+    markPaired,
+    reportToPaul,
     completeQuest,
     checkBadges,
     coffeeRun: () => coffeeRpc('coffee_run'),

@@ -111,6 +111,21 @@ export const devPit: RoomDefinition = {
     // them live. Contrast Town Center's Jory Hutchins, a designed Human NPC
     // who has her own slot there (#137).
   ],
+  // #140: the CI board, Quest "Pair with a JGer and fix the flaky test"'s
+  // "check-ci-board" step. A hit zone over the right wall's BUILD PASSING
+  // build monitor (traced from a 1600x900 Room screenshot: the monitor spans
+  // about x 950-1250, y 140-375), stopping above the whiteboard and Alex
+  // Nikolis's desk below it. There is no existing clickable prop here to
+  // reuse (#16 D5's only other Room hotspots are the Igloo's trophy-case and
+  // the Roof Deck's igloo-gear-stall), so this is a hit zone over that art
+  // rather than a newly exported asset.
+  hotspots: [
+    {
+      id: 'ci-board',
+      label: 'CI Board',
+      rect: { x: 950, y: 140, width: 300, height: 200 },
+    },
+  ],
   // The back desks, drawn in front of the two Alexes sitting at them.
   // Exported by `npm run export:room-art -- dev-pit` (`FOREGROUND_LAYERS`).
   foregrounds: [

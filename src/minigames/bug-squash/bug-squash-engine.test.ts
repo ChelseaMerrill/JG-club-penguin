@@ -251,7 +251,7 @@ describe('createBugSquashEngine: bug lifetime ramp (#181, bug speed unchanged)',
 });
 
 describe('createBugSquashEngine: stats shape', () => {
-  it('getStats reports score, squashed, bestCombo and escaped as numbers', () => {
+  it('getStats reports score, squashed, bestCombo, escaped and flakyHits as numbers', () => {
     const engine = createBugSquashEngine({ rng: alwaysSpawnNonFlakyRng() });
     squashRepeatedly(engine, 5);
 
@@ -262,10 +262,33 @@ describe('createBugSquashEngine: stats shape', () => {
       squashed: expect.any(Number),
       bestCombo: expect.any(Number),
       escaped: expect.any(Number),
+      flakyHits: expect.any(Number),
     });
-    expect(Object.keys(stats).sort()).toEqual(['bestCombo', 'escaped', 'score', 'squashed']);
+    expect(Object.keys(stats).sort()).toEqual([
+      'bestCombo',
+      'escaped',
+      'flakyHits',
+      'score',
+      'squashed',
+    ]);
     expect(stats.squashed).toBe(5);
     expect(stats.score).toBe(engine.getState().score);
+    // Every squash here is non-flaky (`alwaysSpawnNonFlakyRng`): #140's stat
+    // stays at 0 when nothing flaky was squashed.
+    expect(stats.flakyHits).toBe(0);
+  });
+
+  it('#140: counts a flaky bug only once it is fully squashed (the second hit)', () => {
+    const engine = createBugSquashEngine({ rng: alwaysSpawnFlakyRng() });
+    engine.tick(0.1);
+
+    const first = engine.hit(0);
+    expect(first).toEqual({ kind: 'partial' });
+    expect(engine.getStats().flakyHits).toBe(0);
+
+    const second = engine.hit(0);
+    expect(second).toEqual({ kind: 'squashed', points: 25, multiplier: 1 });
+    expect(engine.getStats().flakyHits).toBe(1);
   });
 });
 

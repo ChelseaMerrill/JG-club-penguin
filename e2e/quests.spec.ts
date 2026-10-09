@@ -109,11 +109,12 @@ test('the widget tracks the main Quest and opens the Quests panel; TRACK and BAD
   await expect(panel).toBeVisible();
   await expect(widget).toBeHidden();
   // Main, the Igloo Badge Quest (#143), Nicole's coffee (#141), Linda's
-  // pitch (#142) + one per registered Minigame (Bug Squash, Pancake Flip,
+  // pitch (#142), "Pair with a JGer" (#140) + one per registered Minigame
+  // (Bug Squash, Pancake Flip,
   // Snow Cone Stand, Coffee Rush, Beystadium).
-  await expect(panel.locator('[data-quests-tab="active"]')).toHaveText('ACTIVE · 9');
+  await expect(panel.locator('[data-quests-tab="active"]')).toHaveText('ACTIVE · 10');
   await expect(panel.locator('[data-quests-tab="done"]')).toHaveText('DONE · 0');
-  await expect(panel.locator('.quests__row')).toHaveCount(9);
+  await expect(panel.locator('.quests__row')).toHaveCount(10);
   const bey = panel.locator('[data-quest-id="beystadium"]');
   await expect(bey.locator('.quests__row-title')).toHaveText('LET IT RIP · WIN 3 MATCHES');
   await expect(bey.locator('.quests__row-location')).toHaveText('TEAM ROOM 4 · TALK TO MICHAEL');
@@ -130,6 +131,15 @@ test('the widget tracks the main Quest and opens the Quests panel; TRACK and BAD
   await expect(iglooBadge.locator('.quests__row-location')).toHaveText('THE MARKET · IGLOO GEAR');
   await expect(iglooBadge.locator('.quests__row-progress')).toHaveText('0 / 3');
   await expect(iglooBadge.locator('.quests__row-reward')).toHaveText('75');
+  const pairFlakyTest = panel.locator('[data-quest-id="pair-flaky-test"]');
+  await expect(pairFlakyTest.locator('.quests__row-title')).toHaveText(
+    'Pair with a JGer and fix the flaky test',
+  );
+  await expect(pairFlakyTest.locator('.quests__row-location')).toHaveText(
+    'THE ICEBOX · TALK TO PAUL',
+  );
+  await expect(pairFlakyTest.locator('.quests__row-progress')).toHaveText('0 / 5');
+  await expect(pairFlakyTest.locator('.quests__row-reward')).toHaveText('150');
   const pancake = panel.locator('[data-quest-id="pancake-flip"]');
   await expect(pancake.locator('.quests__row-location')).toHaveText(
     'THE KITCHEN · TALK TO CHELSEA',
@@ -277,7 +287,20 @@ test('every Quest done: the widget shows ALL QUESTS DONE with a line and opens t
   await changeRoom(page, 'dev-pit');
   await page.evaluate(async () => {
     const t = window.__questsTest!;
-    await t.recordRound('bug-squash', 500, { score: 500, squashed: 50, bestCombo: 1, escaped: 0 });
+    // The same round also satisfies #140's "squash-flakes" (flakyHits >= 3).
+    await t.recordRound('bug-squash', 500, {
+      score: 500,
+      squashed: 50,
+      bestCombo: 1,
+      escaped: 0,
+      flakyHits: 3,
+    });
+    // #140: Paul's three client-asserted steps plus the report-back RPC
+    // (squash-flakes is already met by the bug-squash round above).
+    await t.markPaulTalked();
+    await t.markCiBoardChecked();
+    await t.markPaired();
+    await t.reportToPaul();
     await t.recordRound('pancake-flip', 0, {
       golden: 0,
       flipNow: 0,
@@ -328,9 +351,9 @@ test('every Quest done: the widget shows ALL QUESTS DONE with a line and opens t
   await widget.click();
   const panel = page.locator('.quests');
   await expect(panel).toBeVisible();
-  await expect(panel.locator('[data-quests-tab="done"]')).toHaveText('DONE · 9');
+  await expect(panel.locator('[data-quests-tab="done"]')).toHaveText('DONE · 10');
   await expect(panel.locator('[data-quests-tab="done"]')).toHaveAttribute('aria-pressed', 'true');
-  await expect(panel.locator('.quests__row')).toHaveCount(9);
+  await expect(panel.locator('.quests__row')).toHaveCount(10);
 
   expect(errors).toEqual([]);
 });

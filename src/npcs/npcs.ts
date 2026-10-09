@@ -1563,6 +1563,13 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     kind: 'human',
     tagName: 'Paul Carnival',
     dialogLines: ['Found one. Steps to reproduce: exist.'],
+    // #140: "Pair with a JGer and fix the flaky test", his line verbatim
+    // from the ticket.
+    questGiver: {
+      questId: 'pair-flaky-test',
+      startStepId: 'talk-to-paul',
+      startLine: "CI's flaky again. Pair up, squash the flakes, report back.",
+    },
     idleLines: [{ text: 'Found one. Steps to reproduce: exist.', periodS: 21, delayS: -12 }],
     // Clear of Dan's nameplate, one chair up-left of him at the table.
     bubbleOffsetX: 140,
