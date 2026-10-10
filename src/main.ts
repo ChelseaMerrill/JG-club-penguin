@@ -104,6 +104,7 @@ import { recordNpcTalked, recordOpenStall } from './game/rooms/dev-room-hook';
 import { createTrophyCase, TROPHY_CASE_OVERLAY_ID } from './ui/trophy-case';
 import { createMapScreen } from './ui/map-screen';
 import { createRemoteLounge } from './ui/remote-lounge/remote-lounge';
+import { createLatamNav } from './ui/latam-nav/latam-nav';
 import { createElevatorScreen } from './ui/elevator-screen';
 import { createMarket, MARKET_OVERLAY_ID } from './ui/market';
 import { createIglooEditor, type IglooEditor } from './ui/igloo-editor';
@@ -797,6 +798,15 @@ createRemoteLounge(uiLayer, {
   },
   initialRoomId: resolveRoomIdFromLocation(window.location),
   mountBefore: uiLayer.querySelector(':scope > .hud'),
+});
+
+// The LATAM Rooms' own nav (owner request, 2026-10-09): two small pills under
+// the HUD's title, linking a LATAM Room to its two siblings, live only there.
+createLatamNav(uiLayer, {
+  goToRoom: (roomId) => {
+    void roomNavigator?.changeRoom(roomId);
+  },
+  initialRoomId: resolveRoomIdFromLocation(window.location),
 });
 
 // #77 D7: registers with the same shared `OverlayManager` MENU uses, so

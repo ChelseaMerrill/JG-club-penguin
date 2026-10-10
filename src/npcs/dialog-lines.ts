@@ -5,11 +5,15 @@ import type { NpcDefinition } from './npcs';
  * the texts of this appearance's `idleLines` (its Room design's bubbles),
  * minus any `dialogOmit` near-duplicate, with exact repeats removed. The
  * order is first-seen; it doesn't matter to `pickDialogLine`, which is random.
+ * A `dialog.kind === 'none'` NPC (owner request, 2026-10-09) has no
+ * `dialogLines` at all; its dialog never opens (`npc-dialog.ts` skips it), so
+ * this never actually gets called for one, but returns an empty pool rather
+ * than throwing if it ever is.
  */
 export function dialogLinePool(npc: NpcDefinition): string[] {
   const omit = new Set(npc.dialogOmit ?? []);
   const pool: string[] = [];
-  for (const text of [...npc.dialogLines, ...npc.idleLines.map((line) => line.text)]) {
+  for (const text of [...(npc.dialogLines ?? []), ...npc.idleLines.map((line) => line.text)]) {
     if (omit.has(text) || pool.includes(text)) continue;
     pool.push(text);
   }

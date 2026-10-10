@@ -53,18 +53,19 @@ const WALKABLE: readonly (readonly boolean[])[] = [
  * from that design's own banner text).
  *
  * Reached only from the Remote Lounge globe's LATAM pin
- * (`src/ui/remote-lounge/`), not the Map. Its two in-scene door pills lead
- * to the sibling LATAM Rooms, `latam-futebol-field` and `latam-disco-hall`,
- * which link back. The design's third pill, "MAP", isn't a `RoomDoor`: nothing in
- * `RoomDoor`/`room-definition.ts` can open the Map screen (that's
- * `src/ui/map-screen.ts`, a HUD overlay, not a Room), so it is left out of
- * `doors` entirely. The design draws no "BACK TO HQ"-style pill of its own
- * (its only other exit is that same MAP pill) -- the Room's actual way back
- * is the HUD's own persistent MAP button (`src/ui/hud/hud.ts`, present in
- * every Room, this one included), from which Town Center is one tap away;
- * there is no dedicated in-Room exit to HQ, which is a real gap against the
- * Remote Lounge's own BACK TO HQ precedent, not an oversight (flagged in the
- * execution report).
+ * (`src/ui/remote-lounge/`), not the Map. `doors` is empty (owner request,
+ * 2026-10-09): the design's own bottom pill bar (MAP, FUTEBOL FIELD, DISCO
+ * HALL) sat at y≈826, exactly where the HUD's own bottom action bar (chat
+ * input, EMOTE, SNOWBALL, MAP, IGLOO, QUESTS) covers it, so those three
+ * `RoomDoor` hotspots are gone along with the pills themselves (hidden from
+ * the exported art, `scripts/export-room-art.ts`). The HUD's own MAP button
+ * already opens the Map; `src/ui/latam-nav/latam-nav.ts` now links the two
+ * sibling LATAM Rooms as small pills under the HUD's title instead. The
+ * design draws no "BACK TO HQ"-style pill of its own -- the Room's actual way
+ * back is still the HUD's own persistent MAP button, from which Town Center
+ * is one tap away; there is no dedicated in-Room exit to HQ, which is a real
+ * gap against the Remote Lounge's own BACK TO HQ precedent, not an oversight
+ * (flagged in the execution report).
  */
 export const latamCafe: RoomDefinition = {
   id: 'latam-cafe',
@@ -76,22 +77,10 @@ export const latamCafe: RoomDefinition = {
   // An open front-floor tile, clear of every table and NPC, the same kind of
   // spawn the Remote Lounge uses (the design draws no "You" of its own).
   spawnTile: { col: 5, row: 9 },
-  doors: [
-    {
-      label: 'FUTEBOL FIELD',
-      hotspot: { x: 542.6, y: 826, width: 360.3, height: 52 },
-      targetRoomId: 'latam-futebol-field',
-      // The target's own spawn tile: every LATAM pill sits on the bottom edge.
-      entryTile: { col: 6, row: 8 },
-    },
-    {
-      label: 'DISCO HALL',
-      hotspot: { x: 916.9, y: 826, width: 292.1, height: 52 },
-      targetRoomId: 'latam-disco-hall',
-      // The target's own spawn tile: every LATAM pill sits on the bottom edge.
-      entryTile: { col: 5, row: 7 },
-    },
-  ],
+  // The design's own bottom pill bar (and its `RoomDoor` hotspots) is gone
+  // (owner request, 2026-10-09): see this file's own header comment.
+  // `src/ui/latam-nav/latam-nav.ts` links the sibling LATAM Rooms instead.
+  doors: [],
   // The design's seven JGers (`design/Characters LATAM.dc.html`'s cards whose
   // location reads "LATAM Café Lounge"), at the room design's own figure
   // positions (each `<g transform="translate(x y)">`'s point, rounded to its
