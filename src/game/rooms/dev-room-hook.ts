@@ -20,6 +20,14 @@ export interface ChickenTossDebugInfo {
   flying: boolean;
 }
 
+/** #170 D5: the fade layer's state and its computed opacity right now. */
+export interface DoorFadeDebugInfo {
+  state: 'hidden' | 'fading-out' | 'opaque' | 'fading-in';
+  opacity: number;
+  /** Whether it is swallowing pointer input. */
+  blocking: boolean;
+}
+
 /** #146: where the guard NPC stands, the door it guards (`null`: none), and whether that door is shut. */
 export interface GuardDebugInfo {
   npcId: string;
@@ -138,8 +146,12 @@ export interface RoomDebugInfo {
   doorReachedLog?: string[];
   /** Target tile per `local-penguin:move` emission (walk start or re-route), oldest first. */
   localPenguinMoveLog?: Tile[];
-  /** The disabled door's label while its "COMING SOON" hint (#15 D3) is shown; `null` otherwise. */
-  comingSoonHint?: string | null;
+  /** The locked door's label while its UNDER CONSTRUCTION hint (#170 D4) is shown; `null` otherwise. */
+  lockedHint?: string | null;
+  /** #170 D3/D6: the label of the door hovered (or exit focused) whose pill shows; `null` for none. */
+  hoveredDoor?: string | null;
+  /** #170 D5: the door fade layer's state, merged in like `changeRoom` (`registerRoomDebugNavigatorHooks`). */
+  fade?: DoorFadeDebugInfo;
   /**
    * Test-only: #15's navigator's own `changeRoom`, so a test can change Room
    * directly rather than clicking a door or the HUD. Set once, by
@@ -239,8 +251,16 @@ export function recordOpenStall(stallId: string): void {
   openStallLog.push(stallId);
 }
 
-/** #15's navigator-owned fields, set once by `registerRoomDebugNavigatorHooks` and merged onto every `exposeRoomDebug` snapshot below. */
-let navigatorHooks: Pick<RoomDebugInfo, 'changeRoom' | 'roomEventLog'> = {};
+/**
+ * #15's navigator-owned fields, set once by `registerRoomDebugNavigatorHooks`
+ * and merged onto every `exposeRoomDebug` snapshot below; `fade` (#170) is
+ * read fresh on every publish.
+ */
+interface NavigatorDebugHooks extends Pick<RoomDebugInfo, 'changeRoom' | 'roomEventLog'> {
+  fade?: () => DoorFadeDebugInfo;
+}
+
+let navigatorHooks: NavigatorDebugHooks = {};
 
 /**
  * Test-only: publishes #15's navigator `changeRoom` and its `room:leave`/
@@ -249,9 +269,7 @@ let navigatorHooks: Pick<RoomDebugInfo, 'changeRoom' | 'roomEventLog'> = {};
  * `exposeRoomDebug` call knows nothing about the navigator, so without this
  * merge it would overwrite these fields with `undefined` on every frame.
  */
-export function registerRoomDebugNavigatorHooks(
-  hooks: Pick<RoomDebugInfo, 'changeRoom' | 'roomEventLog'>,
-): void {
+export function registerRoomDebugNavigatorHooks(hooks: NavigatorDebugHooks): void {
   navigatorHooks = hooks;
 }
 
@@ -267,5 +285,6 @@ export function exposeRoomDebug(info: RoomDebugInfo): void {
   if (!HOOKS_ENABLED) {
     return;
   }
-  window.__roomDebug = { ...info, npcTalkedLog, openStallLog, ...navigatorHooks };
+  const { fade, ...hooks } = navigatorHooks;
+  window.__roomDebug = { ...info, npcTalkedLog, openStallLog, ...hooks, fade: fade?.() };
 }

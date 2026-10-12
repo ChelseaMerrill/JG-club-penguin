@@ -44,7 +44,7 @@ const ROOMS_IN_REGISTRY_ORDER: readonly RoomDefinition[] = [
 ];
 
 /**
- * The first disabled door (`targetRoomId: null`) of any Room, in registry
+ * The first locked door (`targetRoomId: null`) of any Room, in registry
  * order (#51 slice 4, A5 as amended): Town Center has none left since the
  * Stairwell enabled STAIRWELL, so the example moves on by itself as Rooms
  * land (the Hallway's TEAM ROOM 5 today).
@@ -54,7 +54,7 @@ function firstDisabledDoor(): { room: RoomDefinition; door: RoomDoor } {
     const door = room.doors.find((candidate) => candidate.targetRoomId === null);
     if (door) return { room, door };
   }
-  throw new Error('no disabled door left: pick a new example');
+  throw new Error('no locked door left: pick a new example');
 }
 
 /** Fails the test on any uncaught page error or console error. */
@@ -114,10 +114,10 @@ test('room transitions: doors, changeRoom, HUD, reload (#15)', async ({ page }) 
     .poll(async () => (await debugInfo(page))?.roomEventLog)
     .toEqual([{ type: 'room:enter', roomId: 'town-center' }]);
 
-  // --- A disabled door (`targetRoomId: null`) shows the "coming soon" hint
-  // and leaves the Room unchanged: the first one in registry order (see
-  // `firstDisabledDoor`), entered by `__roomDebug.changeRoom` first when it
-  // isn't Town Center's.
+  // --- A locked door (`targetRoomId: null`) shows the UNDER CONSTRUCTION
+  // hint straight away, with no walk (#170 D4, RT170-9), and leaves the Room
+  // unchanged: the first one in registry order (see `firstDisabledDoor`),
+  // entered by `__roomDebug.changeRoom` first when it isn't Town Center's.
   const { room: disabledRoom, door: disabledDoor } = firstDisabledDoor();
   const detour = disabledRoom.id !== 'town-center';
   if (detour) {
@@ -127,22 +127,22 @@ test('room transitions: doors, changeRoom, HUD, reload (#15)', async ({ page }) 
       .toBe(disabledRoom.id);
     await waitForElevatorHidden(page);
   }
+  const tileBefore = (await debugInfo(page))?.localPenguin?.tile;
+  const movesBefore = (await debugInfo(page))?.localPenguinMoveLog?.length ?? 0;
   await clickStagePoint(page, doorCenter(disabledDoor));
   // Fast, fixed-interval polls: the default backoff (up to 1 s between
   // checks) could notice the hint up to a second late, eating most of its
   // 2 s window before the "still shown" check below.
   await expect
-    .poll(async () => (await debugInfo(page))?.doorReachedLog, {
-      timeout: WALK_TIMEOUT,
-      intervals: [50],
-    })
-    .toEqual(expect.arrayContaining([disabledDoor.label]));
-  await expect
-    .poll(async () => (await debugInfo(page))?.comingSoonHint, { intervals: [50] })
+    .poll(async () => (await debugInfo(page))?.lockedHint, { intervals: [50] })
     .toBe(disabledDoor.label);
   const hintSeenAt = Date.now();
   expect((await debugInfo(page))?.roomId).toBe(disabledRoom.id);
-  await page.screenshot({ path: 'test-results/room-transitions/coming-soon-hint.png' });
+  // No walk: the Penguin never set off, and never "reached" the door.
+  expect((await debugInfo(page))?.localPenguin?.tile).toEqual(tileBefore);
+  expect((await debugInfo(page))?.localPenguinMoveLog?.length ?? 0).toBe(movesBefore);
+  expect((await debugInfo(page))?.doorReachedLog ?? []).not.toContain(disabledDoor.label);
+  await page.screenshot({ path: 'test-results/room-transitions/under-construction-hint.png' });
 
   // DOOR_HINT_DURATION_MS (`RoomScene.ts`) is 2000ms: still shown partway
   // through that window, then gone. The "still shown" half is a strict,
@@ -151,9 +151,9 @@ test('room transitions: doors, changeRoom, HUD, reload (#15)', async ({ page }) 
   // rather than a fixed wait, so parallel e2e workers' CPU contention can't
   // flake it.
   await page.waitForTimeout(Math.max(0, 1500 - (Date.now() - hintSeenAt)));
-  expect((await debugInfo(page))?.comingSoonHint).toBe(disabledDoor.label);
+  expect((await debugInfo(page))?.lockedHint).toBe(disabledDoor.label);
   await expect
-    .poll(async () => (await debugInfo(page))?.comingSoonHint, { timeout: 15_000 })
+    .poll(async () => (await debugInfo(page))?.lockedHint, { timeout: 15_000 })
     .toBeNull();
   if (detour) {
     await page.evaluate(() => window.__roomDebug?.changeRoom?.('town-center'));

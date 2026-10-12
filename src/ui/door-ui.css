@@ -1,0 +1,80 @@
+/* #170 door behaviour, after design/door-nav.js. Every size is Stage pixels:
+   the #ui layer is the 1600x900 Stage. `#ui > *` (style.css) opts every
+   direct child of #ui into `pointer-events: auto`; each layer here re-overrides
+   that with the extra `#ui >` specificity, as `.hud` and `.npc-dialog` do. */
+
+/* The hover pill (`door-hover.ts`): door-nav.js's tip, centred over its
+   point and lifted above it. Above the HUD (no z-index) and under every
+   overlay (z-index 20). */
+.door-hover {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 5;
+  padding: 5px 12px;
+  background: #161719;
+  border: 2px solid #00bdff;
+  border-radius: 999px;
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0.16em;
+  color: #00bdff;
+  white-space: nowrap;
+  transform: translate(-50%, -150%);
+}
+
+#ui > .door-hover {
+  pointer-events: none;
+}
+
+.door-hover[hidden] {
+  display: none;
+}
+
+.door-hover--locked {
+  color: #b3b6c9;
+  border-color: #494949;
+}
+
+/* The fade (`door-fade.ts`): door-nav.js's `#0E1013` layer and 250ms ease.
+   Under the Elevator screen (z-index 30), over every overlay (z-index 20).
+   Up, it takes every pointer event, so the Stage can't be clicked mid-fade. */
+.door-fade {
+  position: absolute;
+  inset: 0;
+  z-index: 29;
+  background: #0e1013;
+  opacity: 0;
+  transition: opacity 250ms ease;
+}
+
+#ui > .door-fade {
+  pointer-events: none;
+}
+
+#ui > .door-fade.door-fade--on {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* The doors' keyboard layer (`door-focus.ts`): invisible buttons over each
+   exit's hotspot that never take the pointer. */
+.door-focus {
+  position: absolute;
+  inset: 0;
+}
+
+#ui > .door-focus {
+  pointer-events: none;
+}
+
+.door-focus__door {
+  position: absolute;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  opacity: 0;
+  pointer-events: none;
+}

@@ -170,7 +170,7 @@ function doorsFor(floor: number): FloorDoors {
       entryTile: UP_PILL_APPROACH,
     };
   } else {
-    // The Lobby (#169) isn't built yet, so this shows the coming-soon hint,
+    // The Lobby (#169) isn't built yet, so this shows UNDER CONSTRUCTION (#170 D4),
     // as holding ↓ here does (UD-7). #169 sets its target.
     down = {
       label: 'LOBBY',

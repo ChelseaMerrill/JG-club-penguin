@@ -10,8 +10,10 @@ import {
 import { direction, floorLabel, ROOM_FLOORS } from './floors';
 import { getRoomDefinition } from './registry';
 import type { RoomDoor } from './room-definition';
+import type { FloorChoice } from './room-definition';
 import {
   createRoomNavigator,
+  type RoomFade,
   type RoomNavigator,
   type RoomNavigatorScene,
   type RoomTransitionScreen,
@@ -22,7 +24,11 @@ type LoggedEvent =
 
 interface FakeScene extends RoomNavigatorScene {
   showRoomCalls: Array<{ roomId: RoomId; entryTile?: Tile; force?: boolean }>;
-  comingSoonDoors: RoomDoor[];
+  lockedDoors: RoomDoor[];
+  /** Labels Anthony guards: `redirectGuardedDoor` redirects these (#170 D7). */
+  guardedLabels: Set<string>;
+  /** Every door `redirectGuardedDoor` redirected, oldest first. */
+  redirected: RoomDoor[];
   triggerDoorReached: (door: RoomDoor) => void;
   /** Resolves every `whenNextReady()` call currently pending — mirrors one Phaser `CREATE` event notifying every listener registered so far, and no others. */
   fireCreate: () => void;
@@ -36,7 +42,9 @@ interface FakeScene extends RoomNavigatorScene {
  */
 function createFakeScene(): FakeScene {
   const showRoomCalls: Array<{ roomId: RoomId; entryTile?: Tile; force?: boolean }> = [];
-  const comingSoonDoors: RoomDoor[] = [];
+  const lockedDoors: RoomDoor[] = [];
+  const guardedLabels = new Set<string>();
+  const redirected: RoomDoor[] = [];
   let doorHandler: ((door: RoomDoor) => void) | null = null;
   let pendingReady: Array<() => void> = [];
 
@@ -54,11 +62,18 @@ function createFakeScene(): FakeScene {
     onDoorReached: vi.fn((handler: (door: RoomDoor) => void) => {
       doorHandler = handler;
     }),
-    showComingSoonHint: vi.fn((door: RoomDoor) => {
-      comingSoonDoors.push(door);
+    showLockedHint: vi.fn((door: RoomDoor) => {
+      lockedDoors.push(door);
+    }),
+    redirectGuardedDoor: vi.fn((door: RoomDoor) => {
+      if (!guardedLabels.has(door.label)) return false;
+      redirected.push(door);
+      return true;
     }),
     showRoomCalls,
-    comingSoonDoors,
+    lockedDoors,
+    guardedLabels,
+    redirected,
     triggerDoorReached: (door) => doorHandler?.(door),
     fireCreate: () => {
       const resolvers = pendingReady;
@@ -257,7 +272,7 @@ describe('createRoomNavigator', () => {
     ]);
   });
 
-  it('a disabled door shows the coming-soon hint and does not change Room', async () => {
+  it('a locked door shows the UNDER CONSTRUCTION hint and does not change Room', async () => {
     const { navigator, scene, seen } = setup();
     await boot(scene, navigator);
     seen.length = 0;
@@ -265,19 +280,19 @@ describe('createRoomNavigator', () => {
     scene.triggerDoorReached(DISABLED_DOOR);
     await Promise.resolve();
 
-    expect(scene.comingSoonDoors).toEqual([DISABLED_DOOR]);
+    expect(scene.lockedDoors).toEqual([DISABLED_DOOR]);
     expect(navigator.currentRoomId()).toBe(SPAWN_ROOM_ID);
     expect(seen).toEqual([]);
   });
 
-  it('a door reached before a Session is active does nothing at all, not even the coming-soon hint', () => {
+  it('a door reached before a Session is active does nothing at all, not even the UNDER CONSTRUCTION hint', () => {
     const { scene } = setup();
 
     scene.triggerDoorReached(DEV_PIT_DOOR);
     scene.triggerDoorReached(DISABLED_DOOR);
 
     expect(scene.showRoomCalls).toEqual([]);
-    expect(scene.comingSoonDoors).toEqual([]);
+    expect(scene.lockedDoors).toEqual([]);
   });
 
   describe('overlapping transitions', () => {
@@ -512,7 +527,8 @@ describe('createRoomNavigator', () => {
         // reports `switched: false`.
         whenNextReady: () => new Promise<void>(() => {}),
         onDoorReached: () => {},
-        showComingSoonHint: () => {},
+        showLockedHint: () => {},
+        redirectGuardedDoor: () => false,
       };
       const navigator = createRoomNavigator({
         scene,
@@ -652,14 +668,14 @@ describe('createRoomNavigator', () => {
       ]);
     });
 
-    it("shows a disabled door's coming-soon hint and stays put", async () => {
+    it("shows a locked door's UNDER CONSTRUCTION hint and stays put", async () => {
       const { navigator, scene, seen } = setup();
       await boot(scene, navigator);
       seen.length = 0;
 
       navigator.useDoor(DISABLED_DOOR);
 
-      expect(scene.comingSoonDoors).toEqual([DISABLED_DOOR]);
+      expect(scene.lockedDoors).toEqual([DISABLED_DOOR]);
       expect(seen).toEqual([]);
       expect(navigator.currentRoomId()).toBe('town-center');
     });
@@ -671,8 +687,318 @@ describe('createRoomNavigator', () => {
       navigator.useDoor(DISABLED_DOOR);
 
       expect(scene.showRoomCalls).toEqual([]);
-      expect(scene.comingSoonDoors).toEqual([]);
+      expect(scene.lockedDoors).toEqual([]);
       expect(seen).toEqual([]);
+    });
+  });
+
+  describe('#170 door behaviour', () => {
+    /** One ordered log of every scene, fade, Elevator and event call, as strings. */
+    function setupLogged(
+      options: { pickFloor?: (door: RoomDoor) => Promise<FloorChoice | null> } = {},
+    ) {
+      const log: string[] = [];
+      const events = createEmitter<RoomEventMap>();
+      events.on('room:leave', ({ roomId }) => log.push(`leave:${roomId}`));
+      events.on('room:enter', ({ roomId }) => log.push(`enter:${roomId}`));
+      const scene = createFakeScene();
+      const realShowRoom = scene.showRoom;
+      scene.showRoom = (roomId, entryTile, force) => {
+        log.push(`showRoom:${roomId}`);
+        return realShowRoom(roomId, entryTile, force);
+      };
+      let finishOut: (() => void) | null = null;
+      const fade: RoomFade & { finishOut: () => void } = {
+        out: () =>
+          new Promise<void>((resolve) => {
+            log.push('fade:out');
+            finishOut = resolve;
+          }),
+        clear: () => log.push('fade:clear'),
+        cancel: () => log.push('fade:cancel'),
+        finishOut: () => finishOut?.(),
+      };
+      const transitionScreen: RoomTransitionScreen = {
+        begin: (from, to) => log.push(`begin:${from}->${to}`),
+        ready: () => log.push('ready'),
+        cancel: () => log.push('elevator:cancel'),
+      };
+      const navigator = createRoomNavigator({
+        scene,
+        events,
+        hasPlayer: () => true,
+        transitionScreen,
+        fade,
+        pickFloor: options.pickFloor,
+      });
+      return { log, scene, fade, navigator };
+    }
+
+    async function flush(): Promise<void> {
+      for (let i = 0; i < 5; i += 1) await Promise.resolve();
+    }
+
+    const ROOF_DOOR: RoomDoor = {
+      label: 'ELEVATOR · ROOF DECK',
+      hotspot: { x: 0, y: 0, width: 10, height: 10 },
+      targetRoomId: 'roof-deck',
+      entryTile: { col: 4, row: 9 },
+    };
+
+    it('a door fades: leave, fade out, then the Elevator, the restart, ready and the fade clearing (D5)', async () => {
+      const { log, scene, fade, navigator } = setupLogged();
+      await boot(scene, navigator);
+      log.length = 0;
+
+      scene.triggerDoorReached(ROOF_DOOR);
+      expect(log).toEqual(['leave:town-center', 'fade:out']);
+      expect(navigator.isTransitioning()).toBe(true);
+      expect(navigator.currentRoomId()).toBeNull();
+
+      fade.finishOut();
+      await flush();
+      expect(log).toEqual([
+        'leave:town-center',
+        'fade:out',
+        'begin:town-center->roof-deck',
+        'fade:cancel',
+        'showRoom:roof-deck',
+      ]);
+      expect(navigator.currentRoomId()).toBe('roof-deck');
+
+      scene.fireCreate();
+      await flush();
+      expect(log.slice(5)).toEqual(['ready', 'fade:clear', 'enter:roof-deck']);
+      expect(navigator.isTransitioning()).toBe(false);
+    });
+
+    it('a same-floor door clears the fade once the Room is ready', async () => {
+      const { log, scene, fade, navigator } = setupLogged();
+      await boot(scene, navigator);
+      log.length = 0;
+
+      scene.triggerDoorReached(DEV_PIT_DOOR);
+      fade.finishOut();
+      await flush();
+      scene.fireCreate();
+      await flush();
+
+      expect(log).toEqual([
+        'leave:town-center',
+        'fade:out',
+        'showRoom:dev-pit',
+        'fade:clear',
+        'enter:dev-pit',
+      ]);
+    });
+
+    it('takes the token before the fade: a sign-out mid-fade emits exactly one room:leave, no restart, no Elevator (RT170-4)', async () => {
+      const { log, scene, fade, navigator } = setupLogged();
+      await boot(scene, navigator);
+      log.length = 0;
+
+      scene.triggerDoorReached(ROOF_DOOR);
+      navigator.leaveForSignOut();
+      fade.finishOut();
+      scene.fireCreate();
+      await flush();
+
+      expect(log).toEqual(['leave:town-center', 'fade:out', 'elevator:cancel', 'fade:cancel']);
+      expect(navigator.isTransitioning()).toBe(false);
+      expect(navigator.currentRoomId()).toBeNull();
+    });
+
+    it('a fresh spawn after a sign-out mid-fade wins: the stale fade never restarts its Room (RT170-24)', async () => {
+      const { log, scene, fade, navigator } = setupLogged();
+      await boot(scene, navigator);
+      log.length = 0;
+
+      scene.triggerDoorReached(DEV_PIT_DOOR);
+      navigator.leaveForSignOut();
+      const spawn = navigator.enterSpawnRoom();
+      fade.finishOut();
+      scene.fireCreate();
+      await spawn;
+      await flush();
+
+      expect(log.filter((entry) => entry.startsWith('showRoom'))).toEqual([
+        `showRoom:${SPAWN_ROOM_ID}`,
+      ]);
+      expect(log).toContain('fade:cancel');
+      expect(log.at(-1)).toBe(`enter:${SPAWN_ROOM_ID}`);
+      expect(navigator.currentRoomId()).toBe(SPAWN_ROOM_ID);
+      expect(navigator.isTransitioning()).toBe(false);
+    });
+
+    it('enterSpawnRoom and leaveForSignOut both cancel the fade layer (RT170-24)', async () => {
+      const { log, scene, navigator } = setupLogged();
+      await boot(scene, navigator);
+      expect(log).toContain('fade:cancel');
+      log.length = 0;
+      navigator.leaveForSignOut();
+      expect(log).toContain('fade:cancel');
+    });
+
+    it('drops every other change while fading: changeRoom, useDoor, a locked door and Anthony (RT170-10)', async () => {
+      const { log, scene, fade, navigator } = setupLogged();
+      await boot(scene, navigator);
+      scene.guardedLabels.add('THE ICEBOX');
+      log.length = 0;
+
+      scene.triggerDoorReached(DEV_PIT_DOOR);
+      await navigator.changeRoom('igloo');
+      navigator.useDoor(ROOF_DOOR);
+      navigator.useDoor(DISABLED_DOOR);
+      scene.triggerDoorReached(DISABLED_DOOR);
+      fade.finishOut();
+      await flush();
+      scene.fireCreate();
+      await flush();
+
+      expect(log.filter((entry) => entry.startsWith('leave') || entry.startsWith('enter'))).toEqual(
+        ['leave:town-center', 'enter:dev-pit'],
+      );
+      expect(scene.lockedDoors).toEqual([]);
+      expect(scene.redirected).toEqual([]);
+    });
+
+    it('the stair keys (useDoor with no options), the Map and the debug changeRoom never fade', async () => {
+      const { log, scene, navigator } = setupLogged();
+      await boot(scene, navigator);
+      log.length = 0;
+
+      navigator.useDoor(DEV_PIT_DOOR);
+      scene.fireCreate();
+      await flush();
+      const p = navigator.changeRoom('town-center');
+      scene.fireCreate();
+      await p;
+
+      expect(log).not.toContain('fade:out');
+      expect(log.at(-1)).toBe('enter:town-center');
+    });
+
+    it("Anthony's guard comes first for every use of a door, the keys included (D7, n3)", async () => {
+      const { log, scene, navigator } = setupLogged();
+      await boot(scene, navigator);
+      scene.guardedLabels.add('DEV PIT');
+      log.length = 0;
+
+      navigator.useDoor(DEV_PIT_DOOR);
+      scene.triggerDoorReached(DEV_PIT_DOOR);
+
+      expect(scene.redirected).toEqual([DEV_PIT_DOOR, DEV_PIT_DOOR]);
+      expect(log).toEqual([]);
+      expect(navigator.currentRoomId()).toBe(SPAWN_ROOM_ID);
+    });
+
+    it('a locked door shows its UNDER CONSTRUCTION hint, by keys or arrival alike', async () => {
+      const { log, scene, navigator } = setupLogged();
+      await boot(scene, navigator);
+      log.length = 0;
+
+      navigator.useDoor(DISABLED_DOOR);
+      scene.triggerDoorReached(DISABLED_DOOR);
+
+      expect(scene.lockedDoors).toEqual([DISABLED_DOOR, DISABLED_DOOR]);
+      expect(log).toEqual([]);
+    });
+
+    describe('pickFloor (D9)', () => {
+      const ROOF_CHOICE: FloorChoice = {
+        floor: 'R',
+        label: 'ROOF DECK',
+        targetRoomId: 'roof-deck',
+        entryTile: { col: 4, row: 9 },
+      };
+      const LOBBY_CHOICE: FloorChoice = {
+        floor: 'L',
+        label: 'LOBBY',
+        targetRoomId: null,
+        entryTile: { col: 0, row: 0 },
+      };
+      const PICKER_DOOR: RoomDoor = { ...ROOF_DOOR, floorChoices: [ROOF_CHOICE, LOBBY_CHOICE] };
+
+      function deferredPick() {
+        let resolvePick: (choice: FloorChoice | null) => void = () => {};
+        const pickFloor = vi.fn<(door: RoomDoor) => Promise<FloorChoice | null>>(
+          () =>
+            new Promise<FloorChoice | null>((resolve) => {
+              resolvePick = resolve;
+            }),
+        );
+        return { pickFloor, choose: (choice: FloorChoice | null) => resolvePick(choice) };
+      }
+
+      it('asks for a floor after the door is reached, then fades to the choice', async () => {
+        const pick = deferredPick();
+        const { log, scene, fade, navigator } = setupLogged({ pickFloor: pick.pickFloor });
+        await boot(scene, navigator);
+        log.length = 0;
+
+        scene.triggerDoorReached(PICKER_DOOR);
+        expect(pick.pickFloor).toHaveBeenCalledWith(PICKER_DOOR);
+        expect(log).toEqual([]);
+
+        pick.choose(ROOF_CHOICE);
+        await flush();
+        expect(log).toEqual(['leave:town-center', 'fade:out']);
+        fade.finishOut();
+        await flush();
+        scene.fireCreate();
+        await flush();
+        expect(log.at(-1)).toBe('enter:roof-deck');
+      });
+
+      it('a cancelled pick (null) or a locked choice changes nothing', async () => {
+        const pick = deferredPick();
+        const { log, scene, navigator } = setupLogged({ pickFloor: pick.pickFloor });
+        await boot(scene, navigator);
+        log.length = 0;
+
+        scene.triggerDoorReached(PICKER_DOOR);
+        pick.choose(null);
+        await flush();
+        scene.triggerDoorReached(PICKER_DOOR);
+        pick.choose(LOBBY_CHOICE);
+        await flush();
+
+        expect(log).toEqual([]);
+      });
+
+      it('re-validates on choice: Anthony, a Room change or a sign-out in the meantime wins', async () => {
+        const pick = deferredPick();
+        const { log, scene, navigator } = setupLogged({ pickFloor: pick.pickFloor });
+        await boot(scene, navigator);
+        log.length = 0;
+
+        // Anthony arrives at the door while the picker is open.
+        scene.triggerDoorReached(PICKER_DOOR);
+        scene.guardedLabels.add(PICKER_DOOR.label);
+        pick.choose(ROOF_CHOICE);
+        await flush();
+        expect(scene.redirected).toEqual([PICKER_DOOR]);
+        expect(log).toEqual([]);
+        scene.guardedLabels.clear();
+
+        // The Map moved the Player on while the picker was open.
+        scene.triggerDoorReached(PICKER_DOOR);
+        const moved = navigator.changeRoom('dev-pit');
+        scene.fireCreate();
+        await moved;
+        log.length = 0;
+        pick.choose(ROOF_CHOICE);
+        await flush();
+        expect(log).toEqual([]);
+
+        // Signed out while the picker was open.
+        scene.triggerDoorReached(PICKER_DOOR);
+        navigator.leaveForSignOut();
+        log.length = 0;
+        pick.choose(ROOF_CHOICE);
+        await flush();
+        expect(log).toEqual([]);
+      });
     });
   });
 });
