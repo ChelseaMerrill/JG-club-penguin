@@ -180,6 +180,19 @@ test("The Melt: Tom's three dialog buttons wrap onto rows without clipping a lab
     .locator('.npc-dialog__panel')
     .screenshot({ path: `${PROOF_DIR}/tom-three-buttons.png` });
 
+  // Keyboard focus shows as a light bottom bar, not an inset ring the chevron
+  // clips down to a white top edge and side tips (#224).
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Shift+Tab');
+  const focusShadow = await page.evaluate(() =>
+    document.activeElement?.matches('.npc-dialog__button:focus-visible')
+      ? getComputedStyle(document.activeElement).boxShadow
+      : null,
+  );
+  expect(focusShadow).not.toBeNull();
+  expect(focusShadow!.split('inset').length - 1).toBe(1);
+  await page.locator('.npc-dialog__panel').screenshot({ path: `${PROOF_DIR}/focused-button.png` });
+
   // A label too long for a whole row wraps inside a taller button, never clipped.
   await addErrandButton(page, 'Ask Tom for the extra-hot oat latte with two pumps of vanilla');
   for (const fit of await buttonFits(page)) {

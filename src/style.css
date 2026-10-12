@@ -1490,11 +1490,12 @@ body {
 }
 
 /* `clip-path` would hide an outline (same reasoning as `.landing__play` and
-   `.minigame__button`'s own focus rings), so focus shows as an inset ring instead. */
+   `.minigame__button`'s own focus rings). An inset ring is clipped too: only its
+   top edge and the two side tips survived the chevron, which read as a white
+   glitch on every focused dialog button (#224). So focus brightens the button
+   and turns its bottom bar light, which the chevron never cuts. */
 .npc-dialog__button:focus-visible {
   outline: none;
-  filter: brightness(1.12);
-  box-shadow:
-    inset 0 -5px 0 var(--jg-secondary),
-    inset 0 0 0 3px var(--jg-light);
+  filter: brightness(1.15);
+  box-shadow: inset 0 -5px 0 var(--jg-light);
 }
