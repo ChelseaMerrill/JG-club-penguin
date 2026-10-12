@@ -54,6 +54,16 @@ function snowConeRaw(stats: Readonly<Record<string, number>>): number {
   );
 }
 
+/**
+ * Penalty Kick's `record_round` branch's extra stats check: `goals` and
+ * `golazos` are each already checked non-negative integers by the shared
+ * rule, so the only extra rule is that a round can't claim more scores than
+ * it had shots: `goals + golazos <= 5` (five penalties, solo).
+ */
+function penaltyKickStatsValid(stats: Readonly<Record<string, number>>): boolean {
+  return stat(stats, 'goals') + stat(stats, 'golazos') <= 5;
+}
+
 /** Beystadium pays this for a match win (design: `tokens = youWins >= 2 ? 60 : 15`). */
 export const BEYSTADIUM_WIN_TOKENS = 60;
 /** Beystadium pays this for a match loss. */
@@ -198,6 +208,20 @@ export const MINIGAME_RULES = {
     rawPayout: (_score, stats) =>
       stat(stats, 'won') === 1 ? BEYSTADIUM_WIN_TOKENS : BEYSTADIUM_LOSS_TOKENS,
     rawBest: (_score, stats) => stat(stats, 'strikes'),
+  },
+  // Five penalties take roughly 15-25 s once the sweep speed-up is in play;
+  // 30 s is a generous anti-farm window (see the migration's header for the
+  // full reasoning), well short of the 5*50=250 cap's own `cap` value.
+  'penalty-kick': {
+    id: 'penalty-kick',
+    cap: 250,
+    durationSeconds: 30,
+    badgeId: 'goleador',
+    badgeKind: 'threshold',
+    badgeThreshold: 4,
+    validStats: penaltyKickStatsValid,
+    rawPayout: (_score, stats) => 30 * stat(stats, 'goals') + 50 * stat(stats, 'golazos'),
+    rawBest: (_score, stats) => stat(stats, 'goals') + stat(stats, 'golazos'),
   },
   // #219: the server never recomputes the payout from stats the way every
   // other Minigame here does -- the multiplier depends on pickup *order*,

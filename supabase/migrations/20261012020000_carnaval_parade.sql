@@ -11,15 +11,14 @@
 -- Passista is a threshold Badge, not a match-win one, so it adds nothing to
 -- quest_progress()'s matchWins object.
 --
--- *** Rebase note: a sibling LATAM Minigame, Penalty Kick
--- (20261012010000_penalty_kick.sql), is being built in parallel and is
--- expected to land first. Whichever of the two merges second must rebase its
--- own record_round/leaderboard redefinition onto the other's (the same rule
--- 20260928000000_beystadium.sql's own header states): copy the already-merged
--- file's bodies and keep both new branches. As authored, this file does not
--- yet know about Penalty Kick's 'penalty-kick' id.
+-- *** Rebased on 20261012010000_penalty_kick.sql (#220), which lands first:
+-- this file's record_round keeps its 'penalty-kick' case verbatim, and its
+-- leaderboard() and both id check constraints list 'penalty-kick' too, so
+-- this is now the cumulative latest definition of all three. Rerun chain:
+-- rerunning the Penalty Kick migration after this one would drop
+-- 'carnaval-parade', so rerun this file after it.
 --
--- Runs after 20261011000000_stair_climb.sql (#51 slice 4). Apply by pasting
+-- Runs after 20261012010000_penalty_kick.sql (#220). Apply by pasting
 -- into the Supabase SQL editor (no CLI). Safe to rerun. Proof:
 -- supabase/tests/219_carnaval_parade_proof.sql (run in PGlite by
 -- src/persistence/sql-carnaval-parade.test.ts; the reviewer re-runs it on
@@ -50,7 +49,7 @@
 -- 20260927000000_badges.sql, so each one's own follow-up migration only ever
 -- flips `available` on. Passista is the first wholly new Badge id since that
 -- seed: the fresh row this file adds to public.badges below (id 'passista',
--- name 'Passista', how-to-earn 'SCORE 400 IN THE PARADE', sort_order 16) sets
+-- name 'Passista', how-to-earn 'SCORE 400 IN THE PARADE', sort_order 17, after #220's Goleador at 16) sets
 -- `available` true directly, on first insert, with no separate
 -- `update ... set available = true` step and no entry needed in the client's
 -- BADGE_AVAILABILITY_OVERRIDES (src/persistence/badge-catalog.ts mirrors
@@ -136,18 +135,18 @@
 alter table public.minigame_bests drop constraint if exists minigame_bests_minigame_id_check;
 alter table public.minigame_bests add constraint minigame_bests_minigame_id_check
   check (minigame_id in
-    ('bug-squash', 'pancake-flip', 'coffee-rush', 'snow-cone-stand', 'beystadium', 'carnaval-parade'));
+    ('bug-squash', 'pancake-flip', 'coffee-rush', 'snow-cone-stand', 'beystadium', 'penalty-kick', 'carnaval-parade'));
 alter table public.minigame_rounds drop constraint if exists minigame_rounds_minigame_id_check;
 alter table public.minigame_rounds add constraint minigame_rounds_minigame_id_check
   check (minigame_id in
-    ('bug-squash', 'pancake-flip', 'coffee-rush', 'snow-cone-stand', 'beystadium', 'carnaval-parade'));
+    ('bug-squash', 'pancake-flip', 'coffee-rush', 'snow-cone-stand', 'beystadium', 'penalty-kick', 'carnaval-parade'));
 
 -- ---------------------------------------------------------------------------
 -- Passista, seeded fresh (C2)
 -- ---------------------------------------------------------------------------
 
 insert into public.badges (id, name, how_to_earn, sort_order, available) values
-  ('passista', 'Passista', 'SCORE 400 IN THE PARADE', 16, true)
+  ('passista', 'Passista', 'SCORE 400 IN THE PARADE', 17, true)
 on conflict (id) do nothing;
 
 -- ---------------------------------------------------------------------------
@@ -199,6 +198,9 @@ declare
   v_rounds_won int;
   v_rounds_lost int;
   v_badge_match_wins int;
+  -- Penalty Kick (20261012010000_penalty_kick.sql P5/P6).
+  v_goals int;
+  v_golazos int;
 begin
   if v_uid is null then
     raise exception 'not_authenticated' using errcode = '42501';
@@ -296,6 +298,24 @@ begin
       -- B7: decided below, after the Player's row is locked.
       v_badge_match_wins := 3;
       v_badge_met := false;
+
+    when 'penalty-kick' then
+      v_cap := 250;
+      v_duration_s := 30;
+      v_badge := 'goleador';
+      v_goals := coalesce((v_stats -> 'goals')::numeric, 0)::int;
+      v_golazos := coalesce((v_stats -> 'golazos')::numeric, 0)::int;
+      -- P5: a solo, 5-shot round can never claim more than 5 scores.
+      if v_goals + v_golazos > 5 then
+        raise exception 'invalid_stats';
+      end if;
+      -- P3: 30 per goal, 50 per golazo.
+      v_raw := 30 * v_goals + 50 * v_golazos;
+      -- P6: the best is goals + golazos.
+      v_best := v_goals + v_golazos;
+      -- P6: Goleador at 4 or 5 scored.
+      v_badge_met := v_best >= 4;
+
 
     when 'carnaval-parade' then
       v_cap := 120;
@@ -423,7 +443,7 @@ begin
   end if;
 
   if v_game not in
-    ('bug-squash', 'pancake-flip', 'coffee-rush', 'snow-cone-stand', 'beystadium', 'carnaval-parade') then
+    ('bug-squash', 'pancake-flip', 'coffee-rush', 'snow-cone-stand', 'beystadium', 'penalty-kick', 'carnaval-parade') then
     raise exception 'unknown_minigame';
   end if;
 

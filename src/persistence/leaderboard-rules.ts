@@ -73,6 +73,15 @@ export const LEADERBOARD_SCORE_CEILINGS: Readonly<Record<MinigameId, number | nu
   // ring zone lands one), so, like Coffee Rush and Snow Cone Stand, this
   // excludes nothing rather than guess a number that could hide a real best.
   beystadium: null,
+  // Penalty Kick's `best_score` is goals + golazos in one round (five
+  // shots), and `MINIGAME_RULES['penalty-kick'].validStats` already rejects
+  // any round claiming more than 5 -- a real, provable ceiling of 5. It is
+  // still `null` here, not `5`: `20261012010000_penalty_kick.sql` (rebased by
+  // `20261012020000_carnaval_parade.sql`, see its header) leaves
+  // `leaderboard()`'s own `case` -- and so this id's entry in it -- untouched,
+  // so this stays "exclude nothing" to match the SQL it mirrors until a
+  // later migration adds a `when 'penalty-kick' then 5` clause there too.
+  'penalty-kick': null,
   // Carnaval Parade's `best_score` is the round's own (bound-checked) score
   // (`MINIGAME_RULES['carnaval-parade'].rawBest`). `record_round`'s own
   // `invalid_stats` check ties a stored score to `feathers`/`stars` at the

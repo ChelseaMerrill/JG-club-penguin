@@ -44,9 +44,11 @@ function seedRows(): SeedRow[] {
 /**
  * Rows any later migration inserts fresh -- a genuinely new Badge id #138
  * never seeded, unlike every id that migration's `do update` only ever
- * flips `available` on (`BADGE_AVAILABILITY_OVERRIDES`). #219's Passista is
- * the first (`20261012020000_carnaval_parade.sql`): its own `insert into
- * public.badges` sets `available` true directly, so it needs no override.
+ * flips `available` on (`BADGE_AVAILABILITY_OVERRIDES`). Goleador
+ * (`20261012010000_penalty_kick.sql`, #220) and Passista
+ * (`20261012020000_carnaval_parade.sql`, #219) are the first two: each
+ * migration's own `insert into public.badges` sets `available` true
+ * directly, so neither needs an override.
  */
 function laterSeedRows(): SeedRow[] {
   const migrationsDir = path.dirname(MIGRATION);
@@ -56,7 +58,8 @@ function laterSeedRows(): SeedRow[] {
   const rows: SeedRow[] = [];
   for (const file of files) {
     const sql = readFileSync(path.join(migrationsDir, file), 'utf8');
-    const index = sql.indexOf('insert into public.badges');
+    // A statement at the start of a line, not a header comment quoting one.
+    const index = sql.search(/^insert into public.badges/m);
     if (index === -1) continue;
     const insert = sql.slice(index);
     const end = insert.search(/\bon conflict\b/);
@@ -72,6 +75,8 @@ describe('BADGE_CATALOG', () => {
     expect(seed).toHaveLength(15);
 
     const allSeedRows = [...seed, ...laterSeedRows()];
+    // #220 and #219 each insert one fresh Badge (Goleador, Passista): 17 total.
+    expect(allSeedRows).toHaveLength(17);
     expect(
       BADGE_CATALOG.map(({ id, name, howToEarn, sortOrder }) => ({
         id,

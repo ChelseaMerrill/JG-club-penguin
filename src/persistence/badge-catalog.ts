@@ -108,15 +108,26 @@ export const BADGE_CATALOG: readonly (BadgeDefinition & { id: BadgeId })[] = [
     sortOrder: 15,
     available: true,
   },
-  // #219: 20261012020000_carnaval_parade.sql inserts this row fresh (there's
-  // no #138-seeded "coming soon" row to flip, unlike every Badge above) with
-  // `available` already true, so it needs no `BADGE_AVAILABILITY_OVERRIDES`
-  // entry.
+  // #220: unlike every Badge above (all 15 seeded, available or not, by
+  // #138's original migration), Goleador didn't exist yet: it is inserted
+  // fresh, already available, by `20261012010000_penalty_kick.sql` -- so it
+  // has no entry in that original seed and isn't a `BADGE_AVAILABILITY_
+  // OVERRIDES` flip (`badge-catalog.test.ts` covers both cases).
+  {
+    id: 'goleador',
+    name: 'Goleador',
+    howToEarn: 'SCORE 4 OF 5 PENALTIES',
+    sortOrder: 16,
+    available: true,
+  },
+  // #219: 20261012020000_carnaval_parade.sql (rebased on #220's migration,
+  // see its header) also inserts this row fresh with `available` already
+  // true, so it too needs no `BADGE_AVAILABILITY_OVERRIDES` entry.
   {
     id: 'passista',
     name: 'Passista',
     howToEarn: 'SCORE 400 IN THE PARADE',
-    sortOrder: 16,
+    sortOrder: 17,
     available: true,
   },
 ];

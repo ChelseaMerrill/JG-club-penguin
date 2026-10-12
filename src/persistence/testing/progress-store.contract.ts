@@ -700,6 +700,13 @@ export function describeProgressStoreContract(
       },
       { minigameId: 'beystadium', durationSeconds: 45, score: 7, stats: WON_MATCH, cap: 60 },
       {
+        minigameId: 'penalty-kick',
+        durationSeconds: 30,
+        score: 5,
+        stats: { goals: 0, golazos: 5, saved: 0, wide: 0, over: 0 },
+        cap: 250,
+      },
+      {
         minigameId: 'carnaval-parade',
         durationSeconds: 45,
         score: 2000,
@@ -799,6 +806,13 @@ export function describeProgressStoreContract(
         // of every cone weight; 195 is the largest reachable value below it.
         belowThreshold: { score: 0, stats: { cone5: 39 } },
         atThreshold: { score: 0, stats: { cone5: 40 } },
+      },
+      {
+        minigameId: 'penalty-kick',
+        badgeId: 'goleador',
+        durationSeconds: 30,
+        belowThreshold: { score: 3, stats: { goals: 3, golazos: 0, saved: 1, wide: 1, over: 0 } },
+        atThreshold: { score: 4, stats: { goals: 4, golazos: 0, saved: 1, wide: 0, over: 0 } },
       },
       {
         minigameId: 'carnaval-parade',

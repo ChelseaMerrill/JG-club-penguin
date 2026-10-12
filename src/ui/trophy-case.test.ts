@@ -88,6 +88,8 @@ describe('orderBadgeTiles', () => {
       'stair-master',
       // #146: so is Phish Fry.
       'phish-fry',
+      // #220: so is Goleador, seeded available at sortOrder 16.
+      'goleador',
       // #219: so is Passista, seeded fresh (not a flipped "coming soon" row).
       'passista',
       'snowmageddon',
@@ -123,10 +125,10 @@ describe('createTrophyCase', () => {
     expect(q('[data-panel="badges"]').hidden).toBe(false);
     expect(q('[data-panel="trophies"]').hidden).toBe(true);
     expect(q('[data-panel="awards"]').hidden).toBe(true);
-    expect(q('.trophy-case__subtitle').textContent).toBe('YOUR IGLOO · BADGES · 1 / 16');
+    expect(q('.trophy-case__subtitle').textContent).toBe('YOUR IGLOO · BADGES · 1 / 17');
   });
 
-  it('shows 16 Badges over two pages: 12 on page 1 and 4 on page 2', async () => {
+  it('shows 17 Badges over two pages: 12 on page 1 and 5 on page 2', async () => {
     const { q, qa, trophyCase } = setup([]);
 
     await trophyCase.open();
@@ -137,7 +139,7 @@ describe('createTrophyCase', () => {
 
     q<HTMLButtonElement>('[aria-label="Next page"]').click();
 
-    expect(qa('.trophy-case__badge')).toHaveLength(4);
+    expect(qa('.trophy-case__badge')).toHaveLength(5);
   });
 
   it.each([
@@ -157,6 +159,10 @@ describe('createTrophyCase', () => {
 
   it('shows an earned Badge unlocked, a locked one with its hint, and a coming-soon one with its tag', async () => {
     const { q, trophyCase } = setup(['exterminator']);
+    // #220: Goleador fills the 12th, last slot on page 1 (earned + every
+    // available-but-unearned Badge sorted by sortOrder is now 12 tiles, not
+    // 11), pushing every coming-soon Badge -- snowmageddon included -- onto
+    // page 2.
 
     await trophyCase.open();
 
@@ -180,9 +186,9 @@ describe('createTrophyCase', () => {
       'ONLINE 2–5 AM ET',
     );
 
-    // Page 1 now holds the earned Badge plus all 11 locked ones (#219 grew
-    // the catalog to 16: 1 earned + 11 locked = exactly TROPHY_CASE_PAGE_SIZE),
-    // pushing every coming-soon Badge, snowmageddon included, onto page 2.
+    // Page 1 holds 12 (TROPHY_CASE_PAGE_SIZE); #220 and #219 grew the catalog
+    // to 17, so Passista and every coming-soon Badge, snowmageddon included,
+    // land on page 2.
     q<HTMLButtonElement>('[aria-label="Next page"]').click();
     const snowmageddon = q('[data-badge-id="snowmageddon"]');
     expect(snowmageddon.classList.contains('trophy-case__badge--coming-soon')).toBe(true);
@@ -204,8 +210,15 @@ describe('createTrophyCase', () => {
     expect(q('[aria-label="Page 1"]').getAttribute('aria-current')).toBe('page');
 
     next.click();
-    // #219 grew the catalog to 16: page 2 is now all 4 coming-soon Badges.
-    expect(tileIds()).toEqual(['snowmageddon', 'rail-rider', 'hexle-parent', 'mullet-mania']);
+    // #220 and #219 grew the catalog to 17: page 2 is Passista plus all 4
+    // coming-soon Badges.
+    expect(tileIds()).toEqual([
+      'passista',
+      'snowmageddon',
+      'rail-rider',
+      'hexle-parent',
+      'mullet-mania',
+    ]);
     expect(q<HTMLButtonElement>('[aria-label="Next page"]').disabled).toBe(true);
     expect(q('[aria-label="Page 2"]').getAttribute('aria-current')).toBe('page');
 
@@ -219,9 +232,9 @@ describe('createTrophyCase', () => {
     const firstPage = tileIds();
 
     press('ArrowRight');
-    expect(tileIds()).toHaveLength(4);
+    expect(tileIds()).toHaveLength(5);
     press('ArrowRight'); // Already on the last page.
-    expect(tileIds()).toHaveLength(4);
+    expect(tileIds()).toHaveLength(5);
     press('ArrowLeft');
     expect(tileIds()).toEqual(firstPage);
 
