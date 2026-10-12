@@ -52,12 +52,12 @@ describe('Stairwell floors (#51 slice 4)', () => {
   });
 });
 
-describe('flightFor (S4-D2, UD-5)', () => {
-  it('starts a climb on floor 0 only from the Map, or by a door from outside the Stairwell', () => {
-    expect(flightFor('town-center', 'stairwell-0', 'map')).toBe(0);
-    expect(flightFor('stairwell-3', 'stairwell-0', 'map')).toBe(0);
+describe('flightFor (S4-D2, UD-5, START CLIMB 2026-10-11)', () => {
+  it('never starts a climb on arriving at floor 0: only its START CLIMB button does', () => {
+    expect(flightFor('town-center', 'stairwell-0', 'map')).toBeNull();
+    expect(flightFor('stairwell-3', 'stairwell-0', 'map')).toBeNull();
     // A non-Stairwell Room standing in for #169's Lobby.
-    expect(flightFor('office-hallway', 'stairwell-0', 'door')).toBe(0);
+    expect(flightFor('office-hallway', 'stairwell-0', 'door')).toBeNull();
   });
 
   it('logs nothing for a descent onto floor 0, a key press, or a spawn', () => {

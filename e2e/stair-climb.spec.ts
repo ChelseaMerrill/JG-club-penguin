@@ -110,12 +110,42 @@ async function mapToFloor0(page: Page): Promise<void> {
 const tokens = (page: Page) => page.locator('.hud__tokens-value');
 const panel = (page: Page) => page.locator('.stair-climb-panel');
 const heading = (page: Page) => page.locator('.stair-climb-panel__heading');
+const startButton = (page: Page) => page.locator('.stair-climb-panel__start');
+
+/**
+ * Presses floor L's START CLIMB (owner decision, 2026-10-11: the only way a
+ * climb starts), by mouse or by keyboard, and waits for the climbing panel.
+ */
+async function startClimb(page: Page, by: 'mouse' | 'keyboard' = 'mouse'): Promise<void> {
+  await expect(startButton(page)).toBeVisible();
+  await expect(startButton(page)).toHaveText('START CLIMB');
+  if (by === 'mouse') {
+    await startButton(page).click();
+  } else {
+    await startButton(page).focus();
+    await page.keyboard.press('Enter');
+  }
+  await expect(heading(page)).toHaveText('STAIRS CHALLENGE · FLIGHT 1 OF 5');
+  await expect(page.locator('.stair-climb-panel__count')).toHaveText(
+    '0 of 5 flights logged. Reward: 10 tokens per flight. All 5 = Stair Master badge.',
+  );
+  await expect(startButton(page)).toBeHidden();
+}
+
+/** Floor L before a climb: its own copy and START CLIMB. */
+async function expectFloorLNotStarted(page: Page): Promise<void> {
+  await expect(panel(page)).toBeVisible();
+  await expect(panel(page)).toHaveAttribute('data-state', 'not-started');
+  await expect(heading(page)).toHaveText('STAIRS CHALLENGE · FLOOR L');
+  await expect(panel(page)).toContainText('Ready? Start the climb, then take all five flights.');
+  await expect(startButton(page)).toBeVisible();
+}
 
 async function shot(page: Page, name: string): Promise<void> {
   await page.screenshot({ path: `${SHOTS}/${name}.png` });
 }
 
-test('the Stairs Challenge: only a floor-L start counts, 10 a flight, Stair Master once, then the daily cap', async ({
+test('the Stairs Challenge: only START CLIMB on floor L starts one, 10 a flight, Stair Master once, then the daily cap', async ({
   page,
 }) => {
   test.setTimeout(300_000);
@@ -139,28 +169,39 @@ test('the Stairs Challenge: only a floor-L start counts, 10 a flight, Stair Mast
 
   // 2. Holding ↓ walks all the way down to floor 0 and stops there (the
   // LOBBY door needs a fresh press), logging nothing; ↑ back to floor 1
-  // still logs nothing: this visit never started on floor L.
+  // still logs nothing: no START CLIMB was pressed.
   await holdUntil(page, 'ArrowDown', 'stairwell-0', 60_000);
   // The panel only shows (with a state) once this floor's own call is back.
-  await expect(panel(page)).toBeVisible();
-  await expect(panel(page)).toHaveAttribute('data-state', 'not-started');
+  await expectFloorLNotStarted(page);
   await page.waitForTimeout(3000);
   await expect(tokens(page)).toHaveText('0');
   await shot(page, 'keys-descended-to-floor-0');
   await holdUntil(page, 'ArrowUp', 'stairwell-1');
   await expect(panel(page)).toBeVisible();
   await expect(panel(page)).toHaveAttribute('data-state', 'not-started');
-  await expect(heading(page)).toHaveText('STAIRS CHALLENGE');
+  await expect(heading(page)).toHaveText('STAIRS CHALLENGE · FLOOR 1');
+  await expect(panel(page)).toContainText(
+    'Every climb starts at floor L. Head down there to start logging flights.',
+  );
+  await expect(startButton(page)).toBeHidden();
   await page.waitForTimeout(3000);
   await expect(tokens(page)).toHaveText('0');
   await shot(page, 'panel-not-started');
 
-  // 3. Map tile 12 starts a climb on floor 0.
+  // 3. Map tile 12 lands on floor L and starts nothing until START CLIMB.
   await mapToFloor0(page);
-  await expect(heading(page)).toHaveText('STAIRS CHALLENGE · FLIGHT 1 OF 5');
-  await expect(page.locator('.stair-climb-panel__count')).toHaveText(
-    '0 of 5 flights logged. Reward: 10 tokens per flight. All 5 = Stair Master badge.',
-  );
+  await expectFloorLNotStarted(page);
+  await page.waitForTimeout(3000);
+  await expect(tokens(page)).toHaveText('0');
+  await expect(heading(page)).toHaveText('STAIRS CHALLENGE · FLOOR L');
+  await shot(page, 'panel-floor-L-start-climb');
+  // Up the ↑ pill and back down the ↓ LOBBY pill: walking down to floor L
+  // starts nothing either; its START CLIMB does.
+  await walkThrough(page, door(stairwell0, 'FLOOR 1'));
+  await walkThrough(page, door(stairwell1, 'LOBBY'));
+  await expectFloorLNotStarted(page);
+  await expect(tokens(page)).toHaveText('0');
+  await startClimb(page);
   await shot(page, 'panel-floor-0');
 
   // 4. Flights 1-2 by holding ↑, 3-5 by the ↑ pill: +10 each on the HUD.
@@ -204,7 +245,10 @@ test('the Stairs Challenge: only a floor-L start counts, 10 a flight, Stair Mast
   // floor to floor and stops at floor 5): its flights pay until the day's
   // 100, and there's no second Badge.
   await mapToFloor0(page);
-  await expect(heading(page)).toHaveText('STAIRS CHALLENGE · FLIGHT 1 OF 5');
+  await expectFloorLNotStarted(page);
+  // By keyboard this time: Tab to it and Enter (which climbs nothing).
+  await startClimb(page, 'keyboard');
+  expect((await debugInfo(page))?.roomId).toBe('stairwell-0');
   await holdUntil(page, 'ArrowUp', 'stairwell-5', 90_000);
   await expect(panel(page)).toHaveAttribute('data-state', 'complete', { timeout: FLIGHT_TIMEOUT });
   await expect(tokens(page)).toHaveText('250');
@@ -227,8 +271,9 @@ test("a climb left half-done can't be finished from floor 5 down (RT2-1)", async
   await page.goto('/?asPlayer&hud');
   await waitForBoot(page);
 
-  // Climb to floor 2 from tile 12, then leave for Town Center.
+  // Climb to floor 2 from tile 12's START CLIMB, then leave for Town Center.
   await mapToFloor0(page);
+  await startClimb(page);
   await walkThrough(page, door(stairwell0, 'FLOOR 1'));
   await walkThrough(page, door(stairwell1, 'FLOOR 2'));
   await expect(tokens(page)).toHaveText('120', { timeout: FLIGHT_TIMEOUT });

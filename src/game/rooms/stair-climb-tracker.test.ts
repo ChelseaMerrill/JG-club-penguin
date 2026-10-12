@@ -71,6 +71,12 @@ async function settle(h: Harness): Promise<void> {
 
 const lastPanel = (h: Harness) => h.panels.at(-1)?.input;
 
+/** Arrives on floor L from the Map and presses START CLIMB. */
+function start(h: Harness): void {
+  h.move('stairwell-0', 'map');
+  h.tracker.startClimb();
+}
+
 beforeEach(() => {
   vi.useFakeTimers({ now: Date.parse('2026-09-30T16:00:00Z') });
 });
@@ -80,12 +86,28 @@ afterEach(() => {
 });
 
 describe('createStairClimbTracker (#51 slice 4)', () => {
-  it('starts on a Map arrival at floor 0 and logs each flight climbed by door or key', async () => {
+  it('starts only from START CLIMB on floor L, then logs each flight climbed by door or key', async () => {
     const h = setup();
     h.move('stairwell-0', 'map');
     await settle(h);
+    expect(h.tracker.isArmed()).toBe(false);
+    expect(h.calls).toEqual(['read']);
+    expect(lastPanel(h)).toMatchObject({ floor: 0, armed: false, startLogged: false });
+
+    h.tracker.startClimb();
+    await settle(h);
     expect(h.tracker.isArmed()).toBe(true);
-    expect(lastPanel(h)).toMatchObject({ floor: 0, armed: true, arrival: { flightsLogged: 0 } });
+    expect(lastPanel(h)).toMatchObject({
+      floor: 0,
+      armed: true,
+      startLogged: true,
+      arrival: { flightsLogged: 0 },
+    });
+    expect(stairPanelState(lastPanel(h)!)).toMatchObject({
+      state: 'climbing',
+      heading: 'STAIRS CHALLENGE · FLIGHT 1 OF 5',
+      startButton: false,
+    });
 
     for (const [floor, source] of [
       [1, 'keys'],
@@ -98,7 +120,7 @@ describe('createStairClimbTracker (#51 slice 4)', () => {
       await settle(h);
     }
 
-    expect(h.calls).toEqual(['log 0', 'log 1', 'log 2', 'log 3', 'log 4', 'log 5']);
+    expect(h.calls).toEqual(['read', 'log 0', 'log 1', 'log 2', 'log 3', 'log 4', 'log 5']);
     expect(lastPanel(h)).toMatchObject({
       floor: 5,
       arrival: { logged: true, flightsLogged: 5, badgesEarned: ['stair-master'] },
@@ -138,7 +160,7 @@ describe('createStairClimbTracker (#51 slice 4)', () => {
 
   it('disarms on leaving the Stairwell, so climbing again needs a new start', async () => {
     const h = setup();
-    h.move('stairwell-0', 'map');
+    start(h);
     await settle(h);
     h.move('stairwell-1', 'door');
     await settle(h);
@@ -148,12 +170,12 @@ describe('createStairClimbTracker (#51 slice 4)', () => {
     h.move('stairwell-5', 'door');
     h.move('stairwell-4', 'door');
     await settle(h);
-    expect(h.calls).toEqual(['log 0', 'log 1', 'read', 'read']);
+    expect(h.calls).toEqual(['read', 'log 0', 'log 1', 'read', 'read']);
   });
 
   it("doesn't let a change the navigator dropped tag the next one (RT2-7)", async () => {
     const h = setup();
-    h.move('stairwell-0', 'map');
+    start(h);
     await settle(h);
     // A door change dropped mid-transition: no room:leave, so nothing is recorded.
     h.tracker.withSource('door', () => undefined);
@@ -161,7 +183,7 @@ describe('createStairClimbTracker (#51 slice 4)', () => {
     h.move('stairwell-1', null);
     await settle(h);
 
-    expect(h.calls).toEqual(['log 0', 'read']);
+    expect(h.calls).toEqual(['read', 'log 0', 'read']);
   });
 
   it('sends flights in order: a flight waits for the start still in flight (RT2-2)', async () => {
@@ -179,23 +201,23 @@ describe('createStairClimbTracker (#51 slice 4)', () => {
     };
     const h = setup(store);
 
-    h.move('stairwell-0', 'map');
+    start(h);
     vi.advanceTimersByTime(3000);
     h.move('stairwell-1', 'keys');
     await vi.advanceTimersByTimeAsync(100);
-    expect(h.calls).toEqual(['log 0']);
+    expect(h.calls).toEqual(['read', 'log 0']);
 
     releaseStart();
     await settle(h);
     // Flight 1 reached the server only after the start had logged (straight
     // after it, so too soon, then retried).
-    expect(h.calls).toEqual(['log 0', 'log 1', 'log 1']);
+    expect(h.calls).toEqual(['read', 'log 0', 'log 1', 'log 1']);
     expect(lastPanel(h)).toMatchObject({ floor: 1, arrival: { logged: true, flightsLogged: 1 } });
   });
 
   it('retries a too-soon flight once the 2 s have passed, even after the Player has climbed on (N5, RT2-2)', async () => {
     const h = setup();
-    h.move('stairwell-0', 'map');
+    start(h);
     await vi.advanceTimersByTimeAsync(0);
     await h.tracker.idle();
     // Straight up two floors, both inside 2 s of the start.
@@ -205,16 +227,20 @@ describe('createStairClimbTracker (#51 slice 4)', () => {
 
     // Each flight came too soon after the one before, so each was retried
     // once, in order.
-    expect(h.calls).toEqual(['log 0', 'log 1', 'log 1', 'log 2', 'log 2']);
+    expect(h.calls).toEqual(['read', 'log 0', 'log 1', 'log 1', 'log 2', 'log 2']);
     const results = h.panels.map((panel) => panel.input.arrival as StairFlightResult | null);
     expect(results.at(-1)).toMatchObject({ logged: true, flightsLogged: 2 });
     // Floor 1's own result came back after the Player had left it: no panel for it.
-    expect(h.panels.map((panel) => panel.roomId)).toEqual(['stairwell-0', 'stairwell-2']);
+    expect(h.panels.map((panel) => panel.roomId)).toEqual([
+      'stairwell-0',
+      'stairwell-0',
+      'stairwell-2',
+    ]);
   });
 
   it("lets a flight's pending retry finish after the Player leaves the Stairwell, with no panel for it", async () => {
     const h = setup();
-    h.move('stairwell-0', 'map');
+    start(h);
     await vi.advanceTimersByTimeAsync(0);
     await h.tracker.idle();
     h.move('stairwell-1', 'keys');
@@ -222,14 +248,14 @@ describe('createStairClimbTracker (#51 slice 4)', () => {
     h.move('town-center', 'map');
     await settle(h);
 
-    expect(h.calls).toEqual(['log 0', 'log 1', 'log 1']);
+    expect(h.calls).toEqual(['read', 'log 0', 'log 1', 'log 1']);
     expect((await h.store.getStairClimb()).flightsLogged).toBe(1);
-    expect(h.panels.map((panel) => panel.roomId)).toEqual(['stairwell-0']);
+    expect(h.panels.map((panel) => panel.roomId)).toEqual(['stairwell-0', 'stairwell-0']);
   });
 
   it('never loses flight 5 to a quick ↑ from floor 5 to the Roof Deck (Stair Master still earned)', async () => {
     const h = setup();
-    h.move('stairwell-0', 'map');
+    start(h);
     for (const floor of [1, 2, 3, 4] as const) {
       await settle(h);
       h.move(`stairwell-${floor}`, 'keys');
@@ -260,8 +286,8 @@ describe('createStairClimbTracker (#51 slice 4)', () => {
       },
       getStairClimb: () => real.getStairClimb(),
     });
-    h.move('stairwell-0', 'map');
-    // Down to floor 0's walk-in: a descent reads, queued behind the start.
+    start(h);
+    // On to floor 1, untagged: a read, queued behind the start.
     h.move('stairwell-1', null);
     h.move('town-center', 'map');
     releaseStart();
@@ -272,7 +298,7 @@ describe('createStairClimbTracker (#51 slice 4)', () => {
 
   it('forgets everything on reset (sign-out, N7)', async () => {
     const h = setup();
-    h.move('stairwell-0', 'map');
+    start(h);
     await settle(h);
     h.tracker.withSource('door', () => h.tracker.roomLeave('stairwell-0'));
     h.tracker.reset();
@@ -281,7 +307,7 @@ describe('createStairClimbTracker (#51 slice 4)', () => {
     h.room.id = 'stairwell-1';
     h.tracker.roomEnter('stairwell-1');
     await settle(h);
-    expect(h.calls).toEqual(['log 0', 'read']);
+    expect(h.calls).toEqual(['read', 'log 0', 'read']);
   });
 
   it("degrades on a failed call: the error is reported and the panel shows the design's climbing line without the count (S4-D9)", async () => {
@@ -291,20 +317,29 @@ describe('createStairClimbTracker (#51 slice 4)', () => {
     };
     const h = setup(store);
 
-    h.move('stairwell-0', 'map');
+    start(h);
     await settle(h);
-    // A thrown start isn't the server saying no: the visit stays armed.
+    // A thrown start isn't the server saying no: the visit stays armed, and
+    // START CLIMB stays up to try again.
     expect(h.tracker.isArmed()).toBe(true);
-    expect(lastPanel(h)).toEqual({ floor: 0, armed: true, progress: null, arrival: null });
+    expect(lastPanel(h)).toEqual({
+      floor: 0,
+      armed: true,
+      startLogged: false,
+      progress: null,
+      arrival: null,
+    });
     expect(stairPanelState(lastPanel(h)!)).toMatchObject({
       state: 'climbing',
       heading: 'STAIRS CHALLENGE · FLIGHT 1 OF 5',
       lines: [],
+      startButton: true,
     });
 
     h.move('stairwell-1', 'door');
     await settle(h);
-    expect(h.errors).toHaveLength(2);
+    // The floor-0 read, the start and flight 1.
+    expect(h.errors).toHaveLength(3);
     expect(stairPanelState(lastPanel(h)!)).toMatchObject({
       state: 'climbing',
       heading: 'STAIRS CHALLENGE · FLIGHT 2 OF 5',
@@ -329,11 +364,80 @@ describe('createStairClimbTracker (#51 slice 4)', () => {
           : real.logStairFlight(floor),
       getStairClimb: () => real.getStairClimb(),
     });
-    h.move('stairwell-0', 'map');
+    start(h);
     h.move('stairwell-1', 'door');
     await settle(h);
 
     expect(h.tracker.isArmed()).toBe(false);
-    expect(h.calls).toEqual(['log 0', 'read']);
+    expect(h.calls).toEqual(['read', 'log 0', 'read']);
+  });
+
+  it('never starts a climb by arriving on floor L: by the Map, a door from outside, or walking down', async () => {
+    const h = setup();
+    h.move('stairwell-0', 'map');
+    h.move('office-hallway', 'door');
+    // A non-Stairwell Room standing in for #169's Lobby.
+    h.move('stairwell-0', 'door');
+    h.move('stairwell-1', 'door');
+    h.move('stairwell-0', 'keys');
+    await settle(h);
+
+    expect(h.tracker.isArmed()).toBe(false);
+    expect(h.calls.filter((call) => call.startsWith('log'))).toEqual([]);
+    expect(stairPanelState(lastPanel(h)!)).toMatchObject({
+      state: 'not-started',
+      heading: 'STAIRS CHALLENGE · FLOOR L',
+      startButton: true,
+    });
+  });
+
+  it('ignores START CLIMB off floor L and while a press is still on its way', async () => {
+    const real = createInMemoryProgressStoreWithControls({ now: () => Date.now() }).store;
+    let releaseStart!: () => void;
+    const slowStart = new Promise<void>((resolve) => {
+      releaseStart = resolve;
+    });
+    const h = setup({
+      logStairFlight: async (floor) => {
+        if (floor === 0) await slowStart;
+        return real.logStairFlight(floor);
+      },
+      getStairClimb: () => real.getStairClimb(),
+    });
+    h.move('stairwell-2', 'map');
+    h.tracker.startClimb();
+    await settle(h);
+    expect(h.calls).toEqual(['read']);
+    expect(h.tracker.isArmed()).toBe(false);
+
+    h.move('stairwell-0', 'door');
+    h.tracker.startClimb();
+    h.tracker.startClimb();
+    releaseStart();
+    await settle(h);
+    expect(h.calls).toEqual(['read', 'read', 'log 0']);
+
+    // Once it has come back, a press restarts the climb.
+    h.tracker.startClimb();
+    await settle(h);
+    expect(h.calls).toEqual(['read', 'read', 'log 0', 'log 0']);
+  });
+
+  it('still never resumes a stale climb after a START CLIMB on an earlier visit (RT2-1)', async () => {
+    const h = setup();
+    start(h);
+    for (const floor of [1, 2] as const) {
+      await settle(h);
+      h.move(`stairwell-${floor}`, 'door');
+    }
+    await settle(h);
+    h.move('town-center', 'map');
+    h.move('stairwell-2', 'map');
+    h.move('stairwell-3', 'door');
+    await settle(h);
+
+    expect(h.tracker.isArmed()).toBe(false);
+    expect(h.calls).toEqual(['read', 'log 0', 'log 1', 'log 2', 'read', 'read']);
+    expect((await h.store.getStairClimb()).flightsLogged).toBe(2);
   });
 });

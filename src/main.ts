@@ -811,7 +811,8 @@ createMapScreen(uiLayer, {
     // #146: leaving by the Map may be a bypass of Anthony; the server decides.
     const leaving = roomNavigator?.currentRoomId();
     if (leaving) void phishing.mapUsed(leaving);
-    // #51 slice 4: a Map arrival on Stairwell floor 0 starts a climb (S4-D7).
+    // #51 slice 4 (RT2-7): tagged as a Map change, which never logs a flight
+    // (a climb starts only from floor L's START CLIMB, 2026-10-11).
     stairClimb.withSource('map', () => void roomNavigator?.changeRoom(roomId));
   },
   currentRoomId: () => roomNavigator?.currentRoomId() ?? null,
@@ -887,7 +888,12 @@ const progressStore = createActiveProgressStore(game.registry, () => devFallback
 // the flights this visit climbs; the ↑/↓ keys climb on Stairwell floors only
 // (S4-D10), never while a text field has focus, a HUD overlay is open or a
 // transition is in flight.
-const stairClimbPanel = createStairClimbPanel(uiLayer);
+// Floor L's START CLIMB button is the only way a climb starts (owner
+// decision, 2026-10-11); `stairClimb` is declared below and only read on a
+// press.
+const stairClimbPanel = createStairClimbPanel(uiLayer, {
+  onStart: () => stairClimb.startClimb(),
+});
 // Held back while the Elevator is still up (#163 review): its ride can
 // outlast the Room becoming ready (6 s from Town Center to floor 0).
 const gatedStairClimbPanel = gateStairPanel(stairClimbPanel, {

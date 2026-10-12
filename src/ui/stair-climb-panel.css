@@ -1,9 +1,23 @@
 /* The Stairwell's climb panel and hint (#51 slice 4, S4-D9), in Stage pixels,
    where design/Stairwell.dc.html draws them. Both are read-only, so they
-   never take a canvas click. */
+   never take a canvas click, except floor L's START CLIMB button. */
 #ui > .stair-climb-panel,
 #ui > .stair-climb-hint {
   pointer-events: none;
+}
+
+/* Floor L's START CLIMB (owner decision, 2026-10-11): the dialog's primary
+   chevron button, a size down to sit in the 340 px panel. The panel grows
+   up from its bottom edge (y 734), so it stays clear of the pills below. */
+#ui > .stair-climb-panel > .stair-climb-panel__start {
+  pointer-events: auto;
+  align-self: flex-start;
+  height: 40px;
+  font-size: 16px;
+}
+
+.stair-climb-panel__start[hidden] {
+  display: none;
 }
 
 .stair-climb-panel {

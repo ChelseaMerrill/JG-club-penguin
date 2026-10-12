@@ -44,14 +44,14 @@ export function isStairsMove(from: RoomId, to: RoomId): boolean {
 }
 
 /**
- * The Stairs Challenge flight a Room change logs (S4-D2, amended by UD-5), or
- * `null` for none:
- * - entering floor 0 is `0`, a (re)start, only from the Map, or through a
- *   door from a Room outside the Stairwell (the Lobby, once #169 adds it);
+ * The Stairs Challenge flight a Room change logs (S4-D2, amended by UD-5 and
+ * by the START CLIMB rule of 2026-10-11), or `null` for none:
  * - entering floor k (1-5) is `k` only straight from floor k-1, by a door or
  *   the Stairwell keys;
- * - nothing else logs anything: descending, arriving on floor 5 from Town
- *   Center or the Roof Deck, a Map arrival on floors 1-5, or a spawn.
+ * - nothing else logs anything: entering floor 0 however it's reached (a
+ *   climb starts only from its panel's START CLIMB button), descending,
+ *   arriving on floor 5 from Town Center or the Roof Deck, a Map arrival on
+ *   floors 1-5, or a spawn.
  */
 export function flightFor(
   leaving: RoomId | null,
@@ -59,12 +59,7 @@ export function flightFor(
   source: RoomChangeSource,
 ): StairwellFloor | null {
   const floor = stairwellFloorOf(entering);
-  if (floor === null) return null;
-  if (floor === 0) {
-    if (source === 'map') return 0;
-    if (source === 'door' && leaving !== null && !isStairwellRoom(leaving)) return 0;
-    return null;
-  }
+  if (floor === null || floor === 0) return null;
   if (source !== 'door' && source !== 'keys') return null;
   return stairwellFloorOf(leaving) === floor - 1 ? floor : null;
 }

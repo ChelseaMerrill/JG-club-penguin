@@ -34,6 +34,13 @@ export interface StairClimbTracker {
   roomLeave(roomId: RoomId): void;
   /** `room:enter`: logs the flight this arrival climbed, if any, else reads the climb. */
   roomEnter(roomId: RoomId): void;
+  /**
+   * The floor L panel's START CLIMB button (owner decision, 2026-10-11): on
+   * floor 0, (re)starts a climb by logging floor 0 through the queue and
+   * arms this visit. A no-op anywhere else, or while a start is still on
+   * its way.
+   */
+  startClimb(): void;
   /** Sign-out (or `bindPlayer(null)`): forgets everything and drops every queued call (N7). */
   reset(): void;
   /** Whether this Stairwell visit started a climb (RT2-1). */
@@ -44,12 +51,14 @@ export interface StairClimbTracker {
 
 /**
  * The client half of the Stairs Challenge (#51 slice 4, S4-D2 as amended,
- * RT2-1, RT2-2, RT2-7, N5, N7):
+ * RT2-1, RT2-2, RT2-7, N5, N7, and the START CLIMB rule of 2026-10-11):
  * - each Room change is tagged with its source (door, keys, Map or spawn),
- *   and `flightFor` decides which flight an arrival climbed;
- * - a floor-0 start arms this visit; leaving the Stairwell or signing out
- *   disarms it, and flights 1-5 are sent only while armed, so a climb left
- *   half-done on an earlier visit can't be finished from floor 5 down;
+ *   and `flightFor` decides which flight an arrival climbed (1-5 only);
+ * - a climb starts only from floor L's START CLIMB button (`startClimb`),
+ *   never by arriving there; the press arms this visit; leaving the
+ *   Stairwell or signing out disarms it, and flights 1-5 are sent only
+ *   while armed, so a climb left half-done on an earlier visit can't be
+ *   finished from floor 5 down;
  * - every store call goes through one FIFO queue, each waiting for the last
  *   one's final result, so flights reach the server in order;
  * - a `too_soon` flight is retried once, when the 2 s have passed, whatever
@@ -75,6 +84,10 @@ export function createStairClimbTracker(deps: StairClimbTrackerDeps): StairClimb
   let visit = 0;
   /** A visit whose floor-0 start the server answered without logging. */
   let rejectedVisit: number | null = null;
+  /** Whether this visit's latest floor-0 start was logged by the server (hides START CLIMB). */
+  let startLogged = false;
+  /** A START CLIMB press still on its way, so a second press is ignored. */
+  let starting = false;
   let tail: Promise<void> = Promise.resolve();
   /** When the last flight the server logged came back, for the retry delay. */
   let lastLoggedAt: number | null = null;
@@ -91,10 +104,13 @@ export function createStairClimbTracker(deps: StairClimbTrackerDeps): StairClimb
     });
   }
 
-  function render(roomId: RoomId, input: Omit<StairPanelInput, 'floor' | 'armed'>): void {
+  function render(
+    roomId: RoomId,
+    input: Omit<StairPanelInput, 'floor' | 'armed' | 'startLogged'>,
+  ): void {
     const floor = stairwellFloorOf(roomId);
     if (floor === null || deps.currentRoomId() !== roomId) return;
-    deps.onPanel(roomId, { floor, armed, ...input });
+    deps.onPanel(roomId, { floor, armed, startLogged, ...input });
   }
 
   async function readClimb(roomId: RoomId, isCurrent: () => boolean): Promise<void> {
@@ -134,6 +150,7 @@ export function createStairClimbTracker(deps: StairClimbTrackerDeps): StairClimb
     }
     if (!live()) return;
     if (result.logged) lastLoggedAt = deps.now();
+    if (floor === 0 && ofVisit === visit) startLogged = result.logged;
     if (floor === 0 && !result.logged) {
       rejectedVisit = ofVisit;
       if (ofVisit === visit) armed = false;
@@ -144,6 +161,7 @@ export function createStairClimbTracker(deps: StairClimbTrackerDeps): StairClimb
   /** Leaving the Stairwell: disarms and drops queued reads, but lets queued flights finish. */
   function leaveStairwell(): void {
     armed = false;
+    startLogged = false;
     visit += 1;
     readGeneration += 1;
   }
@@ -168,9 +186,8 @@ export function createStairClimbTracker(deps: StairClimbTrackerDeps): StairClimb
         return;
       }
       const flight = flightFor(change?.leaving ?? null, roomId, change?.source ?? 'spawn');
-      if (flight === 0) armed = true;
       const gen = generation;
-      if (flight !== null && (flight === 0 || armed)) {
+      if (flight !== null && armed) {
         const ofVisit = visit;
         enqueue(
           () => logFlight(roomId, flight, gen, ofVisit),
@@ -182,7 +199,26 @@ export function createStairClimbTracker(deps: StairClimbTrackerDeps): StairClimb
         enqueue(() => readClimb(roomId, isCurrent), isCurrent);
       }
     },
+    startClimb() {
+      const roomId = deps.currentRoomId();
+      if (roomId === null || stairwellFloorOf(roomId) !== 0 || starting) return;
+      starting = true;
+      armed = true;
+      startLogged = false;
+      const ofVisit = visit;
+      // A fresh press may succeed where this visit's last start didn't.
+      if (rejectedVisit === ofVisit) rejectedVisit = null;
+      const gen = generation;
+      enqueue(
+        () =>
+          logFlight(roomId, 0, gen, ofVisit).finally(() => {
+            if (gen === generation) starting = false;
+          }),
+        () => gen === generation,
+      );
+    },
     reset() {
+      starting = false;
       source = null;
       pending = null;
       lastLoggedAt = null;

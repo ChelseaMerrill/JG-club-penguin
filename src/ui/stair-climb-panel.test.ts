@@ -38,6 +38,7 @@ describe('stairPanelState (#51 slice 4, S4-D9, RT2-1)', () => {
         progress: null,
         arrival: FLIGHT({ flightsLogged: 0, tokensAwarded: 0, flightTokensToday: 0 }),
         armed: true,
+        startLogged: true,
       },
       {
         state: 'climbing',
@@ -46,7 +47,13 @@ describe('stairPanelState (#51 slice 4, S4-D9, RT2-1)', () => {
         climbLine: true,
         lines: [{ kind: 'count', text: STAIR_PANEL_COPY.climbCount(0) }],
         progress: 0,
+        startButton: false,
       },
+    ],
+    [
+      'floor L when START CLIMB threw: the degraded climbing view, the button still there',
+      { floor: 0, progress: null, arrival: null, armed: true, startLogged: false },
+      { state: 'climbing', lines: [], progress: null, startButton: true },
     ],
     [
       'floor 3 after flight 3',
@@ -55,6 +62,7 @@ describe('stairPanelState (#51 slice 4, S4-D9, RT2-1)', () => {
         progress: null,
         arrival: FLIGHT({ flightsLogged: 3, flightTokensToday: 30 }),
         armed: true,
+        startLogged: false,
       },
       {
         state: 'climbing',
@@ -71,6 +79,7 @@ describe('stairPanelState (#51 slice 4, S4-D9, RT2-1)', () => {
         progress: null,
         arrival: FLIGHT({ flightsLogged: 4, tokensAwarded: 0, flightTokensToday: 100 }),
         armed: true,
+        startLogged: false,
       },
       {
         state: 'climbing',
@@ -82,14 +91,15 @@ describe('stairPanelState (#51 slice 4, S4-D9, RT2-1)', () => {
     ],
     [
       'floor 2 reached by the Map (not armed), whatever the server row says',
-      { floor: 2, progress: PROGRESS(2), arrival: null, armed: false },
+      { floor: 2, progress: PROGRESS(2), arrival: null, armed: false, startLogged: false },
       {
         state: 'not-started',
-        heading: 'STAIRS CHALLENGE',
+        heading: 'STAIRS CHALLENGE · FLOOR 2',
         floorTag: 'FLOOR 2',
         climbLine: false,
         lines: [{ kind: 'body', text: STAIR_PANEL_COPY.notStarted }],
         progress: null,
+        startButton: false,
       },
     ],
     [
@@ -99,17 +109,51 @@ describe('stairPanelState (#51 slice 4, S4-D9, RT2-1)', () => {
         progress: null,
         arrival: FLIGHT({ logged: false, reason: 'out_of_order', flightsLogged: 1 }),
         armed: true,
+        startLogged: false,
       },
       { state: 'not-started' },
     ],
     [
-      'floor 0 reached by walking down (not armed)',
-      { floor: 0, progress: PROGRESS(0), arrival: null, armed: false },
-      { state: 'not-started' },
+      'floor L however it was reached, before a climb (not armed): START CLIMB',
+      { floor: 0, progress: PROGRESS(0), arrival: null, armed: false, startLogged: false },
+      {
+        state: 'not-started',
+        heading: 'STAIRS CHALLENGE · FLOOR L',
+        floorTag: 'FLOOR L',
+        lines: [{ kind: 'body', text: STAIR_PANEL_COPY.notStartedFloorL }],
+        startButton: true,
+      },
+    ],
+    [
+      'floor L walked down to mid-climb (armed, 3 logged): START CLIMB to restart',
+      { floor: 0, progress: PROGRESS(3), arrival: null, armed: true, startLogged: true },
+      { state: 'not-started', startButton: true },
+    ],
+    [
+      'floor L after a completed climb: START CLIMB again',
+      {
+        floor: 0,
+        progress: { flightsLogged: 5, completed: true, flightTokensToday: 50 },
+        arrival: null,
+        armed: true,
+        startLogged: true,
+      },
+      { state: 'not-started', startButton: true },
+    ],
+    [
+      'floor L when the server answered that a start did not log',
+      {
+        floor: 0,
+        progress: null,
+        arrival: FLIGHT({ logged: false, reason: 'not_started', flightsLogged: 0 }),
+        armed: false,
+        startLogged: false,
+      },
+      { state: 'not-started', startButton: true },
     ],
     [
       'floor 5 from Town Center',
-      { floor: 5, progress: PROGRESS(5), arrival: null, armed: false },
+      { floor: 5, progress: PROGRESS(5), arrival: null, armed: false, startLogged: false },
       {
         state: 'floor5-incomplete',
         heading: 'STAIRS CHALLENGE · FLOOR 5',
@@ -125,6 +169,7 @@ describe('stairPanelState (#51 slice 4, S4-D9, RT2-1)', () => {
         progress: null,
         arrival: FLIGHT({ logged: false, reason: 'already_logged', flightsLogged: 5 }),
         armed: true,
+        startLogged: false,
       },
       { state: 'floor5-incomplete' },
     ],
@@ -139,6 +184,7 @@ describe('stairPanelState (#51 slice 4, S4-D9, RT2-1)', () => {
           badgesEarned: ['stair-master'],
         }),
         armed: true,
+        startLogged: false,
       },
       {
         state: 'complete',
@@ -158,6 +204,7 @@ describe('stairPanelState (#51 slice 4, S4-D9, RT2-1)', () => {
         progress: null,
         arrival: FLIGHT({ flightsLogged: 5, tokensAwarded: 0, flightTokensToday: 100 }),
         armed: true,
+        startLogged: false,
       },
       {
         state: 'complete',
@@ -170,7 +217,7 @@ describe('stairPanelState (#51 slice 4, S4-D9, RT2-1)', () => {
     ],
     [
       "floor 2 armed when the climb couldn't be read: the design's line, no count",
-      { floor: 2, progress: null, arrival: null, armed: true },
+      { floor: 2, progress: null, arrival: null, armed: true, startLogged: false },
       {
         state: 'climbing',
         heading: 'STAIRS CHALLENGE · FLIGHT 3 OF 5',
@@ -186,6 +233,7 @@ describe('stairPanelState (#51 slice 4, S4-D9, RT2-1)', () => {
   it('keeps every approved line under about 90 characters, for the 340 px panel', () => {
     for (const line of [
       STAIR_PANEL_COPY.notStarted,
+      STAIR_PANEL_COPY.notStartedFloorL,
       STAIR_PANEL_COPY.floor5Incomplete,
       STAIR_PANEL_COPY.complete,
       STAIR_PANEL_COPY.completeFirst,
@@ -205,17 +253,79 @@ describe('createStairClimbPanel', () => {
   function setup() {
     const root = document.createElement('div');
     document.body.append(root);
-    const panel = createStairClimbPanel(root);
+    const onStart = vi.fn();
+    const panel = createStairClimbPanel(root, { onStart });
     const q = (selector: string) => root.querySelector<HTMLElement>(selector)!;
-    return { panel, q };
+    return { panel, q, onStart };
   }
+
+  it("shows START CLIMB only on floor L when no logged climb is under way, and presses it by click or keyboard without reaching the window's keys", () => {
+    const { panel, q, onStart } = setup();
+    const button = q('.stair-climb-panel__start') as HTMLButtonElement;
+    expect(button.tagName).toBe('BUTTON');
+    expect(button.textContent).toBe('START CLIMB');
+    expect(button.hidden).toBe(true);
+
+    panel.show({
+      floor: 0,
+      progress: PROGRESS(0),
+      arrival: null,
+      armed: false,
+      startLogged: false,
+    });
+    expect(button.hidden).toBe(false);
+    expect(q('.stair-climb-panel__heading').textContent).toBe('STAIRS CHALLENGE · FLOOR L');
+
+    button.click();
+    expect(onStart).toHaveBeenCalledTimes(1);
+    const windowKeys = vi.fn();
+    window.addEventListener('keydown', windowKeys);
+    for (const key of ['Enter', ' ']) {
+      button.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
+    }
+    button.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+    window.removeEventListener('keydown', windowKeys);
+    // Enter and Space stay on the button; the stair keys still hear ↑.
+    expect(windowKeys).toHaveBeenCalledTimes(1);
+
+    panel.show({
+      floor: 0,
+      progress: null,
+      arrival: FLIGHT({ flightsLogged: 0, tokensAwarded: 0, flightTokensToday: 0 }),
+      armed: true,
+      startLogged: true,
+    });
+    expect(button.hidden).toBe(true);
+    panel.show({
+      floor: 1,
+      progress: PROGRESS(0),
+      arrival: null,
+      armed: false,
+      startLogged: false,
+    });
+    expect(button.hidden).toBe(true);
+    panel.show({
+      floor: 5,
+      progress: PROGRESS(5),
+      arrival: null,
+      armed: false,
+      startLogged: false,
+    });
+    expect(button.hidden).toBe(true);
+  });
 
   it('is hidden until shown, then renders the state, the climbing line and the bar', () => {
     const { panel, q } = setup();
     expect(q('.stair-climb-panel').hidden).toBe(true);
     expect(q('.stair-climb-hint').hidden).toBe(true);
 
-    panel.show({ floor: 1, progress: null, arrival: FLIGHT({ flightsLogged: 1 }), armed: true });
+    panel.show({
+      floor: 1,
+      progress: null,
+      arrival: FLIGHT({ flightsLogged: 1 }),
+      armed: true,
+      startLogged: false,
+    });
 
     expect(q('.stair-climb-panel').hidden).toBe(false);
     expect(q('.stair-climb-panel').dataset.state).toBe('climbing');
@@ -232,8 +342,20 @@ describe('createStairClimbPanel', () => {
 
   it('replaces the body on every show, with no bar for a state that has none', () => {
     const { panel, q } = setup();
-    panel.show({ floor: 1, progress: null, arrival: FLIGHT({ flightsLogged: 1 }), armed: true });
-    panel.show({ floor: 5, progress: PROGRESS(5), arrival: null, armed: false });
+    panel.show({
+      floor: 1,
+      progress: null,
+      arrival: FLIGHT({ flightsLogged: 1 }),
+      armed: true,
+      startLogged: false,
+    });
+    panel.show({
+      floor: 5,
+      progress: PROGRESS(5),
+      arrival: null,
+      armed: false,
+      startLogged: false,
+    });
 
     expect(q('.stair-climb-panel').dataset.state).toBe('floor5-incomplete');
     expect(q('.stair-climb-panel__lines').textContent).toBe(STAIR_PANEL_COPY.floor5Incomplete);
@@ -242,26 +364,50 @@ describe('createStairClimbPanel', () => {
 
   it('hide() hides both; a dismissed hint stays hidden on later shows', () => {
     const { panel, q } = setup();
-    panel.show({ floor: 0, progress: PROGRESS(0), arrival: null, armed: false });
+    panel.show({
+      floor: 0,
+      progress: PROGRESS(0),
+      arrival: null,
+      armed: false,
+      startLogged: false,
+    });
     panel.hide();
     expect(q('.stair-climb-panel').hidden).toBe(true);
     expect(q('.stair-climb-panel').dataset.state).toBeUndefined();
     expect(q('.stair-climb-hint').hidden).toBe(true);
 
     panel.dismissHint();
-    panel.show({ floor: 0, progress: PROGRESS(0), arrival: null, armed: false });
+    panel.show({
+      floor: 0,
+      progress: PROGRESS(0),
+      arrival: null,
+      armed: false,
+      startLogged: false,
+    });
     expect(q('.stair-climb-panel').hidden).toBe(false);
     expect(q('.stair-climb-hint').hidden).toBe(true);
   });
 
   it('reset() (sign-out) hides both and brings a dismissed hint back', () => {
     const { panel, q } = setup();
-    panel.show({ floor: 0, progress: PROGRESS(0), arrival: null, armed: false });
+    panel.show({
+      floor: 0,
+      progress: PROGRESS(0),
+      arrival: null,
+      armed: false,
+      startLogged: false,
+    });
     panel.dismissHint();
     panel.reset();
     expect(q('.stair-climb-panel').hidden).toBe(true);
 
-    panel.show({ floor: 0, progress: PROGRESS(0), arrival: null, armed: false });
+    panel.show({
+      floor: 0,
+      progress: PROGRESS(0),
+      arrival: null,
+      armed: false,
+      startLogged: false,
+    });
     expect(q('.stair-climb-hint').hidden).toBe(false);
   });
 
@@ -300,6 +446,7 @@ describe('gateStairPanel (#163 review)', () => {
     progress: PROGRESS(floor),
     arrival: null,
     armed: false,
+    startLogged: false,
   });
 
   it('shows straight away when the Elevator is down', () => {

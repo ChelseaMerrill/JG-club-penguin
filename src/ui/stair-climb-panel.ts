@@ -16,7 +16,12 @@ export const STAIR_PANEL_COPY = {
   /** The design's count line on floors 0-4, with `n` flights logged. */
   climbCount: (n: number) =>
     `${n} of 5 flights logged. Reward: 10 tokens per flight. All 5 = Stair Master badge.`,
-  notStarted: 'Every climb starts at floor L. Enter the stairwell there to start logging flights.',
+  /** Floors 1-4 before this visit's climb (owner copy, 2026-10-11). */
+  notStarted: 'Every climb starts at floor L. Head down there to start logging flights.',
+  /** Floor L before a climb is under way (owner copy, 2026-10-11). */
+  notStartedFloorL: 'Ready? Start the climb, then take all five flights.',
+  /** Floor L's button: the only way a climb starts (owner decision, 2026-10-11). */
+  startButton: 'START CLIMB',
   floor5Incomplete: "Nice view, but this one doesn't count. Start at floor L and climb all five.",
   complete: 'Top floor. Jason logged all five. Head through the door, or up to the roof.',
   completeFirst: '5 of 5 flights logged. +50 tokens. Stair Master badge unlocked.',
@@ -40,6 +45,8 @@ export interface StairPanelInput {
   arrival: StairFlightResult | null;
   /** Whether this Stairwell visit started a climb on floor 0 (RT2-1). */
   armed: boolean;
+  /** Whether the server logged this visit's latest START CLIMB (hides the button). */
+  startLogged: boolean;
 }
 
 /** One line of the panel's body: the main line, or the dimmer count line. */
@@ -58,6 +65,8 @@ export interface StairPanelView {
   climbLine: boolean;
   /** The progress bar's fill, 0-1, or `null` for no bar. */
   progress: number | null;
+  /** Whether floor L's START CLIMB button shows. */
+  startButton: boolean;
 }
 
 /**
@@ -65,7 +74,10 @@ export interface StairPanelView {
  * amended, RT2-1):
  * - `climbing` on floors 0-4 while this visit's climb is armed and has
  *   logged exactly this floor's flights;
- * - `not-started` on floors 0-4 otherwise;
+ * - `not-started` on floors 0-4 otherwise, with floor L's own copy;
+ * - START CLIMB on floor L whenever no climb the server logged is under way
+ *   there: not started, after a completed climb, or a start that failed
+ *   (owner decision, 2026-10-11);
  * - `complete` on floor 5 when this arrival logged flight 5 (the first-climb
  *   last line when it earned Stair Master);
  * - `floor5-incomplete` on floor 5 otherwise.
@@ -78,6 +90,7 @@ export function stairPanelState({
   progress,
   arrival,
   armed,
+  startLogged,
 }: StairPanelInput): StairPanelView {
   const flightsLogged = arrival?.flightsLogged ?? progress?.flightsLogged;
   const tokensToday = arrival?.flightTokensToday ?? progress?.flightTokensToday ?? 0;
@@ -101,6 +114,7 @@ export function stairPanelState({
         ],
         climbLine: false,
         progress: 1,
+        startButton: false,
       };
     }
     return {
@@ -110,6 +124,7 @@ export function stairPanelState({
       lines: [{ kind: 'body', text: STAIR_PANEL_COPY.floor5Incomplete }],
       climbLine: false,
       progress: null,
+      startButton: false,
     };
   }
 
@@ -124,15 +139,23 @@ export function stairPanelState({
         : [{ kind: 'count', text: STAIR_PANEL_COPY.climbCount(floor) }, ...cappedLine],
       climbLine: true,
       progress: unread ? null : floor / STAIR_TOP_FLOOR,
+      startButton: floor === 0 && !startLogged,
     };
   }
+  const floorName = floor === 0 ? 'L' : String(floor);
   return {
     state: 'not-started',
-    heading: 'STAIRS CHALLENGE',
-    floorTag: `FLOOR ${floor}`,
-    lines: [{ kind: 'body', text: STAIR_PANEL_COPY.notStarted }],
+    heading: `STAIRS CHALLENGE · FLOOR ${floorName}`,
+    floorTag: `FLOOR ${floorName}`,
+    lines: [
+      {
+        kind: 'body',
+        text: floor === 0 ? STAIR_PANEL_COPY.notStartedFloorL : STAIR_PANEL_COPY.notStarted,
+      },
+    ],
     climbLine: false,
     progress: null,
+    startButton: floor === 0,
   };
 }
 
@@ -209,12 +232,21 @@ function el(tag: string, className: string, text?: string): HTMLElement {
   return node;
 }
 
+export interface StairClimbPanelOptions {
+  /** Floor L's START CLIMB button was pressed (`StairClimbTracker.startClimb`). */
+  onStart?(): void;
+}
+
 /**
  * The Stairwell's climb panel and hint (#51 slice 4, S4-D9): plain DOM in
  * `#ui`, where `design/Stairwell.dc.html` draws them (the panel at left 36,
- * bottom 166, 340 wide). Read-only: it never takes a click.
+ * bottom 166, 340 wide). Read-only but for floor L's START CLIMB button, the
+ * one part that takes a click (and Tab/Enter/Space).
  */
-export function createStairClimbPanel(root: HTMLElement): StairClimbPanel {
+export function createStairClimbPanel(
+  root: HTMLElement,
+  options: StairClimbPanelOptions = {},
+): StairClimbPanel {
   const panel = el('div', 'stair-climb-panel');
   panel.hidden = true;
   panel.setAttribute('role', 'status');
@@ -223,10 +255,23 @@ export function createStairClimbPanel(root: HTMLElement): StairClimbPanel {
   const floorTag = el('span', 'stair-climb-panel__floor');
   header.append(heading, floorTag);
   const body = el('div', 'stair-climb-panel__lines');
+  const start = el(
+    'button',
+    'npc-dialog__button npc-dialog__button--primary stair-climb-panel__start',
+    STAIR_PANEL_COPY.startButton,
+  ) as HTMLButtonElement;
+  start.type = 'button';
+  start.hidden = true;
+  start.addEventListener('click', () => options.onStart?.());
+  // Enter/Space press the button and nothing else (no stair key, no other
+  // game shortcut listening on the window).
+  start.addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' || event.key === ' ') event.stopPropagation();
+  });
   const bar = el('div', 'stair-climb-panel__bar');
   const fill = el('div', 'stair-climb-panel__bar-fill');
   bar.append(fill);
-  panel.append(header, body, bar);
+  panel.append(header, body, start, bar);
 
   const hint = el('div', 'stair-climb-hint');
   hint.hidden = true;
@@ -261,6 +306,7 @@ export function createStairClimbPanel(root: HTMLElement): StairClimbPanel {
           ),
         );
       }
+      start.hidden = !view.startButton;
       bar.hidden = view.progress === null;
       fill.style.width = `${Math.round((view.progress ?? 0) * 100)}%`;
       panel.hidden = false;
