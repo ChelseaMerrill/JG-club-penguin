@@ -176,7 +176,7 @@ describe('createNpcDialog', () => {
     gameEvents.emit('npc:arrived', { npcId: 'chelsea' });
 
     expect(root.querySelector('.npc-dialog__subtitle')?.textContent).toBe(
-      'THE MELT · PANCAKE FLIP',
+      'THE KITCHEN · PANCAKE FLIP',
     );
 
     const grabButton = Array.from(root.querySelectorAll('button')).find(
