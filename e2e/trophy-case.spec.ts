@@ -186,16 +186,14 @@ test('pages all 16 Badges over two pages by arrow, dot and keyboard, with COMING
   await page.evaluate(() => document.fonts.ready);
   await page.screenshot({ path: 'test-results/trophy-case-pages/page-1.png' });
 
-  // Page 2 by the arrow: the last four coming-soon Badges, each tagged
-  // (#220: Goleador's own page-1 slot pushes a fourth Badge, snowmageddon,
-  // onto this page too).
+  // Page 2 by the arrow: Goleador (#220, the 13th earnable Badge) and the
+  // three coming-soon ones, each tagged (Snowmageddon is earnable, #154).
   await next.click();
   await expect(tiles).toHaveCount(4);
   await expect(page.locator('[aria-label="Page 2"]')).toHaveAttribute('aria-current', 'page');
   await expect(next).toBeDisabled();
-  await expect(page.locator('.trophy-case__badge--coming-soon')).toHaveCount(4);
+  await expect(page.locator('.trophy-case__badge--coming-soon')).toHaveCount(3);
   await expect(page.locator('.trophy-case__badge-tag')).toHaveText([
-    'COMING SOON',
     'COMING SOON',
     'COMING SOON',
     'COMING SOON',
