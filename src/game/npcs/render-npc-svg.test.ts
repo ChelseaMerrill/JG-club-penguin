@@ -430,22 +430,16 @@ describe('renderNpcSvg', () => {
     expect(raising).not.toContain('<rect x="84" y="82" width="26"');
   });
 
-  it("draws the Mullet's Jason with his hands raised on the controls at rest, and none while his arcade hands play (owner requests, 2026-10-01 and 2026-10-02)", () => {
-    const raisedLeft =
-      '<g transform="translate(10 -40)"><circle cx="30" cy="101" r="5.5" fill="#F6DCC6" stroke="#0C4B5F" stroke-width="2"></circle></g>';
-    const raisedRight =
-      '<g transform="translate(0 -36)"><circle cx="90" cy="101" r="5.5" fill="#F6DCC6" stroke="#0C4B5F" stroke-width="2"></circle></g>';
+  it("draws the Mullet's Jason with his hands at his sides, and none while his arcade hands play (owner request, 2026-10-01)", () => {
+    const leftHand =
+      '<circle cx="30" cy="101" r="5.5" fill="#F6DCC6" stroke="#0C4B5F" stroke-width="2">';
+    const rightHand =
+      '<circle cx="90" cy="101" r="5.5" fill="#F6DCC6" stroke="#0C4B5F" stroke-width="2">';
     const resting = renderRosterNpc('jason-mullet');
-    expect(resting).toContain(raisedLeft);
-    expect(resting).toContain(raisedRight);
-    // No hands at his sides as well, and they're drawn before his head, as in the design.
-    expect(resting.split('<circle cx="30" cy="101"')).toHaveLength(2);
-    expect(resting.split('<circle cx="90" cy="101"')).toHaveLength(2);
-    expect(resting.indexOf(raisedLeft)).toBeLessThan(
-      resting.indexOf('<circle cx="60" cy="40" r="25"'),
-    );
-    // The Icebox's Jason keeps his hands at his sides.
-    expect(renderRosterNpc('jason')).not.toContain('translate(10 -40)');
+    expect(resting).toContain(leftHand);
+    expect(resting).toContain(rightHand);
+    // Resting is exactly the Icebox's Jason, the same person.
+    expect(resting).toBe(renderRosterNpc('jason').replaceAll('npc-jason', 'npc-jason-mullet'));
     const jason = NPCS['jason-mullet'];
     if (jason.kind !== 'human') throw new Error('expected jason-mullet to be a Human NPC');
     const playing = renderNpcSvg({ ...jason.figure, arcadeHands: 'playing' });
@@ -470,23 +464,6 @@ describe('renderNpcSvg', () => {
     );
     // The henley's placket is drawn instead of a crew neck.
     expect(svg).not.toContain('<path d="M50 66 Q60 74 70 66"');
-  });
-
-  it("draws Ashley's curly volume hair in the Mullet, behind her head and over it, but not Town Center's", () => {
-    const svg = renderRosterNpc('ashley-mullet');
-    assertValidSvg(svg);
-    const back = '<path d="M32 28 Q18 32 25 42 Q14 50 23 58';
-    const front =
-      '<path d="M33 42 C30 18 48 9 60 11 C74 10 90 18 87 42 Q86 33 80 33 Q77 25 70 28 Q64 22 58 27 Q50 22 46 30 Q38 29 33 42 Z" fill="#5e4128" stroke="#0C4B5F" stroke-width="2.5"></path>';
-    expect(svg).toContain(back);
-    expect(svg).toContain(front);
-    expect(svg).toContain('stroke="#3a2818" stroke-width="1.6"');
-    // The back hair is drawn before the torso, the front after the head.
-    expect(svg.indexOf(back)).toBeLessThan(
-      svg.indexOf('<rect x="34" y="66" width="52" height="44"'),
-    );
-    expect(svg.indexOf(front)).toBeGreaterThan(svg.indexOf('<circle cx="60" cy="40" r="25"'));
-    expect(renderRosterNpc('ashley')).not.toContain(back);
   });
 
   it("draws the Mullet's ping-pong paddles at rest in Jon's right and Brandon's left hand, but not Town Center's", () => {

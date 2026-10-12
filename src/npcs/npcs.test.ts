@@ -190,7 +190,7 @@ describe('NPCS', () => {
   });
 
   it("draws the Team Rooms' and the Mullet's Humans as their Room designs do (#149)", () => {
-    // Dark nameplates: every Team Room and Mullet NPC except Tony.
+    // Dark nameplates: every Team Room NPC still placed, and the Mullet's Jon and Brandon (not Tony).
     const dark = Object.values(NPCS)
       .filter((npc) => npc.nameplate === 'dark')
       .map((npc) => npc.id)
@@ -199,21 +199,12 @@ describe('NPCS', () => {
       [
         'jethro-team-room-1',
         'dom-team-room-1',
-        'ian-team-room-2',
-        'millie-team-room-3',
-        'casey-team-room-3',
         'sydney-team-room-3',
         'michael',
         'sam-team-room-4',
         'ryan-team-room-4',
-        'jason-mullet',
-        'nicole-mullet',
-        'ann-marie-mullet',
-        'jory-mullet',
-        'ashley-mullet',
         'jon-mullet',
         'brandon-mullet',
-        'dom-mullet',
       ].sort(),
     );
     expect(NPCS.tony.nameplate).toBeUndefined();
@@ -221,38 +212,25 @@ describe('NPCS', () => {
     const scales: [NpcId, number][] = [
       ['jethro-team-room-1', 70 / 120],
       ['dom-team-room-1', 70 / 120],
-      ['ian-team-room-2', 70 / 120],
       ['michael', 0.5],
       ['sam-team-room-4', 0.5],
       ['ryan-team-room-4', 0.5],
-      ['jason-mullet', 0.5],
-      ['nicole-mullet', 0.5],
-      ['ann-marie-mullet', 0.5],
-      ['jory-mullet', 0.58],
-      ['ashley-mullet', 0.58],
       ['jon-mullet', 0.58],
       ['brandon-mullet', 0.58],
-      ['dom-mullet', 0.58],
     ];
     for (const [id, scale] of scales) expect(NPCS[id].scale, id).toBeCloseTo(scale, 10);
     expect(NPCS.tony.scale).toBeUndefined();
 
     const offsets: [NpcId, { x?: number; y?: number }][] = [
-      ['millie-team-room-3', { y: -3 }],
-      ['casey-team-room-3', { y: 9 }],
       ['sydney-team-room-3', { y: 7 }],
       ['sam-team-room-4', { y: -9.5 }],
-      ['jason-mullet', { x: -55.5, y: 15 }],
       ['jon-mullet', { y: 19 }],
       ['brandon-mullet', { y: 19 }],
-      ['nicole-mullet', { y: -5 }],
-      ['ann-marie-mullet', { y: -5 }],
     ];
     for (const [id, offset] of offsets) expect(NPCS[id].nameplateOffset, id).toEqual(offset);
 
     expect(NPCS['sydney-team-room-3'].bubbleOffsetY).toBe(-8);
     expect(NPCS.michael.bubbleOffsetY).toBe(-23);
-    expect(NPCS['ashley-mullet'].bubbleOffsetY).toBe(-7.6);
 
     const michael = NPCS.michael;
     const tony = NPCS.tony;
@@ -782,16 +760,11 @@ describe('NPCS', () => {
       // The Mullet's Jon and Brandon hold a ping-pong paddle at rest (#149).
       ['jon', 'jon-mullet', { cards: true, paddle: undefined }],
       ['brandon-mullet', 'brandon', { paddle: 'left' }],
-      // The Mullet's design draws Ashley's hair as curly volume (#149).
-      ['ashley-mullet', 'ashley', { style: 'curlyVolume' }],
       ['nicole', 'nicole-mullet', { seated: 'laptop' }],
       // Team Room 3's Casey holds an open laptop and its Sydney wears a
       // headset; the Roof Deck's and Town Center's designs draw neither.
       ['casey-team-room-3', 'casey', { prop: 'openLaptop' }],
       ['sydney-team-room-3', 'sydney', { headset: true }],
-      // The Mullet's Jason plays its arcade machine, his hands drawn by his
-      // motion's layers (owner request, 2026-10-01, Track D).
-      ['jason-mullet', 'jason', { arcadeHands: 'resting' }],
     ];
     for (const [roomOwn, other, added] of overrides) {
       const withOverride = NPCS[roomOwn];

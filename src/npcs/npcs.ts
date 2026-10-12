@@ -369,9 +369,9 @@ interface NpcDefinitionBase {
   still?: boolean;
   /**
    * The Room design's draw scale for this NPC, when it isn't its kind's
-   * default (`npc-layout.ts`): Team Rooms 1 and 2 draw theirs at 70/120,
-   * Team Room 3 and most of the Mullet at 0.58 (`width="69.6"`) and Team Room
-   * 4 (and the Mullet's Jason, Nicole and Ann Marie) at 0.5, not 0.62 (owner
+   * default (`npc-layout.ts`): Team Room 1 draws its at 70/120,
+   * Team Room 3 and the Mullet's Jon and Brandon at 0.58 (`width="69.6"`) and
+   * Team Room 4 at 0.5, not 0.62 (owner
    * requests, 2026-09-30, Track D; #149).
    */
   scale?: number;
@@ -942,11 +942,7 @@ function guestLines(first: string, second: string): readonly [StairwellLine, Sta
   ];
 }
 
-/**
- * How the Mullet's design draws its Humans (#149): Jason, Nicole and Ann Marie
- * at 0.5, everyone else but Tony at 0.58, all with dark nameplates.
- */
-const MULLET_SMALL = { scale: 0.5, nameplate: 'dark' } as const;
+/** How the Mullet's design draws Jon and Brandon (#149): at 0.58, with dark nameplates. */
 const MULLET_MEDIUM = { scale: 0.58, nameplate: 'dark' } as const;
 
 /**
@@ -1994,8 +1990,8 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     idleLines: [
       { text: "Act natural. Camera's rolling.", periodS: 4, delayS: 0, window: [0.38, 0.76] },
     ],
-    // Team Rooms 1 and 2 draw their Humans at 70/120 (`width="70"`), and
-    // their nameplates dark (#149).
+    // Team Room 1 draws its Humans at 70/120 (`width="70"`), and their
+    // nameplates dark (#149).
     scale: 70 / 120,
     nameplate: 'dark',
     dialog: LINE_DIALOG,
@@ -2018,8 +2014,8 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     idleLines: [
       { text: 'you gotta be faster than that', periodS: 6, delayS: 0, window: [0.39, 0.66] },
     ],
-    // Team Rooms 1 and 2 draw their Humans at 70/120 (`width="70"`), and
-    // their nameplates dark (#149).
+    // Team Room 1 draws its Humans at 70/120 (`width="70"`), and their
+    // nameplates dark (#149).
     scale: 70 / 120,
     nameplate: 'dark',
     dialog: LINE_DIALOG,
@@ -2039,10 +2035,6 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     // ENGINEERING" (#51 review fix 2): the trigger line and action/decline
     // labels are still Ian's own Bug Squash copy, shared via
     // `BUG_SQUASH_DIALOG`.
-    // Team Rooms 1 and 2 draw their Humans at 70/120 (`width="70"`), and
-    // their nameplates dark (#149).
-    scale: 70 / 120,
-    nameplate: 'dark',
     dialog: { ...BUG_SQUASH_DIALOG, subtitle: 'TEAM ROOM 2 · VP OF ENGINEERING' },
     figure: IAN_FIGURE,
   },
@@ -2060,9 +2052,6 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     still: true,
     // Team Room 3 draws its Humans at 0.58, not 0.62 (`width="69.6"`).
     scale: 0.58,
-    // Its nameplate is dark and sits higher than the layout puts it (#149).
-    nameplate: 'dark',
-    nameplateOffset: { y: -3 },
     dialog: LINE_DIALOG,
     figure: MILLIE_FIGURE,
   },
@@ -2082,9 +2071,6 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     still: true,
     // Team Room 3 draws its Humans at 0.58, not 0.62 (`width="69.6"`).
     scale: 0.58,
-    // Its nameplate is dark and sits lower than the layout puts it (#149).
-    nameplate: 'dark',
-    nameplateOffset: { y: 9 },
     dialog: LINE_DIALOG,
     // The Room design hands her an open laptop, which the Roof Deck's
     // `casey` doesn't carry (owner request, 2026-09-30, Track D).
@@ -2216,14 +2202,9 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     idleLines: [],
     // The design jiggles him at the joystick rather than bobbing him.
     still: true,
-    ...MULLET_SMALL,
-    // Hand-placed, left of his head.
-    nameplateOffset: { x: -55.5, y: 15 },
     dialog: LINE_DIALOG,
-    // His hands are up at the controls, where the design's animation starts
-    // them: drawn at rest (as under reduced motion), and by his Mullet
-    // motion's hand layers while it plays (owner requests, 2026-10-01 and
-    // 2026-10-02, Track D).
+    // His hands go up to the controls while his Mullet motion plays (owner
+    // request, 2026-10-01, Track D); at rest they're at his sides as usual.
     figure: { ...JASON_FIGURE, arcadeHands: 'resting' },
   },
   'nicole-mullet': {
@@ -2238,8 +2219,6 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     // opacity `0;1;1;0;0` at `keyTimes` `0;0.05;0.35;0.4;1`, fully shown from
     // 5% to 35% (owner request, 2026-10-01, Track D; it was a static line).
     idleLines: [{ text: 'hehe', periodS: 3, delayS: 0, window: [0.05, 0.35] }],
-    ...MULLET_SMALL,
-    nameplateOffset: { y: -5 },
     dialog: LINE_DIALOG,
     figure: NICOLE_FIGURE,
   },
@@ -2253,8 +2232,6 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     dialogLines: ANN_MARIE_LINES,
     // As Nicole's laugh, half a cycle later (`begin="1.5s"`).
     idleLines: [{ text: 'haha', periodS: 3, delayS: -1.5, window: [0.05, 0.35] }],
-    ...MULLET_SMALL,
-    nameplateOffset: { y: -5 },
     dialog: LINE_DIALOG,
     figure: ANN_MARIE_FIGURE,
   },
@@ -2273,7 +2250,6 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     bubbleOffsetX: 20,
     // The design walks her a loop of the room rather than bobbing her.
     still: true,
-    ...MULLET_MEDIUM,
     dialog: LINE_DIALOG,
     figure: JORY_FIGURE,
   },
@@ -2293,12 +2269,8 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: 'Clucknelius coming at you!', periodS: 18, delayS: 0, window: [0.4111, 0.5333] },
       { text: 'Clucknelius coming at you!', periodS: 18, delayS: 0, window: [0.7056, 0.8278] },
     ],
-    ...MULLET_MEDIUM,
-    // Its bubble sits 7.6 px higher (#149).
-    bubbleOffsetY: -7.6,
     dialog: LINE_DIALOG,
-    // The Mullet design gives her curly volume hair (#149).
-    figure: { ...ASHLEY_FIGURE, style: 'curlyVolume' },
+    figure: ASHLEY_FIGURE,
   },
   tony: {
     id: 'tony',
@@ -2375,7 +2347,6 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: 'Undefeated. I always win.', periodS: 9.4, delayS: 0, window: [0, 0.1] },
       { text: 'Undefeated. I always win.', periodS: 9.4, delayS: 0, window: [0.88, 1] },
     ],
-    ...MULLET_MEDIUM,
     dialog: LINE_DIALOG,
     // The Room design dresses him in running gear for his lap of the room,
     // which the renderer now draws (owner request, 2026-09-30, Track D).

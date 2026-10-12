@@ -28,8 +28,8 @@ import type { NpcMotionSpec } from './types';
  * Units: a translate on a group outside a figure's `<svg>` is in Stage px.
  * On the NPC's outer group it is a `path` (Stage px from the slot point);
  * moving just the figure, it is a `figure` track, inside `npc-sprite.ts`'s
- * scaled wrapper, so divided by the NPC's draw scale to move the same Stage px
- * (Team Room 1's `bob` precedent); moving the figure and its nameplate but not
+ * scaled wrapper, so divided by the NPC's draw scale to move the same Stage px (Team
+ * Room 1's `bob` precedent); moving the figure and its nameplate but not
  * its feet off their spot, it is a `stage` track. Transforms inside a
  * figure's `<svg>` are figure viewBox units already, verbatim.
  *
@@ -44,8 +44,8 @@ import type { NpcMotionSpec } from './types';
 
 /**
  * Stage px to figure units inside `npc-sprite.ts`'s scaled wrapper: 1 over the
- * NPC's draw scale (`npcs.ts`: Jason, Nicole and Ann Marie draw at 0.5, Jory,
- * Ashley, Jon, Brandon and Dom at 0.58, Tony at the Human default, 0.62).
+ * NPC's draw scale (`npcs.ts`: Jon and Brandon draw at 0.58, Tony at the Human
+ * default, 0.62).
  */
 const TO_FIGURE_058 = (1 / 0.58).toFixed(6);
 const TO_FIGURE_062 = (1 / 0.62).toFixed(6);
@@ -64,7 +64,7 @@ function paddle(cx: number): string {
  * Tony's cue, one of the design's two cue `<g>`s, verbatim: its lines are in
  * the same Stage px as his `<svg x="462.8" y="440.5">` (both inside his walk
  * group), so they're mapped into his figure's units with that `<svg>`'s own
- * placement and his 0.62 scale (Tony keeps the Human default).
+ * placement and his 0.62 scale.
  */
 function cue(lines: string, shiftX = 0): string {
   const shift = shiftX ? `translate(${shiftX} 0) ` : '';

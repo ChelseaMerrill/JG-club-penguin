@@ -185,23 +185,32 @@ test('Dev Pit: clicking Ian arrives, opens his dialog, and NOT MY TICKET shows h
 // covers that dialog.
 
 /**
- * #149: the Hallway's and Team Room 4's NPCs draw at their own scales, so a
- * click at the middle of each one's own click area still has to arrive and
- * open its dialog. Michael's Beystadium launch is `beystadium.spec.ts`. Team
- * Room 3's Millie and the Mullet's Jason (whose offset nameplate had its own
- * test) went when they left those Rooms (owner request, 2026-10-02).
+ * #149: the Hallway's and Team Room 4's NPCs draw at their own scales, with
+ * hand-placed nameplates, so a click at the middle of each one's own click
+ * area still has to arrive and open its dialog. Emily walks laps of the
+ * Hallway, so that click runs under reduced motion, which plays no motion and
+ * leaves her standing at her slot. Michael's Beystadium launch is
+ * `beystadium.spec.ts`.
  */
 const HAND_PLACED_CLICKS: {
   room: RoomId;
   definition: typeof officeHallway;
   npcId: NpcId;
   name: string;
+  reducedMotion?: boolean;
 }[] = [
-  { room: 'office-hallway', definition: officeHallway, npcId: 'emily', name: 'Emily Smith' },
+  {
+    room: 'office-hallway',
+    definition: officeHallway,
+    npcId: 'emily',
+    name: 'Emily Smith',
+    reducedMotion: true,
+  },
   { room: 'team-room-4', definition: teamRoom4, npcId: 'michael', name: 'Michael Prete' },
 ];
-for (const { room, definition, npcId, name } of HAND_PLACED_CLICKS) {
+for (const { room, definition, npcId, name, reducedMotion } of HAND_PLACED_CLICKS) {
   test(`${room}: clicking ${name} arrives and opens the dialog (#149)`, async ({ page }) => {
+    if (reducedMotion) await page.emulateMedia({ reducedMotion: 'reduce' });
     const errors = await bootRoom(page, room);
 
     const slot = definition.npcSlots.find((s) => s.npcId === npcId);
