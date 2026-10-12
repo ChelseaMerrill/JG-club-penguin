@@ -68,6 +68,9 @@ declare
     array['badgesEarned', 'balance', 'flightTokensToday', 'flightsLogged', 'logged', 'reason',
           'tokensAwarded'];
   v_progress_keys constant text[] := array['completed', 'flightTokensToday', 'flightsLogged'];
+  -- The key lists are in C (byte) order, and every comparison sorts with collate "C":
+  -- Supabase's default en_US collation ignores case and would put flightsLogged
+  -- before flightTokensToday, failing the proof on real Supabase only (2026-10-11).
 begin
   begin
     -----------------------------------------------------------------------
@@ -149,7 +152,7 @@ begin
     v_names := array_append(v_names, 'fresh_progress_is_defaults');
     v_pass := array_append(
       v_pass,
-      array(select jsonb_object_keys(v_p) order by 1) = v_progress_keys
+      array(select jsonb_object_keys(v_p) order by 1 collate "C") = v_progress_keys
         and v_p = '{"flightsLogged":0,"completed":false,"flightTokensToday":0}'::jsonb
     );
     v_detail := array_append(v_detail, v_p::text);
@@ -159,7 +162,7 @@ begin
     v_names := array_append(v_names, 'flight_before_a_start_is_not_started');
     v_pass := array_append(
       v_pass,
-      array(select jsonb_object_keys(v_r) order by 1) = v_result_keys
+      array(select jsonb_object_keys(v_r) order by 1 collate "C") = v_result_keys
         and not (v_r ->> 'logged')::boolean
         and v_r ->> 'reason' = 'not_started'
         and (v_r ->> 'tokensAwarded')::int = 0
