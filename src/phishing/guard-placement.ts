@@ -12,6 +12,20 @@ import type { NpcId } from '../npcs/npcs';
 import { GUARD_NPC_ID, type GuardWindow, type PhishingState } from './phishing-client';
 
 /**
+ * The Rooms Anthony guards (#146 P3 as amended by #170 Q1/D13): their
+ * enabled in-scene doors are the guard posts, each with its own `guardTile`.
+ * `public.phishing_guard_posts`' `room_id` check names exactly these
+ * (`20261012000000_door_network_guard_posts.sql`, DN7).
+ */
+export const GUARD_ROOM_IDS: readonly RoomId[] = [
+  'town-center',
+  'dev-pit',
+  'the-melt',
+  'roof-deck',
+  'office-hallway',
+];
+
+/**
  * Where Anthony stands in the Room being shown (#146), for
  * `RoomScene.setGuard`. `doorLabel` names the door he guards (he stands on
  * its approach tile); `null` puts him next to the Player instead (the
@@ -146,6 +160,36 @@ export function guardPaceMotion(
   tile: Tile,
   avoid: readonly Tile[] = [],
 ): NpcMotionSpec | undefined {
+  const [first, second] = guardPaceSides(room, tile, avoid);
+  if (!first) return undefined;
+  const offset = ([dc, dr]: [number, number]): string =>
+    `translate(${((dc - dr) * TILE_WIDTH) / 2}px,${((dc + dr) * TILE_HEIGHT) / 2}px)`;
+  const home = 'translate(0,0)';
+  return {
+    path: {
+      keyframes: `@keyframes guardPace { 0%,10% { transform: ${home};} 25%,35% { transform: ${offset(first)};} 50%,60% { transform: ${home};} 75%,85% { transform: ${second ? offset(second) : home};} 100% { transform: ${home};} }`,
+      animation: `guardPace ${GUARD_PACE_PERIOD_S}s ease-in-out infinite`,
+    },
+    // The design's generic `idle` bob, as every authored walk uses.
+    figure: {
+      keyframes:
+        '@keyframes idle { 0%,100% { transform: translateY(0);} 50% { transform: translateY(-3px);} }',
+      animation: 'idle 3s ease-in-out infinite',
+    },
+  };
+}
+
+/**
+ * The one or two tile steps (`[dCol, dRow]`) `guardPaceMotion` paces to from
+ * `tile`: the two sides across or along the door where both are free, else
+ * whichever single sides are, over walkable tiles off every Room NPC's tiles
+ * (`npcOccupiedTiles`) and off `avoid`. Empty when none is free.
+ */
+function guardPaceSides(
+  room: RoomDefinition,
+  tile: Tile,
+  avoid: readonly Tile[],
+): [number, number][] {
   const occupied = [...npcOccupiedTiles(room), ...avoid];
   const free = (dc: number, dr: number): boolean => {
     const col = tile.col + dc;
@@ -164,24 +208,19 @@ export function guardPaceMotion(
     ],
   ];
   const opposite = axes.find((pair) => pair.every(([dc, dr]) => free(dc, dr)));
-  const sides = opposite ?? axes.flat().filter(([dc, dr]) => free(dc, dr));
-  const [first, second] = sides;
-  if (!first) return undefined;
-  const offset = ([dc, dr]: [number, number]): string =>
-    `translate(${((dc - dr) * TILE_WIDTH) / 2}px,${((dc + dr) * TILE_HEIGHT) / 2}px)`;
-  const home = 'translate(0,0)';
-  return {
-    path: {
-      keyframes: `@keyframes guardPace { 0%,10% { transform: ${home};} 25%,35% { transform: ${offset(first)};} 50%,60% { transform: ${home};} 75%,85% { transform: ${second ? offset(second) : home};} 100% { transform: ${home};} }`,
-      animation: `guardPace ${GUARD_PACE_PERIOD_S}s ease-in-out infinite`,
-    },
-    // The design's generic `idle` bob, as every authored walk uses.
-    figure: {
-      keyframes:
-        '@keyframes idle { 0%,100% { transform: translateY(0);} 50% { transform: translateY(-3px);} }',
-      animation: 'idle 3s ease-in-out infinite',
-    },
-  };
+  return (opposite ?? axes.flat().filter(([dc, dr]) => free(dc, dr))).slice(0, 2);
+}
+
+/** The tiles Anthony paces onto from his post `tile` (`guardPaceMotion`), for #170 D14's I6/I7. */
+export function guardPaceTiles(
+  room: RoomDefinition,
+  tile: Tile,
+  avoid: readonly Tile[] = [],
+): Tile[] {
+  return guardPaceSides(room, tile, avoid).map(([dc, dr]) => ({
+    col: tile.col + dc,
+    row: tile.row + dr,
+  }));
 }
 
 /** Anthony's click zone relative to his feet (`npcLayout(...).hitArea`), in Stage pixels. */
