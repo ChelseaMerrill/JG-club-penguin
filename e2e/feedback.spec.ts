@@ -1,6 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
 import type { FeedbackTestHandle } from '../src/feedback/feedback-test-handle';
 import type { HudTestHandle } from '../src/ui/hud/hud-test-handle';
+import { GAME_HEIGHT, GAME_WIDTH } from '../src/game/stage-size';
+import { ROOM_DEFINITIONS } from './support/room-definitions';
 
 declare global {
   interface Window {
@@ -107,6 +109,65 @@ test('feedback-rate-limited', async ({ page }) => {
   // Escape still closes it.
   await page.keyboard.press('Escape');
   await expect(modal).toBeHidden();
+
+  expect(errors).toEqual([]);
+});
+
+interface Rect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+function intersects(a: Rect, b: Rect): boolean {
+  return a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
+}
+
+test("feedback-button-clears-every-room's-doors, the chat and the bottom bar (#169)", async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await openHudInDevPit(page);
+
+  // Stage pixels: the HUD is part of the Stage, so measure against the canvas.
+  const stage = await page.locator('#game canvas').boundingBox();
+  if (!stage) throw new Error('canvas not visible');
+  const scale = stage.width / GAME_WIDTH;
+  const toStage = (box: Rect | null): Rect => {
+    if (!box) throw new Error('element not visible');
+    return {
+      x: (box.x - stage.x) / scale,
+      y: (box.y - stage.y) / scale,
+      width: box.width / scale,
+      height: box.height / scale,
+    };
+  };
+  const button = toStage(await page.getByRole('button', { name: 'Send feedback' }).boundingBox());
+
+  expect(button.x).toBeGreaterThanOrEqual(0);
+  expect(button.x + button.width).toBeLessThanOrEqual(GAME_WIDTH);
+  expect(button.y + button.height).toBeLessThanOrEqual(GAME_HEIGHT);
+  // Above the bottom-right exit pills' row (the designs' `bottom: 112px`, 40px tall).
+  expect(button.y + button.height).toBeLessThanOrEqual(748);
+  expect(intersects(button, toStage(await page.locator('.hud__chat-input').boundingBox()))).toBe(
+    false,
+  );
+  expect(intersects(button, toStage(await page.locator('.hud__bottom-bar').boundingBox()))).toBe(
+    false,
+  );
+
+  // The HUD (and so the button) is the same in every Room.
+  const overlaps: string[] = [];
+  for (const room of Object.values(ROOM_DEFINITIONS)) {
+    for (const door of room.doors) {
+      if (intersects(button, door.hotspot)) overlaps.push(`${room.id} door ${door.label}`);
+    }
+    for (const hotspot of room.hotspots ?? []) {
+      if (intersects(button, hotspot.rect)) overlaps.push(`${room.id} hotspot ${hotspot.id}`);
+    }
+  }
+  expect(overlaps).toEqual([]);
 
   expect(errors).toEqual([]);
 });

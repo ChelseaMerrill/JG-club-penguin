@@ -278,10 +278,10 @@
   box-shadow: inset 0 0 0 3px var(--jg-light);
 }
 
-/* The design's blinking BACK TO HQ pill. It sits just left of the HUD's "!?"
-   feedback button (72px wide, 12px above the bottom bar), centred on its
-   52px row, where the design's own `right: 36px; bottom: 112px` spot is
-   taken by that button. */
+/* The design's blinking BACK TO HQ pill. It sits 12px above the bottom bar,
+   just left of the 72px right-hand column the HUD's "!?" feedback button
+   stands in (the button itself now sits higher, above the exit-pill row,
+   #169), on the row the button used to take. */
 @keyframes remote-lounge-blink {
   50% {
     opacity: 0.35;

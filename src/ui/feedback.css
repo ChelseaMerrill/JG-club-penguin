@@ -2,14 +2,17 @@
    is Stage pixels (the #ui layer is the 1600x900 Stage), following
    market.css's pattern. */
 
-/* Bottom right, stacked 12px above the bottom bar's rightmost button: the
-   only HUD corner with no widget of its own (Room title top left, Tokens/
-   PENGUIN/MENU and the quest widget top right, chat bottom left, the button
-   row along the bottom). */
+/* Bottom right: the only HUD corner with no widget of its own (Room title
+   top left, Tokens/PENGUIN/MENU and the quest widget top right, chat bottom
+   left, the button row along the bottom). Stacked 12px above the row the
+   Room designs give their bottom-right exit pills (`bottom: 112px`, 40px
+   tall, so up to y 748), rather than 12px above the bottom bar, where it sat
+   on the Lobby's "ELEVATOR · FLOOR 5" pill (#169). `e2e/feedback.spec.ts`
+   checks it clears every Room's doors and hotspots, the chat and the bar. */
 .hud__feedback-slot {
   position: absolute;
   right: var(--hud-inset-x);
-  bottom: calc(var(--hud-inset-y) + 52px + 12px);
+  bottom: calc(112px + 40px + 12px);
   pointer-events: auto;
 }
 
