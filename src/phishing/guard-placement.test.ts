@@ -1,17 +1,19 @@
 import { describe, expect, it } from 'vitest';
-import { getRoomDefinition } from '../game/rooms/registry';
+import { getRoomDefinition, ROOM_DEFINITIONS } from '../game/rooms/registry';
+import { doorApproachTile } from '../game/movement/targets';
 import { townCenter } from '../game/rooms/definitions/town-center';
 import {
   compileCssAnimation,
   sampleCssAnimation,
   transformPoint,
 } from '../game/npcs/css-keyframes';
-import { TILE_HEIGHT, TILE_WIDTH } from '../game/rooms/iso';
+import { TILE_HEIGHT, TILE_WIDTH, tileToScreen } from '../game/rooms/iso';
 import type { RoomDefinition } from '../game/rooms/room-definition';
 import type { NpcMotionSpec } from '../npcs/npc-motions';
 import {
   createBumpTracker,
   GUARD_PACE_PERIOD_S,
+  guardPaceAvoidTiles,
   guardPaceMotion,
   guardTile,
   isGuardedDoor,
@@ -89,6 +91,26 @@ describe('guardTile', () => {
     expect(townCenter.walkable[tile.row][tile.col]).toBe(true);
     // The Icebox door is up at the top of Town Center's floor.
     expect(tile.row).toBeLessThan(townCenter.spawnTile.row);
+  });
+
+  it("prefers the door's own guardTile over its approach tile (#170 D14)", () => {
+    const withPost: RoomDefinition = {
+      ...townCenter,
+      doors: townCenter.doors.map((door) =>
+        door.label === 'THE ICEBOX' ? { ...door, guardTile: { col: 2, row: 1 } } : door,
+      ),
+    };
+    expect(guardTile(withPost, { doorLabel: 'THE ICEBOX' }, townCenter.spawnTile)).toEqual({
+      col: 2,
+      row: 1,
+    });
+    // Other doors, and the locked-out "next to the Player" case, are unchanged.
+    expect(guardTile(withPost, { doorLabel: 'DEV PIT' }, townCenter.spawnTile)).toEqual(
+      guardTile(townCenter, { doorLabel: 'DEV PIT' }, townCenter.spawnTile),
+    );
+    expect(guardTile(withPost, { doorLabel: null }, townCenter.spawnTile)).toEqual(
+      guardTile(townCenter, { doorLabel: null }, townCenter.spawnTile),
+    );
   });
 
   it('has no tile for a door the Room does not have', () => {
@@ -228,5 +250,96 @@ describe('guardPaceMotion', () => {
       walkable: townCenter.walkable.map((row) => row.map(() => false)),
     };
     expect(guardPaceMotion(boxedIn, { col: 3, row: 3 })).toBeUndefined();
+  });
+});
+
+describe('guardPaceAvoidTiles (#170 D14 I6, RT170-22 I7)', () => {
+  const has = (tiles: { col: number; row: number }[], tile: { col: number; row: number }) =>
+    tiles.some((candidate) => candidate.col === tile.col && candidate.row === tile.row);
+
+  it("covers every exit's approach tile, every landing tile into the Room, and its spawn", () => {
+    const avoid = guardPaceAvoidTiles(townCenter, ROOM_DEFINITIONS, null);
+    expect(has(avoid, townCenter.spawnTile)).toBe(true);
+    for (const door of townCenter.doors) {
+      expect(has(avoid, doorApproachTile(townCenter.walkable, door, townCenter.grid.origin))).toBe(
+        true,
+      );
+    }
+    for (const room of ROOM_DEFINITIONS) {
+      for (const door of room.doors) {
+        if (door.targetRoomId === 'town-center') expect(has(avoid, door.entryTile)).toBe(true);
+      }
+    }
+  });
+
+  it('counts floorChoices landing in the Room too', () => {
+    const elevator: RoomDefinition = {
+      ...getRoomDefinition('roof-deck'),
+      doors: [
+        {
+          label: 'ELEVATOR',
+          hotspot: { x: 0, y: 0, width: 10, height: 10 },
+          targetRoomId: 'town-center',
+          entryTile: { col: 0, row: 7 },
+          floorChoices: [
+            {
+              floor: '5',
+              label: 'TOWN',
+              targetRoomId: 'town-center',
+              entryTile: { col: 9, row: 9 },
+            },
+          ],
+        },
+      ],
+    };
+    expect(has(guardPaceAvoidTiles(townCenter, [elevator], null), { col: 9, row: 9 })).toBe(true);
+  });
+
+  it("adds every tile where his click zone would cover another label's exit, never his own", () => {
+    const zone = { centerX: 0, centerY: -40, width: 48, height: 104 };
+    const own = 'THE ICEBOX';
+    const avoid = guardPaceAvoidTiles(townCenter, [], own, zone);
+    const covers = (tile: { col: number; row: number }, label: string) => {
+      const door = townCenter.doors.find((candidate) => candidate.label === label)!;
+      const feet = tileToScreen(tile, townCenter.grid.origin);
+      const left = feet.x + zone.centerX - zone.width / 2;
+      const top = feet.y + zone.centerY - zone.height / 2;
+      const { x, y, width, height } = door.hotspot;
+      return left < x + width && left + zone.width > x && top < y + height && top + zone.height > y;
+    };
+    townCenter.walkable.forEach((cells, row) =>
+      cells.forEach((walkable, col) => {
+        if (!walkable) return;
+        const tile = { col, row };
+        const coversOther = townCenter.doors.some(
+          (door) => door.label !== own && covers(tile, door.label),
+        );
+        if (coversOther) expect(has(avoid, tile), `${col},${row}`).toBe(true);
+      }),
+    );
+  });
+
+  it('keeps his pacing off every avoided tile', () => {
+    const open: RoomDefinition = {
+      ...townCenter,
+      walkable: townCenter.walkable.map((row) => row.map(() => true)),
+      npcSlots: [],
+    };
+    // Both sides across the door are avoided, so he paces along it instead.
+    const motion = guardPaceMotion(open, { col: 5, row: 5 }, [
+      { col: 4, row: 5 },
+      { col: 6, row: 5 },
+    ])!;
+    expect(motion.path!.keyframes).not.toContain(
+      `translate(${-TILE_WIDTH / 2}px,${-TILE_HEIGHT / 2}px)`,
+    );
+    expect(
+      guardPaceMotion(open, { col: 5, row: 5 }, [
+        { col: 4, row: 5 },
+        { col: 6, row: 5 },
+        { col: 5, row: 4 },
+        { col: 5, row: 6 },
+      ]),
+    ).toBeUndefined();
   });
 });
