@@ -323,6 +323,51 @@ export const QUEST_DEFINITIONS: readonly QuestDefinition[] = [
       },
     ],
   },
+  // #154: "Snowmageddon: hit 5 penguins today". No giver, active from the
+  // start, like the #46 quests. The server's
+  // `quest_steps__snowmageddon` (20261012000000_quest_snowmageddon.sql S5)
+  // reports today's (Eastern) distinct-target hit count as five steps; the
+  // thrower's client reports each hit through `recordSnowballHit`
+  // (`src/snowball/snowball-controller.ts`).
+  {
+    kind: 'steps',
+    id: 'snowmageddon',
+    title: 'Snowmageddon: hit 5 penguins today',
+    location: 'ANYWHERE · SNOWBALL',
+    rewardTokens: 75,
+    steps: [
+      {
+        id: 'hit-1',
+        label: 'Hit 1 different Player today',
+        hint: 'Hit a different Player with a snowball',
+        roomId: null,
+      },
+      {
+        id: 'hit-2',
+        label: 'Hit 2 different Players today',
+        hint: 'Hit another different Player with a snowball',
+        roomId: null,
+      },
+      {
+        id: 'hit-3',
+        label: 'Hit 3 different Players today',
+        hint: 'Hit another different Player with a snowball',
+        roomId: null,
+      },
+      {
+        id: 'hit-4',
+        label: 'Hit 4 different Players today',
+        hint: 'Hit another different Player with a snowball',
+        roomId: null,
+      },
+      {
+        id: 'hit-5',
+        label: 'Hit 5 different Players today',
+        hint: 'Hit another different Player with a snowball',
+        roomId: null,
+      },
+    ],
+  },
 ];
 
 /**

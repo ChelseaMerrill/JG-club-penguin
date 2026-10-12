@@ -109,6 +109,7 @@ function deferredStore(): { store: ProgressStore; resolve: (snapshot: ProgressSn
       ...UNUSED_PAIR_FLAKY_TEST_METHODS,
       logStairFlight: () => Promise.reject(new Error('unused in this test')),
       getStairClimb: () => Promise.reject(new Error('unused in this test')),
+      recordSnowballHit: () => Promise.reject(new Error('unused in this test')),
     },
     resolve: resolveFn,
   };
@@ -133,6 +134,7 @@ function failingStore(): ProgressStore {
     ...UNUSED_PAIR_FLAKY_TEST_METHODS,
     logStairFlight: () => Promise.reject(new Error('unused in this test')),
     getStairClimb: () => Promise.reject(new Error('unused in this test')),
+    recordSnowballHit: () => Promise.reject(new Error('unused in this test')),
   };
 }
 
@@ -315,6 +317,7 @@ describe('createProgressSession', () => {
         ...UNUSED_PAIR_FLAKY_TEST_METHODS,
         logStairFlight: () => Promise.reject(new Error('unused in this test')),
         getStairClimb: () => Promise.reject(new Error('unused in this test')),
+        recordSnowballHit: () => Promise.reject(new Error('unused in this test')),
       };
       await session.start(PLAYER, store);
       const wrapped = registry.get(PROGRESS_STORE_KEY) as ProgressStore;

@@ -77,6 +77,8 @@ describe('orderBadgeTiles', () => {
       'exterminator',
       'night-owl',
       'first-waddle',
+      // #154: Snowmageddon is earnable now, so it sorts with the locked ones.
+      'snowmageddon',
       'ship-it',
       'breakfast-club',
       'brain-freeze',
@@ -88,7 +90,6 @@ describe('orderBadgeTiles', () => {
       'stair-master',
       // #146: so is Phish Fry.
       'phish-fry',
-      'snowmageddon',
       'rail-rider',
       'hexle-parent',
       'mullet-mania',
@@ -154,7 +155,7 @@ describe('createTrophyCase', () => {
   });
 
   it('shows an earned Badge unlocked, a locked one with its hint, and a coming-soon one with its tag', async () => {
-    const { q, trophyCase } = setup(['exterminator']);
+    const { q, qa, trophyCase } = setup(['exterminator']);
 
     await trophyCase.open();
 
@@ -178,9 +179,20 @@ describe('createTrophyCase', () => {
       'ONLINE 2–5 AM ET',
     );
 
+    // #154: Snowmageddon is earnable now, pushing the "coming soon" group
+    // (rail-rider first) onto page 2.
+    qa<HTMLButtonElement>('[aria-label="Next page"]')[0].click();
+    const railRider = q('[data-badge-id="rail-rider"]');
+    expect(railRider.classList.contains('trophy-case__badge--coming-soon')).toBe(true);
+    expect(railRider.querySelector('.trophy-case__badge-tag')?.textContent).toBe('COMING SOON');
+    expect(railRider.querySelector('.trophy-case__badge-hint')?.textContent).toBe(
+      'SLIDE THE STAIRWELL',
+    );
+    qa<HTMLButtonElement>('[aria-label="Previous page"]')[0].click();
+
     const snowmageddon = q('[data-badge-id="snowmageddon"]');
-    expect(snowmageddon.classList.contains('trophy-case__badge--coming-soon')).toBe(true);
-    expect(snowmageddon.querySelector('.trophy-case__badge-tag')?.textContent).toBe('COMING SOON');
+    expect(snowmageddon.classList.contains('trophy-case__badge--coming-soon')).toBe(false);
+    expect(snowmageddon.querySelector('.trophy-case__badge-tag')).toBeNull();
     expect(snowmageddon.querySelector('.trophy-case__badge-hint')?.textContent).toBe(
       '5 SNOWBALL HITS / DAY',
     );

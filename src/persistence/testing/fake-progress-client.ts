@@ -107,6 +107,8 @@ export interface FakeResponses {
   /** #51 slice 4 */
   logStairFlight?: FakeResult<unknown>;
   stairClimbProgress?: FakeResult<unknown>;
+  /** #154 */
+  recordSnowballHit?: FakeResult<unknown>;
 }
 
 export type LoggedCall = [op: string, ...args: unknown[]];
@@ -234,6 +236,9 @@ export function makeFakeClient(responses: FakeResponses = {}): {
     } satisfies FakeResult<unknown>);
   const submitPitch =
     responses.submitPitch ?? ({ data: { seconds: 0 }, error: null } satisfies FakeResult<unknown>);
+  const recordSnowballHit =
+    responses.recordSnowballHit ??
+    ({ data: { counted: true, today: 1 }, error: null } satisfies FakeResult<unknown>);
 
   const client: ProgressClient = {
     from(table) {
@@ -435,6 +440,9 @@ export function makeFakeClient(responses: FakeResponses = {}): {
       }
       if (fn === 'stair_climb_progress') {
         return Promise.resolve(stairClimbProgress);
+      }
+      if (fn === 'record_snowball_hit') {
+        return Promise.resolve(recordSnowballHit);
       }
       throw new Error(`unexpected rpc ${fn}`);
     },

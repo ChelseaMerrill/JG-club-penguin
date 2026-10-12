@@ -46,10 +46,11 @@ describe('questsInBuild', () => {
       'igloo-badge',
       'bug-squash',
       'pancake-flip',
-      // #141/#142/#140: a steps Quest is always in the build.
+      // #141/#142/#140/#154: a steps Quest is always in the build.
       'nicole-coffee',
       'pitch-hack',
       'pair-flaky-test',
+      'snowmageddon',
     ]);
   });
 

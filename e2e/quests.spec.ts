@@ -109,12 +109,12 @@ test('the widget tracks the main Quest and opens the Quests panel; TRACK and BAD
   await expect(panel).toBeVisible();
   await expect(widget).toBeHidden();
   // Main, the Igloo Badge Quest (#143), Nicole's coffee (#141), Linda's
-  // pitch (#142), "Pair with a JGer" (#140) + one per registered Minigame
-  // (Bug Squash, Pancake Flip,
-  // Snow Cone Stand, Coffee Rush, Beystadium).
-  await expect(panel.locator('[data-quests-tab="active"]')).toHaveText('ACTIVE · 10');
+  // pitch (#142), "Pair with a JGer" (#140), Snowmageddon (#154) + one per
+  // registered Minigame (Bug Squash, Pancake Flip, Snow Cone Stand, Coffee
+  // Rush, Beystadium).
+  await expect(panel.locator('[data-quests-tab="active"]')).toHaveText('ACTIVE · 11');
   await expect(panel.locator('[data-quests-tab="done"]')).toHaveText('DONE · 0');
-  await expect(panel.locator('.quests__row')).toHaveCount(10);
+  await expect(panel.locator('.quests__row')).toHaveCount(11);
   const bey = panel.locator('[data-quest-id="beystadium"]');
   await expect(bey.locator('.quests__row-title')).toHaveText('LET IT RIP · WIN 3 MATCHES');
   await expect(bey.locator('.quests__row-location')).toHaveText('TEAM ROOM 4 · TALK TO MICHAEL');
@@ -140,6 +140,13 @@ test('the widget tracks the main Quest and opens the Quests panel; TRACK and BAD
   );
   await expect(pairFlakyTest.locator('.quests__row-progress')).toHaveText('0 / 5');
   await expect(pairFlakyTest.locator('.quests__row-reward')).toHaveText('150');
+  const snowmageddon = panel.locator('[data-quest-id="snowmageddon"]');
+  await expect(snowmageddon.locator('.quests__row-title')).toHaveText(
+    'Snowmageddon: hit 5 penguins today',
+  );
+  await expect(snowmageddon.locator('.quests__row-location')).toHaveText('ANYWHERE · SNOWBALL');
+  await expect(snowmageddon.locator('.quests__row-progress')).toHaveText('0 / 5');
+  await expect(snowmageddon.locator('.quests__row-reward')).toHaveText('75');
   const pancake = panel.locator('[data-quest-id="pancake-flip"]');
   await expect(pancake.locator('.quests__row-location')).toHaveText(
     'THE KITCHEN · TALK TO CHELSEA',
