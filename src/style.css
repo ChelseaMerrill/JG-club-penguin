@@ -1454,9 +1454,14 @@ body {
    buttons: 48px tall, Anton 20px, the same six-point chevron `clip-path`
    (#36 round-1 review item 10). */
 .npc-dialog__button {
-  height: 48px;
-  padding: 0 24px;
-  white-space: nowrap;
+  /* #224: buttons keep their one-line width and move to a new row rather than
+     shrinking (flex: none), and a label too long for a whole row wraps inside
+     a taller chevron (min-height, not height) instead of being clipped. */
+  flex: none;
+  max-width: 100%;
+  min-height: 48px;
+  padding: 8px 24px;
+  line-height: 1.1;
   border: none;
   clip-path: polygon(
     14px 0,
