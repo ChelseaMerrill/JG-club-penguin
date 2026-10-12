@@ -37,13 +37,22 @@ const AWAITING_BA_LINE: readonly string[] = [
   // Linda Martin, placed in The Icebox with one card line (owner request,
   // 2026-10-09).
   'linda-martin',
-  // The 19 LATAM JGers (7 Café, 6 Disco Hall, 6 Futebol Field) are NOT here
-  // (owner request, 2026-10-09): their character sheet gives no quote at all,
-  // and rather than inventing placeholder flavor text pending BA copy, they
-  // carry `dialog: { kind: 'none' }` and no `dialogLines` -- there is no
-  // dialog to await copy for, so `dialogLinePool` gives each of them zero
-  // lines, not one, and they are excluded from the check below by
-  // `dialog.kind` instead of being listed here.
+  // 18 of the 19 LATAM JGers (7 Café, 6 Disco Hall, 5 of the Futebol Field's
+  // 6) are NOT here (owner request, 2026-10-09): their character sheet gives
+  // no quote at all, and rather than inventing placeholder flavor text
+  // pending BA copy, they carry `dialog: { kind: 'none' }` and no
+  // `dialogLines` -- there is no dialog to await copy for, so
+  // `dialogLinePool` gives each of them zero lines, not one, and they are
+  // excluded from the check below by `dialog.kind` instead of being listed
+  // here.
+  //
+  // Chrystian Rissoli (the Futebol Field's 6th) is the one exception (#220):
+  // he hosts Penalty Kick now, a `kind: 'minigame'` dialog, which always
+  // shows its own `triggerLine` instead of this pool -- his own single
+  // `dialogLines` entry exists only so the pool is never empty for a dialog
+  // kind that isn't `'none'`, and is never actually shown, so it lands here
+  // rather than getting an invented second line just to clear this check.
+  'chrystian-rissoli',
 ];
 
 /**
@@ -137,7 +146,7 @@ describe('dialogLinePool', () => {
     expect(short).toEqual([...AWAITING_BA_LINE].sort());
   });
 
-  it('gives every dialog.kind === "none" NPC (the 19 LATAM JGers) no dialog lines at all', () => {
+  it('gives every dialog.kind === "none" NPC (18 of the 19 LATAM JGers) no dialog lines at all', () => {
     const noneNpcs = Object.values(NPCS).filter((npc) => npc.dialog.kind === 'none');
     expect(noneNpcs.map((npc) => npc.id).sort()).toEqual(
       [
@@ -157,7 +166,7 @@ describe('dialogLinePool', () => {
         'thalles-stakonski',
         'bruno-amado',
         'washington-marino',
-        'chrystian-rissoli',
+        // #220: Chrystian Rissoli left this list -- he hosts Penalty Kick now.
         'paulo-ponciano',
         'gustavo-barska',
       ].sort(),

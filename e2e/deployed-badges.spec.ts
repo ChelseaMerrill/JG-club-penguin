@@ -131,7 +131,7 @@ test('deployed-badges: the Session check awards First Waddle and pays exactly +5
   expect(await readState()).toEqual(before);
 });
 
-test('deployed-badges: the Trophy Case shows x / 15 over two pages with First Waddle earned', async ({
+test('deployed-badges: the Trophy Case shows x / 16 over two pages with First Waddle earned', async ({
   page,
 }) => {
   test.skip(!DEPLOY_URL || !AUTH_STATE, 'requires DEPLOY_URL and AUTH_STATE');
@@ -155,7 +155,7 @@ test('deployed-badges: the Trophy Case shows x / 15 over two pages with First Wa
   }).toPass({ timeout: 15_000 });
 
   await expect(page.locator('.trophy-case__subtitle')).toHaveText(
-    /^YOUR IGLOO · BADGES · \d+ \/ 15$/,
+    /^YOUR IGLOO · BADGES · \d+ \/ 16$/,
   );
   await expect(page.locator('.trophy-case__page-dot')).toHaveCount(2);
   await expect(page.locator('[data-badge-id="first-waddle"]')).toHaveClass(

@@ -108,6 +108,18 @@ export const BADGE_CATALOG: readonly (BadgeDefinition & { id: BadgeId })[] = [
     sortOrder: 15,
     available: true,
   },
+  // #220: unlike every Badge above (all 15 seeded, available or not, by
+  // #138's original migration), Goleador didn't exist yet: it is inserted
+  // fresh, already available, by `20261012010000_penalty_kick.sql` -- so it
+  // has no entry in that original seed and isn't a `BADGE_AVAILABILITY_
+  // OVERRIDES` flip (`badge-catalog.test.ts` covers both cases).
+  {
+    id: 'goleador',
+    name: 'Goleador',
+    howToEarn: 'SCORE 4 OF 5 PENALTIES',
+    sortOrder: 16,
+    available: true,
+  },
 ];
 
 /**
