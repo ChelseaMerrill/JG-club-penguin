@@ -1,5 +1,6 @@
 import type { HexColor, RoomId, Tile } from '../../contracts';
 import type { Placement } from '../../persistence/progress-store';
+import type { DiscoFloorTile } from './disco-floor';
 import type { TankFish } from './tank-fish';
 
 /**
@@ -187,4 +188,12 @@ export interface RoomDefinition {
   tankFish?: TankFish;
   /** Potted plants on these floor tiles, a decoration (`plants.ts`); each tile must be unwalkable. */
   plants?: readonly Tile[];
+  /**
+   * A floor that cycles colours like its design (owner request, 2026-10-09:
+   * the LATAM Disco Hall's dance floor -- see `disco-floor.ts`), drawn above
+   * `background` and below every NPC/Penguin/foreground. Not from `walkable`:
+   * only the LATAM Disco Hall's design has this animation baked into its
+   * `.dc.html`, so nothing derives it generically from the grid.
+   */
+  animatedFloorTiles?: readonly DiscoFloorTile[];
 }

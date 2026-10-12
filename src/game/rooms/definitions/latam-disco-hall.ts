@@ -1,5 +1,6 @@
 import type { RoomDefinition } from '../room-definition';
 import { createStandardRoomGrid } from '../grid';
+import { LATAM_DISCO_HALL_FLOOR_TILES } from './latam-disco-hall-floor';
 
 /**
  * Traced from `design/Latam Disco Hall.dc.html` ("18 · LATAM DISCO HALL"):
@@ -85,4 +86,8 @@ export const latamDiscoHall: RoomDefinition = {
     { npcId: 'fernando-garagnani', tile: { col: 8, row: 4 }, offset: { x: 10, y: 0 } },
     { npcId: 'ricardo-cordeiro', tile: { col: 7, row: 6 }, offset: { x: 5, y: -7.5 } },
   ],
+  // The dance floor's own flashing tile colours (the design's `<animate>`
+  // SMIL loops `RoomScene`'s exported PNG froze at one frame): generated,
+  // never hand-edited (`scripts/latam-disco-floor.ts`).
+  animatedFloorTiles: LATAM_DISCO_HALL_FLOOR_TILES,
 };
