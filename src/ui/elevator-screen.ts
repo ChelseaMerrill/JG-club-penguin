@@ -49,6 +49,8 @@ export interface ElevatorScreenOptions {
   resolveLook: () => PenguinLook | null;
   /** How long each floor crossed takes (#163); default `MS_PER_FLOOR` (1200ms). */
   msPerFloor?: number;
+  /** Called whenever the overlay hides (#170 D6: the doors' keyboard layer wakes then). */
+  onHide?: () => void;
 }
 
 /**
@@ -257,7 +259,9 @@ export function createElevatorScreen(
     stopRideLoop();
     minElapsed = false;
     readyReceived = false;
+    const wasShowing = !overlay.hidden;
     overlay.hidden = true;
+    if (wasShowing) options.onHide?.();
   }
 
   /** Hides only once both the ride has ended and `ready()` has fired (#52 D4). */

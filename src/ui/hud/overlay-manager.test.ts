@@ -125,4 +125,39 @@ describe('createOverlayManager', () => {
     expect(onClose).not.toHaveBeenCalled();
     expect(manager.current()).toBe('menu');
   });
+
+  it('onClose fires after the open overlay closes by close(), Escape or another opening, with its id (#170 D6)', () => {
+    manager = createOverlayManager();
+    const closed: Array<{ id: string; current: string | null }> = [];
+    const m = manager;
+    m.onClose((id) => closed.push({ id, current: m.current() }));
+
+    m.open('a', () => {});
+    m.close('a');
+    m.open('b', () => {});
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    m.open('c', () => {});
+    m.open('d', () => {});
+
+    expect(closed).toEqual([
+      { id: 'a', current: null },
+      { id: 'b', current: null },
+      { id: 'c', current: null },
+    ]);
+  });
+
+  it('onClose never fires for a no-op close, and its unsubscribe stops it (#170 D6)', () => {
+    manager = createOverlayManager();
+    const onClose = vi.fn();
+    const unsubscribe = manager.onClose(onClose);
+
+    manager.close('nothing-open');
+    manager.open('a', () => {});
+    manager.close('not-a');
+    expect(onClose).not.toHaveBeenCalled();
+
+    unsubscribe();
+    manager.close('a');
+    expect(onClose).not.toHaveBeenCalled();
+  });
 });
