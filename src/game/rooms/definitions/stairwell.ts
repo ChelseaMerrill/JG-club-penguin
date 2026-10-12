@@ -66,6 +66,18 @@ function downPill(floor: number): DoorHotspot {
 const LANDING_DOOR: DoorHotspot = { x: 405, y: 392.5, width: 70, height: 165 };
 
 /**
+ * The two exit pills the design draws as links beside a landing door, each
+ * its pill's own rect in the design and the art, border included: floor 0's
+ * "↙ LOBBY · 108 STATE ST" (`left:36px; bottom:112px`, 191 px wide, where
+ * the other floors draw "↓") and floor 5's "↙ FLOOR 5 · JG HQ" (`left:36px;
+ * top:120px`, 156 px wide). Each is a second hotspot for its landing door's
+ * exit, with the same label, target and landing, so the baked pill does what
+ * it says (owner request, 2026-10-11).
+ */
+const LOBBY_PILL: DoorHotspot = { x: 36, y: 748, width: 191, height: 40 };
+const JG_HQ_PILL: DoorHotspot = { x: 36, y: 120, width: 156, height: 40 };
+
+/**
  * The upper stair flight, from the stairs polygon the design links up a
  * floor (`640,540 800,300 1010,300 1010,420 820,415 690,600`): only its
  * upper part, which clears every NPC's hit area (the lower part runs
@@ -142,12 +154,13 @@ function doorsFor(floor: number): FloorDoors {
       entryTile: roofDeck.spawnTile,
     };
     doors.push(up);
-    doors.push({
+    const jgHq: RoomDoor = {
       label: 'JG HQ',
       hotspot: LANDING_DOOR,
       targetRoomId: 'town-center',
       entryTile: TOWN_CENTER_STAIRWELL_SILL,
-    });
+    };
+    doors.push(jgHq, { ...jgHq, hotspot: JG_HQ_PILL });
   }
   if (floor > 0) {
     down = {
@@ -167,6 +180,9 @@ function doorsFor(floor: number): FloorDoors {
     };
   }
   doors.push(down);
+  // Floor 0's "↙ LOBBY" pill shares the landing door's exit; ↓ still uses
+  // the door alone, so one press shows one hint.
+  if (floor === 0) doors.push({ ...down, hotspot: LOBBY_PILL });
   return { doors, up, down };
 }
 

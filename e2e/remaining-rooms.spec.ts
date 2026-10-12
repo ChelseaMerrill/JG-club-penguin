@@ -432,3 +432,58 @@ test("The Stairwell: floor 0's LOBBY door is coming soon, clicked or by holding 
 
   expect(errors).toEqual([]);
 });
+
+// Every Stairwell door, pill or frame, clicked from the floor's spawn tile
+// (not from the approach tile a pill-to-pill climb lands on): the Penguin
+// walks there and changes Room, or (floor 0's LOBBY door and pill) shows the
+// coming-soon hint. Each floor is re-entered by `changeRoom`, which lands on
+// its spawn tile; a move between two Stairwell floors, or from Town Center or
+// the Roof Deck onto floor 5, never shows the Elevator, so after the first
+// visit there is nothing to wait out.
+test('The Stairwell: every door and pill works when clicked from the spawn tile', async ({
+  page,
+}) => {
+  test.setTimeout(360_000);
+  const errors = collectErrors(page);
+
+  await page.goto('/?asPlayer');
+  await waitForBoot(page);
+
+  for (const room of STAIRWELL_DEFINITIONS) {
+    for (const through of room.doors) {
+      const name = `${room.id} / ${through.label} (${through.hotspot.x}, ${through.hotspot.y})`;
+      // Re-enter at the spawn tile: from another floor if already here.
+      if ((await debugInfo(page))?.roomId === room.id) {
+        await changeRoom(page, room.id === 'stairwell-5' ? 'stairwell-4' : 'stairwell-5');
+      }
+      await changeRoom(page, room.id);
+      await waitForElevatorHidden(page);
+      expect((await debugInfo(page))?.localPenguin?.tile, name).toEqual(room.spawnTile);
+
+      await clickStagePoint(page, {
+        x: through.hotspot.x + through.hotspot.width / 2,
+        y: through.hotspot.y + through.hotspot.height / 2,
+      });
+      if (through.targetRoomId === null) {
+        await expect
+          .poll(async () => (await debugInfo(page))?.comingSoonHint, {
+            timeout: WALK_TIMEOUT,
+            intervals: [50],
+            message: name,
+          })
+          .toBe(through.label);
+        expect((await debugInfo(page))?.roomId, name).toBe(room.id);
+        continue;
+      }
+      await expect
+        .poll(async () => (await debugInfo(page))?.roomId, { timeout: WALK_TIMEOUT, message: name })
+        .toBe(through.targetRoomId);
+      await expect
+        .poll(async () => (await debugInfo(page))?.localPenguin?.tile, { message: name })
+        .toEqual(through.entryTile);
+      await waitForElevatorHidden(page);
+    }
+  }
+
+  expect(errors).toEqual([]);
+});

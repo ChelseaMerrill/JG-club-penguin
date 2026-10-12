@@ -601,14 +601,14 @@ describe('ROOM_DEFINITIONS registry', () => {
       'the-mullet': ['dev-pit', 'office-hallway'],
       // #51 slice 4: each floor's ↑ pill and upper stair flight both climb a
       // floor, and its ↓ pill descends one. Floor 0's LOBBY door waits for
-      // #169; floor 5's flight leads to the Roof Deck and its JG HQ door to
-      // Town Center.
+      // #169 (its "↙ LOBBY" pill too); floor 5's flight leads to the Roof
+      // Deck, and its JG HQ door and "↙ FLOOR 5 · JG HQ" pill to Town Center.
       'stairwell-0': ['stairwell-1', 'stairwell-1'],
       'stairwell-1': ['stairwell-0', 'stairwell-2', 'stairwell-2'],
       'stairwell-2': ['stairwell-1', 'stairwell-3', 'stairwell-3'],
       'stairwell-3': ['stairwell-2', 'stairwell-4', 'stairwell-4'],
       'stairwell-4': ['stairwell-3', 'stairwell-5', 'stairwell-5'],
-      'stairwell-5': ['roof-deck', 'stairwell-4', 'town-center'],
+      'stairwell-5': ['roof-deck', 'stairwell-4', 'town-center', 'town-center'],
       // Reached only from the Map; its BACK TO HQ pill (a HUD button, not a
       // door) is its one exit.
       'remote-lounge': [],

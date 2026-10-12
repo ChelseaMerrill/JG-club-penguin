@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ROOM_IDS, type RoomId } from '../../contracts';
+import { findPath } from '../movement/pathfinding';
 import { doorApproachTile, npcInteractionTile } from '../movement/targets';
 import { STAIRWELL_DEFINITIONS, stairwellExit } from './definitions/stairwell';
 import { townCenter } from './definitions/town-center';
@@ -201,5 +202,41 @@ describe('Stairwell doors (S4-D4)', () => {
     ]);
     expect(stairwellExit('stairwell-0', 'down')?.targetRoomId).toBeNull();
     expect(stairwellExit('town-center' as RoomId, 'up')).toBeUndefined();
+  });
+
+  it('makes the baked "↙ LOBBY" and "↙ FLOOR 5 · JG HQ" pills second hotspots for their landing doors', () => {
+    const [bottom, top] = [floors[0]!, floors[5]!];
+    const lobbies = bottom.doors.filter((each) => each.label === 'LOBBY');
+    expect(lobbies.map((each) => each.hotspot)).toEqual([
+      { x: 405, y: 392.5, width: 70, height: 165 },
+      { x: 36, y: 748, width: 191, height: 40 },
+    ]);
+    for (const lobby of lobbies) {
+      expect(lobby).toMatchObject({ targetRoomId: null, entryTile: lobbies[0]!.entryTile });
+    }
+    // ↓ keeps the landing door alone, so one press shows one hint.
+    expect(stairwellExit(bottom.id, 'down')).toBe(lobbies[0]);
+
+    const jgHqs = top.doors.filter((each) => each.label === 'JG HQ');
+    expect(jgHqs.map((each) => each.hotspot)).toEqual([
+      { x: 405, y: 392.5, width: 70, height: 165 },
+      { x: 36, y: 120, width: 156, height: 40 },
+    ]);
+    for (const jgHq of jgHqs) {
+      expect(jgHq).toMatchObject({ targetRoomId: 'town-center', entryTile: jgHqs[0]!.entryTile });
+    }
+  });
+
+  it("reaches every door's approach tile from the floor's spawn tile", () => {
+    for (const room of floors) {
+      for (const each of room.doors) {
+        const approach = doorApproachTile(room.walkable, each, room.grid.origin);
+        expect(room.walkable[approach.row]![approach.col], `${room.id} / ${each.label}`).toBe(true);
+        expect(
+          findPath(room.walkable, room.spawnTile, approach),
+          `${room.id} / ${each.label}`,
+        ).not.toBeNull();
+      }
+    }
   });
 });
