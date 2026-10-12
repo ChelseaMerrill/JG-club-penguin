@@ -6,6 +6,7 @@ import type { CoffeeRushTestHooks } from './coffee-rush/coffee-rush';
 import type { LaunchedMinigame, MinigameLauncher } from './minigame-launcher';
 import type { MinigameTestHandle } from './minigame-test-handle';
 import type { PancakeFlipTestHooks } from './pancake-flip/pancake-flip';
+import type { PenaltyKickTestHooks } from './penalty-kick/penalty-kick';
 import type { SnowConeStandTestHooks } from './snow-cone-stand/snow-cone-stand';
 import type { StubMinigameTestHooks } from './stub-minigame';
 
@@ -37,6 +38,10 @@ function hasSnowConeStandHooks(value: unknown): value is SnowConeStandTestHooks 
 
 function hasBeystadiumHooks(value: unknown): value is BeystadiumTestHooks {
   return !!value && typeof (value as Partial<BeystadiumTestHooks>).debugFinishNow === 'function';
+}
+
+function hasPenaltyKickHooks(value: unknown): value is PenaltyKickTestHooks {
+  return !!value && typeof (value as Partial<PenaltyKickTestHooks>).debugForceShot === 'function';
 }
 
 /** True when `value` is one of `MINIGAME_RULES`'s registered ids. */
@@ -105,6 +110,10 @@ export function initDevMinigameHook(hud: Hud, launcher: MinigameLauncher): boole
     finishBeystadiumNow() {
       // Gated on the loaded id for the same reason as `finishPancakeFlipNow`.
       if (currentId === 'beystadium' && hasBeystadiumHooks(hooks)) hooks.debugFinishNow();
+    },
+    takePenaltyKickShot(outcome) {
+      // Gated on the loaded id for the same reason as `finishPancakeFlipNow`.
+      if (currentId === 'penalty-kick' && hasPenaltyKickHooks(hooks)) hooks.debugForceShot(outcome);
     },
     launch(minigameId) {
       if (!isMinigameId(minigameId)) return;

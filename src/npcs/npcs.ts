@@ -475,6 +475,25 @@ const BEYSTADIUM_DIALOG: NpcMinigameDialog = {
   subtitle: 'THE POD · IT ASSOCIATE · BEYSTADIUM CHAMP',
 };
 
+/**
+ * Chrystian Rissoli's Penalty Kick trigger dialog (#220), verbatim from
+ * `design/Minigame Penalty Kick.dc.html`'s trigger phase: its line and its
+ * TAKE THE SHOT / JUST WATCHING buttons, with Chrystian's own figure and
+ * name standing in for the design's generic "COACH" (owner decision: a real
+ * LATAM JGer hosts, per the ticket). Opened by walking up to or clicking
+ * him, or the Futebol Field's `penalty-kick-ball` hotspot
+ * (`latam-futebol-field.ts`, wired in `main.ts`).
+ */
+const PENALTY_KICK_DIALOG: NpcMinigameDialog = {
+  kind: 'minigame',
+  minigameId: 'penalty-kick',
+  actionLabel: 'TAKE THE SHOT',
+  declineLabel: 'JUST WATCHING',
+  triggerLine:
+    'Cinco pênaltis. Pick a corner and mean it. Score four and the Goleador badge is yours.',
+  subtitle: 'LATAM FUTEBOL FIELD · PENALTY KICK',
+};
+
 const IGLOO_GEAR_STALL_DIALOG: NpcStallDialog = { kind: 'stall', stallId: 'igloo-gear' };
 
 const LINE_DIALOG: NpcLineDialog = { kind: 'line' };
@@ -2557,17 +2576,19 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
   // `card-figures.ts`'s LATAM comment), placed at their own position in
   // `design/Latam Futebol Field.dc.html` (owner request, 2026-10-09). None of
   // the 19 LATAM cards carries a title or a quote (confirmed by inspection),
-  // so `title` is `null` and `dialog` is `NO_DIALOG` for all six: walking up
-  // to or clicking any of them opens nothing, rather than inventing a shared
-  // placeholder line the sheet never gave them (removed from
-  // `dialog-lines.test.ts`'s `AWAITING_BA_LINE`). Each walks the design's own
-  // ping-pong `<animateTransform>` path on its shared .6s/4px walk bob,
-  // ported in `src/npcs/motions/latam-futebol-field.ts`, at the design's own
-  // 0.58 draw scale (Team Room 3's precedent). Chrystian Rissoli stands
-  // closest to the design's "KICK IT · PENALTY SHOOTOUT" ball icon (90 Stage
-  // px away, the next-closest 147), so he will host the Penalty Kick
-  // minigame's trigger dialog once it's built (ticket #220); the minigame
-  // itself is not built yet (see `latam-futebol-field.ts`'s own comment).
+  // so `title` is `null` for all six, and `dialog` is `NO_DIALOG` for five of
+  // them: walking up to or clicking any of those five opens nothing, rather
+  // than inventing a shared placeholder line the sheet never gave them
+  // (removed from `dialog-lines.test.ts`'s `AWAITING_BA_LINE`). Each walks
+  // the design's own ping-pong `<animateTransform>` path on its shared
+  // .6s/4px walk bob, ported in `src/npcs/motions/latam-futebol-field.ts`, at
+  // the design's own 0.58 draw scale (Team Room 3's precedent). Chrystian
+  // Rissoli stands closest to the design's "KICK IT · PENALTY SHOOTOUT" ball
+  // icon (90 Stage px away, the next-closest 147), so he hosts the Penalty
+  // Kick minigame's trigger dialog (ticket #220, `PENALTY_KICK_DIALOG`
+  // below): walking up to or clicking the ball itself (the Room's
+  // `penalty-kick-ball` hotspot, `latam-futebol-field.ts`) opens the same
+  // dialog as clicking him.
   'thalles-stakonski': {
     id: 'thalles-stakonski',
     name: 'Thalles Stakonski',
@@ -2612,7 +2633,15 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     kind: 'human',
     tagName: 'Chrystian Rissoli',
     idleLines: [],
-    dialog: NO_DIALOG,
+    // #220: his own `dialogLines` entry exists only so `dialogLinePool`
+    // never throws on this appearance (every dialog kind but `'none'`
+    // needs at least one); it is never actually shown, since a
+    // `kind: 'minigame'` dialog always displays its own `triggerLine`
+    // instead (see `NpcDefinitionBase.dialogLines`'s own comment).
+    dialogLines: [
+      'Cinco pênaltis. Pick a corner and mean it. Score four and the Goleador badge is yours.',
+    ],
+    dialog: PENALTY_KICK_DIALOG,
     scale: 0.58,
     figure: { card: 'chrystianRissoli' },
   },

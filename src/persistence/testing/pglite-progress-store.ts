@@ -64,6 +64,7 @@ export const MIGRATIONS = [
   ['quest-pitch-hack', '20261009010000_quest_pitch_hack.sql'],
   ['stair-climb', '20261011000000_stair_climb.sql'],
   ['quest-snowmageddon', '20261012000000_quest_snowmageddon.sql'],
+  ['penalty-kick', '20261012010000_penalty_kick.sql'],
 ] as const;
 
 export type MigrationName = (typeof MIGRATIONS)[number][0];

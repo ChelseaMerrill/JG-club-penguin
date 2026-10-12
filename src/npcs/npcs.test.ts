@@ -925,6 +925,9 @@ describe('NPCS', () => {
       'tom',
       'michael',
       'anthony',
+      // #220: Chrystian Rissoli hosts Penalty Kick -- a `kind: 'minigame'`
+      // dialog, like the talkers above -- its own test covers it below.
+      'chrystian-rissoli',
     ];
     const latamNpcIds: NpcId[] = [];
     for (const npc of Object.values(NPCS)) {
@@ -934,8 +937,9 @@ describe('NPCS', () => {
         expect(npc.dialog).toEqual({ kind: 'remote-card' });
         continue;
       }
-      // The 19 LATAM JGers carry no dialog at all (owner request, 2026-10-09):
-      // their character sheet gives no quote.
+      // 18 of the 19 LATAM JGers carry no dialog at all (owner request,
+      // 2026-10-09): their character sheet gives no quote. Chrystian
+      // Rissoli (excluded above) is the one exception (#220).
       if (
         npc.roomId === 'latam-cafe' ||
         npc.roomId === 'latam-disco-hall' ||
@@ -947,7 +951,22 @@ describe('NPCS', () => {
       }
       expect(npc.dialog).toMatchObject({ kind: 'line' });
     }
-    expect(latamNpcIds).toHaveLength(19);
+    expect(latamNpcIds).toHaveLength(18);
+  });
+
+  it('includes Chrystian Rissoli in the LATAM Futebol Field with a Penalty Kick trigger dialog', () => {
+    const chrystian = NPCS['chrystian-rissoli'];
+    expect(chrystian.name).toBe('Chrystian Rissoli');
+    expect(chrystian.roomId).toBe('latam-futebol-field');
+    expect(chrystian.dialog).toEqual({
+      kind: 'minigame',
+      minigameId: 'penalty-kick',
+      actionLabel: 'TAKE THE SHOT',
+      declineLabel: 'JUST WATCHING',
+      triggerLine:
+        'Cinco pênaltis. Pick a corner and mean it. Score four and the Goleador badge is yours.',
+      subtitle: 'LATAM FUTEBOL FIELD · PENALTY KICK',
+    });
   });
 
   it('gives a human NPC a figure spec and a penguin-kind NPC a fixed look', () => {

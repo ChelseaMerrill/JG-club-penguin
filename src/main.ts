@@ -1090,6 +1090,16 @@ gameEvents.on('hotspot:click', ({ hotspotId }) => {
   void questAwareStore.markCiBoardChecked();
 });
 
+// The LATAM Futebol Field's ball (#220, `penalty-kick-ball`): clicking it
+// opens the exact same Penalty Kick intro card clicking Chrystian Rissoli
+// does, by reusing the real `npc:arrived` event `createNpcDialog` (below)
+// already listens for -- one dialog implementation, two ways to reach it,
+// rather than a second copy of the trigger card's markup.
+gameEvents.on('hotspot:click', ({ hotspotId }) => {
+  if (hotspotId !== 'penalty-kick-ball') return;
+  gameEvents.emit('npc:arrived', { npcId: 'chrystian-rissoli' });
+});
+
 /**
  * Reloads the signed-in Player's `ProgressSnapshot` and pushes its Furniture
  * layout/catalog into `RoomScene` (#41 resolved decision 1): called once on
