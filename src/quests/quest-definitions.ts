@@ -231,6 +231,15 @@ export const QUEST_DEFINITIONS: readonly QuestDefinition[] = [
     roomId: 'latam-futebol-field',
     hintLocation: roomTitle('latam-futebol-field'),
   },
+  // #219: the design's own trigger-screen quest counter, "QUEST · CARNAVAL
+  // PARADE · 0 / 400 PTS"; Hector gives it, from the LATAM Disco Hall.
+  minigameQuest(
+    'carnaval-parade',
+    'CARNAVAL PARADE · SCORE 400 PTS',
+    'latam-disco-hall',
+    'TALK TO HECTOR',
+    'Score 400 in one parade',
+  ),
   // #141: Nicole's coffee run, steps in the ticket's order. The server's
   // `quest_steps__nicole_coffee` (20261006020000_quest_nicole_coffee.sql C4)
   // reports them; a cup that goes cold resets steps 3-5 until Tom hands over

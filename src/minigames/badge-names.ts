@@ -8,7 +8,9 @@ import { badgeDefinition } from '../persistence/badge-catalog';
  * Pancake Flip.dc.html`'s "Breakfast Club", `design/Trophy Case.dc.html`'s
  * tile titles for the rest; Coffee Rush's "Barista" and Snow Cone Stand's
  * "Brain Freeze" follow the same title-casing convention). They match the
- * catalog's `name` column (`public.badges`, #138).
+ * catalog's `name` column (`public.badges`, #138; Goleador's own row is
+ * `20261012010000_penalty_kick.sql`'s, #220, and Passista's own row is
+ * `20261012020000_carnaval_parade.sql`'s, #219).
  */
 const BADGE_NAMES: Record<BadgeId, string> = {
   exterminator: 'Exterminator',
@@ -27,6 +29,7 @@ const BADGE_NAMES: Record<BadgeId, string> = {
   'stair-master': 'Stair Master',
   'phish-fry': 'Phish Fry',
   goleador: 'Goleador',
+  passista: 'Passista',
 };
 
 /**

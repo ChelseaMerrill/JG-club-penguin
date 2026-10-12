@@ -89,6 +89,18 @@ function beystadiumStatsValid(stats: Readonly<Record<string, number>>): boolean 
   );
 }
 
+/**
+ * Carnaval Parade's `record_round` branch (#219): the server never trusts
+ * the client's `score` outright, so it rejects one that's higher than what
+ * `feathers`/`stars` could possibly have scored at the max x4 multiplier
+ * (`(10 * feathers + 25 * stars) * 4`), and rejects `barriersHit` over 3 (the
+ * round's own 3 lives mean a 4th barrier hit can't happen honestly).
+ */
+function carnavalParadeStatsValid(stats: Readonly<Record<string, number>>, score: number): boolean {
+  const bound = (10 * stat(stats, 'feathers') + 25 * stat(stats, 'stars')) * 4;
+  return stat(stats, 'barriersHit') <= 3 && score <= bound;
+}
+
 interface MinigameRuleBase {
   id: MinigameId;
   /** The round's maximum Token payout. */
@@ -98,9 +110,10 @@ interface MinigameRuleBase {
   badgeId: BadgeId;
   rawPayout(score: number, stats: Readonly<Record<string, number>>): number;
   rawBest(score: number, stats: Readonly<Record<string, number>>): number;
-  /** Extra per-Minigame stats checks; `false` rejects the round as
+  /** Extra per-Minigame stats checks, given the round's own `stats` and its
+   *  (already range/integer-checked) `score`; `false` rejects the round as
    *  `invalid_stats`. Omitted when the shared checks are enough. */
-  validStats?(stats: Readonly<Record<string, number>>): boolean;
+  validStats?(stats: Readonly<Record<string, number>>, score: number): boolean;
 }
 
 /** A Badge earned by one round's `rawBest` reaching `badgeThreshold`. */
@@ -209,6 +222,21 @@ export const MINIGAME_RULES = {
     validStats: penaltyKickStatsValid,
     rawPayout: (_score, stats) => 30 * stat(stats, 'goals') + 50 * stat(stats, 'golazos'),
     rawBest: (_score, stats) => stat(stats, 'goals') + stat(stats, 'golazos'),
+  },
+  // #219: the server never recomputes the payout from stats the way every
+  // other Minigame here does -- the multiplier depends on pickup *order*,
+  // which the aggregate stats can't reconstruct -- so `rawPayout`/`rawBest`
+  // both read the client's own (bound-checked) `score` directly.
+  'carnaval-parade': {
+    id: 'carnaval-parade',
+    cap: 120,
+    durationSeconds: 45,
+    badgeId: 'passista',
+    badgeKind: 'threshold',
+    badgeThreshold: 400,
+    validStats: carnavalParadeStatsValid,
+    rawPayout: (score) => Math.floor(score / 10),
+    rawBest: (score) => score,
   },
 } satisfies Record<MinigameId, MinigameRule>;
 
