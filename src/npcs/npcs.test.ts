@@ -54,7 +54,10 @@ describe('NPCS', () => {
     // Jon and Sydney left Town Center (owner request, 2026-10-02); the Mullet
     // and Team Room 3 have their own. Steven left the Dev Pit too; the
     // Characters sheet puts him in the Remote Lounge, which isn't built yet.
-    // Millie, Jason and Darrin left the Icebox (owner request, 2026-10-02).
+    // Millie, Jason and Darrin left the Icebox (owner request, 2026-10-02),
+    // and Jethro did too (owner request, 2026-10-12): his Team Room 1
+    // appearance stays, and his Icebox definition keeps the bubbles it
+    // shares with that appearance.
     const NO_LONGER_PLACED: NpcId[] = [
       'dom',
       'anthony',
@@ -66,6 +69,7 @@ describe('NPCS', () => {
       'millie-icebox',
       'jason',
       'darrin-icebox',
+      'jethro',
       // Millie and Brandon left the Market (owner request, 2026-10-02).
       'millie',
       'brandon',
