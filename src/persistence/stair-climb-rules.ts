@@ -1,6 +1,6 @@
 /**
  * The Stairs Challenge's rules (#51 slice 4), mirroring
- * `supabase/migrations/20260929000000_stair_climb.sql` (SC8-SC11) for the
+ * `supabase/migrations/20261011000000_stair_climb.sql` (SC8-SC11) for the
  * in-memory fake and the client.
  */
 

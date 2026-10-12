@@ -4,7 +4,7 @@
 -- first full climb earns the Stair Master Badge (#138). Not a Minigame: it
 -- has no timer, score, best or leaderboard, so record_round isn't used.
 --
--- Runs after 20260928020000_phishing_quiz.sql (#146) and needs #9's
+-- Runs after 20261009010000_quest_pitch_hack.sql (#142) and needs #9's
 -- 20260924000000_players.sql, #27's 20260924010000_saved_progress.sql and
 -- #138's 20260927000000_badges.sql (public.badges, public.award_badge). Apply
 -- by pasting into the Supabase SQL editor (no CLI). Safe to rerun: if a paste

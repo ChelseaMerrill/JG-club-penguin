@@ -1,5 +1,5 @@
 -- Stairs Challenge proof, against the #9 H1 fixture Player, in
--- 146_phishing_proof.sql's style. Covers 20260929000000_stair_climb.sql's
+-- 146_phishing_proof.sql's style. Covers 20261011000000_stair_climb.sql's
 -- decisions SC1-SC17.
 --
 -- What this proves: Stair Master is on in #138's catalog (SC14); the new

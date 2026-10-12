@@ -15,7 +15,7 @@ const COMING_SOON_TILE: MapRoomTile = {
 };
 
 describe('MAP_ROOMS', () => {
-  it('has the 14 design tiles, in the design document order', () => {
+  it('has the 14 design tiles, in the design document order, then the Remote Lounge', () => {
     expect(MAP_ROOMS.map((tile) => tile.number)).toEqual([
       '01',
       '02',
@@ -31,6 +31,7 @@ describe('MAP_ROOMS', () => {
       '12',
       '13',
       '15',
+      '16',
     ]);
   });
 
@@ -70,7 +71,11 @@ describe('MAP_ROOMS', () => {
     expect(isMapTileClickable(COMING_SOON_TILE)).toBe(false);
   });
 
-  it('gives every registered RoomDefinition exactly one clickable Map tile', () => {
+  it('gives every registered RoomDefinition exactly one clickable Map tile, except the LATAM section', () => {
+    // The LATAM section (owner request, 2026-10-09) is reached only from the
+    // Remote Lounge globe's LATAM pin and the Café's doors, never the Map -- unlike the Remote
+    // Lounge itself, which does get a Map tile (`16 · REMOTE LOUNGE`, above).
+    const NOT_ON_THE_MAP = ['latam-cafe', 'latam-disco-hall', 'latam-futebol-field'];
     for (const room of ROOM_DEFINITIONS) {
       // #51 slice 4 (RT2-4): the Stairwell's floors 1-5 have no tile of
       // their own; tile 12 opens floor 0 and stands for all six
@@ -78,6 +83,13 @@ describe('MAP_ROOMS', () => {
       if (/^stairwell-[1-5]$/.test(room.id)) {
         expect(MAP_ROOMS.some((tile) => tile.roomId === room.id)).toBe(false);
         expect(mapTileRoomId(room.id)).toBe('stairwell-0');
+        continue;
+      }
+      if (NOT_ON_THE_MAP.includes(room.id)) {
+        expect(
+          MAP_ROOMS.some((tile) => tile.roomId === room.id),
+          room.id,
+        ).toBe(false);
         continue;
       }
       const matches = MAP_ROOMS.filter((tile) => tile.roomId === room.id);

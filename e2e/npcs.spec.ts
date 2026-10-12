@@ -3,11 +3,8 @@ import type { RoomId } from '../src/contracts';
 import { npcLayout } from '../src/game/npcs/npc-layout';
 import { officeHallway } from '../src/game/rooms/definitions/office-hallway';
 import { roofDeck } from '../src/game/rooms/definitions/roof-deck';
-import { teamRoom2 } from '../src/game/rooms/definitions/team-room-2';
-import { teamRoom3 } from '../src/game/rooms/definitions/team-room-3';
 import { teamRoom4 } from '../src/game/rooms/definitions/team-room-4';
 import { theMelt } from '../src/game/rooms/definitions/the-melt';
-import { theMullet } from '../src/game/rooms/definitions/the-mullet';
 import { npcSlotPoint, tileToScreen } from '../src/game/rooms/iso';
 import { NPCS, type NpcId } from '../src/npcs/npcs';
 import { GAME_HEIGHT, GAME_WIDTH } from '../src/game/stage-size';
@@ -90,6 +87,10 @@ for (const roomId of [
   'stairwell-3',
   'stairwell-4',
   'stairwell-5',
+  'remote-lounge',
+  'latam-cafe',
+  'latam-disco-hall',
+  'latam-futebol-field',
 ] as const) {
   test(`npcs-${roomId}: NPCs show at their designed positions`, async ({ page }) => {
     const errors = await bootRoom(page, roomId);
@@ -151,44 +152,44 @@ test('Dev Pit: clicking Ian arrives, opens his dialog, and GRAB THE HAMMER opens
   expect(errors).toEqual([]);
 });
 
-test('Team Room 2: clicking Ian arrives, opens his dialog, and GRAB THE HAMMER opens Bug Squash (#51)', async ({
+test('Dev Pit: clicking Ian arrives, opens his dialog, and NOT MY TICKET shows his decline line (#181)', async ({
   page,
 }) => {
-  const errors = await bootRoom(page, 'team-room-2');
+  const errors = await bootRoom(page, 'dev-pit');
 
-  const ian = teamRoom2.npcSlots.find((slot) => slot.npcId === 'ian-team-room-2');
-  if (!ian) throw new Error('expected team-room-2 to have an "ian-team-room-2" NPC slot');
-  const point = tileToScreen(ian.tile, teamRoom2.grid.origin);
-
-  await clickStagePoint(page, point);
+  const ian = await npc(page, 'ian');
+  await clickStagePoint(page, { x: ian.x, y: ian.y });
 
   await expect
     .poll(async () => (await debugInfo(page))?.npcArrivedLog, { timeout: LONG_WALK_TIMEOUT })
-    .toContain('ian-team-room-2');
+    .toContain('ian');
 
   const dialog = page.locator('.npc-dialog');
   await expect(dialog).toBeVisible();
-  await expect(dialog.locator('.npc-dialog__name')).toHaveText('Ian Ballard');
 
-  const grabButton = dialog.getByRole('button', { name: 'GRAB THE HAMMER' });
-  await expect(grabButton).toBeVisible();
-  await grabButton.click();
+  const declineButton = dialog.getByRole('button', { name: 'NOT MY TICKET' });
+  await expect(declineButton).toBeVisible();
+  await declineButton.click();
 
-  await expect(page.locator('.minigame__howto')).toBeVisible();
-  await expect(page.locator('.minigame__howto-subtitle')).toContainText('BUG SQUASH');
+  await expect(dialog.locator('.npc-dialog__line')).toHaveText('Cool. Enjoy the red build.');
+  await expect(dialog).toBeVisible();
+
+  await dialog.locator('.npc-dialog__close').click();
   await expect(dialog).toBeHidden();
-
-  await page.screenshot({ path: 'test-results/npcs-team-room-2/bug-squash-launched.png' });
 
   expect(errors).toEqual([]);
 });
 
+// Team Room 2's Ian, and his Bug Squash dialog there, went when he left the
+// Room (owner request, 2026-10-02, Track D); the Dev Pit's Ian test above
+// covers that dialog.
+
 /**
- * #149: the Hallway's, Team Room 3's and Team Room 4's NPCs draw at their own
- * scales (Millie's with a hand-placed nameplate and an exact slot `offset`), so a
- * click at the middle of each one's own click area still has to arrive and open
- * its dialog. Ian (Team Room 2) is covered above; Michael's Beystadium launch
- * is `beystadium.spec.ts`; Jason's offset nameplate is covered below.
+ * #149: the Hallway's and Team Room 4's NPCs draw at their own scales, so a
+ * click at the middle of each one's own click area still has to arrive and
+ * open its dialog. Michael's Beystadium launch is `beystadium.spec.ts`. Team
+ * Room 3's Millie and the Mullet's Jason (whose offset nameplate had its own
+ * test) went when they left those Rooms (owner request, 2026-10-02).
  */
 const HAND_PLACED_CLICKS: {
   room: RoomId;
@@ -197,12 +198,6 @@ const HAND_PLACED_CLICKS: {
   name: string;
 }[] = [
   { room: 'office-hallway', definition: officeHallway, npcId: 'emily', name: 'Emily Smith' },
-  {
-    room: 'team-room-3',
-    definition: teamRoom3,
-    npcId: 'millie-team-room-3',
-    name: 'Millie Elliott',
-  },
   { room: 'team-room-4', definition: teamRoom4, npcId: 'michael', name: 'Michael Prete' },
 ];
 for (const { room, definition, npcId, name } of HAND_PLACED_CLICKS) {
@@ -225,32 +220,6 @@ for (const { room, definition, npcId, name } of HAND_PLACED_CLICKS) {
     expect(errors).toEqual([]);
   });
 }
-
-/**
- * #149: Jason's nameplate hangs 55.5 px left of him, off his figure, so it has
- * to be part of his click area: clicking its middle opens his dialog.
- */
-test("The Mullet: clicking Jason's offset nameplate opens his dialog (#149)", async ({ page }) => {
-  const errors = await bootRoom(page, 'the-mullet');
-
-  const slot = theMullet.npcSlots.find((s) => s.npcId === 'jason-mullet');
-  if (!slot) throw new Error('expected the-mullet to have a "jason-mullet" NPC slot');
-  const feet = npcSlotPoint(slot, theMullet.grid.origin);
-  const layout = npcLayout(NPCS['jason-mullet']);
-  await clickStagePoint(page, {
-    x: feet.x + layout.nameplateCenterX,
-    y: feet.y + (layout.nameplateTopY + layout.nameplateBottomY) / 2,
-  });
-
-  await expect
-    .poll(async () => (await debugInfo(page))?.npcArrivedLog, { timeout: LONG_WALK_TIMEOUT })
-    .toContain('jason-mullet');
-  const dialog = page.locator('.npc-dialog');
-  await expect(dialog).toBeVisible();
-  await expect(dialog.locator('.npc-dialog__name')).toHaveText('Jason Jahnel');
-
-  expect(errors).toEqual([]);
-});
 
 /**
  * Clicking near Ian's head (not just his own tile centre) still opens his

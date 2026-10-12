@@ -1,0 +1,60 @@
+/* The LATAM Rooms' own nav (`src/ui/latam-nav/latam-nav.ts`), shown only
+   while the local Player is in a LATAM Room. Every size is Stage pixels: the
+   #ui layer is the 1600x900 Stage. Unlike `.remote-lounge`/`.hud`, this isn't
+   a full-Stage overlay -- it's a small box sitting just under the HUD's
+   title/subtitle block -- so it keeps the shared `#ui > *` `pointer-events:
+   auto` default (`style.css`) rather than needing the "opt back in" dance
+   those do. Each pill still sets its own `pointer-events: auto` explicitly
+   below, so a future ancestor rule can never quietly swallow its clicks (a
+   past Remote Lounge globe pin shipped without a real click target). */
+
+.latam-nav {
+  position: absolute;
+  /* Left-aligned with the HUD's title/subtitle block (`.hud__title-block`,
+     `top: var(--hud-inset-y)` i.e. 28px); 108px is the Remote Lounge
+     roster's own precedent for "just under the title" at this same left
+     inset (`remote-lounge.css`'s `.remote-lounge__roster`). */
+  top: 108px;
+  left: var(--hud-inset-x);
+  display: flex;
+  gap: 8px;
+}
+
+.latam-nav[hidden] {
+  display: none;
+}
+
+/* The design's own door-pill look (`design/Latam Cafe.dc.html` and
+   siblings' "CAFE LOUNGE"/"DISCO HALL"/"FUTEBOL FIELD" pills: `#0C4B5F`
+   background, a chevron `clip-path`, `#06303D` inset shadow, white
+   Bumbastika/Anton text), scaled down from the design's 52px/20px to sit
+   clearly smaller than the HUD's own 40px top-right buttons and 52px bottom
+   bar. */
+.latam-nav__pill {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 30px;
+  padding: 0 14px;
+  border: none;
+  background: var(--jg-secondary);
+  clip-path: polygon(9px 0, calc(100% - 9px) 0, 100% 50%, calc(100% - 9px) 100%, 9px 100%, 0 50%);
+  box-shadow: inset 0 -3px 0 #06303d;
+  font-family: 'Bumbastika', 'Anton', sans-serif;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  color: var(--jg-light);
+  white-space: nowrap;
+  cursor: pointer;
+  pointer-events: auto;
+}
+
+.latam-nav__pill:hover,
+.latam-nav__pill:focus-visible {
+  filter: brightness(1.15);
+}
+
+.latam-nav__pill:focus-visible {
+  outline: none;
+  box-shadow: inset 0 0 0 2px var(--jg-light);
+}

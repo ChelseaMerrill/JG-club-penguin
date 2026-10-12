@@ -3,7 +3,11 @@ import { computeDebugOverlay, type DebugOverlayMarker } from '../src/game/rooms/
 import { bathroom } from '../src/game/rooms/definitions/bathroom';
 import { devPit } from '../src/game/rooms/definitions/dev-pit';
 import { igloo } from '../src/game/rooms/definitions/igloo';
+import { latamCafe } from '../src/game/rooms/definitions/latam-cafe';
+import { latamDiscoHall } from '../src/game/rooms/definitions/latam-disco-hall';
+import { latamFutebolField } from '../src/game/rooms/definitions/latam-futebol-field';
 import { officeHallway } from '../src/game/rooms/definitions/office-hallway';
+import { remoteLounge } from '../src/game/rooms/definitions/remote-lounge';
 import { roofDeck } from '../src/game/rooms/definitions/roof-deck';
 import {
   stairwell0,
@@ -51,6 +55,10 @@ const ROOM_DEFINITIONS: Record<RoomId, RoomDefinition> = {
   'stairwell-3': stairwell3,
   'stairwell-4': stairwell4,
   'stairwell-5': stairwell5,
+  'remote-lounge': remoteLounge,
+  'latam-cafe': latamCafe,
+  'latam-disco-hall': latamDiscoHall,
+  'latam-futebol-field': latamFutebolField,
 };
 
 /** Fails the test on any uncaught page error or console error. */

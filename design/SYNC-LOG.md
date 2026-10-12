@@ -2,6 +2,37 @@
 
 Newest first. Written by design_resync.py apply.
 
+## 2026-10-09 · plan 3a67a4d134ee
+
+From latam-snap by Chelsea Merrill (partial pull; binaries not re-verified).
+
+LATAM section: Characters LATAM, Cafe, Disco Hall, Futebol Field, Carnaval Parade, Penalty Kick; Remote Area globe LATAM link
+
+- added: `Characters LATAM.dc.html`
+- added: `Latam Cafe.dc.html`
+- added: `Latam Disco Hall.dc.html`
+- added: `Latam Futebol Field.dc.html`
+- added: `Minigame Carnaval Parade.dc.html`
+- added: `Minigame Penalty Kick.dc.html`
+- changed: `Remote Area.html`
+
+## 2026-10-06 · plan 959f6851cd75
+
+From snap3 by Chelsea Merrill (partial pull; binaries not re-verified).
+
+Remote Lounge only: adds Chris Nyberg and Nick Carson
+
+- changed: `Remote Area.html`
+
+## 2026-10-05 · plan 2caeddf39c5c
+
+From snap2 by Chelsea Merrill (partial pull; binaries not re-verified).
+
+Remote Lounge only (Remote Area.dc.html, Remote Area.html); other design changes not pulled
+
+- added: `Remote Area.dc.html`
+- added: `Remote Area.html`
+
 ## 2026-09-27 · plan 2937811514f1
 
 From Club JenGuin logo directions.zip by milliehime.

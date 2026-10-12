@@ -86,6 +86,19 @@ vi.mock('phaser', () => {
     fillRoundedRect() {
       return this;
     }
+    // #141's coffee cup.
+    fillPoints() {
+      return this;
+    }
+    strokePoints() {
+      return this;
+    }
+    fillRect() {
+      return this;
+    }
+    strokeRect() {
+      return this;
+    }
     once(event: string, handler: () => void) {
       this.handlers.set(event, handler);
       return this;
@@ -214,6 +227,23 @@ describe('createPenguin body-motion cleanup (#68 review fix 3)', () => {
     expect(tweens.every((t) => t.removed)).toBe(true);
   });
 
+  it("draws #141's coffee cup in the flipper only while carried, and never after destroy", () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: false }));
+    const { scene } = fakeScene();
+    const penguin = createPenguin(scene as unknown as Scene, 0, 0, DEFAULT_LOOK);
+    expect(penguin.hasCarriedCup()).toBe(false);
+
+    penguin.setCarriedCup(true);
+    expect(penguin.hasCarriedCup()).toBe(true);
+    expect(penguin.hasSnowHat()).toBe(false);
+    penguin.setCarriedCup(false);
+    expect(penguin.hasCarriedCup()).toBe(false);
+
+    penguin.setCarriedCup(true);
+    penguin.destroy();
+    expect(penguin.hasCarriedCup()).toBe(false);
+  });
+
   it('a destroy fired on the container directly also leaves no tween', () => {
     vi.stubGlobal('matchMedia', () => ({ matches: false }));
     const { scene, tweens } = fakeScene();
@@ -231,10 +261,10 @@ describe('createPenguin body-motion cleanup (#68 review fix 3)', () => {
       name: 'Waddles',
     });
     penguin.say('hello');
-    // The body holds only the sprite and snow hat; the overlay holds the name
-    // tag's pill and text and the bubble's pill and text. (Every fake here is
-    // one class, so the split is checked by count.)
-    expect(penguin.container.list).toHaveLength(2);
+    // The body holds only the sprite, snow hat and #141's coffee cup; the
+    // overlay holds the name tag's pill and text and the bubble's pill and
+    // text. (Every fake here is one class, so the split is checked by count.)
+    expect(penguin.container.list).toHaveLength(3);
     expect(penguin.overlay.list).toHaveLength(4);
     expect(penguin.overlay.name).toBe(PENGUIN_OVERLAY_NAME);
 

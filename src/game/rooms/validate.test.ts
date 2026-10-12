@@ -609,6 +609,19 @@ describe('ROOM_DEFINITIONS registry', () => {
       'stairwell-3': ['stairwell-2', 'stairwell-4', 'stairwell-4'],
       'stairwell-4': ['stairwell-3', 'stairwell-5', 'stairwell-5'],
       'stairwell-5': ['roof-deck', 'stairwell-4', 'town-center'],
+      // Reached only from the Map; its BACK TO HQ pill (a HUD button, not a
+      // door) is its one exit.
+      'remote-lounge': [],
+      // The LATAM section (owner request, 2026-10-09): the Café is reached
+      // from the Remote Lounge globe's LATAM pin. Their own door-pill bars
+      // (MAP and the two sibling links) sat at y≈826, exactly where the
+      // HUD's own bottom action bar covers them, so all three Rooms now have
+      // no `RoomDoor`s at all: `src/ui/latam-nav/latam-nav.ts` links the
+      // sibling LATAM Rooms as small pills under the HUD's title instead, and
+      // the HUD's MAP button is still the way back to HQ.
+      'latam-cafe': [],
+      'latam-disco-hall': [],
+      'latam-futebol-field': [],
     });
   });
 

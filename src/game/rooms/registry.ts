@@ -2,7 +2,11 @@ import type { RoomId } from '../../contracts';
 import { bathroom } from './definitions/bathroom';
 import { devPit } from './definitions/dev-pit';
 import { igloo } from './definitions/igloo';
+import { latamCafe } from './definitions/latam-cafe';
+import { latamDiscoHall } from './definitions/latam-disco-hall';
+import { latamFutebolField } from './definitions/latam-futebol-field';
 import { officeHallway } from './definitions/office-hallway';
+import { remoteLounge } from './definitions/remote-lounge';
 import { roofDeck } from './definitions/roof-deck';
 import {
   stairwell0,
@@ -44,6 +48,10 @@ export const ROOM_DEFINITIONS: readonly RoomDefinition[] = [
   stairwell3,
   stairwell4,
   stairwell5,
+  remoteLounge,
+  latamCafe,
+  latamDiscoHall,
+  latamFutebolField,
 ];
 
 // Fails fast on a broken RoomDefinition in dev (`npm run dev`) and test

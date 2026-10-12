@@ -17,7 +17,7 @@ function readRepoFile(...segments: string[]): string {
 
 const FIXTURE_PLACEHOLDER = /00000000-0000-0000-0000-00000000f1f0/g;
 
-// The Stairs Challenge migration (20260929000000_stair_climb.sql, #51 slice
+// The Stairs Challenge migration (20261011000000_stair_climb.sql, #51 slice
 // 4) against a real Postgres database (PGlite), migrated through every
 // migration in timestamp order. The proof file is what the reviewer re-runs
 // on real Postgres/Supabase; the rest are checks a raw connection makes as a

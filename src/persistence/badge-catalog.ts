@@ -122,7 +122,7 @@ export const BADGE_AVAILABILITY_OVERRIDES: ReadonlySet<BadgeId> = new Set<BadgeI
   'let-it-rip',
   // #146: 20260928020000_phishing_quiz.sql turns Phish Fry on.
   'phish-fry',
-  // #51 slice 4: 20260929000000_stair_climb.sql turns Stair Master on.
+  // #51 slice 4: 20261011000000_stair_climb.sql turns Stair Master on.
   'stair-master',
 ]);
 

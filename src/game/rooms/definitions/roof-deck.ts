@@ -21,15 +21,17 @@ import { createStandardRoomGrid } from '../grid';
 // unverified mask change to widen that aisle. Casey's tile already sat
 // outside the walkable interior. Millie's (2,5) and Brandon's (4,6) are open
 // again (they left the Market, owner request, 2026-10-02, Track D); the
-// five potted plants' own tiles (`plants` below) are blocked instead.
+// five potted plants' own tiles (`plants` below) are blocked instead, and
+// so are Bich Dudla's (2,5) and Eva Trimboli's (6,6), the tiles each one's
+// walk starts from (owner request, 2026-10-02, Track D).
 const WALKABLE: readonly (readonly boolean[])[] = [
   [false, false, false, false, false, false, false, false, false, false, false, true],
   [false, false, false, false, false, false, false, false, false, false, false, true],
   [false, true, true, true, false, true, true, true, true, true, true, true],
   [true, true, true, false, true, true, true, true, false, false, false, false],
   [true, true, true, true, true, true, true, true, false, false, false, false],
-  [true, true, true, true, true, true, true, false, true, false, false, false],
-  [false, false, true, true, true, true, true, true, true, true, true, true],
+  [true, true, false, true, true, true, true, false, true, false, false, false],
+  [false, false, true, true, true, true, false, true, true, true, true, true],
   [true, false, true, true, true, true, true, true, true, true, true, false],
   [true, true, true, true, true, true, true, true, true, false, false, true],
   [true, false, false, false, true, false, true, true, true, false, false, true],
@@ -122,6 +124,12 @@ export const roofDeck: RoomDefinition = {
     // valid column (11); clamped to 11 — a judgment call reported on the
     // #16 execution plan.
     { npcId: 'casey', tile: { col: 11, row: 5 } },
+    // New from the Characters sheet (owner request, 2026-10-02, Track D):
+    // Bich Dudla walks round the left-hand plants watering each one, and Eva
+    // Trimboli walks the middle and right of the deck. Each slot is where
+    // their walk starts and ends (`motions/roof-deck.ts`).
+    { npcId: 'bich-dudla', tile: { col: 2, row: 5 } },
+    { npcId: 'eva-trimboli', tile: { col: 6, row: 6 } },
   ],
   // Potted plants round the deck (owner request, 2026-10-02, Track D), on
   // open floor clear of the counters, the Kitchen arrow, the Tokens machine

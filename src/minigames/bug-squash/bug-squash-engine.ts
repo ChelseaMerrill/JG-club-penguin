@@ -1,7 +1,7 @@
 /**
  * Bug Squash's pure game logic: spawns and expires bugs across a 16-cell
  * grid, scores hits with a combo multiplier, and tracks build lights until
- * three escapes end the round. DOM-free and driven entirely by an injected
+ * five escapes end the round (#181). DOM-free and driven entirely by an injected
  * `rng` and explicit `tick(dtSeconds)` calls, so it's deterministically
  * unit-testable without touching `document`, a real clock, or real
  * randomness. Ported from `design/Minigame Bug Squash.dc.html`'s `tick`/
@@ -43,7 +43,7 @@ export const CELL_KEYS: readonly string[] = [
  *  keeps the shell's own timer at the same value). */
 export const ROUND_SECONDS = 60;
 
-export const MAX_LIGHTS = 3;
+export const MAX_LIGHTS = 5;
 export const MAX_COMBO_MULTIPLIER = 4;
 export const CYAN_POINTS = 10;
 export const FLAKY_POINTS = 25;
@@ -81,10 +81,10 @@ export interface BugSquashState {
   /** The best `comboMultiplier` reached this round; reported as the
    *  `bestCombo` stat. */
   bestComboMultiplier: number;
-  /** Remaining build lights, `3` down to `0`. */
+  /** Remaining build lights, `5` down to `0`. */
   lights: number;
   escaped: number;
-  /** True once `lights` has reached 0 (three escapes). The DOM layer calls
+  /** True once `lights` has reached 0 (five escapes). The DOM layer calls
    *  `context.finish()` when this flips true. */
   ended: boolean;
   cells: readonly BugSquashCell[];
@@ -98,6 +98,9 @@ export interface BugSquashStats {
   squashed: number;
   bestCombo: number;
   escaped: number;
+  /** #140: flaky (white, two-hit) bugs fully squashed this round, for the
+   *  "Squash 3 flaky bugs in one Bug Squash round" Quest step. */
+  flakyHits: number;
 }
 
 export interface BugSquashEngineOptions {
@@ -142,9 +145,9 @@ function spawnProbability(elapsedSec: number): number {
 
 function maxConcurrentBugs(elapsedSec: number): number {
   const elapsed = clampElapsed(elapsedSec);
-  if (elapsed < 20) return 2;
-  if (elapsed < 40) return 3;
-  return 4;
+  if (elapsed < 20) return 1;
+  if (elapsed < 40) return 2;
+  return 3;
 }
 
 function spawnTtlMs(elapsedSec: number): number {
@@ -162,6 +165,7 @@ export function createBugSquashEngine(options: BugSquashEngineOptions = {}): Bug
   let bestComboCount = 0;
   let lights = MAX_LIGHTS;
   let escaped = 0;
+  let flakyHits = 0;
   let ended = false;
   const bugs = new Map<number, Bug>();
 
@@ -194,7 +198,7 @@ export function createBugSquashEngine(options: BugSquashEngineOptions = {}): Bug
   }
 
   function getStats(): BugSquashStats {
-    return { score, squashed, bestCombo: deriveMultiplier(bestComboCount), escaped };
+    return { score, squashed, bestCombo: deriveMultiplier(bestComboCount), escaped, flakyHits };
   }
 
   /** One `STEP_MS` of simulation: ages/expires bugs, then maybe spawns one,
@@ -265,6 +269,10 @@ export function createBugSquashEngine(options: BugSquashEngineOptions = {}): Bug
     const points = (bug.flaky ? FLAKY_POINTS : CYAN_POINTS) * multiplier;
     score += points;
     squashed += 1;
+    // #140: a flaky bug reaches this branch only on its second hit (the
+    // first took it from hp 2 to 1 in the `partial` branch above), so this
+    // is exactly "fully squashed".
+    if (bug.flaky) flakyHits += 1;
     return { kind: 'squashed', points, multiplier };
   }
 

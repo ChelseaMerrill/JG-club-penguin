@@ -71,6 +71,10 @@ type RoomId =
   | 'team-room-4'
   | 'bathroom'
   | 'the-mullet'
+  | 'remote-lounge'
+  | 'latam-cafe'
+  | 'latam-disco-hall'
+  | 'latam-futebol-field'
   | 'stairwell-0'
   | 'stairwell-1'
   | 'stairwell-2'
@@ -129,6 +133,20 @@ const ROOM_FILES: Record<RoomId, string> = {
   'stairwell-3': 'Stairwell.dc.html',
   'stairwell-4': 'Stairwell.dc.html',
   'stairwell-5': 'Stairwell.dc.html',
+  // Not `Remote Area.dc.html`: that file only redirects here.
+  'remote-lounge': 'Remote Area.html',
+  // The LATAM section (owner request, 2026-10-09).
+  'latam-cafe': 'Latam Cafe.dc.html',
+  'latam-disco-hall': 'Latam Disco Hall.dc.html',
+  'latam-futebol-field': 'Latam Futebol Field.dc.html',
+};
+
+// Per-Room overrides of the element `openRoomStage` waits for before it
+// screenshots. Every `.dc.html` design renders into `#dc-root`; `Remote
+// Area.html` is a plain page that draws its own room shell with a script, so
+// it waits for that shell instead.
+const READY_SELECTORS: Partial<Record<RoomId, string>> = {
+  'remote-lounge': '#room polygon',
 };
 
 // A hide rule targets one of three shapes the design markup uses for a live
@@ -159,6 +177,15 @@ type HideRule =
   // go with it. `labels` can't reach these: its sibling walk stops at the
   // <g> wrapping the figure, leaving the shadow ellipse baked in.
   | { kind: 'label-group'; texts: string[]; comment: string }
+  // Like `label-group`, but for a character whose name is an SVG `<title>`
+  // (an accessible/hover name, not a baked glyph run) rather than a `<text>`
+  // (`design/Latam Cafe.dc.html`'s own figures, the LATAM section): hides
+  // the plain `<g>` the exact-matching `<title>` is a direct child of, which
+  // for this design's figures is the same group that also holds the
+  // nameplate, shadow and bob/walk animation -- so one rule removes the
+  // whole character. Fails loudly, like `label-group`, if a name matches no
+  // `<title>` or more than one, or sits outside a `<g>`.
+  | { kind: 'title-group'; texts: string[]; comment: string }
   // Exact-matching <text> elements only (#77): unlike `labels`, this never
   // touches preceding siblings, so a backing shape the <text> sits inside
   // (a hexagon badge, a banner plate) stays in the exported art -- only the
@@ -826,18 +853,20 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
     {
       kind: 'selector',
       selectors: [
-        'polygon[points="675,605.5 705,620.5 670,638 680,643 625,645.5 630,618 640,623"]',
+        'polygon[points="550,478 670,538 620,563 500,503"]',
+        'polygon[points="500,528 620,588 620,563 500,503"]',
+        'polygon[points="670,563 620,588 620,563 670,538"]',
+        'polygon[points="550,448 670,508 655,515.5 535,455.5"]',
+        'polygon[points="535,485.5 655,545.5 655,515.5 535,455.5"]',
+        'polygon[points="670,538 655,545.5 655,515.5 670,508"]',
       ],
       comment:
-        "First of two non-working floor arrow decals in this Room (#132): this Room's only working exit is the 'HALLWAY ↓' HUD nav pill below, not this floor paint.",
+        'The couch in front of the left desk, its seat and back boxes, removed from the Room (owner request, 2026-10-02, Track D).',
     },
-    {
-      kind: 'selector',
-      selectors: [
-        'polygon[points="890,713 920,728 885,745.5 895,750.5 840,753 845,725.5 855,730.5"]',
-      ],
-      comment: 'Second non-working floor arrow decal in this Room (#132), same reasoning as above.',
-    },
+    // #132's two floor-arrow rules are gone: the 2026-09-27 design resync
+    // removed both decals from `design/Team Room 2.dc.html` itself, so the
+    // selectors matched nothing and failed the export (owner request,
+    // 2026-10-02, Track D).
     {
       kind: 'animation',
       names: ['blink'],
@@ -1190,6 +1219,137 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
   'stairwell-3': stairwellRules(3),
   'stairwell-4': stairwellRules(4),
   'stairwell-5': stairwellRules(5),
+  // `design/Remote Area.html` is a plain script-drawn page, not a `.dc.html`
+  // design, so most of its live parts have their own ids. Its blinking "BACK
+  // TO HQ ↘" pill is HUD chrome, redrawn live by `src/ui/remote-lounge/`.
+  'remote-lounge': [
+    {
+      kind: 'selector',
+      selectors: ['#globeG', '#figs', '#scene > g:not([id])', '#roster', '#card', 'a[data-exit]'],
+      comment:
+        'The spinning globe and its glow, beam and stand; the remote JGers standing on the floor; the layer their quote bubbles pop up in; the roster list; the person card; and the BACK TO HQ pill. The hex pedestal under the globe is part of #room and stays.',
+    },
+    {
+      kind: 'cluster',
+      anchor: 'THE REMOTE LOUNGE',
+      companions: ['THE REMOTE LOUNGE', 'JGERS OUTSIDE HQ'],
+      comment: 'Room title/subtitle banner (HUD).',
+    },
+    {
+      kind: 'cluster',
+      anchor: 'MENU',
+      companions: ['1,250', '12 ONLINE', 'MENU'],
+      comment: 'Top-right token/presence/menu HUD cluster.',
+    },
+    {
+      kind: 'cluster',
+      anchor: 'EMOTE',
+      companions: ['EMOTE', 'SNOWBALL', 'QUESTS'],
+      comment: 'Bottom chat/action toolbar (HUD).',
+    },
+  ],
+  // `design/Latam Cafe.dc.html` (the LATAM section, owner request,
+  // 2026-10-09) draws no HUD chrome at all (no title/subtitle banner, no
+  // token/presence cluster, no chat/action toolbar -- confirmed, nothing in
+  // the file matches MENU/ONLINE/EMOTE/SNOWBALL/QUESTS/TOKENS): its only live
+  // elements are its seven JGers, plus its own bottom door-pill bar (below).
+  'latam-cafe': [
+    {
+      kind: 'title-group',
+      texts: [
+        'ALEXANDRE NUNES',
+        'YGOR AZEVEDO',
+        'FERNANDA GIOIOSA',
+        'JEAN RODRIGUES',
+        'JOAO VITOR AMORIM',
+        'VINICIUS MARTINS',
+        // Sander Nonaka's actual figure (body, shadow, bob): drawn once here,
+        // separately from his nameplate/glow/minigame-bubble group below
+        // (the design repeats his `translate(1095.0 402.5)` in two places).
+        'SANDER NONAKA',
+      ],
+      comment:
+        "The Room's seven JGers: each a <title>-named <g> holding its own figure, shadow and bob/walk animation. Six also carry their nameplate in the same group; Sander Nonaka's is drawn separately (see the `selector` rule below).",
+    },
+    {
+      kind: 'selector',
+      selectors: ['a[href="Minigame Pao de Queijo Memory.dc.html"]'],
+      comment:
+        'Sander Nonaka\'s nameplate, pulsing highlight glow and "MATCH THE TREATS" minigame-trigger bubble, drawn together in this second, separate group at his same point (his figure itself is the `title-group` rule above).',
+    },
+    {
+      kind: 'selector',
+      selectors: ['div[style*="bottom: 22px"]'],
+      comment:
+        'The design\'s own bottom door-pill bar (MAP / FUTEBOL FIELD / DISCO HALL), an HTML overlay <div> sitting just inside the Stage element, not part of the <svg> (owner request, 2026-10-09): hidden now that the HUD\'s own bottom action bar covers this same y≈826 row, and that the HUD\'s MAP button already opens the Map and `src/ui/latam-nav/latam-nav.ts` already links the sibling LATAM Rooms as small pills under the title. The `div[style*="bottom: 22px"]` selector matches this one wrapper <div> only -- the matching breadcrumb `<a href="Club JenGuin Map.dc.html">` above it sits outside the Stage element already and is never captured.',
+    },
+  ],
+  // `design/Latam Disco Hall.dc.html` draws no top-right MENU/presence
+  // cluster and no bottom EMOTE toolbar at all (a leaner design than the HQ
+  // Rooms'), and its "← MAP / 18 · LATAM DISCO HALL" breadcrumb sits above
+  // the Stage element in normal document flow (measured: breadcrumb bottom
+  // edge at viewport y=56, Stage top at y=70), so it's already outside the
+  // captured screenshot with no hide rule needed. The DJ booth's "SPIN IT ·
+  // CARNAVAL PARADE" sign is static, non-NPC design furniture and stays; its
+  // own bottom door-pill bar is hidden (below), like the Café's.
+  'latam-disco-hall': [
+    {
+      kind: 'selector',
+      selectors: ['#latam-people'],
+      comment:
+        "The six dancers (Lucas Varani, Hector Grecco, Jose Acosta, Fernando Possebon, Fernando Garagnani, Ricardo Cordeiro): each one's ground shadow, nameplate and bouncing/swaying figure.",
+    },
+    {
+      kind: 'selector',
+      selectors: ['div[style*="bottom: 22px"]'],
+      comment:
+        "The design's own bottom door-pill bar (MAP / CAFE LOUNGE / FUTEBOL FIELD), the same HTML overlay <div> the Café's own rule above hides, for the same reason (owner request, 2026-10-09).",
+    },
+  ],
+  // `design/Latam Futebol Field.dc.html` draws no in-canvas HUD banner or
+  // toolbar at all (unlike every indoor `.dc.html` Room), and its breadcrumb
+  // sits outside the exported `[data-screen-label]` Stage, so neither needs a
+  // rule here. Its whole scene is native SMIL (`<animate>`/`<animateTransform>`),
+  // not CSS `@keyframes`, so `kind: 'animation'` never matches here; every
+  // rule below is a `selector` instead, exactly like Remote Lounge's.
+  //
+  // The stadium's ~126 bobbing crowd dots and 3 animated corner-kick flags
+  // are deliberately left as static Room art, not hidden: `openRoomStage`'s
+  // `freezeSmilAnimations` already resets every `<animate>` to its rest frame
+  // before the screenshot, so they bake in looking like a normal seated
+  // crowd and planted flags, not a jarring mid-motion pose; and
+  // `hideSelectors` requires each selector to match exactly one element, so
+  // hiding ~126 individual unlabelled dots would need ~126 individually
+  // unique selectors for texture that is neither "people" nor "the ball" (a
+  // reviewable judgment call; the four orange training cones are likewise
+  // static, un-animated floor decoration and were never a candidate).
+  //
+  // The Penalty Kick minigame's bouncing ball (`a[href="Minigame Penalty
+  // Kick.dc.html"]`, with its pulsing glow ring and "KICK IT · PENALTY
+  // SHOOTOUT" callout) and its own ground shadow
+  // (`ellipse[cx="855"][cy="562"]`) are left un-hidden too (owner request,
+  // 2026-10-09: the ball was missing from the exported art). `freezeSmil
+  // Animations` resets both the bounce (`translate` 0/-34/0) and the shadow's
+  // pulsing `rx` to their 0% rest frame before the screenshot, so the ball
+  // bakes in sitting on the pitch at (855,546) rather than mid-bounce --
+  // exactly the Disco Hall's own precedent for keeping its "SPIN IT ·
+  // CARNAVAL PARADE" sign baked into the art instead of hidden. The minigame
+  // itself is not built yet (see `src/game/rooms/definitions/
+  // latam-futebol-field.ts`'s own comment, and tickets #218/#219/#220).
+  'latam-futebol-field': [
+    {
+      kind: 'selector',
+      selectors: ['#latam-people'],
+      comment:
+        "The six LATAM Futebol Field JGers (Thalles Stakonski, Bruno Amado, Washington Marino, Chrystian Rissoli, Paulo Ponciano, Gustavo Barska), each a wandering figure with its own nested ground shadow and nameplate -- hidden as one group, like Remote Lounge's `#figs`.",
+    },
+    {
+      kind: 'selector',
+      selectors: ['div[style*="bottom: 22px"]'],
+      comment:
+        "The design's own bottom door-pill bar (MAP / CAFE LOUNGE / DISCO HALL), the same HTML overlay <div> the Café's own rule hides, for the same reason (owner request, 2026-10-09).",
+    },
+  ],
 };
 
 // Art fixes: geometry corrections applied to the rendered design before
@@ -1269,6 +1429,55 @@ const FOREGROUND_LAYERS: Partial<
         'Desk E (the back-right desk), its monitor and keyboard: Alex Kelly sits behind it (owner request, 2026-10-02, Track D).',
     },
   ],
+  'team-room-2': [
+    {
+      name: 'frank-desk',
+      selectors: [
+        'polygon[points="535,448 645,503 595,528 485,473"]',
+        'polygon[points="485,520.5 595,575.5 595,528 485,473"]',
+        'polygon[points="645,550.5 595,575.5 595,528 645,503"]',
+        'polygon[points="535,441.5 650,499 595,526.5 480,469"]',
+        'polygon[points="480,473 595,530.5 595,526.5 480,469"]',
+        'polygon[points="650,503 595,530.5 595,526.5 650,499"]',
+        'polygon[points="530,451.5 575,474 571,476 526,453.5"]',
+        'polygon[points="526,481 571,503.5 571,476 526,453.5"]',
+        'polygon[points="575,501.5 571,503.5 571,476 575,474"]',
+        'polygon[points="560,464.5 595,482 582.5,488.3 547.5,470.8"]',
+        'polygon[points="547.5,472.8 582.5,490.3 582.5,488.3 547.5,470.8"]',
+        'polygon[points="595,484 582.5,490.3 582.5,488.3 595,482"]',
+      ],
+      comment:
+        'The left desk, its monitor and keyboard, drawn after its chair: Frank Nardone sits in the chair, behind the desk (owner request, 2026-10-02, Track D).',
+    },
+    {
+      name: 'nick-desk',
+      selectors: [
+        'polygon[points="845,603 955,658 905,683 795,628"]',
+        'polygon[points="795,675.5 905,730.5 905,683 795,628"]',
+        'polygon[points="955,705.5 905,730.5 905,683 955,658"]',
+        'polygon[points="845,596.5 960,654 905,681.5 790,624"]',
+        'polygon[points="790,628 905,685.5 905,681.5 790,624"]',
+        'polygon[points="960,658 905,685.5 905,681.5 960,654"]',
+        'polygon[points="840,606.5 885,629 881,631 836,608.5"]',
+        'polygon[points="836,636 881,658.5 881,631 836,608.5"]',
+        'polygon[points="885,656.5 881,658.5 881,631 885,629"]',
+        'polygon[points="870,619.5 905,637 892.5,643.3 857.5,625.8"]',
+        'polygon[points="857.5,627.8 892.5,645.3 892.5,643.3 857.5,625.8"]',
+        'polygon[points="905,639 892.5,645.3 892.5,643.3 905,637"]',
+      ],
+      comment:
+        'The front desk, its monitor and keyboard, drawn after its chair: Nick Brown sits in that chair, behind it (owner request, 2026-10-02, Track D).',
+    },
+    {
+      name: 'aleksandr-chair',
+      selectors: [
+        'polygon[points="1060,583 1090,598 1090,573 1060,558"]',
+        'polygon[points="1120,583 1090,598 1090,573 1120,558"]',
+      ],
+      comment:
+        "The right desk's chair seat's two front faces: Aleksandr Molchagin sits in that chair, turned round to face out of it, so they are drawn over his legs (owner request, 2026-10-02, Track D).",
+    },
+  ],
   'team-room-1': [
     {
       name: 'rebecca-desk',
@@ -1334,35 +1543,6 @@ const FOREGROUND_LAYERS: Partial<
     },
   ],
   'team-room-3': [
-    {
-      name: 'millie-desk',
-      selectors: [
-        'polygon[points="535,448 645,503 595,528 485,473"]',
-        'polygon[points="485,520.5 595,575.5 595,528 485,473"]',
-        'polygon[points="645,550.5 595,575.5 595,528 645,503"]',
-        'polygon[points="535,441.5 650,499 595,526.5 480,469"]',
-        'polygon[points="480,473 595,530.5 595,526.5 480,469"]',
-        'polygon[points="650,503 595,530.5 595,526.5 650,499"]',
-        'polygon[points="530,451.5 575,474 571,476 526,453.5"]',
-        'polygon[points="526,481 571,503.5 571,476 526,453.5"]',
-        'polygon[points="575,501.5 571,503.5 571,476 575,474"]',
-        'polygon[points="560,464.5 595,482 582.5,488.3 547.5,470.8"]',
-        'polygon[points="547.5,472.8 582.5,490.3 582.5,488.3 547.5,470.8"]',
-        'polygon[points="595,484 582.5,490.3 582.5,488.3 595,482"]',
-      ],
-      comment:
-        "Millie's desk, its monitor and keyboard, drawn after her figure: she sits behind it, hidden from the waist down.",
-    },
-    {
-      name: 'casey-couch-arm',
-      selectors: [
-        'polygon[points="868,402 882,409 882,425 868,418"]',
-        'polygon[points="932,384 882,409 882,425 932,400"]',
-        'polygon[points="918,377 932,384 882,409 868,402"]',
-      ],
-      comment:
-        "The couch's right arm, drawn after Casey's figure: she sits in the couch, beside it.",
-    },
     {
       name: 'sydney-desk',
       selectors: [
@@ -1753,6 +1933,29 @@ function hideLiveElements(rules: HideRule[]): void {
     }
   }
 
+  // Like `hideLabelGroups`, but for a character whose name is an SVG
+  // `<title>` rather than a baked `<text>` glyph run (`design/Latam
+  // Cafe.dc.html`'s figures): hides the plain `<g>` the exact-matching
+  // `<title>` is a direct child of, failing the export loudly if a name
+  // matches no `<title>`, more than one, or sits outside a `<g>`.
+  function hideTitleGroups(texts: string[]): void {
+    for (const text of texts) {
+      const matches = Array.from(document.querySelectorAll('title')).filter(
+        (title) => title.textContent?.trim() === text,
+      );
+      if (matches.length !== 1) {
+        throw new Error(
+          `title-group hide rule expected exactly one <title> "${text}", found ${matches.length}`,
+        );
+      }
+      const group: Element | null = matches[0]!.parentElement;
+      if (!group || group.tagName.toLowerCase() !== 'g') {
+        throw new Error(`title-group hide rule found no <g>-wrapped <title> for "${text}"`);
+      }
+      (group as SVGElement).style.setProperty('display', 'none', 'important');
+    }
+  }
+
   // #51: hides exactly one element per selector, failing the export loudly
   // when a selector matches none or several (a design resync that moved or
   // duplicated the element), rather than leaving a character baked in.
@@ -1802,6 +2005,7 @@ function hideLiveElements(rules: HideRule[]): void {
     if (rule.kind === 'animation') hideAnimationNames(rule.names, rule.except);
     else if (rule.kind === 'labels') hideLabels(rule.texts);
     else if (rule.kind === 'label-group') hideLabelGroups(rule.texts);
+    else if (rule.kind === 'title-group') hideTitleGroups(rule.texts);
     else if (rule.kind === 'text-only') hideTextOnly(rule.entries);
     else if (rule.kind === 'selector') hideSelectors(rule.selectors);
     else hideCluster(rule.anchor, rule.companions);
@@ -1829,7 +2033,9 @@ async function openRoomStage(
 
   await page.addInitScript(freezeAnimations);
   await page.goto(`http://127.0.0.1:${port}/${encodeURIComponent(file)}`, { waitUntil: 'load' });
-  await page.waitForSelector('#dc-root', { timeout: PAGE_LOAD_TIMEOUT_MS });
+  await page.waitForSelector(READY_SELECTORS[roomId] ?? '#dc-root', {
+    timeout: PAGE_LOAD_TIMEOUT_MS,
+  });
   const stage = page.locator(STAGE_SELECTORS[roomId] ?? STAGE_SELECTOR);
   await stage.waitFor({ state: 'visible', timeout: PAGE_LOAD_TIMEOUT_MS });
   // Let the @font-face fonts finish loading before screenshotting -- without

@@ -22,13 +22,13 @@ const DOOR_HOTSPOT_SIZE = { width: 70, height: 165 };
 // decal by the left-wall counter (#16 fix 5); that decal is hidden from the
 // exported art since #132 (it wasn't a working door -- the Kitchen's real
 // TOWN CENTER exit is a framed door, not an elevator). Chelsea's and Jesse's own
-// tiles are blocked (#92 D3 round 2); Tom's is left walkable since he walks
+// tiles are blocked (#92 D3 round 2; Chelsea's is now (1, 1), at the stove); Tom's is left walkable since he walks
 // in the design, so there's no single tile that's "his" the way there is for
 // every stationary NPC; Tonya's tile already sat on an unwalkable counter.
 const WALKABLE: readonly (readonly boolean[])[] = [
   [false, false, false, false, false, false, false, false, false, false, true, true],
-  [false, true, true, true, true, true, true, true, true, true, true, true],
-  [true, true, true, false, true, true, true, true, true, true, false, true],
+  [false, false, true, true, true, true, true, true, true, true, true, true],
+  [true, true, true, true, true, true, true, true, true, true, false, true],
   [true, true, true, false, false, false, false, true, true, true, true, true],
   [true, true, true, false, false, false, false, true, true, true, true, true],
   [true, true, false, false, false, false, false, false, false, false, false, false],
@@ -82,7 +82,10 @@ export const theMelt: RoomDefinition = {
     // Penguin-kind NPCs are left out of every Room: only Players appear as
     // Penguins (owner decision, 2026-09-25). Their `NpcDefinition`s stay in
     // `src/npcs/npcs.ts`.
-    { npcId: 'chelsea', tile: { col: 3, row: 2 } },
+    // At the stove (owner request, 2026-10-06): the cooktop at the back
+    // counter's left end, row 0, cols 0-1, is right behind (1, 1). She stood
+    // at (3, 2), out on the floor, before.
+    { npcId: 'chelsea', tile: { col: 1, row: 1 } },
     { npcId: 'tom', tile: { col: 7, row: 2 } },
   ],
 };
