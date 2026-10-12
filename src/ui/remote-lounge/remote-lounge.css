@@ -299,6 +299,14 @@
   box-shadow: inset 0 -4px 0 var(--jg-secondary);
 }
 
+/* The LATAM card's VISIT LATAM + GLOBE pair is wider than a JGer card's
+   PREV/GLOBE/NEXT, so its two buttons run a little smaller to fit the card. */
+.remote-lounge__card--latam .remote-lounge__hex {
+  flex: 1 1 auto;
+  padding: 0 14px;
+  font-size: 13px;
+}
+
 .remote-lounge__hex:hover {
   filter: brightness(0.9);
 }
