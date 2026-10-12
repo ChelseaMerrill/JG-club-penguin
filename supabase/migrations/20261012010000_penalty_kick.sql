@@ -37,16 +37,10 @@
 -- this ticket, so it has no earlier placeholder row to flip on; and
 -- (c) redefines record_round(text, int, jsonb), copied whole from
 -- 20260928000000_beystadium.sql (the latest definition) with exactly one
--- added case, 'penalty-kick'. leaderboard() and quest_progress() are
--- deliberately NOT touched here (P6): Penalty Kick's own personal best still
--- works (it is read straight off public.minigame_bests, which this file's
--- constraint change already allows), but `leaderboard('penalty-kick')`
--- itself raises unknown_minigame until a later migration adds it to that
--- function's own id list -- the Minigame done screen's leaderboard panel
--- shows its ordinary "couldn't load" error state for this game only, same
--- as any other failed read. Reviewable; the alternative (also touching
--- leaderboard() here) was rejected to keep this migration's diff to exactly
--- the stated scope, per the deploy-order note above.
+-- added case, 'penalty-kick'; and (d) redefines leaderboard(text, int), copied
+-- whole from the same file with 'penalty-kick' added to its known ids (P9),
+-- so the Minigame done screen's leaderboard works for this game.
+-- quest_progress() is not touched.
 --
 -- P2 Goleador: `insert into public.badges (...) values ('goleador',
 -- 'Goleador', 'SCORE 4 OF 5 PENALTIES', 16, true) on conflict (id) do
@@ -97,6 +91,13 @@
 -- directly can claim 4+ goals/golazos and Goleador on the very first call;
 -- that pays at most what P4 allows (250 per 30 s, the honest rate) and earns
 -- the Badge once, the same trust model as every other threshold Badge.
+--
+-- P9 leaderboard(): 'penalty-kick' joins the known ids, exactly as
+-- Beystadium's own migration added 'beystadium' (its B9). Its best_score is
+-- minigame_bests.best_score, goals + golazos (0-5); no score ceiling is
+-- needed (LEADERBOARD_SCORE_CEILINGS['penalty-kick'] is null, like
+-- Beystadium's). A sibling Minigame migration that lands later must keep
+-- 'penalty-kick' in this list too.
 --
 -- P8 Ordering and reruns. It sorts after 20261011000000_stair_climb.sql (the
 -- latest migration as of this ticket) and before any sibling LATAM Minigame
@@ -389,3 +390,85 @@ $$;
 -- it right.
 revoke all on function public.record_round(text, int, jsonb) from public, anon, authenticated;
 grant execute on function public.record_round(text, int, jsonb) to authenticated;
+
+-- ---------------------------------------------------------------------------
+-- leaderboard(minigame_id, max_rows)
+--
+-- #70's function (see 20260924020000_leaderboard.sql for its R1-R9
+-- decisions), unchanged from 20260928000000_beystadium.sql except that 'penalty-kick' is
+-- a known id too (P9).
+-- ---------------------------------------------------------------------------
+
+create or replace function public.leaderboard(minigame_id text, max_rows int default 10)
+returns table (rank int, penguin_name text, best_score int, is_me boolean)
+language plpgsql
+stable
+security definer
+set search_path = ''
+as $$
+#variable_conflict use_column
+declare
+  v_uid uuid := auth.uid();
+  v_game text := leaderboard.minigame_id;
+  v_max_rows int := least(greatest(coalesce(leaderboard.max_rows, 10), 1), 50);
+begin
+  if v_uid is null then
+    raise exception 'not_authenticated' using errcode = '42501';
+  end if;
+
+  if v_game not in ('bug-squash', 'pancake-flip', 'coffee-rush', 'snow-cone-stand', 'beystadium', 'penalty-kick') then
+    raise exception 'unknown_minigame';
+  end if;
+
+  return query
+    with eligible as (
+      select
+        b.player_id,
+        pl.penguin_name as penguin_name,
+        b.best_score,
+        b.updated_at
+      from public.minigame_bests b
+      join public.players pl on pl.id = b.player_id
+      where b.minigame_id = v_game
+        -- R1: blank after stripping the invisible/control/bidi set plus
+        -- ordinary whitespace (see the header comment for the full range
+        -- list and rationale).
+        and length(regexp_replace(
+              pl.penguin_name,
+              '[\u0000-\u001F\u007F-\u009F\u00A0\u00AD\u034F\u061C\u115F-\u1160\u1680\u17B4-\u17B5\u180B-\u180F\u2000-\u200A\u200B-\u200F\u2028\u2029\u202A-\u202E\u202F\u205F\u2060-\u206F\u2800\u3000\u3164\uFE00-\uFE0F\uFEFF\uFFA0\uFFF0-\uFFF8\U00013430-\U0001343F\U0001BCA0-\U0001BCA3\U0001D173-\U0001D17A\U000E0000-\U000E0FFF[:space:]]',
+              '',
+              'g'
+            )) > 0
+        -- R2: per-Minigame plausibility ceiling. Keep in step with
+        -- `LEADERBOARD_SCORE_CEILINGS` (src/persistence/leaderboard-rules.ts).
+        and b.best_score <= (
+          case v_game
+            when 'bug-squash' then 60000
+            when 'pancake-flip' then 148
+            else b.best_score
+          end
+        )
+    ),
+    ranked as (
+      select
+        (row_number() over (
+          order by e.best_score desc, e.updated_at asc, e.player_id asc
+        ))::int as rank,
+        e.player_id,
+        e.penguin_name,
+        e.best_score
+      from eligible e
+    )
+    select r.rank, r.penguin_name, r.best_score, (r.player_id = v_uid) as is_me
+    from ranked r
+    where r.rank <= v_max_rows
+    union all
+    select r.rank, r.penguin_name, r.best_score, true as is_me
+    from ranked r
+    where r.player_id = v_uid and r.rank > v_max_rows
+    order by rank;
+end;
+$$;
+
+revoke all on function public.leaderboard(text, int) from public, anon, authenticated;
+grant execute on function public.leaderboard(text, int) to authenticated;

@@ -62,7 +62,7 @@ const ballHotspotCenter = {
   y: ballHotspot.rect.y + ballHotspot.rect.height / 2,
 };
 
-test('Penalty Kick: clicking the ball opens Chrystian’s intro, five shots pay Tokens (#220)', async ({
+test('Penalty Kick: clicking the ball opens Chrystian’s intro, and a shot aims by Space then click (#220)', async ({
   page,
 }) => {
   const errors = collectErrors(page);
@@ -106,18 +106,38 @@ test('Penalty Kick: clicking the ball opens Chrystian’s intro, five shots pay 
   await page.locator('.penalty-kick').click();
   await expect(page.locator('.penalty-kick__toast')).toBeVisible();
   await page.screenshot({ path: 'test-results/penalty-kick/aim.png' });
-  // Let the first shot's result pause clear before forcing the rest.
-  await page.waitForTimeout(1300);
 
-  // Shots 2-5 via the minigame test hooks (bypassing the aim sweep's RNG
-  // for a deterministic, fast round): three more goals (a 4th scored shot
-  // reaches Goleador's own threshold) and a save.
-  for (const outcome of ['goal', 'goal', 'goal', 'save'] as const) {
+  expect(errors).toEqual([]);
+});
+
+test('Penalty Kick: four goals and a save end GOLEADOR, with the Badge and Tokens (#220)', async ({
+  page,
+}) => {
+  // Five kicks and result pauses advance per tick, slower than real time on
+  // a slow headless browser.
+  test.setTimeout(120_000);
+  const errors = collectErrors(page);
+
+  // `window.__minigameTest` exists only when the game boots straight into a
+  // Minigame (`?minigame=`, dev-minigame-hook.ts), as Beystadium's spec does;
+  // the test above covers reaching it from the Field.
+  await page.goto('/?minigame=penalty-kick');
+  await expect(page.locator('.minigame__howto')).toBeVisible();
+  await page.locator('.minigame__button--start').click();
+  await expect(page.locator('.penalty-kick')).toBeVisible();
+
+  // All five shots via the test hooks (bypassing the aim sweep's RNG for a
+  // deterministic round): four goals (Goleador's threshold) and a save.
+  for (const outcome of ['goal', 'goal', 'goal', 'goal', 'save'] as const) {
+    // Each shot only takes while the side sweep is live: wait for it (the
+    // kick and its result pause advance per frame, slower on a slow machine).
+    await expect(page.locator('.penalty-kick__subline')).toHaveText('SPACE LOCKS THE SIDE', {
+      timeout: 15_000,
+    });
     await page.evaluate((o) => window.__minigameTest!.takePenaltyKickShot(o), outcome);
-    await page.waitForTimeout(2_000); // the kick's flight + the result pause
   }
 
-  await expect(page.locator('.minigame__done')).toBeVisible();
+  await expect(page.locator('.minigame__done')).toBeVisible({ timeout: 40_000 });
   await expect(page.locator('.minigame__done-kicker')).toHaveText('FULL TIME');
   await expect(page.locator('.minigame__done-title')).toHaveText('GOLEADOR');
   await expect(page.locator('[data-done-stat="saved"] .minigame__done-stat-value')).toHaveText('1');

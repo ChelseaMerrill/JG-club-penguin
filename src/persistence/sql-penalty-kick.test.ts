@@ -42,7 +42,7 @@ describe('Penalty Kick migration (PGlite)', () => {
         'four_goals_earns_goleador_plus_50',
         'full_marks_no_second_badge_still_pays_250',
         'bonus_paid_once_over_the_run',
-        'leaderboard_does_not_yet_know_penalty_kick',
+        'leaderboard_knows_penalty_kick',
         'anon_denied_record_round',
       ]),
     );
@@ -106,16 +106,16 @@ describe('Penalty Kick migration (PGlite)', () => {
     expect(proof.find((row) => row.check_name === 'ALL')).toMatchObject({ pass: true });
   });
 
-  it("documents the known gap: leaderboard('penalty-kick') still raises unknown_minigame", async () => {
+  it("leaderboard('penalty-kick') answers once this migration is applied (P9)", async () => {
     const fixture = await createPgliteLeaderboardFixture();
 
     await expect(
       fixture.asAnon("select * from public.leaderboard('penalty-kick')", []),
     ).rejects.toMatchObject({ code: '42501' }); // anon is denied before the id is even checked
 
-    const playerId = await fixture.addPlayer('LEADERBOARD GAP');
+    const playerId = await fixture.addPlayer('LEADERBOARD PK');
     await expect(
       fixture.runSqlAs(playerId, "select * from public.leaderboard('penalty-kick')", []),
-    ).rejects.toThrow(/unknown_minigame/);
+    ).resolves.toBeDefined();
   });
 });

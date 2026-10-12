@@ -13,9 +13,7 @@
 -- +50 once, reported in badgesEarned on that call only, and a later 5-golazo
 -- round earns no second Badge or bonus but still pays its own 250 (P3, P6);
 -- public.badges has Goleador available, already seeded by this migration
--- (P2); leaderboard('penalty-kick') is NOT yet a known id -- this migration
--- deliberately leaves leaderboard() untouched (P1) -- so it still raises
--- unknown_minigame, proving that documented gap rather than hiding it; as
+-- (P2); leaderboard('penalty-kick') is a known id (P9) and answers; as
 -- anon, record_round is denied (42501). Also: record_round is security
 -- definer with search_path = '' and exactly one overload, with EXECUTE
 -- granted to authenticated only, and award_badge stays internal (P7).
@@ -248,18 +246,16 @@ begin
     v_pass := array_append(v_pass, v_tokens = 1635);
     v_detail := array_append(v_detail, format('tokens=%s (expected 1635)', v_tokens));
 
-    -- P1: leaderboard() is deliberately NOT extended by this migration, so
-    -- 'penalty-kick' stays an unknown id there -- proving the documented gap
-    -- rather than silently assuming it works.
+    -- P9: leaderboard() knows 'penalty-kick'.
     v_err := null;
     begin
       perform count(*) from public.leaderboard('penalty-kick');
     exception when others then
       v_err := sqlerrm;
     end;
-    v_names := array_append(v_names, 'leaderboard_does_not_yet_know_penalty_kick');
-    v_pass := array_append(v_pass, v_err is not distinct from 'unknown_minigame');
-    v_detail := array_append(v_detail, format('error=%s (expected unknown_minigame)', v_err));
+    v_names := array_append(v_names, 'leaderboard_knows_penalty_kick');
+    v_pass := array_append(v_pass, v_err is null);
+    v_detail := array_append(v_detail, format('error=%s (expected none)', v_err));
 
     -- P7: the Player can't award a Badge directly.
     v_state := null;
