@@ -69,6 +69,20 @@ describe('NPCS', () => {
       // Millie and Brandon left the Market (owner request, 2026-10-02).
       'millie',
       'brandon',
+      // Casey and Millie left Team Room 3 (owner request, 2026-10-02).
+      'casey-team-room-3',
+      'millie-team-room-3',
+      // Anthony left the Hallway (owner request, 2026-10-02).
+      'anthony-hallway',
+      // Six left the Mullet (owner request, 2026-10-02).
+      'ashley-mullet',
+      'jory-mullet',
+      'dom-mullet',
+      'jason-mullet',
+      'nicole-mullet',
+      'ann-marie-mullet',
+      // Ian left Team Room 2 (owner request, 2026-10-02).
+      'ian-team-room-2',
     ];
 
     for (const npc of Object.values(NPCS)) {
@@ -252,18 +266,11 @@ describe('NPCS', () => {
           }
         }
       }
-      // Overlaps the Room design itself draws at rest, kept as designed: the
-      // Mullet's Dom and Jory stand where the design starts their lap (their
-      // slot `offset`s, #189), where Dom's bubble crosses Nicole's nameplate
-      // and Jory's crosses Brandon's. Both walk off it at once. (Dev Pit's old
-      // Steven-over-Ryan overlap went when Ryan left, 2026-09-30.)
-      const drawnByTheDesign: string[] = [
-        `the-mullet: dom-mullet "Undefeated. I always win." x nicole-mullet's nameplate "Nicole"`,
-        `the-mullet: jory-mullet "Tribe has spoken." x brandon-mullet's nameplate "Brandon"`,
-      ];
-      expect(collisions.filter((collision) => !drawnByTheDesign.includes(collision))).toEqual([]);
-      // Each allowed overlap still happens, so a stale entry can't linger.
-      for (const allowed of drawnByTheDesign) expect(collisions).toContain(allowed);
+      // The Mullet's two design-drawn overlaps (Dom over Nicole, Jory over
+      // Brandon) went when Dom, Nicole and Jory left (owner request,
+      // 2026-10-02); Dev Pit's Steven-over-Ryan went when Ryan left
+      // (2026-09-30).
+      expect(collisions).toEqual([]);
     },
   );
 
@@ -576,7 +583,7 @@ describe('NPCS', () => {
         throw new Error(`expected ${repeat} and ${first} to be Human NPCs`);
       }
       expect(again.figure, repeat).toBe(original.figure);
-      expect(again.dialogLines[0], repeat).toBe(original.dialogLines[0]);
+      expect(again.dialogLines![0], repeat).toBe(original.dialogLines![0]);
     }
   });
 
@@ -607,7 +614,7 @@ describe('NPCS', () => {
         throw new Error(`expected ${roomOwn} and ${other} to be Human NPCs`);
       }
       expect(withOverride.figure, roomOwn).toEqual({ ...plain.figure, ...added });
-      expect(withOverride.dialogLines[0], roomOwn).toBe(plain.dialogLines[0]);
+      expect(withOverride.dialogLines![0], roomOwn).toBe(plain.dialogLines![0]);
     }
 
     // Team Room 1's design wins for its own two NPCs (owner request,
@@ -629,11 +636,11 @@ describe('NPCS', () => {
       collar: undefined,
       runner: true,
     });
-    expect(domTeamRoom1.dialogLines[0]).toBe(dom.dialogLines[0]);
+    expect(domTeamRoom1.dialogLines![0]).toBe(dom.dialogLines![0]);
     expect(jethro.figure.cameraRig).toBeUndefined();
     expect(jethroTeamRoom1.figure).toEqual(jethro.figure);
     expect(jethroTeamRoom1.figure).toMatchObject({ prop: undefined, cameraRaise: 'lowered' });
-    expect(jethroTeamRoom1.dialogLines[0]).toBe(jethro.dialogLines[0]);
+    expect(jethroTeamRoom1.dialogLines![0]).toBe(jethro.dialogLines![0]);
   });
 
   it('gives Front Desk a single static (periodS: 0) idle line', () => {
@@ -756,10 +763,28 @@ describe('NPCS', () => {
       'michael',
       'anthony',
     ];
+    const latamNpcIds: NpcId[] = [];
     for (const npc of Object.values(NPCS)) {
       if (talkers.includes(npc.id)) continue;
+      // The Remote Lounge's JGers open their person card instead.
+      if (npc.roomId === 'remote-lounge') {
+        expect(npc.dialog).toEqual({ kind: 'remote-card' });
+        continue;
+      }
+      // The 19 LATAM JGers carry no dialog at all (owner request, 2026-10-09):
+      // their character sheet gives no quote.
+      if (
+        npc.roomId === 'latam-cafe' ||
+        npc.roomId === 'latam-disco-hall' ||
+        npc.roomId === 'latam-futebol-field'
+      ) {
+        latamNpcIds.push(npc.id);
+        expect(npc.dialog).toEqual({ kind: 'none' });
+        continue;
+      }
       expect(npc.dialog).toMatchObject({ kind: 'line' });
     }
+    expect(latamNpcIds).toHaveLength(19);
   });
 
   it('gives a human NPC a figure spec and a penguin-kind NPC a fixed look', () => {

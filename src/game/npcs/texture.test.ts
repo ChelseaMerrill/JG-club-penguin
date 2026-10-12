@@ -72,18 +72,6 @@ describe('ensureNpcTexture: one of each prop while an NPC moves (#137 with PR #1
     expect(movingFigureSvg('anthony')).toContain(ROD);
   });
 
-  it("hands the Mullet's Jason's hands to his arcade layers, and Ashley's chicken to her throw, while they play (owner request, 2026-10-01)", () => {
-    const hand = '<circle cx="30" cy="101"';
-    expect(stillFigureSvg('jason-mullet')).toContain(hand);
-    expect(movingFigureSvg('jason-mullet')).not.toContain(hand);
-    expect(movingFigureSvg('jason-mullet')).toContain('<path d="M37 30 C40 20 50 16 60 16');
-    const chicken = '<ellipse cx="20" cy="98" rx="11" ry="9"';
-    expect(stillFigureSvg('ashley-mullet')).toContain(chicken);
-    expect(movingFigureSvg('ashley-mullet')).not.toContain(chicken);
-    // The Dev Pit's Ashley keeps hers: her toss draws its own chicken.
-    expect(movingFigureSvg('ashley')).toContain(chicken);
-  });
-
   it("hands Team Room 1's Jethro's hands and camera to his `jdown`/`jup` layers while they play", () => {
     const hand = '<circle cx="30" cy="101"';
     const camera = '<rect x="84" y="82" width="26" height="18"';

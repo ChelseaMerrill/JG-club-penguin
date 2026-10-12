@@ -69,14 +69,15 @@ describe('createMapScreen', () => {
     expect(q('.map-screen').hidden).toBe(true);
   });
 
-  it('renders the 14 design tiles, each labelled verbatim', () => {
+  it('renders the 14 design tiles and the Remote Lounge, each labelled verbatim', () => {
     const { qa } = setup();
 
     const labels = qa('.map-screen__label').map((el) => el.textContent);
-    expect(labels).toHaveLength(14);
+    expect(labels).toHaveLength(15);
     expect(labels).toContain('01 · TOWN CENTER');
     expect(labels).toContain('04 · THE KITCHEN');
     expect(labels).toContain('15 · THE MULLET');
+    expect(labels).toContain('16 · REMOTE LOUNGE');
   });
 
   it('clicking a clickable tile closes the Map, then calls changeRoom with its roomId', () => {

@@ -11,6 +11,7 @@ const SHARED_TEST_USER_SPECS = [
   '**/snowball-hit.spec.ts',
   '**/penguin-load-retry.spec.ts',
   '**/own-penguin-sign-in.spec.ts',
+  '**/quest-pair-two-browsers.spec.ts',
 ];
 
 export default defineConfig({

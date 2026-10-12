@@ -2,7 +2,11 @@ import type { RoomId } from '../../contracts';
 import { bathroom } from './definitions/bathroom';
 import { devPit } from './definitions/dev-pit';
 import { igloo } from './definitions/igloo';
+import { latamCafe } from './definitions/latam-cafe';
+import { latamDiscoHall } from './definitions/latam-disco-hall';
+import { latamFutebolField } from './definitions/latam-futebol-field';
 import { officeHallway } from './definitions/office-hallway';
+import { remoteLounge } from './definitions/remote-lounge';
 import { roofDeck } from './definitions/roof-deck';
 import { teamRoom1 } from './definitions/team-room-1';
 import { teamRoom2 } from './definitions/team-room-2';
@@ -30,6 +34,10 @@ export const ROOM_DEFINITIONS: readonly RoomDefinition[] = [
   teamRoom4,
   bathroom,
   theMullet,
+  remoteLounge,
+  latamCafe,
+  latamDiscoHall,
+  latamFutebolField,
 ];
 
 // Fails fast on a broken RoomDefinition in dev (`npm run dev`) and test

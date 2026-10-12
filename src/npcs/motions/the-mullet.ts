@@ -1,5 +1,5 @@
 import type { NpcId } from '../npcs';
-import type { NpcMotionSpec, NpcPropLayer } from './types';
+import type { NpcMotionSpec } from './types';
 
 /**
  * The Mullet's NPC motions (owner request, 2026-10-01, Track D: "the right
@@ -45,36 +45,6 @@ import type { NpcMotionSpec, NpcPropLayer } from './types';
 /** Stage px to figure units inside `npc-sprite.ts`'s scaled wrapper (Human NPCs draw at 0.62). */
 const TO_FIGURE = '1.612903';
 
-/**
- * The lap Dom and Jory both run: Dom's 12-corner `animateMotion` path, 9.4s,
- * paced (Jory's is the same path minus (450, 150), and her figure is drawn
- * 450, 150 further right and down, so both run one loop of the Room). Its
- * stops sit at each corner's share of the 1565.6 px path; `dx`/`dy`
- * re-express Dom's path points relative to the NPC's slot point.
- */
-function lap(name: string, dx: number, dy: number): string {
-  const corners: [number, number, number][] = [
-    [0, 30, -13],
-    [5.89, 50, -103],
-    [16.11, 210, -98],
-    [27.4, 370, -23],
-    [35.12, 420, 87],
-    [42.21, 435, 197],
-    [51.04, 330, 287],
-    [57.68, 230, 315],
-    [64.99, 120, 347],
-    [74.91, -30, 307],
-    [81.74, -68, 207],
-    [93.24, -68, 27],
-    [100, 30, -13],
-  ];
-  const stops = corners.map(
-    ([at, x, y]) =>
-      `${at}% { transform: translate(${+(x + dx).toFixed(2)}px,${+(y + dy).toFixed(2)}px);}`,
-  );
-  return `@keyframes ${name} { ${stops.join(' ')} }`;
-}
-
 /** A paddle's swing: the design's `rotate` `0;±35;0` about the hand, 2.4s. */
 function paddleSwing(name: string, deg: number): string {
   return `@keyframes ${name} { 0%,100% { transform: rotate(0deg);} 50% { transform: rotate(${deg}deg);} }`;
@@ -83,49 +53,6 @@ function paddleSwing(name: string, deg: number): string {
 /** The design's ping-pong paddle, verbatim from inside each player's `<svg>`, in the hand at `cx`. */
 function paddle(cx: number): string {
   return `<rect x="${cx - 2.5}" y="88" width="5" height="14" rx="2" fill="#8B5A2B" stroke="#0C4B5F" stroke-width="1.5"/><circle cx="${cx}" cy="76" r="14" fill="#D9534F" stroke="#0C4B5F" stroke-width="2"/>`;
-}
-
-/**
- * Clucknelius, verbatim from Ashley's own `<svg>`, minus its discrete
- * `<animate>` opacity (the keyframes own it now).
- */
-const ASHLEY_HELD_CHICKEN =
-  '<ellipse cx="20" cy="98" rx="11" ry="9" fill="#F2C12E" stroke="#0C4B5F" stroke-width="2"/><path d="M14 90 Q10 74 18 70 Q24 76 22 90" fill="#F2C12E" stroke="#0C4B5F" stroke-width="2"/><circle cx="19" cy="73" r="6" fill="#F2C12E" stroke="#0C4B5F" stroke-width="2"/><polygon points="24,73 32,75 24,77" fill="#E07A2F"/><path d="M17 67 q2 -6 5 0 q2 -5 4 1" fill="#D63C3C"/><circle cx="21" cy="72" r="1.3" fill="#161719"/><path d="M8 106 l-4 6 M12 106 l-2 7" stroke="#E07A2F" stroke-width="2.5" stroke-linecap="round"/>';
-
-/**
- * The thrown chicken, verbatim from the design's three flying `<g>`s (drawn
- * about its own (0, 0) in Stage px), placed on the held chicken's body,
- * figure (20, 98), at Stage size: each throw leaves from Ashley's hand.
- */
-const ASHLEY_THROWN_CHICKEN = `<g transform="translate(20 98) scale(${TO_FIGURE})"><ellipse cx="0" cy="2" rx="8" ry="6.5" fill="#F2C12E" stroke="#0C4B5F" stroke-width="1.5"/><circle cx="5" cy="-6" r="4" fill="#F2C12E" stroke="#0C4B5F" stroke-width="1.5"/><polygon points="8.5,-6.5 13,-5 8.5,-3.5" fill="#E07A2F"/><path d="M3 -10 q1.5 -4 3 0" fill="#D63C3C"/></g>`;
-
-/**
- * One throw: the design's flying `<g>`, its discrete opacity (shown only in
- * flight) and its `animateMotion` along a quadratic curve (`keyPoints`
- * `0;0;1;1`, linear, so constant speed between its `keyTimes`), sampled
- * into 16 chords and re-expressed in figure units from its start point;
- * inside it, the design's own spin (`rotate` `0;360` over 0.5s) about the
- * chicken's centre. Each throw goes while Ashley stands still at one of her
- * three stops, from exactly where the design draws her hand there, so it
- * runs on her path's clock.
- */
-function throwLayer(keyframes: string, name: string): NpcPropLayer {
-  return {
-    svg: '',
-    pathClock: true,
-    motion: { keyframes, animation: `${name} 18s linear infinite` },
-    children: [
-      {
-        svg: ASHLEY_THROWN_CHICKEN,
-        motion: {
-          keyframes:
-            '@keyframes ashleyChickenSpin { from { transform: rotate(0deg);} to { transform: rotate(360deg);} }',
-          animation: 'ashleyChickenSpin .5s linear infinite',
-          transformOrigin: '20px 98px',
-        },
-      },
-    ],
-  };
 }
 
 /**
@@ -140,127 +67,94 @@ function cue(lines: string, shiftX = 0): string {
 }
 
 export const THE_MULLET_MOTIONS: Partial<Record<NpcId, NpcMotionSpec>> = {
-  // Jason plays the Ms. Pac-Man: his figure jiggles (`translate` `0 0;0.8
-  // -0.5;-0.8 0;0 0` Stage px over 0.5s, on the group around his `<svg>`),
-  // and both hands are up at the controls, his left working the joystick
-  // (`10 -40;4 -42;14 -38;10 -40` over 0.4s) and his right mashing a button
-  // (`0 -36;0 -40;0 -36;0 -36` over 0.25s), each an `animateTransform` on
-  // its hand's own `<g>` inside his `<svg>`, verbatim. His arms don't move.
-  // The two hand layers replace his figure's resting hands
-  // (`arcadeHands: 'resting'`). Approximated: the design draws the hands
-  // before his collar and head, so his raised left hand tucks under his
-  // jaw's edge; a prop layer draws in front of the figure, so it overlaps
-  // that edge by about a pixel.
-  'jason-mullet': {
+  // Abby Rivera (owner request, 2026-10-02, Track D) paints the wall beside
+  // her: her right arm is raised to it with her card's own brush, and every
+  // 8 s she paints four stripes in her palette's colours, one under the
+  // next, each brushed back and forth along the wall's slope (the arm turns
+  // about her shoulder, (90, 74), to reach each one), then they fade and she
+  // starts again. Her figure keeps her card's own 2.3 s bob; the stripes and
+  // arm are props, so they bob with her. Authored, not from a Room design.
+  'abby-rivera': {
     figure: {
       keyframes:
-        '@keyframes jasonJiggle { 0%,100% { transform: translate(0,0);} 33.33% { transform: translate(1.29px,-0.81px);} 66.67% { transform: translate(-1.29px,0);} }',
-      animation: 'jasonJiggle .5s linear infinite',
+        '@keyframes bobAbby { 0%,100% { transform: translateY(0);} 50% { transform: translateY(-3.41px);} }',
+      animation: 'bobAbby 2.3s ease-in-out infinite',
     },
-    replaceFigureRestPose: true,
     props: [
       {
-        svg: '<circle cx="30" cy="101" r="5.5" fill="#F6DCC6" stroke="#0C4B5F" stroke-width="2"/>',
+        svg: '<path d="M107 22.5 L137 37.5" stroke="#00BDFF" stroke-width="6.5" stroke-linecap="round" opacity=".9"/>',
         motion: {
           keyframes:
-            '@keyframes jasonJoystick { 0%,100% { transform: translate(10px,-40px);} 33.33% { transform: translate(4px,-42px);} 66.67% { transform: translate(14px,-38px);} }',
-          animation: 'jasonJoystick .4s linear infinite',
+            '@keyframes abbyStripe1 { 0%,7% { opacity:0;} 20%,90% { opacity:1;} 97%,100% { opacity:0;} }',
+          animation: 'abbyStripe1 8s linear infinite',
         },
       },
       {
-        svg: '<circle cx="90" cy="101" r="5.5" fill="#F6DCC6" stroke="#0C4B5F" stroke-width="2"/>',
+        svg: '<path d="M114.2 28.7 L144.2 43.7" stroke="#E8C547" stroke-width="6.5" stroke-linecap="round" opacity=".9"/>',
         motion: {
           keyframes:
-            '@keyframes jasonButton { 0%,66.67%,100% { transform: translate(0,-36px);} 33.33% { transform: translate(0,-40px);} }',
-          animation: 'jasonButton .25s linear infinite',
+            '@keyframes abbyStripe2 { 0%,27% { opacity:0;} 40%,90% { opacity:1;} 97%,100% { opacity:0;} }',
+          animation: 'abbyStripe2 8s linear infinite',
+        },
+      },
+      {
+        svg: '<path d="M120.1 36.1 L150.1 51.1" stroke="#D6262E" stroke-width="6.5" stroke-linecap="round" opacity=".9"/>',
+        motion: {
+          keyframes:
+            '@keyframes abbyStripe3 { 0%,47% { opacity:0;} 60%,90% { opacity:1;} 97%,100% { opacity:0;} }',
+          animation: 'abbyStripe3 8s linear infinite',
+        },
+      },
+      {
+        svg: '<path d="M124.7 44.4 L154.7 59.4" stroke="#3F8A45" stroke-width="6.5" stroke-linecap="round" opacity=".9"/>',
+        motion: {
+          keyframes:
+            '@keyframes abbyStripe4 { 0%,67% { opacity:0;} 80%,90% { opacity:1;} 97%,100% { opacity:0;} }',
+          animation: 'abbyStripe4 8s linear infinite',
+        },
+      },
+      {
+        svg: '<rect x="84" y="70" width="12" height="30" rx="6" fill="#EADBC8" stroke="#0C4B5F" stroke-width="2.5" transform="rotate(-135 90 74)"/><path d="M107 57 L119 36" stroke="#7A4A26" stroke-width="3" stroke-linecap="round"/><path d="M117 39 L119 35 L121 30 Q124 27 123 33 L120 38 Z" fill="#00BDFF" stroke="#0C4B5F" stroke-width="1.5"/><circle cx="108.4" cy="55.6" r="5.5" fill="#A8714A" stroke="#0C4B5F" stroke-width="2"/>',
+        motion: {
+          keyframes:
+            '@keyframes abbyBrush { 0% { transform: rotate(0deg) translate(0,0);} 5% { transform: rotate(0deg) translate(-6px,-3px);} 8.75% { transform: rotate(0deg) translate(6px,3px);} 12.5% { transform: rotate(0deg) translate(-6px,-3px);} 16.25% { transform: rotate(0deg) translate(6px,3px);} 20% { transform: rotate(0deg) translate(0px,0px);} 25% { transform: rotate(10deg) translate(-6px,-3px);} 28.75% { transform: rotate(10deg) translate(6px,3px);} 32.5% { transform: rotate(10deg) translate(-6px,-3px);} 36.25% { transform: rotate(10deg) translate(6px,3px);} 40% { transform: rotate(10deg) translate(0px,0px);} 45% { transform: rotate(20deg) translate(-6px,-3px);} 48.75% { transform: rotate(20deg) translate(6px,3px);} 52.5% { transform: rotate(20deg) translate(-6px,-3px);} 56.25% { transform: rotate(20deg) translate(6px,3px);} 60% { transform: rotate(20deg) translate(0px,0px);} 65% { transform: rotate(30deg) translate(-6px,-3px);} 68.75% { transform: rotate(30deg) translate(6px,3px);} 72.5% { transform: rotate(30deg) translate(-6px,-3px);} 76.25% { transform: rotate(30deg) translate(6px,3px);} 80% { transform: rotate(30deg) translate(0px,0px);} 90% { transform: rotate(30deg) translate(0,0);} 100% { transform: rotate(0deg) translate(0,0);} }',
+          animation: 'abbyBrush 8s ease-in-out infinite',
+          transformOrigin: '90px 74px',
         },
       },
     ],
   },
-  // Nicole and Ann Marie giggle on the couch: two quick 2.5 Stage px hops
-  // (`values` `0 0;0 -2.5;0 0;0 -2.5;0 0;0 0` at `keyTimes`
-  // `0;0.1;0.2;0.3;0.4;1` over 1.6s, on the group around each `<svg>`), Ann
-  // Marie's `begin="0.3s"` behind Nicole's. 2.5 / 0.62 = 4.03 figure units.
-  'nicole-mullet': {
-    figure: {
-      keyframes:
-        '@keyframes coupleGiggle { 0%,20%,40%,100% { transform: translateY(0);} 10%,30% { transform: translateY(-4.03px);} }',
-      animation: 'coupleGiggle 1.6s linear infinite',
-    },
-  },
-  'ann-marie-mullet': {
-    figure: {
-      keyframes:
-        '@keyframes coupleGiggle { 0%,20%,40%,100% { transform: translateY(0);} 10%,30% { transform: translateY(-4.03px);} }',
-      animation: 'coupleGiggle 1.6s linear -1.3s infinite',
-    },
-  },
-  // Jory runs Dom's lap of the Room half a cycle (`begin="-4.7s"`) behind
-  // him, her nameplate and bubble with her: her feet are at (830, 491.26)
-  // plus Dom's path point, like his. Her slot stays on the floor at (13,6),
-  // (1150, 748): an `offset` to the design's t=0 point, (1172.4, 767.6),
-  // would stand her just off the floor under reduced motion, so each stop
-  // is re-expressed relative to that slot instead (dx, dy = 830 - 1150,
-  // 491.26 - 748).
-  'jory-mullet': {
-    path: {
-      keyframes: lap('joryLap', -320, -256.74),
-      animation: 'joryLap 9.4s linear -4.7s infinite',
-    },
-  },
-  // Ashley paces between three spots (`animateMotion` `M0 0 L-140 -40 L-60
-  // 70 L0 0`, `keyPoints` `0;0;0.3895;0.3895;0.7534;0.7534;1` -- exactly
-  // its corners -- at sixths of 18s, linear), bobbing on the way (`0 0;0
-  // -3;0 0` over 0.9s, on a group holding her figure, nameplate and bubble:
-  // a `stage` track). At each stop she throws Clucknelius: the chicken in her
-  // hand vanishes (a discrete opacity, `1;0;1;0;1;0;1` at `keyTimes`
-  // `0;0.0667;0.1278;0.4333;0.4944;0.7278;0.7889`) while a chicken spins
-  // from her hand to Jon, to where the design stands the Player's Penguin
-  // (570, 500), then to Brandon. Her slot `offset` puts her exactly where the
-  // design does, so each throw lands on its target to within about 2 px
-  // (her figure draws at 0.62 here, the design's at 0.58, so her hand sits
-  // that much further from her feet). Approximated: the design draws the
-  // flying chickens over every character; here they sort with Ashley, who
-  // stands in front of all three targets.
-  'ashley-mullet': {
+  // Adam Wilson-Hwang and Bryan Sambrook (owner request, 2026-10-02, Track
+  // D) walk laps of the open floor, each on his card's own bob: Adam from
+  // (11,1) south to (11,4), east to (13,4), north to (13,1) and home; Bryan
+  // from (7,10) north to (7,8), east to (12,8), past the front of the
+  // ping-pong table, south to (12,10) and home. Each lap keeps to walkable tiles
+  // clear of every fixture and other NPC's slot; `translate()`s are
+  // `tileToScreen` deltas (100/50 tiles) from his own tile, timed by each
+  // leg's length with a short pause at each corner. Authored.
+  'adam-wilson-hwang': {
     path: {
       keyframes:
-        '@keyframes ashleyPace { 0%,16.67% { transform: translate(0,0);} 33.33%,50% { transform: translate(-140px,-40px);} 66.67%,83.33% { transform: translate(-60px,70px);} 100% { transform: translate(0,0);} }',
-      animation: 'ashleyPace 18s linear infinite',
+        '@keyframes adamLap { 0%,3% { transform: translate(0,0);} 29.4%,32.4% { transform: translate(-150px,75px);} 50%,53% { transform: translate(-50px,125px);} 79.4%,82.4% { transform: translate(100px,50px);} 100% { transform: translate(0,0);} }',
+      animation: 'adamLap 22s ease-in-out infinite',
     },
-    stage: {
+    figure: {
       keyframes:
-        '@keyframes ashleyBob { 0%,100% { transform: translate(0,0);} 50% { transform: translate(0,-3px);} }',
-      animation: 'ashleyBob .9s linear infinite',
+        '@keyframes bobAdam { 0%,100% { transform: translateY(0);} 50% { transform: translateY(-3.41px);} }',
+      animation: 'bobAdam 2.6s ease-in-out infinite',
     },
-    // The held chicken layer is the moving version of her `chicken` prop.
-    replaceFigureProp: true,
-    props: [
-      {
-        svg: ASHLEY_HELD_CHICKEN,
-        pathClock: true,
-        motion: {
-          keyframes:
-            '@keyframes ashleyHeldChicken { 0%,6.66% { opacity:1;} 6.67%,12.77% { opacity:0;} 12.78%,43.32% { opacity:1;} 43.33%,49.43% { opacity:0;} 49.44%,72.77% { opacity:1;} 72.78%,78.88% { opacity:0;} 78.89%,100% { opacity:1;} }',
-          animation: 'ashleyHeldChicken 18s linear infinite',
-        },
-      },
-      // At Jon: `M596.8 685.5 Q723.4 470 850 560`, `keyTimes` `0;0.0667;0.1111;1`.
-      throwLayer(
-        '@keyframes ashleyThrowJon { 0%,6.66% { opacity:0; transform: translate(0,0);} 6.67% { opacity:1; transform: translate(0,0);} 6.95% { transform: translate(16.97px,-28.03px);} 7.23% { transform: translate(34.74px,-55.57px);} 7.5% { transform: translate(53.41px,-82.49px);} 7.78% { transform: translate(73.12px,-108.67px);} 8.06% { transform: translate(94.01px,-133.91px);} 8.34% { transform: translate(116.26px,-157.97px);} 8.61% { transform: translate(140.07px,-180.47px);} 8.89% { transform: translate(165.67px,-200.91px);} 9.17% { transform: translate(193.23px,-218.61px);} 9.45% { transform: translate(222.83px,-232.61px);} 9.72% { transform: translate(254.24px,-241.8px);} 10% { transform: translate(286.79px,-245.18px);} 10.28% { transform: translate(319.38px,-242.29px);} 10.56% { transform: translate(350.91px,-233.52px);} 10.83% { transform: translate(380.66px,-219.86px);} 11.11% { opacity:1; transform: translate(408.39px,-202.42px);} 11.12%,100% { opacity:0; transform: translate(408.39px,-202.42px);} }',
-        'ashleyThrowJon',
-      ),
-      // At the Player's Penguin: `M456.8 645.5 Q513.4 410 570 500`, `keyTimes` `0;0.4333;0.4778;1`.
-      throwLayer(
-        '@keyframes ashleyThrowPenguin { 0%,43.32% { opacity:0; transform: translate(0,0);} 43.33% { opacity:1; transform: translate(0,0);} 43.61% { transform: translate(5.72px,-23.29px);} 43.89% { transform: translate(11.7px,-46.51px);} 44.16% { transform: translate(17.96px,-69.65px);} 44.44% { transform: translate(24.56px,-92.7px);} 44.72% { transform: translate(31.56px,-115.64px);} 45% { transform: translate(39.04px,-138.42px);} 45.28% { transform: translate(47.09px,-161.01px);} 45.56% { transform: translate(55.88px,-183.32px);} 45.83% { transform: translate(65.62px,-205.22px);} 46.11% { transform: translate(76.7px,-226.48px);} 46.39% { transform: translate(89.75px,-246.58px);} 46.67% { transform: translate(106.03px,-264.11px);} 46.95% { transform: translate(127.34px,-274.46px);} 47.22% { transform: translate(150.34px,-269.57px);} 47.5% { transform: translate(168.44px,-254.01px);} 47.78% { opacity:1; transform: translate(182.58px,-234.68px);} 47.79%,100% { opacity:0; transform: translate(182.58px,-234.68px);} }',
-        'ashleyThrowPenguin',
-      ),
-      // At Brandon: `M536.8 755.5 Q799.4 590 1062 680`, `keyTimes` `0;0.7278;0.7722;1`.
-      throwLayer(
-        '@keyframes ashleyThrowBrandon { 0%,72.77% { opacity:0; transform: translate(0,0);} 72.78% { opacity:1; transform: translate(0,0);} 73.06% { transform: translate(47.49px,-28.63px);} 73.33% { transform: translate(96.12px,-55.27px);} 73.61% { transform: translate(145.88px,-79.72px);} 73.89% { transform: translate(196.76px,-101.77px);} 74.17% { transform: translate(248.69px,-121.21px);} 74.45% { transform: translate(301.58px,-137.84px);} 74.72% { transform: translate(355.34px,-151.43px);} 75% { transform: translate(409.8px,-161.83px);} 75.28% { transform: translate(464.79px,-168.86px);} 75.55% { transform: translate(520.12px,-172.44px);} 75.83% { transform: translate(575.57px,-172.49px);} 76.11% { transform: translate(630.9px,-169.03px);} 76.39% { transform: translate(685.91px,-162.1px);} 76.67% { transform: translate(740.39px,-151.81px);} 76.94% { transform: translate(794.17px,-138.3px);} 77.22% { opacity:1; transform: translate(847.1px,-121.77px);} 77.23%,100% { opacity:0; transform: translate(847.1px,-121.77px);} }',
-        'ashleyThrowBrandon',
-      ),
-    ],
+  },
+  'bryan-sambrook': {
+    path: {
+      keyframes:
+        '@keyframes bryanLap { 0%,3% { transform: translate(0,0);} 15.57%,18.57% { transform: translate(100px,-50px);} 50%,53% { transform: translate(350px,75px);} 65.57%,68.57% { transform: translate(250px,125px);} 100% { transform: translate(0,0);} }',
+      animation: 'bryanLap 26s ease-in-out infinite',
+    },
+    figure: {
+      keyframes:
+        '@keyframes bobBryan { 0%,100% { transform: translateY(0);} 50% { transform: translateY(-3.41px);} }',
+      animation: 'bobBryan 2.4s ease-in-out infinite',
+    },
   },
   // Tony lines up a shot, walks round the pool table, and shoots again from
   // the far side, then walks back (`animateMotion` `M0 0 L0 83 L150 153 L210
@@ -381,21 +275,5 @@ export const THE_MULLET_MOTIONS: Partial<Record<NpcId, NpcMotionSpec>> = {
         },
       },
     ],
-  },
-  // Dom runs his lap of the Room (the 12-corner path, 9.4s, paced; his
-  // bubble and nameplate with him) on a quick running bob (`0 0;0 -5;0 0`
-  // over 0.35s on his `<svg>`'s group: 5 / 0.62 = 8.06 figure units). His
-  // slot `offset` puts him on the path's first point, (860, 478.26), so each
-  // stop is the design's point minus that one.
-  'dom-mullet': {
-    path: {
-      keyframes: lap('domLap', -30, 13),
-      animation: 'domLap 9.4s linear infinite',
-    },
-    figure: {
-      keyframes:
-        '@keyframes domBob { 0%,100% { transform: translateY(0);} 50% { transform: translateY(-8.06px);} }',
-      animation: 'domBob .35s linear infinite',
-    },
   },
 };

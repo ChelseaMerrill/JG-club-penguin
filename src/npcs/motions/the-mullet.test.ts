@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  compileCssAnimation,
   decomposeAffine,
   multiplyAffine as multiply,
+  sampleCssAnimation,
+  sampleCssOpacity,
   transformPoint,
   type Affine,
 } from '../../game/npcs/css-keyframes';
@@ -60,18 +63,20 @@ function expectNear(actual: ScreenPoint, expected: ScreenPoint, within: number):
 }
 
 describe("The Mullet's NPC motions (owner request, 2026-10-01)", () => {
-  it('registers every one of its nine NPCs', () => {
+  it('registers every one of its six NPCs', () => {
+    // Ashley, Jory, Dom, Jason, Nicole and Ann Marie left; Abby, Adam and
+    // Bryan joined (owner request, 2026-10-02, Track D).
     expect(Object.keys(THE_MULLET_MOTIONS).sort()).toEqual([
-      'ann-marie-mullet',
-      'ashley-mullet',
+      'abby-rivera',
+      'adam-wilson-hwang',
       'brandon-mullet',
-      'dom-mullet',
-      'jason-mullet',
+      'bryan-sambrook',
       'jon-mullet',
-      'jory-mullet',
-      'nicole-mullet',
       'tony',
     ]);
+    expect(theMullet.npcSlots.map((slot) => slot.npcId).sort()).toEqual(
+      Object.keys(THE_MULLET_MOTIONS).sort(),
+    );
     for (const slot of theMullet.npcSlots) {
       expect(getNpcMotion(slot.npcId), slot.npcId).toBe(THE_MULLET_MOTIONS[slot.npcId as NpcId]);
       expect(NPCS[slot.npcId as NpcId].roomId).toBe('the-mullet');
@@ -85,59 +90,6 @@ describe("The Mullet's NPC motions (owner request, 2026-10-01)", () => {
         createNpcMotion(getNpcMotion(id), slotPoint(id), ORIGIN, { reducedMotion: true }),
       ).toBeNull();
     }
-  });
-
-  it("works Jason's hands at the Ms. Pac-Man (the design's two hand animateTransforms) while he jiggles", () => {
-    const motion = motionFor('jason-mullet');
-    expect(motion.roams).toBe(false);
-    const [left, right] = motion.pose().props;
-    // At rest in the cycle: the left hand at `10 -40`, the right at `0 -36`.
-    expect(offsetOf(left.matrix)).toEqual({ x: 10, y: -40 });
-    expect(offsetOf(right.matrix)).toEqual({ x: 0, y: -36 });
-    // A third of the right hand's 0.25s press: `0 -40`.
-    motion.advance(250 / 3);
-    expect(offsetOf(motion.pose().props[1].matrix).y).toBeCloseTo(-40);
-    // A third of the 0.5s jiggle: 0.8 Stage px right, 0.5 up.
-    motion.advance(250 / 3);
-    const jiggle = offsetOf(motion.pose().figure);
-    expect(jiggle.x * 0.62).toBeCloseTo(0.8, 1);
-    expect(jiggle.y * 0.62).toBeCloseTo(-0.5, 1);
-    expect(motion.pose().point).toEqual(slotPoint('jason-mullet'));
-  });
-
-  it('hops Nicole and Ann Marie 2.5 Stage px on the couch, Ann Marie 0.3s behind', () => {
-    const nicole = motionFor('nicole-mullet');
-    const annMarie = motionFor('ann-marie-mullet');
-    nicole.advance(160);
-    annMarie.advance(160);
-    expect(offsetOf(nicole.pose().figure).y * 0.62).toBeCloseTo(-2.5, 1);
-    expect(offsetOf(annMarie.pose().figure).y).toBeCloseTo(0);
-    annMarie.advance(300);
-    expect(offsetOf(annMarie.pose().figure).y * 0.62).toBeCloseTo(-2.5, 1);
-  });
-
-  it("runs Dom's lap from his slot, through each corner of the design's path at its share of the length", () => {
-    const motion = motionFor('dom-mullet');
-    expect(motion.roams).toBe(true);
-    // His offset slot is the path's first point, (860, 478.26).
-    expect(motion.pose().point.x).toBeCloseTo(860);
-    expect(motion.pose().point.y).toBeCloseTo(478.26);
-    // The path's second corner, (50, -103): 5.89% of 9.4s in.
-    motion.advance(0.0589 * 9_400);
-    expect(motion.pose().point.x).toBeCloseTo(880);
-    expect(motion.pose().point.y).toBeCloseTo(388.26);
-    // Half way round: the same point Jory starts at.
-    motion.advance(0.5 * 9_400 - 0.0589 * 9_400);
-    expectNear(motion.pose().point, { x: 1172.39, y: 767.64 }, 0.5);
-  });
-
-  it("starts Jory half a lap ahead, at the design's own t=0 point, and keeps her slot on the floor", () => {
-    const motion = motionFor('jory-mullet');
-    expect(slotPoint('jory-mullet')).toEqual({ x: 1150, y: 748 });
-    expectNear(motion.pose().point, { x: 1172.39, y: 767.64 }, 0.5);
-    // `begin="-4.7s"`: 4.7s later she's at the lap's start, where Dom began.
-    motion.advance(4_700);
-    expectNear(motion.pose().point, { x: 860, y: 478.26 }, 0.01);
   });
 
   it('walks Tony round the pool table and shows each cue only while he stands at it', () => {
@@ -191,46 +143,6 @@ describe("The Mullet's NPC motions (owner request, 2026-10-01)", () => {
     expect(motion.pose().props[0].alpha).toBe(0);
   });
 
-  it('paces Ashley between her three stops, throwing Clucknelius at Jon, the Penguin and Brandon from each', () => {
-    const motion = motionFor('ashley-mullet');
-    expectNear(slotPoint('ashley-mullet'), { x: 620, y: 698.26 }, 0.01);
-    const layers = THE_MULLET_MOTIONS['ashley-mullet']!.props!;
-    expect(layers).toHaveLength(4);
-    const chickenCentre = { x: 20, y: 98 };
-    // Before the first throw the chicken is in her hand and none is flying.
-    expect(motion.pose().props.map((layer) => layer.alpha)).toEqual([1, 0, 0, 0]);
-
-    for (const [throwIndex, landsAtMs, target, stop] of [
-      [1, 1_998.8, { x: 850, y: 560 }, { x: 0, y: 0 }],
-      [2, 8_599.4, { x: 570, y: 500 }, { x: -140, y: -40 }],
-      [3, 13_898.6, { x: 1062, y: 680 }, { x: -60, y: 70 }],
-    ] as const) {
-      const at = createNpcMotion(
-        getNpcMotion('ashley-mullet'),
-        slotPoint('ashley-mullet'),
-        ORIGIN,
-        {
-          reducedMotion: false,
-        },
-      )!;
-      at.advance(landsAtMs);
-      const pose = at.pose();
-      expectNear(pose.point, { x: 620 + stop.x, y: 698.26 + stop.y }, 0.01);
-      // The held chicken is gone while one flies.
-      expect(pose.props[0].alpha).toBe(0);
-      expect(pose.props[throwIndex].alpha).toBe(1);
-      const flight = pose.props[throwIndex];
-      const landed = stagePointOf(
-        'ashley-mullet',
-        at,
-        multiply(flight.matrix, flight.children[0].matrix),
-        chickenCentre,
-      );
-      // Within her 0.62-vs-0.58 hand offset and her 3 px bob.
-      expectNear(landed, target, 6);
-    }
-  });
-
   it("flies the ping-pong ball along the design's own path, whatever Jon's sway, and swings both paddles", () => {
     const jon = motionFor('jon-mullet');
     const ballIndex = THE_MULLET_MOTIONS['jon-mullet']!.props!.findIndex((layer) =>
@@ -262,5 +174,80 @@ describe("The Mullet's NPC motions (owner request, 2026-10-01)", () => {
     brandon.advance(2_800);
     expect(offsetOf(brandon.pose().stage).x).toBeCloseTo(-18);
     expect(offsetOf(brandon.pose().stage).y).toBeCloseTo(9);
+  });
+  it('keeps Abby at the wall and brushes four stripes on it, one after another', () => {
+    const spec = THE_MULLET_MOTIONS['abby-rivera']!;
+    expect(spec.path).toBeUndefined();
+    const layers = spec.props!;
+    expect(layers).toHaveLength(5);
+    const alphaAt = (layer: number, ms: number): number => {
+      const compiled = compileCssAnimation(layers[layer]!.motion!);
+      return sampleCssOpacity(compiled, ms);
+    };
+    // 8 s loop: stripe k is painted over 5+20k%..20+20k%, then all fade by 97%.
+    expect(alphaAt(0, 0)).toBeCloseTo(0);
+    expect(alphaAt(0, 1_800)).toBeCloseTo(1);
+    expect(alphaAt(3, 1_800)).toBeCloseTo(0);
+    expect(alphaAt(3, 7_000)).toBeCloseTo(1);
+    expect(alphaAt(3, 7_900)).toBeCloseTo(0);
+    // The arm turns about her shoulder to reach the lowest stripe.
+    const arm = compileCssAnimation(layers[4]!.motion!);
+    expect((decomposeAffine(sampleCssAnimation(arm, 7_100)).rotation * 180) / Math.PI).toBeCloseTo(
+      30,
+    );
+  });
+
+  it("walks Adam and Bryan only over walkable tiles that aren't another NPC's slot", () => {
+    const laps: Record<string, { col: number; row: number }[]> = {
+      'adam-wilson-hwang': [
+        { col: 11, row: 4 },
+        { col: 13, row: 4 },
+        { col: 13, row: 1 },
+      ],
+      'bryan-sambrook': [
+        { col: 7, row: 8 },
+        { col: 12, row: 8 },
+        { col: 12, row: 10 },
+      ],
+    };
+    for (const [id, corners] of Object.entries(laps)) {
+      const home = theMullet.npcSlots.find((slot) => slot.npcId === id)!.tile;
+      const loop = [home, ...corners, home];
+      const others = theMullet.npcSlots.filter((slot) => slot.npcId !== id);
+      for (let leg = 0; leg < loop.length - 1; leg += 1) {
+        const a = loop[leg]!;
+        const b = loop[leg + 1]!;
+        const steps = Math.max(Math.abs(b.col - a.col), Math.abs(b.row - a.row));
+        for (let step = 0; step <= steps; step += 1) {
+          const tile = {
+            col: a.col + Math.sign(b.col - a.col) * step,
+            row: a.row + Math.sign(b.row - a.row) * step,
+          };
+          const label = `${id} (${tile.col},${tile.row})`;
+          if (tile.col !== home.col || tile.row !== home.row) {
+            expect(theMullet.walkable[tile.row]![tile.col], label).toBe(true);
+          }
+          expect(
+            others.some((o) => o.tile.col === tile.col && o.tile.row === tile.row),
+            label,
+          ).toBe(false);
+        }
+      }
+      // Each corner of the lap is a stop of its path, in tileToScreen deltas.
+      const compiled = compileCssAnimation(THE_MULLET_MOTIONS[id as NpcId]!.path!);
+      const loopMs = id === 'adam-wilson-hwang' ? 22_000 : 26_000;
+      const seen = new Set<string>();
+      for (let ms = 0; ms < loopMs; ms += 50) {
+        const p = transformPoint(sampleCssAnimation(compiled, ms), { x: 0, y: 0 });
+        seen.add(`${Math.round(p.x)},${Math.round(p.y)}`);
+      }
+      for (const c of corners) {
+        const dc = c.col - home.col;
+        const dr = c.row - home.row;
+        expect(seen, `${id} corner (${c.col},${c.row})`).toContain(
+          `${(dc - dr) * 50},${(dc + dr) * 25}`,
+        );
+      }
+    }
   });
 });

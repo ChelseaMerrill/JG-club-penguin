@@ -30,7 +30,9 @@ const DOOR_HOTSPOT_SIZE = { width: 70, height: 165 };
 // own tiles). Millie's (1,0), Jason's (8,0) and Darrin's (10,6) are open
 // again: they left the Icebox (owner request, 2026-10-02, Track D). The floor-arrow decal by the
 // left wall is hidden from the exported art (#132 -- it wasn't a working
-// door); its tile stays walkable floor regardless.
+// door); its tile stays walkable floor regardless. Linda Martin's own
+// tile, (9,8), is blocked the same way (owner request, 2026-10-09): she
+// walks laps of the open floor near the front of the Room.
 const WALKABLE: readonly (readonly boolean[])[] = [
   [true, true, true, true, false, false, true, true, true, true, true, true],
   [true, true, true, true, true, true, true, true, true, true, true, true],
@@ -40,7 +42,7 @@ const WALKABLE: readonly (readonly boolean[])[] = [
   [true, true, true, false, false, false, false, false, false, true, true, true],
   [true, true, true, true, false, false, false, false, false, true, true, true],
   [true, false, true, true, true, true, true, true, true, true, true, true],
-  [true, true, true, true, true, true, true, true, true, true, true, true],
+  [true, true, true, true, true, true, true, true, false, true, true, true],
   [true, true, true, true, false, true, true, true, true, true, true, false],
 ];
 
@@ -108,6 +110,11 @@ export const theIcebox: RoomDefinition = {
     { npcId: 'dan-bedian', tile: { col: 3, row: 2 }, offset: { x: 10, y: 25 } },
     { npcId: 'paul-carnival', tile: { col: 4, row: 2 }, offset: { x: 25, y: 32.5 } },
     { npcId: 'greg-westover', tile: { col: 6, row: 2 }, offset: { x: -10, y: 15 } },
+    // Linda Martin (owner request, 2026-10-09): an explicit exception to
+    // "don't place unplaced Characters-sheet people", walking laps of the
+    // open floor near the front of the Room, clear of the table, Nicole
+    // and Jethro (`THE_ICEBOX_MOTIONS['linda-martin']`).
+    { npcId: 'linda-martin', tile: { col: 9, row: 8 } },
     // "You" is the local Player's own Penguin, never a static NPC slot
     // (compare Dev Pit's Matt).
   ],

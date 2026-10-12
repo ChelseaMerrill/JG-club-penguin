@@ -107,6 +107,8 @@ It also checks `security definer`/`search_path = ''`/one overload each and the
 
    #121's `20260928000000_beystadium.sql` adds `matchWins` to `quest_progress()`,
    so once it is applied this proof expects `matchWins: {}` in that row.
+   `20261006000000_quest_registry.sql` adds `questSteps`, so once it is
+   applied the same row also expects `questSteps.main` with every step met.
 
 ## #138 Badges (gate H1)
 
@@ -344,3 +346,182 @@ overload and the `authenticated`-only grant.
    `true`, including the final `ALL` row. It changes nothing (everything is
    rolled back, so no webhook fires) and prints only booleans, counts and
    error codes.
+
+## Quest registry (reviewer gate; shared by #140, #141 and #143)
+
+`quest_registry_proof.sql` proves `20261006000000_quest_registry.sql`
+(decisions R1-R8 in its header) against the same #9 H1 fixture Player. As
+postgres it checks that `public.quests` holds `('main', 150)` and is closed to
+every client role, that every `public.quests` row has its
+`public.quest_steps__<id>(uuid)` function, and that no `quest_steps__*`
+function (nor `quest_steps_for`) is executable by anon or authenticated --
+so it also catches a later Quest that breaks the convention. As the fixture
+signed in: the steps functions and the table are denied (`42501`);
+`complete_quest` refuses unlisted, malformed and null ids (`unknown_quest`)
+and the main Quest while a step is unmet (`quest_incomplete`);
+`quest_progress().questSteps.main` reports the saved state; the main Quest
+still pays 150 once plus Ship It. It then adds a test-only Quest the way a
+later migration would (a `public.quests` row plus its steps function, with
+`complete_quest`'s body proved unchanged) and shows it is refused while a step
+is false, paid its own reward (no Ship It) once, reported in `questSteps` and
+`completedQuests`; a Quest with no steps (an empty object or no function) is
+refused. As anon every function is denied. It also checks `security
+definer`/`search_path = ''`/one overload each and the grants.
+
+**Apply it before the client that reads `questSteps` merges or deploys**
+(#138's deploy-order rule), after every earlier migration.
+
+1. Local: covered automatically by `sql-quest-registry.test.ts`'s PGlite run
+   in `npm test` (not by `run-local.sh`), including a rerun and the
+   test-only Quests' rollback.
+2. Real Postgres/Supabase: apply `20261006000000_quest_registry.sql` in the
+   SQL editor, then open `quest_registry_proof.sql`, replace every occurrence
+   of `00000000-0000-0000-0000-00000000f1f0` with the real #9 H1 fixture
+   Player's id, and run it. Expect every row's `pass` column to read `true`,
+   including the final `ALL` row. It changes nothing (everything, including
+   the test-only Quests and their functions, is rolled back) and prints only
+   booleans, counts and Token amounts. Then rerun `46_quests_proof.sql` and
+   `138_badges_proof.sql` the same way: both still pass.
+
+## Igloo Badge Quest (reviewer gate; #143)
+
+`quest_igloo_badge_proof.sql` proves `20261006010000_quest_igloo_badge.sql`
+against the same #9 H1 fixture Player. As postgres it checks the
+`('igloo-badge', 75)` registry row and its `quest_steps__igloo_badge(uuid)`
+function. As the fixture signed in: `complete_quest('igloo-badge')` refuses
+with `quest_incomplete` (paying nothing) until all three steps are met;
+`mark_casey_talked()` keeps the first time; a non-award item never meets
+`buy-jg-award` and one of the three JG awards does; an award in a floor slot is
+rejected outright (`wrong_placement`) and in a wall slot meets
+`hang-jg-award`; the Quest then pays 75 once, with no Badge, and a second call
+pays nothing. A second Player shows `mark_casey_talked` only touches the
+caller's own row, and that an award already owned and hung before the Quest
+is credited straight away (#46's "earlier play counts" rule). As anon both
+functions are denied (`42501`). It also checks `security definer`/
+`search_path = ''`/one overload each and the grants.
+
+Apply it after `20261006000000_quest_registry.sql`, before the client that
+shows this Quest merges or deploys.
+
+1. Local: covered automatically by `sql-quest-igloo-badge.test.ts`'s PGlite
+   run in `npm test` (not by `run-local.sh`).
+2. Real Postgres/Supabase: apply `20261006010000_quest_igloo_badge.sql` in the
+   SQL editor, then open `quest_igloo_badge_proof.sql`, replace every
+   occurrence of `00000000-0000-0000-0000-00000000f1f0` with the real #9 H1
+   fixture Player's id, and run it. Expect every row's `pass` column to read
+   `true`, including the final `ALL` row. It changes nothing (everything,
+   including Player B, is rolled back) and prints only booleans, counts and
+   Token amounts. Then rerun `quest_registry_proof.sql` the same way: it still
+   passes, and now also checks this Quest's steps function.
+
+## Nicole coffee Quest (reviewer gate; #141)
+
+`quest_nicole_coffee_proof.sql` proves `20261006020000_quest_nicole_coffee.sql`
+(decisions C1-C7 in its header) against the same #9 H1 fixture Player. As
+postgres it checks the `('nicole-coffee', 75)` registry row and that
+`public.player_coffee_runs` is RLS-on, SELECT-only for its owner and closed to
+anon. As the fixture signed in: the internal functions are denied (`42501`);
+every step before talking to Nicole is refused (`coffee_not_started`), a
+delivery before Tom hands over a cup is refused (`coffee_not_carrying`), and
+the Quest is refused (`quest_incomplete`) until delivery. Time is controlled
+by setting the stored hand-over time into the past, as postgres, relative to
+the database's own `now()` -- the only clock the server reads, and a write
+the fixture is shown to be denied. So: re-asking Tom while the cup is hot
+keeps its timer; a delivery 66 s after the hand-over is refused
+(`coffee_cold`, nothing written) and steps 3-5 read as reset; Tom then hands
+over a fresh cup; 64 s (inside the 5 s grace) is accepted; a delivery at 20 s
+completes all five steps and `complete_quest('nicole-coffee')` pays 75 once,
+without Ship It. As anon every RPC is denied. It also checks `security
+definer`/`search_path = ''`/one overload, that the five RPCs take no
+arguments, and the grants.
+
+**Apply it before the client that calls its RPCs merges or deploys**, after
+`20261006000000_quest_registry.sql`.
+
+1. Local: covered automatically by `sql-quest-nicole-coffee.test.ts`'s PGlite
+   run in `npm test`, including a rerun, a 70 s refusal, and a two-Player
+   isolation check.
+2. Real Postgres/Supabase: apply `20261006020000_quest_nicole_coffee.sql` in
+   the SQL editor, then open `quest_nicole_coffee_proof.sql`, replace every
+   occurrence of `00000000-0000-0000-0000-00000000f1f0` with the real fixture
+   Player's id, and run it. Expect every row's `pass` column to read `true`,
+   including the final `ALL` row. It changes nothing and prints only
+   booleans, error codes and Token amounts. Then rerun
+   `quest_registry_proof.sql`: it still passes.
+
+## "Pair with a JGer" Quest (reviewer gate; #140)
+
+`quest_pair_flaky_test_proof.sql` proves
+`20261009000000_quest_pair_flaky_test.sql` (decisions P1-P8 in its header)
+against the same #9 H1 fixture Player. As postgres it checks the
+`('pair-flaky-test', 150)` registry row and its
+`quest_steps__pair_flaky_test(uuid)` function. As the fixture signed in:
+`report_to_paul()` refuses with `quest_steps_incomplete` (writing nothing)
+before any step, and again once talk-to-paul/check-ci-board/pair-with-jger
+are met but squash-flakes isn't; `mark_paul_talked()`, `mark_ci_board_checked()`
+and `mark_paired()` each keep their own first time on a second call; a
+`bug-squash` round with `flakyHits: 2` never meets `squash-flakes`, one with
+`flakyHits: 3` does, and a round whose `flakyHits` isn't a JSON number is
+rejected outright by `record_round`'s own stats validation (#27, unchanged by
+this migration); `report_to_paul()` then succeeds and keeps its own first
+time; `complete_quest('pair-flaky-test')` pays 150 once, with no Badge, and a
+second call pays nothing. A second Player shows the three `mark_*` functions
+only ever touch the caller's own row. As anon every function is denied
+(`42501`). It also checks `security definer`/`search_path = ''`/one overload
+each and the grants.
+
+**Apply it before the client that lists this Quest merges or deploys**, after
+`20261006000000_quest_registry.sql`. A sibling Quest's own migration (#141,
+#143, or #142's `20261009010000_quest_pitch_hack.sql`) may sort before or
+after this one; neither depends on the other.
+
+1. Local: covered automatically by `sql-quest-pair-flaky-test.test.ts`'s
+   PGlite run in `npm test`, including a rerun.
+2. Real Postgres/Supabase: apply `20261009000000_quest_pair_flaky_test.sql` in
+   the SQL editor, then open `quest_pair_flaky_test_proof.sql`, replace every
+   occurrence of `00000000-0000-0000-0000-00000000f1f0` with the real fixture
+   Player's id, and run it. Expect every row's `pass` column to read `true`,
+   including the final `ALL` row. It changes nothing (everything, including
+   Player B, is rolled back) and prints only booleans, counts and Token
+   amounts. Then rerun `quest_registry_proof.sql`: it still passes, and now
+   also checks this Quest's steps function.
+
+## Pitch Linda Quest (reviewer gate; #142)
+
+`quest_pitch_hack_proof.sql` proves `20261009010000_quest_pitch_hack.sql`
+(decisions P1-P8 in its header) against the same #9 H1 fixture Player. As
+postgres it checks the `('pitch-hack', 75)` registry row and that
+`public.player_pitch_runs` is RLS-on, SELECT-only for its owner and closed to
+anon. As the fixture signed in: the internal functions are denied (`42501`);
+`start_pitch` and `submit_pitch` are refused (`pitch_not_started`) before
+`mark_linda_talked`, and `submit_pitch` is refused the same way before
+`start_pitch`; an out-of-range or null Problem/Solution/Ask choice is refused
+(`invalid_pitch`) without touching `started_at`; the Quest is refused
+(`quest_incomplete`) until a pitch lands. Time is controlled by setting the
+stored start time into the past, as postgres, relative to the database's own
+`now()` -- the only clock the server reads, and a write the fixture is shown
+to be denied. So: a submission 66 s after `start_pitch` is refused
+(`pitch_timeout`, nothing written, `started_at` left untouched); a fresh
+`start_pitch` resets the clock; 64 s (inside the 5 s grace) is accepted and
+reports its seconds; a submission under 20 s completes both steps and
+`complete_quest('pitch-hack')` pays 75 once; a replay (another `start_pitch`
+then a faster `submit_pitch`) improves `best_seconds` but never pays again. As
+anon every RPC is denied. It also checks `security definer`/`search_path =
+''`/one overload each, that the RPCs take only their stated arguments, and
+the grants.
+
+**Apply it before the client that calls its RPCs merges or deploys**, after
+`20261006000000_quest_registry.sql`. A sibling Quest's migration (#140,
+`20261009000000_quest_pair_flaky_test.sql`) may sort between the two; neither
+depends on the other.
+
+1. Local: covered automatically by `sql-quest-pitch-hack.test.ts`'s PGlite
+   run in `npm test`, including a rerun, a 70 s refusal, and a two-Player
+   isolation check.
+2. Real Postgres/Supabase: apply `20261009010000_quest_pitch_hack.sql` in the
+   SQL editor, then open `quest_pitch_hack_proof.sql`, replace every
+   occurrence of `00000000-0000-0000-0000-00000000f1f0` with the real fixture
+   Player's id, and run it. Expect every row's `pass` column to read `true`,
+   including the final `ALL` row. It changes nothing and prints only
+   booleans, error codes and Token amounts. Then rerun
+   `quest_registry_proof.sql`: it still passes.

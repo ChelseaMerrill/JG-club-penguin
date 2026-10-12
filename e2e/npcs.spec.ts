@@ -1,7 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import type { RoomId } from '../src/contracts';
 import { roofDeck } from '../src/game/rooms/definitions/roof-deck';
-import { teamRoom2 } from '../src/game/rooms/definitions/team-room-2';
 import { theMelt } from '../src/game/rooms/definitions/the-melt';
 import { tileToScreen } from '../src/game/rooms/iso';
 import { GAME_HEIGHT, GAME_WIDTH } from '../src/game/stage-size';
@@ -77,6 +76,10 @@ for (const roomId of [
   'team-room-4',
   'bathroom',
   'the-mullet',
+  'remote-lounge',
+  'latam-cafe',
+  'latam-disco-hall',
+  'latam-futebol-field',
 ] as const) {
   test(`npcs-${roomId}: NPCs show at their designed positions`, async ({ page }) => {
     const errors = await bootRoom(page, roomId);
@@ -138,37 +141,37 @@ test('Dev Pit: clicking Ian arrives, opens his dialog, and GRAB THE HAMMER opens
   expect(errors).toEqual([]);
 });
 
-test('Team Room 2: clicking Ian arrives, opens his dialog, and GRAB THE HAMMER opens Bug Squash (#51)', async ({
+test('Dev Pit: clicking Ian arrives, opens his dialog, and NOT MY TICKET shows his decline line (#181)', async ({
   page,
 }) => {
-  const errors = await bootRoom(page, 'team-room-2');
+  const errors = await bootRoom(page, 'dev-pit');
 
-  const ian = teamRoom2.npcSlots.find((slot) => slot.npcId === 'ian-team-room-2');
-  if (!ian) throw new Error('expected team-room-2 to have an "ian-team-room-2" NPC slot');
-  const point = tileToScreen(ian.tile, teamRoom2.grid.origin);
-
-  await clickStagePoint(page, point);
+  const ian = await npc(page, 'ian');
+  await clickStagePoint(page, { x: ian.x, y: ian.y });
 
   await expect
     .poll(async () => (await debugInfo(page))?.npcArrivedLog, { timeout: LONG_WALK_TIMEOUT })
-    .toContain('ian-team-room-2');
+    .toContain('ian');
 
   const dialog = page.locator('.npc-dialog');
   await expect(dialog).toBeVisible();
-  await expect(dialog.locator('.npc-dialog__name')).toHaveText('Ian Ballard');
 
-  const grabButton = dialog.getByRole('button', { name: 'GRAB THE HAMMER' });
-  await expect(grabButton).toBeVisible();
-  await grabButton.click();
+  const declineButton = dialog.getByRole('button', { name: 'NOT MY TICKET' });
+  await expect(declineButton).toBeVisible();
+  await declineButton.click();
 
-  await expect(page.locator('.minigame__howto')).toBeVisible();
-  await expect(page.locator('.minigame__howto-subtitle')).toContainText('BUG SQUASH');
+  await expect(dialog.locator('.npc-dialog__line')).toHaveText('Cool. Enjoy the red build.');
+  await expect(dialog).toBeVisible();
+
+  await dialog.locator('.npc-dialog__close').click();
   await expect(dialog).toBeHidden();
-
-  await page.screenshot({ path: 'test-results/npcs-team-room-2/bug-squash-launched.png' });
 
   expect(errors).toEqual([]);
 });
+
+// Team Room 2's Ian, and his Bug Squash dialog there, went when he left the
+// Room (owner request, 2026-10-02, Track D); the Dev Pit's Ian test above
+// covers that dialog.
 
 /**
  * Clicking near Ian's head (not just his own tile centre) still opens his

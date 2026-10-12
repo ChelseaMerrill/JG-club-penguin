@@ -720,6 +720,10 @@ describe('createSupabaseProgressStore', () => {
             roundsFinished: ['bug-squash', 'beystadium'],
             completedQuests: [],
             matchWins: { beystadium: 2 },
+            questSteps: {
+              main: { 'create-penguin': true, 'visit-dev-pit': false },
+              'igloo-badge': { 'place-six': false },
+            },
           },
           error: null,
         },
@@ -731,8 +735,50 @@ describe('createSupabaseProgressStore', () => {
         roundsFinished: ['bug-squash', 'beystadium'],
         completedQuests: [],
         matchWins: { beystadium: 2 },
+        questSteps: {
+          main: { 'create-penguin': true, 'visit-dev-pit': false },
+          'igloo-badge': { 'place-six': false },
+        },
       });
       expect(calls).toContainEqual(['rpc.quest_progress', {}]);
+    });
+
+    it('questProgress reads a missing questSteps (an older server) as {}', async () => {
+      const { client } = makeFakeClient({
+        questProgress: {
+          data: { devPitVisited: false, roundsFinished: [], completedQuests: [], matchWins: {} },
+          error: null,
+        },
+      });
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID });
+
+      await expect(store.questProgress()).resolves.toMatchObject({ questSteps: {} });
+    });
+
+    it('questProgress keeps only boolean steps of object-shaped Quests from questSteps', async () => {
+      const { client } = makeFakeClient({
+        questProgress: {
+          data: {
+            devPitVisited: false,
+            roundsFinished: [],
+            completedQuests: [],
+            matchWins: {},
+            questSteps: {
+              main: { 'create-penguin': true, 'visit-dev-pit': 'yes', 'buy-igloo-gear': null },
+              broken: ['create-penguin'],
+              alsoBroken: true,
+            },
+          },
+          error: null,
+        },
+      });
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID });
+
+      await expect(store.questProgress()).resolves.toMatchObject({
+        questSteps: { main: { 'create-penguin': true } },
+      });
+      expect((await store.questProgress()).questSteps).not.toHaveProperty('broken');
+      expect((await store.questProgress()).questSteps).not.toHaveProperty('alsoBroken');
     });
 
     it('questProgress never emits ui:toast on failure', async () => {
@@ -755,6 +801,15 @@ describe('createSupabaseProgressStore', () => {
       await store.markDevPitVisited();
 
       expect(calls).toContainEqual(['rpc.mark_dev_pit_visited', {}]);
+    });
+
+    it('markCaseyTalked calls mark_casey_talked with no arguments (#143)', async () => {
+      const { client, calls } = makeFakeClient();
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID });
+
+      await store.markCaseyTalked();
+
+      expect(calls).toContainEqual(['rpc.mark_casey_talked', {}]);
     });
 
     it('completeQuest sends quest_id, emits tokens:changed with the server balance and badge:earned per awarded Badge', async () => {
@@ -933,6 +988,152 @@ describe('createSupabaseProgressStore', () => {
 
       await expect(store.checkBadges()).rejects.toMatchObject({ code: 'not_authenticated' });
       expect(toasts).toEqual([]);
+    });
+  });
+
+  describe('Nicole coffee Quest (#141)', () => {
+    const CARRYING = {
+      talkedToNicole: true,
+      kitchenVisited: true,
+      delivered: false,
+      handedOverAt: '2026-10-06T19:00:00.000+00:00',
+      secondsLeft: 42.5,
+    };
+
+    it.each([
+      ['coffeeRun', 'coffee_run'],
+      ['talkToNicole', 'start_coffee_run'],
+      ['markKitchenVisited', 'mark_kitchen_visited'],
+      ['askTomForCoffee', 'ask_tom_for_coffee'],
+      ['deliverCoffee', 'deliver_coffee'],
+    ] as const)('%s calls %s with no arguments and returns the run', async (method, rpc) => {
+      const { client, calls } = makeFakeClient({ coffeeRun: { data: CARRYING, error: null } });
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID });
+
+      await expect(store[method]()).resolves.toEqual(CARRYING);
+      expect(calls).toContainEqual([`rpc.${rpc}`, {}]);
+    });
+
+    it('a refused delivery toasts "Your coffee went cold." and rejects with coffee_cold', async () => {
+      const { client } = makeFakeClient({
+        coffeeRun: { data: null, error: { message: 'coffee_cold', code: 'P0001' } },
+      });
+      const toasts: string[] = [];
+      const emitter = createEmitter<GameEventMap>();
+      emitter.on('ui:toast', ({ message }) => toasts.push(message));
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID, emitter });
+
+      await expect(store.deliverCoffee()).rejects.toMatchObject({ code: 'coffee_cold' });
+      expect(toasts).toEqual(['Your coffee went cold.']);
+    });
+
+    it('coffeeRun is a read: a failure rejects without a toast', async () => {
+      const { client } = makeFakeClient({
+        coffeeRun: { data: null, error: { message: 'not_authenticated', code: '42501' } },
+      });
+      const toasts: string[] = [];
+      const emitter = createEmitter<GameEventMap>();
+      emitter.on('ui:toast', ({ message }) => toasts.push(message));
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID, emitter });
+
+      await expect(store.coffeeRun()).rejects.toMatchObject({ code: 'not_authenticated' });
+      expect(toasts).toEqual([]);
+    });
+
+    it.each([
+      ['no data', null],
+      ['a missing flag', { talkedToNicole: true, kitchenVisited: true }],
+      ['a string flag', { ...CARRYING, delivered: 'false' }],
+    ])('rejects a malformed reply (%s) with invalid_response', async (_label, data) => {
+      const { client } = makeFakeClient({ coffeeRun: { data, error: null } });
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID });
+
+      await expect(store.coffeeRun()).rejects.toMatchObject({ code: 'invalid_response' });
+    });
+
+    it('reads a cup as not carried unless both handedOverAt and secondsLeft are present', async () => {
+      const { client } = makeFakeClient({
+        coffeeRun: { data: { ...CARRYING, secondsLeft: null }, error: null },
+      });
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID });
+
+      await expect(store.coffeeRun()).resolves.toMatchObject({
+        handedOverAt: null,
+        secondsLeft: null,
+      });
+    });
+  });
+
+  describe("Linda's pitch Quest (#142)", () => {
+    const PASSED = { talkedToLinda: true, passed: true, bestSeconds: 12 };
+
+    it.each([
+      ['pitchRun', 'pitch_run'],
+      ['markLindaTalked', 'mark_linda_talked'],
+      ['startPitch', 'start_pitch'],
+    ] as const)('%s calls %s with no arguments and returns the run', async (method, rpc) => {
+      const { client, calls } = makeFakeClient({ pitchRun: { data: PASSED, error: null } });
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID });
+
+      await expect(store[method]()).resolves.toEqual(PASSED);
+      expect(calls).toContainEqual([`rpc.${rpc}`, {}]);
+    });
+
+    it('submitPitch calls submit_pitch with the three choices and returns its seconds', async () => {
+      const { client, calls } = makeFakeClient({
+        submitPitch: { data: { seconds: 7 }, error: null },
+      });
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID });
+
+      await expect(store.submitPitch(2, 1, 0)).resolves.toEqual({ seconds: 7 });
+      expect(calls).toContainEqual(['rpc.submit_pitch', { problem: 2, solution: 1, ask: 0 }]);
+    });
+
+    it('a refused submission toasts its message and rejects with pitch_timeout', async () => {
+      const { client } = makeFakeClient({
+        submitPitch: { data: null, error: { message: 'pitch_timeout', code: 'P0001' } },
+      });
+      const toasts: string[] = [];
+      const emitter = createEmitter<GameEventMap>();
+      emitter.on('ui:toast', ({ message }) => toasts.push(message));
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID, emitter });
+
+      await expect(store.submitPitch(0, 0, 0)).rejects.toMatchObject({ code: 'pitch_timeout' });
+      expect(toasts).toEqual(["Every room is a pitch. That one wasn't."]);
+    });
+
+    it('pitchRun is a read: a failure rejects without a toast', async () => {
+      const { client } = makeFakeClient({
+        pitchRun: { data: null, error: { message: 'not_authenticated', code: '42501' } },
+      });
+      const toasts: string[] = [];
+      const emitter = createEmitter<GameEventMap>();
+      emitter.on('ui:toast', ({ message }) => toasts.push(message));
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID, emitter });
+
+      await expect(store.pitchRun()).rejects.toMatchObject({ code: 'not_authenticated' });
+      expect(toasts).toEqual([]);
+    });
+
+    it.each([
+      ['no data', null],
+      ['a missing flag', { talkedToLinda: true }],
+      ['a string flag', { ...PASSED, passed: 'true' }],
+    ])('rejects a malformed run reply (%s) with invalid_response', async (_label, data) => {
+      const { client } = makeFakeClient({ pitchRun: { data, error: null } });
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID });
+
+      await expect(store.pitchRun()).rejects.toMatchObject({ code: 'invalid_response' });
+    });
+
+    it.each([
+      ['no data', null],
+      ['a non-number seconds', { seconds: '12' }],
+    ])('rejects a malformed submit reply (%s) with invalid_response', async (_label, data) => {
+      const { client } = makeFakeClient({ submitPitch: { data, error: null } });
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID });
+
+      await expect(store.submitPitch(0, 0, 0)).rejects.toMatchObject({ code: 'invalid_response' });
     });
   });
 });

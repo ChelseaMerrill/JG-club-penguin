@@ -18,11 +18,13 @@ const REST = { x: 840, y: 310 }; // Millie's own slot point in the design
 describe('The Icebox NPC motions (#113)', () => {
   it("registers a motion for every one of this Room's NPCs", () => {
     // Millie, Jason and Darrin left (owner request, 2026-10-02, Track D); the
-    // three at the table only bob.
+    // three at the table only bob; Linda Martin (owner request, 2026-10-09)
+    // walks a lap.
     expect((Object.keys(THE_ICEBOX_MOTIONS) as NpcId[]).sort()).toEqual([
       'dan-bedian',
       'greg-westover',
       'jethro',
+      'linda-martin',
       'nicole',
       'paul-carnival',
     ]);
@@ -72,6 +74,29 @@ describe('The Icebox NPC motions (#113)', () => {
   it('takes photos as he walks, with the same camera raise as Team Room 1', () => {
     expect(THE_ICEBOX_MOTIONS.jethro!.props).toBe(JETHRO_CAMERA_PROPS);
     expect(THE_ICEBOX_MOTIONS.jethro!.replaceFigureRestPose).toBe(true);
+  });
+
+  it('walks Linda Martin a lap, on her own card bob, never seated (owner request, 2026-10-09)', () => {
+    expect(THE_ICEBOX_MOTIONS['linda-martin']!.path).toBeDefined();
+    expect(THE_ICEBOX_MOTIONS['linda-martin']!.figure).toBeDefined();
+  });
+
+  it("keeps Linda Martin's whole lap on the Icebox floor, starting and ending at her slot", () => {
+    const slot = theIcebox.npcSlots.find((candidate) => candidate.npcId === 'linda-martin')!;
+    const start = npcSlotPoint(slot, theIcebox.grid.origin);
+    const compiled = compileCssAnimation(THE_ICEBOX_MOTIONS['linda-martin']!.path!);
+    expect(transformPoint(sampleCssAnimation(compiled, 0), { x: 0, y: 0 })).toEqual({ x: 0, y: 0 });
+    for (let ms = 0; ms < 18_000; ms += 250) {
+      const offset = transformPoint(sampleCssAnimation(compiled, ms), { x: 0, y: 0 });
+      const tile = screenToTile(
+        { x: start.x + offset.x, y: start.y + offset.y },
+        theIcebox.grid.origin,
+      );
+      expect(tile.col, `col at ${ms} ms`).toBeGreaterThanOrEqual(0);
+      expect(tile.row, `row at ${ms} ms`).toBeGreaterThanOrEqual(0);
+      expect(tile.col, `col at ${ms} ms`).toBeLessThan(theIcebox.grid.columns);
+      expect(tile.row, `row at ${ms} ms`).toBeLessThan(theIcebox.grid.rows);
+    }
   });
 
   it("bobs the design's NPCs 3 Stage px at the shared roam-idle's 50% stop, .55s into the 1.1s loop", () => {

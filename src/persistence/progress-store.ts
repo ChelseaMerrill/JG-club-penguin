@@ -133,6 +133,12 @@ export interface QuestProgress {
    *  no entry. Producer: the Beystadium migration's `quest_progress`.
    *  Consumer: the Beystadium Quest's "x / 3" progress. */
   matchWins: Partial<Record<MinigameId, number>>;
+  /** Every server-paid steps Quest's steps for this Player: Quest id ->
+   *  (step id -> met), in the client's step ids (`QuestStepDefinition.id`).
+   *  Producer: 20261006000000_quest_registry.sql's `quest_progress` (one
+   *  entry per `public.quests` row). `{}` from a server without it.
+   *  Consumer: `src/quests/quest-engine.ts`'s step evaluation. */
+  questSteps: Record<string, Record<string, boolean>>;
 }
 
 /**
@@ -155,15 +161,51 @@ export interface CompleteQuestResult {
  * The result of the Session Badge check (#138's `check_session_badges`):
  * every Badge the Player now holds and the server's balance after the check.
  */
+/**
+ * The Player's run at the Nicole coffee Quest (#141), as the server's
+ * `coffee_run_state` reports it (20261006020000_quest_nicole_coffee.sql C6).
+ * `handedOverAt` and `secondsLeft` are `null` unless a cup is being carried
+ * within the 60 s limit; `secondsLeft` is worked out by the server's clock,
+ * so the client's countdown starts from it rather than from `handedOverAt`.
+ */
+export interface CoffeeRun {
+  talkedToNicole: boolean;
+  kitchenVisited: boolean;
+  delivered: boolean;
+  /** When Tom handed over the cup being carried (ISO 8601), or `null`. */
+  handedOverAt: string | null;
+  /** Seconds (0-60, fractional) left on the cup being carried, or `null`. */
+  secondsLeft: number | null;
+}
+
 export interface BadgeCheckResult {
   badges: BadgeId[];
   balance: number;
 }
 
-/** The Quest ids `completeQuest` accepts: only the main Quest is server-paid (#46). */
-export const SERVER_QUEST_IDS = ['main'] as const;
+/**
+ * The Player's run at Linda's pitch Quest (#142), as the server's
+ * `pitch_run_state` reports it (20261009010000_quest_pitch_hack.sql P6).
+ * There is no "an attempt is running" flag: the overlay's own countdown
+ * (started by its own call to `startPitch`) is the only place that state is
+ * shown, so there is nothing to resume across a reload.
+ */
+export interface PitchRun {
+  talkedToLinda: boolean;
+  passed: boolean;
+  /** The fastest accepted pitch's whole seconds, kept across replays, or `null`. */
+  bestSeconds: number | null;
+}
 
-/** The main Quest's reward, paid once by `complete_quest` (#46). */
+/** `submitPitch`'s success reply (P7): the accepted attempt's whole seconds, by the server's clock. */
+export interface PitchSubmitResult {
+  seconds: number;
+}
+
+/**
+ * The main Quest's reward, paid once by `complete_quest` (#46;
+ * `public.quests`' 'main' row since 20261006000000_quest_registry.sql).
+ */
 export const MAIN_QUEST_REWARD = 150;
 
 /** `ProgressStore.leaderboard`'s row count when `maxRows` is omitted. */
@@ -205,14 +247,33 @@ export const PROGRESS_ERROR_CODES = [
   // #135: an item placed in a slot of another placement (a wall item in a
   // floor slot, and so on). Raised by `igloo_slots_placement_guard`.
   'wrong_placement',
-  // #46: `complete_quest` with an id other than 'main', or before every
-  // main-Quest step is met.
+  // #46: `complete_quest` with an id that isn't a registered steps Quest
+  // (`public.quests`), or before every one of that Quest's steps is met.
   'unknown_quest',
   'quest_incomplete',
   // #138: a response that doesn't have the shape the client expects (the
   // Session Badge check's malformed `check_session_badges` result). Raised
   // client-side only, never by the database.
   'invalid_response',
+  // #141: the Nicole coffee Quest's RPCs (20261006020000_quest_nicole_coffee.sql
+  // C7). A Kitchen visit, an ask or a delivery before talking to Nicole; a
+  // delivery before Tom handed over a cup; a delivery more than 65 s (60 s
+  // plus 5 s of grace) after the hand-over, by the server's clock.
+  'coffee_not_started',
+  'coffee_not_carrying',
+  'coffee_cold',
+  // #142: Linda's pitch Quest's RPCs (20261009010000_quest_pitch_hack.sql
+  // P8). A start or a submission before talking to Linda, or a submission
+  // before starting; an out-of-range Problem/Solution/Ask choice; a
+  // submission more than 65 s (60 s plus 5 s of grace) after the start, by
+  // the server's clock.
+  'pitch_not_started',
+  'invalid_pitch',
+  'pitch_timeout',
+  // #140: the "pair with a JGer" Quest's report_to_paul() RPC
+  // (20261009000000_quest_pair_flaky_test.sql P5/P6) before steps 1-4 (talk
+  // to Paul, check the CI board, pair up, squash 3 flaky bugs) are all met.
+  'quest_steps_incomplete',
 ] as const;
 
 export type ProgressErrorCode = (typeof PROGRESS_ERROR_CODES)[number];
@@ -395,10 +456,52 @@ export interface ProgressStore {
   markDevPitVisited(): Promise<void>;
 
   /**
-   * Asks the server to pay `questId` (only 'main'). The server checks every
-   * main-Quest step against saved records and pays `MAIN_QUEST_REWARD` once;
-   * a repeat call resolves `alreadyCompleted: true` and pays nothing.
-   * Rejects with `unknown_quest` or `quest_incomplete`. Emits
+   * Records the Player's first "talk to Casey" moment for the Igloo Badge
+   * Quest (#143's `quest_steps__igloo_badge` 'talk-to-casey' step), the same
+   * client-asserted, idempotent shape as `markDevPitVisited`: the first call
+   * sticks. Always the caller's own row -- there is no Player id argument,
+   * so no caller can ever mark it for someone else.
+   */
+  markCaseyTalked(): Promise<void>;
+
+  /**
+   * Records the Player's first "talk to Paul" moment for the "pair with a
+   * JGer" Quest (#140's `quest_steps__pair_flaky_test` 'talk-to-paul' step),
+   * the same client-asserted, idempotent shape as `markCaseyTalked`.
+   */
+  markPaulTalked(): Promise<void>;
+
+  /**
+   * Records the Player's first "checked the CI board" moment for #140's
+   * 'check-ci-board' step. Same shape as `markPaulTalked`.
+   */
+  markCiBoardChecked(): Promise<void>;
+
+  /**
+   * Records the Player's first "paired up for 10 continuous seconds" moment
+   * for #140's 'pair-with-jger' step, client-asserted (`src/quests/pairing.ts`
+   * decides when to call this; Presence positions are live-only and never
+   * recorded, so the server can't check it itself). Same idempotent shape as
+   * `markPaulTalked`.
+   */
+  markPaired(): Promise<void>;
+
+  /**
+   * Reports back to Paul for #140's 'report-to-paul' step. Rejects with
+   * `quest_steps_incomplete` unless 'talk-to-paul', 'check-ci-board',
+   * 'pair-with-jger' and 'squash-flakes' are all already met, and writes
+   * nothing in that case. Idempotent once reported.
+   */
+  reportToPaul(): Promise<void>;
+
+  /**
+   * Asks the server to pay the steps Quest `questId` (any `kind: 'steps'`
+   * id in `QUEST_DEFINITIONS` that the server registers in `public.quests`;
+   * the Minigame Quests have no RPC). The server checks every one of that
+   * Quest's steps against saved records (`public.quest_steps__<id>`) and pays
+   * its reward once (`MAIN_QUEST_REWARD` for 'main'); a repeat call resolves
+   * `alreadyCompleted: true` and pays nothing. Only 'main' also awards Ship
+   * It. Rejects with `unknown_quest` or `quest_incomplete`. Emits
    * `tokens:changed` with the server's balance on success, as `purchase` does,
    * and `badge:earned` once for each id in `badgesEarned` (#138).
    */
@@ -412,4 +515,60 @@ export interface ProgressStore {
    * the session wrapper (`progress-session.ts`) announces what's new.
    */
   checkBadges(): Promise<BadgeCheckResult>;
+
+  /**
+   * #141, the Nicole coffee Quest (20261006020000_quest_nicole_coffee.sql).
+   * The Player's coffee run. Read-only: a failure never emits `ui:toast`.
+   */
+  coffeeRun(): Promise<CoffeeRun>;
+
+  /** Talking to Nicole starts the run; a repeat keeps the first talk. Rejects with `no_player`. */
+  talkToNicole(): Promise<CoffeeRun>;
+
+  /** The first Kitchen visit after talking to Nicole. Rejects with `coffee_not_started`. */
+  markKitchenVisited(): Promise<CoffeeRun>;
+
+  /**
+   * Tom hands over a fresh cup (the server's now(), 60 s on the clock) when
+   * none is being carried or the last one went past 60 s; while a cup is
+   * still hot, or once delivered, it changes nothing. Also counts as the
+   * Kitchen visit. Rejects with `coffee_not_started`.
+   */
+  askTomForCoffee(): Promise<CoffeeRun>;
+
+  /**
+   * Hands the cup to Nicole. Accepted only up to 65 s (60 s plus 5 s of
+   * grace) after the hand-over, by the server's clock; later it rejects with
+   * `coffee_cold` and writes nothing (steps 3-5 already read as reset).
+   * Rejects with `coffee_not_started` or `coffee_not_carrying`; once
+   * delivered, a repeat changes nothing. Paying is still `completeQuest`'s.
+   */
+  deliverCoffee(): Promise<CoffeeRun>;
+
+  /**
+   * #142, Linda's pitch Quest (20261009010000_quest_pitch_hack.sql). The
+   * Player's pitch run. Read-only: a failure never emits `ui:toast`.
+   */
+  pitchRun(): Promise<PitchRun>;
+
+  /** Talking to Linda marks the step; a repeat keeps the first talk. Rejects with `no_player`. */
+  markLindaTalked(): Promise<PitchRun>;
+
+  /**
+   * Opens the overlay's 60 s clock. Each call resets it, so a replay after
+   * passing (allowed, for practice) starts a fresh attempt. Rejects with
+   * `pitch_not_started` before `markLindaTalked`.
+   */
+  startPitch(): Promise<PitchRun>;
+
+  /**
+   * Linda hears the pitch. `problem`/`solution`/`ask` must each be 0, 1 or 2
+   * (the overlay's three choices per row), else this rejects with
+   * `invalid_pitch`. Accepted only up to 65 s (60 s plus 5 s of grace) after
+   * `startPitch`, by the server's clock; later it rejects with
+   * `pitch_timeout` and writes nothing. Rejects with `pitch_not_started`
+   * before `startPitch`. Resolves the accepted attempt's whole seconds.
+   * Paying is still `completeQuest`'s.
+   */
+  submitPitch(problem: number, solution: number, ask: number): Promise<PitchSubmitResult>;
 }

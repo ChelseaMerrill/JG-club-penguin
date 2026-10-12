@@ -142,12 +142,15 @@ describe('quest-giver data (#144 D5, Q17)', () => {
       // Town Center (owner request, 2026-10-02, Track D).
       [
         'ashley',
+        'casey',
         'dom-team-room-1',
         'ian',
         'jon-mullet',
         'jory',
+        'linda-martin',
         'michael',
         'nicole',
+        'paul-carnival',
         'sydney-team-room-3',
       ].sort(),
     );

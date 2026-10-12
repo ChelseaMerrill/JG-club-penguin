@@ -1,7 +1,13 @@
 import type { NpcId } from './npcs';
 import { DEV_PIT_MOTIONS } from './motions/dev-pit';
+import { LATAM_CAFE_MOTIONS } from './motions/latam-cafe';
+import { LATAM_DISCO_HALL_MOTIONS } from './motions/latam-disco-hall';
+import { LATAM_FUTEBOL_FIELD_MOTIONS } from './motions/latam-futebol-field';
+import { OFFICE_HALLWAY_MOTIONS } from './motions/office-hallway';
+import { REMOTE_LOUNGE_MOTIONS } from './motions/remote-lounge';
 import { ROOF_DECK_MOTIONS } from './motions/roof-deck';
 import { TEAM_ROOM_1_MOTIONS } from './motions/team-room-1';
+import { TEAM_ROOM_2_MOTIONS } from './motions/team-room-2';
 import { TEAM_ROOM_3_MOTIONS } from './motions/team-room-3';
 import { THE_ICEBOX_MOTIONS } from './motions/the-icebox';
 import { THE_MELT_MOTIONS } from './motions/the-melt';
@@ -20,13 +26,19 @@ export type { NpcMotionSpec, NpcPropLayer } from './motions/types';
 const NPC_MOTIONS: Partial<Record<NpcId, NpcMotionSpec>> = {
   ...TOWN_CENTER_MOTIONS,
   ...DEV_PIT_MOTIONS,
+  ...OFFICE_HALLWAY_MOTIONS,
   ...THE_MELT_MOTIONS,
   ...ROOF_DECK_MOTIONS,
   ...THE_ICEBOX_MOTIONS,
   ...TEAM_ROOM_1_MOTIONS,
+  ...TEAM_ROOM_2_MOTIONS,
   ...TEAM_ROOM_3_MOTIONS,
   ...TEAM_ROOM_4_MOTIONS,
   ...THE_MULLET_MOTIONS,
+  ...REMOTE_LOUNGE_MOTIONS,
+  ...LATAM_CAFE_MOTIONS,
+  ...LATAM_DISCO_HALL_MOTIONS,
+  ...LATAM_FUTEBOL_FIELD_MOTIONS,
 };
 
 /** The NPC's designed motion, looked up by a Room slot's loosely-typed `npcId`. */

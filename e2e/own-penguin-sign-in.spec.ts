@@ -4,13 +4,17 @@
  * sign-in and progress loads run (slowed by 1.5 s to widen the window), and
  * every visible frame must show the saved look. Three independent tests:
  * a restored Session on a fresh boot, sign-out then an in-page sign-in as
- * test user B, and an in-page account switch from A to B.
+ * test user B, and an in-page account switch from A to B. For the in-page
+ * sign-ins, assertion S's window starts at the first hidden frame after the
+ * broadcast; the frames before it must be the legitimate prior state.
  *
  * Uses the shared test users, so it runs in the single-worker
  * `realtime-shared-users` project; see "Running the two-browser e2e specs"
  * in the README. Writes: none, apart from `completeCreatorIfShown`'s
  * one-time first save if a test user has no complete profile yet.
  */
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { dirname } from 'node:path';
 import { expect, test, type Browser, type Page } from '@playwright/test';
 import type { PenguinLook } from '../src/contracts';
 import { penguinLookHash } from '../src/game/penguin/look-hash';
@@ -21,27 +25,23 @@ import {
   type TestUser,
 } from './support/password-session';
 import { assertTestUsersAbsent, playerIdFromStorageState } from './support/presence-guard';
-import { completeCreatorIfShown, waitUntilJoined } from './support/two-browser-session';
+import {
+  assertionSFailures,
+  penguinSampler,
+  type AssertionSOptions,
+  type PenguinSample,
+} from './support/penguin-samples';
+import {
+  completeCreatorIfShown,
+  READY_TIMEOUT,
+  waitUntilJoined,
+} from './support/two-browser-session';
 import './support/room-debug-types';
 
 const AUTH_STATE_A = process.env.AUTH_STATE_A;
 const AUTH_STATE_B = process.env.AUTH_STATE_B;
 const OUT = 'test-results/own-penguin-sign-in';
 const LOAD_DELAY_MS = 1_500;
-
-interface Sample {
-  t: number;
-  visible: boolean;
-  lookName: string;
-  lookBody: string;
-  textureKey?: string;
-}
-
-declare global {
-  interface Window {
-    __penguinSamples?: Sample[];
-  }
-}
 
 function hasUser(user: TestUser): boolean {
   return Boolean(user === 'A' ? AUTH_STATE_A : AUTH_STATE_B) || hasTestUsers(user);
@@ -50,27 +50,6 @@ function hasUser(user: TestUser): boolean {
 async function stateFor(user: TestUser, origin: string): Promise<StorageState | string> {
   const fromFile = user === 'A' ? AUTH_STATE_A : AUTH_STATE_B;
   return fromFile ?? passwordSessionState(user, origin);
-}
-
-/** Records one sample per animation frame, only once the local Penguin exists. */
-async function installSampler(page: Page): Promise<void> {
-  await page.addInitScript(() => {
-    window.__penguinSamples = [];
-    const tick = (): void => {
-      const own = window.__roomDebug?.localPenguin;
-      if (own) {
-        window.__penguinSamples!.push({
-          t: performance.now(),
-          visible: own.visible ?? true,
-          lookName: own.lookName,
-          lookBody: own.lookBody,
-          textureKey: own.textureKey,
-        });
-      }
-      requestAnimationFrame(tick);
-    };
-    requestAnimationFrame(tick);
-  });
 }
 
 async function delayProgressLoads(page: Page): Promise<void> {
@@ -92,31 +71,27 @@ async function clearSamples(page: Page): Promise<void> {
   });
 }
 
-/** Assertion S: every visible frame is `look`, it starts hidden, and it ends visible. */
-async function expectOnlySavedLook(page: Page, look: PenguinLook, forbidden?: PenguinLook) {
-  // Let at least a few more frames land after the join.
+/**
+ * Assertion S (see `assertionSFailures`) for the saved look `look`. With
+ * `options.prior`, S's window starts at the first hidden sample. Writes the
+ * sample log to `samplesPath` before asserting, so it's saved whether or not
+ * the assertion passes.
+ */
+async function expectOnlySavedLook(
+  page: Page,
+  look: PenguinLook,
+  samplesPath: string,
+  options: AssertionSOptions = {},
+): Promise<PenguinSample[]> {
+  // Wait for the reveal, then let at least a few more frames land after it.
+  await page.waitForFunction(() => window.__roomDebug?.localPenguin?.visible === true, undefined, {
+    timeout: READY_TIMEOUT,
+  });
   await page.waitForTimeout(500);
   const samples = await page.evaluate(() => window.__penguinSamples ?? []);
-  const texturePrefix = `penguin:${penguinLookHash(look)}:`;
-  const firstVisible = samples.findIndex((s) => s.visible);
-  expect(firstVisible, 'a visible sample').toBeGreaterThan(-1);
-  expect(
-    samples.slice(0, firstVisible).some((s) => !s.visible),
-    'a hidden sample before the first visible one',
-  ).toBe(true);
-  expect(
-    samples.length - firstVisible - 1,
-    'visible samples after the first',
-  ).toBeGreaterThanOrEqual(5);
-  expect(samples[samples.length - 1].visible, 'the final sample is visible').toBe(true);
-  for (const sample of samples.filter((s) => s.visible)) {
-    expect(sample.lookName).toBe(look.name);
-    expect(sample.lookBody).toBe(look.body);
-    const key = sample.textureKey ?? '__DEFAULT';
-    expect(key === '__DEFAULT' || key.startsWith(texturePrefix), `texture ${key}`).toBe(true);
-    if (forbidden)
-      expect(sample.lookName === forbidden.name && sample.lookBody === forbidden.body).toBe(false);
-  }
+  await writeSamples(samplesPath, samples);
+  const expected = { ...look, texturePrefix: `penguin:${penguinLookHash(look)}:` };
+  expect(assertionSFailures(samples, expected, options), 'assertion S').toEqual([]);
   return samples;
 }
 
@@ -130,6 +105,8 @@ async function openAs(
   const context = await browser.newContext({ storageState: state });
   const page = await context.newPage();
   await page.setViewportSize({ width: 1618, height: 918 });
+  // Before the first navigation, so the in-page sign-ins (no reload) are sampled too.
+  await page.addInitScript(penguinSampler);
   await page.goto('/?debug&masknames');
   await completeCreatorIfShown(page, `Sign-in Tester ${user}`);
   await waitUntilJoined(page);
@@ -140,7 +117,7 @@ async function openAs(
 async function signInInPage(page: Page, user: TestUser, origin: string): Promise<void> {
   const state = await stateFor(user, origin);
   const parsed =
-    typeof state === 'string' ? (JSON.parse(await readFile(state)) as StorageState) : state;
+    typeof state === 'string' ? (JSON.parse(await readFile(state, 'utf8')) as StorageState) : state;
   const entry = parsed.origins
     .flatMap((o) => o.localStorage)
     .find((item) => /^sb-.*-auth-token$/.test(item.name));
@@ -149,11 +126,6 @@ async function signInInPage(page: Page, user: TestUser, origin: string): Promise
     localStorage.setItem(name, value);
     new BroadcastChannel(name).postMessage({ event: 'SIGNED_IN', session: JSON.parse(value) });
   }, entry);
-}
-
-async function readFile(path: string): Promise<string> {
-  const fs = await import('node:fs/promises');
-  return fs.readFile(path, 'utf8');
 }
 
 async function guard(users: TestUser[], origin: string): Promise<void> {
@@ -176,13 +148,11 @@ test.describe('own-penguin-sign-in', () => {
     const { page, close } = await openAs(browser, baseURL, 'A');
     const saved = await ownLook(page);
 
-    await installSampler(page);
     await delayProgressLoads(page);
     await page.reload();
     await waitUntilJoined(page);
-    const samples = await expectOnlySavedLook(page, saved);
+    await expectOnlySavedLook(page, saved, `${OUT}/restored/samples.json`);
     await page.screenshot({ path: `${OUT}/restored/joined.png` });
-    await writeSamples(`${OUT}/restored/samples.json`, samples);
     await close();
   });
 
@@ -196,7 +166,6 @@ test.describe('own-penguin-sign-in', () => {
     await guard(['A', 'B'], origin);
     const { page, close } = await openAs(browser, baseURL, 'A');
 
-    await installSampler(page);
     await page.locator('.hud__button--menu').click();
     await page.locator('.hud__menu-signout').click();
     await expect(page.locator('#ui .landing')).toBeVisible();
@@ -209,9 +178,10 @@ test.describe('own-penguin-sign-in', () => {
     await signInInPage(page, 'B', origin);
     await waitUntilJoined(page);
     const lookB = await ownLook(page);
-    const samples = await expectOnlySavedLook(page, lookB);
+    await expectOnlySavedLook(page, lookB, `${OUT}/signed-out-then-in/samples.json`, {
+      prior: { kind: 'landing' },
+    });
     await page.screenshot({ path: `${OUT}/signed-out-then-in/joined.png` });
-    await writeSamples(`${OUT}/signed-out-then-in/samples.json`, samples);
     await close();
   });
 
@@ -226,7 +196,6 @@ test.describe('own-penguin-sign-in', () => {
     const { page, close } = await openAs(browser, baseURL, 'A');
     const lookA = await ownLook(page);
 
-    await installSampler(page);
     await delayProgressLoads(page);
     await clearSamples(page);
     await signInInPage(page, 'B', origin);
@@ -238,18 +207,21 @@ test.describe('own-penguin-sign-in', () => {
       .toBe(true);
     await waitUntilJoined(page);
     const lookB = await ownLook(page);
-    const samples = await expectOnlySavedLook(page, lookB, lookA);
+    expect(penguinLookHash(lookA), 'A and B must have different saved looks').not.toBe(
+      penguinLookHash(lookB),
+    );
+    await expectOnlySavedLook(page, lookB, `${OUT}/account-switch/samples.json`, {
+      prior: { kind: 'look', look: lookA },
+      forbidden: lookA,
+    });
     await page.screenshot({ path: `${OUT}/account-switch/joined.png` });
-    await writeSamples(`${OUT}/account-switch/samples.json`, samples);
     await close();
   });
 });
 
 /** Saves the sample log without names (the page runs with `?masknames` anyway). */
-async function writeSamples(path: string, samples: Sample[]): Promise<void> {
-  const fs = await import('node:fs/promises');
-  const nodePath = await import('node:path');
-  await fs.mkdir(nodePath.dirname(path), { recursive: true });
+async function writeSamples(path: string, samples: PenguinSample[]): Promise<void> {
+  await mkdir(dirname(path), { recursive: true });
   const sanitized = samples.map(({ lookName, ...rest }) => ({ ...rest, hasName: lookName !== '' }));
-  await fs.writeFile(path, JSON.stringify(sanitized, null, 2));
+  await writeFile(path, JSON.stringify(sanitized, null, 2));
 }

@@ -1,6 +1,6 @@
 import { gameEvents, type MinigameId } from '../../contracts';
 import { dialogLinePool, pickDialogLine } from '../../npcs/dialog-lines';
-import { getNpcDefinition, type NpcDefinition } from '../../npcs/npcs';
+import { getNpcDefinition, type NpcDefinition, type NpcId } from '../../npcs/npcs';
 import {
   QUEST_GIVER_BUTTON_LABEL,
   resolveQuestGiverResponse,
@@ -36,9 +36,22 @@ export interface NpcDialogQuests {
   canStart: (questId: string) => boolean;
 }
 
+/** A Quest errand button on an NPC's dialog (#141's Tom: Nicole's coffee). */
+export interface NpcExtraAction {
+  label: string;
+  /** Runs on click; the dialog then closes. */
+  run: () => void;
+}
+
 export interface NpcDialogDeps {
   overlays: OverlayManager;
   actions: NpcDialogActions;
+  /**
+   * Extra buttons for this NPC right now, shown after its own buttons and
+   * before "Got any work for me?" (#141: Tom's "Nicole's coffee" while that
+   * Quest needs it, alongside Coffee Rush's). Read on every open.
+   */
+  extraActions?: (npcId: NpcId) => readonly NpcExtraAction[];
   /** Omitted (tests, or before Quests are wired): every quest giver answers as if no Quest were connected. */
   quests?: NpcDialogQuests;
   /** Picks each dialog line (#144 D3); `Math.random` by default, injected by tests. */
@@ -174,6 +187,11 @@ export function createNpcDialog(root: HTMLElement, deps: NpcDialogDeps): NpcDial
         if (response === null) return;
         if (response.kind === 'start') {
           deps.actions.startQuest(response.questId);
+          // #141: a giver with a start line says it, and the dialog stays open.
+          if (npc.questGiver?.startLine !== undefined) {
+            lineEl.textContent = npc.questGiver.startLine;
+            return;
+          }
           handleClose();
           return;
         }
@@ -195,7 +213,8 @@ export function createNpcDialog(root: HTMLElement, deps: NpcDialogDeps): NpcDial
 
     actionsEl.replaceChildren();
     if (npc.dialog.kind === 'minigame') {
-      const { minigameId, actionLabel, declineLabel, triggerLine, subtitle } = npc.dialog;
+      const { minigameId, actionLabel, declineLabel, triggerLine, subtitle, declineLine } =
+        npc.dialog;
       // The minigame trigger design shows one "ROOM · ROLE" badge next to the
       // name instead of the plain title line (#36 round-1 review item 4).
       subtitleEl.textContent = subtitle;
@@ -207,7 +226,16 @@ export function createNpcDialog(root: HTMLElement, deps: NpcDialogDeps): NpcDial
           deps.actions.launchMinigame(minigameId);
           handleClose();
         }),
-        actionButton('npc-dialog__button', declineLabel, handleClose),
+        actionButton('npc-dialog__button', declineLabel, () => {
+          // #181: an NPC with its own decline line (Ian's "Cool. Enjoy the
+          // red build.") shows it in place of the trigger line instead of
+          // closing outright; the dialog's own close button dismisses it.
+          if (declineLine !== undefined) {
+            lineEl.textContent = declineLine;
+            return;
+          }
+          handleClose();
+        }),
       );
     } else if (npc.dialog.kind === 'phishing-quiz') {
       // #146: the same trigger layout; the action opens the quiz. Closed
@@ -245,6 +273,14 @@ export function createNpcDialog(root: HTMLElement, deps: NpcDialogDeps): NpcDial
       }
       // 'line': no extra action buttons; the panel's own close button covers it.
     }
+    for (const extra of deps.extraActions?.(npc.id) ?? []) {
+      actionsEl.append(
+        actionButton('npc-dialog__button npc-dialog__button--extra', extra.label, () => {
+          extra.run();
+          handleClose();
+        }),
+      );
+    }
     appendQuestGiverButton(npc);
   }
 
@@ -259,6 +295,12 @@ export function createNpcDialog(root: HTMLElement, deps: NpcDialogDeps): NpcDial
 
     const npc = getNpcDefinition(npcId);
     if (!npc) return;
+    // The Remote Lounge's JGers open their person card instead
+    // (`src/ui/remote-lounge/remote-lounge.ts`).
+    if (npc.dialog.kind === 'remote-card') return;
+    // A `kind: 'none'` NPC (the 19 LATAM JGers, owner request, 2026-10-09)
+    // has no quote at all: walking up to or clicking it opens nothing.
+    if (npc.dialog.kind === 'none') return;
 
     const wasHidden = panel.hidden;
     // A repeated `npc:arrived` for the dialog already open re-renders with

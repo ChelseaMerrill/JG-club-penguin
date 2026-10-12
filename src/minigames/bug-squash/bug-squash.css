@@ -101,3 +101,13 @@
 .bug-squash__bug[hidden] {
   display: none;
 }
+
+/* Ian's line under the grid (#181), matching the design's own
+   `Ian: "{{ ianLine }}"` row: a top rule off the grid, then his line in the
+   body font and the page's primary foreground colour. */
+.bug-squash__ian-line {
+  border-top: 2px solid var(--jg-secondary);
+  padding-top: 14px;
+  font: 700 14px var(--font-body);
+  color: var(--fg-primary);
+}

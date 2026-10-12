@@ -11,7 +11,6 @@ import { getNpcDefinition, NPCS, type NpcDefinition } from './npcs';
  */
 const AWAITING_BA_LINE: readonly string[] = [
   'emily',
-  'jason-mullet',
   'jon-mullet',
   'brandon-mullet',
   // His "corner pocket" bubble is a fragment of his one line, so it's
@@ -25,7 +24,26 @@ const AWAITING_BA_LINE: readonly string[] = [
   'dan-bedian',
   'paul-carnival',
   'greg-westover',
+  'nick-brown',
+  'frank-nardone',
+  'chris-pence',
+  'aleksandr-molchagin',
   'rebecca-congi',
+  'bich-dudla',
+  'eva-trimboli',
+  'abby-rivera',
+  'adam-wilson-hwang',
+  'bryan-sambrook',
+  // Linda Martin, placed in The Icebox with one card line (owner request,
+  // 2026-10-09).
+  'linda-martin',
+  // The 19 LATAM JGers (7 Café, 6 Disco Hall, 6 Futebol Field) are NOT here
+  // (owner request, 2026-10-09): their character sheet gives no quote at all,
+  // and rather than inventing placeholder flavor text pending BA copy, they
+  // carry `dialog: { kind: 'none' }` and no `dialogLines` -- there is no
+  // dialog to await copy for, so `dialogLinePool` gives each of them zero
+  // lines, not one, and they are excluded from the check below by
+  // `dialog.kind` instead of being listed here.
 ];
 
 /**
@@ -106,10 +124,47 @@ function seeded(seed: number): () => number {
 describe('dialogLinePool', () => {
   it('gives every placed NPC at least two lines, except the ones awaiting BA copy', () => {
     const short = placedNpcs()
+      // The Remote Lounge's people open their person card, not a dialog, so
+      // their one design quote is all they need.
+      .filter((npc) => npc.roomId !== 'remote-lounge')
+      // A `dialog.kind === 'none'` NPC (the 19 LATAM JGers) deliberately has
+      // zero lines, not one awaiting BA copy -- its own test below covers it.
+      .filter((npc) => npc.dialog.kind !== 'none')
       .filter((npc) => dialogLinePool(npc).length < 2)
       .map((npc) => npc.id)
       .sort();
     expect(short).toEqual([...AWAITING_BA_LINE].sort());
+  });
+
+  it('gives every dialog.kind === "none" NPC (the 19 LATAM JGers) no dialog lines at all', () => {
+    const noneNpcs = Object.values(NPCS).filter((npc) => npc.dialog.kind === 'none');
+    expect(noneNpcs.map((npc) => npc.id).sort()).toEqual(
+      [
+        'alexandre-nunes',
+        'fernanda-gioiosa',
+        'jean-rodrigues',
+        'joao-vitor-amorim',
+        'sander-nonaka',
+        'vinicius-martins',
+        'ygor-azevedo',
+        'lucas-varani',
+        'hector-grecco',
+        'jose-acosta',
+        'fernando-possebon',
+        'fernando-garagnani',
+        'ricardo-cordeiro',
+        'thalles-stakonski',
+        'bruno-amado',
+        'washington-marino',
+        'chrystian-rissoli',
+        'paulo-ponciano',
+        'gustavo-barska',
+      ].sort(),
+    );
+    for (const npc of noneNpcs) {
+      expect(npc.dialogLines, npc.id).toBeUndefined();
+      expect(dialogLinePool(npc), npc.id).toEqual([]);
+    }
   });
 
   it("starts with the NPC's own dialog lines, then its Room bubbles, without duplicates", () => {
@@ -148,7 +203,10 @@ describe('dialogLinePool', () => {
 
   it("keeps each NPC's first dialog line as #36's single line", () => {
     for (const npc of Object.values(NPCS)) {
-      expect(dialogLinePool(npc)[0], npc.id).toBe(npc.dialogLines[0]);
+      // A `dialog.kind === 'none'` NPC has no `dialogLines` at all, covered
+      // by its own test above.
+      if (npc.dialog.kind === 'none') continue;
+      expect(dialogLinePool(npc)[0], npc.id).toBe(npc.dialogLines![0]);
     }
   });
 });

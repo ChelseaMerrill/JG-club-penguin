@@ -77,7 +77,7 @@ import {
 } from './snowball/dev-snowball-hook';
 import { DEFAULT_LOOK, type EmoteId, type PenguinLook, type RoomBroadcastMap } from './contracts';
 import { createInMemoryProgressStore } from './persistence/in-memory-progress-store';
-import type { ProgressStore } from './persistence/progress-store';
+import type { IglooSlot, ProgressStore } from './persistence/progress-store';
 import { createActiveProgressStore, createProgressSession } from './persistence/progress-session';
 import {
   createSupabaseProgressStore,
@@ -93,10 +93,18 @@ import { createPenguinLoadError } from './ui/penguin-load-error';
 import { createPenguinEditor } from './penguin/penguin-editor';
 import { initDevCreatorHook, withDevLoadFailures } from './penguin/dev-creator-hook';
 import { createNpcDialog } from './ui/npc-dialog/npc-dialog';
-import { hasQuestStarter, startQuest } from './npcs/quest-giver';
+import { hasQuestStarter, registerQuestStarter, startQuest } from './npcs/quest-giver';
+import { createCoffeeRunController, TOM_COFFEE_ACTION_LABEL } from './quests/coffee-run';
+import { NICOLE_COFFEE_QUEST_ID } from './persistence/coffee-run-rules';
+import { createPitchOverlay } from './quests/pitch-overlay';
+import { PITCH_HACK_QUEST_ID } from './persistence/pitch-run-rules';
+import { createPairingTracker, type PairingCandidate } from './quests/pairing';
+import { theIcebox } from './game/rooms/definitions/the-icebox';
 import { recordNpcTalked, recordOpenStall } from './game/rooms/dev-room-hook';
 import { createTrophyCase, TROPHY_CASE_OVERLAY_ID } from './ui/trophy-case';
 import { createMapScreen } from './ui/map-screen';
+import { createRemoteLounge } from './ui/remote-lounge/remote-lounge';
+import { createLatamNav } from './ui/latam-nav/latam-nav';
 import { createElevatorScreen } from './ui/elevator-screen';
 import type { ElevatorTestHandle } from './ui/elevator-test-handle';
 import { createMarket, MARKET_OVERLAY_ID } from './ui/market';
@@ -554,6 +562,7 @@ function endSession(): RoomChannel | null {
   debugOverlay?.setSubscribed(false);
   // #46: Quest tracking lives and dies with the Session.
   quests.stop();
+  stopCoffee();
   // #138: so do the Session Badge checks.
   stopBadgeChecks?.();
   stopBadgeChecks = null;
@@ -608,6 +617,7 @@ async function startSession(player: Player, previous: RoomChannel | null): Promi
   }
   // #46: loads Quest progress from saved data (steps already done aren't toasted).
   void quests.start();
+  startCoffee();
   // #138 D11: the Session Badge check, now and every 5 minutes (First Waddle,
   // Night Owl), by the server's own clock.
   stopBadgeChecks?.();
@@ -794,6 +804,26 @@ createMapScreen(uiLayer, {
   currentRoomId: () => roomNavigator?.currentRoomId() ?? null,
 });
 
+// The Remote Lounge's globe, roster, person card and BACK TO HQ pill, live
+// over that Room only. Mounted just under the HUD, like the wall text.
+createRemoteLounge(uiLayer, {
+  overlays: hud.overlays,
+  goToRoom: (roomId) => {
+    void roomNavigator?.changeRoom(roomId);
+  },
+  initialRoomId: resolveRoomIdFromLocation(window.location),
+  mountBefore: uiLayer.querySelector(':scope > .hud'),
+});
+
+// The LATAM Rooms' own nav (owner request, 2026-10-09): two small pills under
+// the HUD's title, linking a LATAM Room to its two siblings, live only there.
+createLatamNav(uiLayer, {
+  goToRoom: (roomId) => {
+    void roomNavigator?.changeRoom(roomId);
+  },
+  initialRoomId: resolveRoomIdFromLocation(window.location),
+});
+
 // #77 D7: registers with the same shared `OverlayManager` MENU uses, so
 // opening one closes the other and Escape closes whichever is open.
 coreValuesCard = createCoreValuesCard(getUiLayer(), hud.overlays);
@@ -807,8 +837,13 @@ const progress = createProgressSession({ registry: game.registry, emitter: gameE
 // deployment never falls back to the fake: signed out, the store rejects
 // with `not_authenticated`.
 const e2eHooksEnabled = import.meta.env.DEV || import.meta.env.VITE_E2E_HOOKS === 'true';
+// #141: the dev store's clock, which `__questsTest.advanceClock` moves on so
+// e2e can let Nicole's coffee go cold without waiting a real minute. The
+// coffee countdown reads the same clock in a hooks build.
+let devClockOffsetMs = 0;
+const devNow = (): number => Date.now() + devClockOffsetMs;
 const devFallbackStore: ProgressStore | null = e2eHooksEnabled
-  ? createInMemoryProgressStore({ emitter: gameEvents, ...devLeaderboardSeed() })
+  ? createInMemoryProgressStore({ emitter: gameEvents, now: devNow, ...devLeaderboardSeed() })
   : null;
 
 declare global {
@@ -904,7 +939,34 @@ const questAwareStore: ProgressStore = {
   recordRound: (minigameId, score, stats) =>
     refreshQuestsAfter(progressStore.recordRound(minigameId, score, stats)),
   purchase: (itemId) => refreshQuestsAfter(progressStore.purchase(itemId)),
+  // #143: the Igloo Badge Quest's "talk to Casey" step.
+  markCaseyTalked: () => refreshQuestsAfter(progressStore.markCaseyTalked()),
+  // #142: Linda's pitch Quest's "talk to Linda" step.
+  markLindaTalked: () => refreshQuestsAfter(progressStore.markLindaTalked()),
+  submitPitch: (problem, solution, ask) =>
+    refreshQuestsAfter(progressStore.submitPitch(problem, solution, ask)),
+  // #140: the "pair with a JGer" Quest's four steps.
+  markPaulTalked: () => refreshQuestsAfter(progressStore.markPaulTalked()),
+  markCiBoardChecked: () => refreshQuestsAfter(progressStore.markCiBoardChecked()),
+  markPaired: () => refreshQuestsAfter(progressStore.markPaired()),
+  reportToPaul: () => refreshQuestsAfter(progressStore.reportToPaul()),
 };
+
+// #143: Casey's "Got any work for me?" starts the Igloo Badge Quest by
+// recording the "talk to Casey" step; the engine claims the Quest itself
+// once every step (this one, the purchase and the wall placement) is met.
+registerQuestStarter('igloo-badge', () => {
+  void questAwareStore.markCaseyTalked();
+});
+
+// #140: Paul's "Got any work for me?" starts "Pair with a JGer and fix the
+// flaky test" by recording the "talk to Paul" step and tracks it in the HUD
+// widget, as Nicole's does; the engine claims the Quest itself once every
+// step is met.
+registerQuestStarter('pair-flaky-test', () => {
+  quests.track('pair-flaky-test');
+  void questAwareStore.markPaulTalked();
+});
 
 const minigameLauncher = createMinigameLauncher({
   layer: getUiLayer(),
@@ -943,6 +1005,16 @@ gameEvents.on('hotspot:click', ({ hotspotId }) => {
   void market.open();
 });
 
+// #140: the Dev Pit's CI board, "Check the CI board in the Dev Pit" step.
+// No overlay of its own: a click records the step and shows a short toast
+// about the state of the builds, the same "quick flavor, no panel" shape as
+// a line NPC's dialog without any action buttons.
+gameEvents.on('hotspot:click', ({ hotspotId }) => {
+  if (hotspotId !== 'ci-board') return;
+  gameEvents.emit('ui:toast', { message: 'Half the builds are red. Typical.' });
+  void questAwareStore.markCiBoardChecked();
+});
+
 /**
  * Reloads the signed-in Player's `ProgressSnapshot` and pushes its Furniture
  * layout/catalog into `RoomScene` (#41 resolved decision 1): called once on
@@ -974,7 +1046,14 @@ iglooEditor = createIglooEditor(uiLayer, {
     roomScene?.setFurnitureEditMode(on);
     if (on) setSnowballMode(false);
   },
-  onSlotsChanged: () => void refreshIglooFurniture(),
+  onSlotsChanged: () => {
+    void refreshIglooFurniture();
+    // #143: the Igloo Badge Quest's "hang the award" step depends on slot
+    // state, so a placement needs its own refresh (recordRound/purchase
+    // already get one through `questAwareStore`; `iglooEditor` calls
+    // `progressStore.setSlot` directly, above).
+    void quests.refresh();
+  },
 });
 
 gameEvents.on('room:leave', ({ roomId }) => {
@@ -1031,6 +1110,101 @@ quests.onChange((view) => {
 });
 quests.onQuestComplete((quest, tokensAwarded) => questBanner.show(quest.title, tokensAwarded));
 
+// #141: "Bring Nicole a coffee before kickoff". Nicole's "Got any work for
+// me?" starts the run and tracks the Quest; the countdown drives the HUD
+// widget's mm:ss and the cup in the local Penguin's flipper.
+const coffee = createCoffeeRunController({
+  store: progressStore,
+  events: gameEvents,
+  refreshQuests: () => void quests.refresh(),
+  now: e2eHooksEnabled ? devNow : undefined,
+});
+registerQuestStarter(NICOLE_COFFEE_QUEST_ID, () => {
+  quests.track(NICOLE_COFFEE_QUEST_ID);
+  void coffee.talkToNicole();
+});
+function showCoffee(carrying: boolean, secondsLeft: number | null): void {
+  questWidget.setCountdown(NICOLE_COFFEE_QUEST_ID, carrying ? secondsLeft : null);
+  roomScene?.setLocalCarriedCup(carrying);
+}
+coffee.onChange((view) => showCoffee(view.carrying, view.secondsLeft));
+function startCoffee(): void {
+  void coffee.start();
+}
+function stopCoffee(): void {
+  coffee.stop();
+  showCoffee(false, null);
+}
+
+// #142: "Pitch your hack in under 60 seconds". Linda's "Got any work for
+// me?" marks the "talk to Linda" step and shows her card quote; her dialog's
+// own "Pitch Linda" action (below) then opens the overlay, which drives the
+// rest of the Quest itself.
+registerQuestStarter(PITCH_HACK_QUEST_ID, () => {
+  quests.track(PITCH_HACK_QUEST_ID);
+  void questAwareStore.markLindaTalked();
+});
+const pitchOverlay = createPitchOverlay(uiLayer, {
+  overlays: hud.overlays,
+  start: () => progressStore.startPitch().then(() => undefined),
+  submit: (problem, solution, ask) => questAwareStore.submitPitch(problem, solution, ask),
+  now: e2eHooksEnabled ? devNow : undefined,
+});
+/** Whether Linda's dialog should offer "Pitch Linda": only once the Quest's
+ *  "talk to Linda" step is met (replay after passing stays offered, #142). */
+function canPitchLinda(): boolean {
+  const status = quests.view()?.statuses.find((s) => s.quest.id === PITCH_HACK_QUEST_ID);
+  return (status?.progress ?? 0) >= 1;
+}
+
+/** #140: whether Paul's "Report back" option should show (the Quest is active and not yet done). */
+function canReportToPaul(): boolean {
+  const status = quests.view()?.statuses.find((s) => s.quest.id === 'pair-flaky-test');
+  return status !== undefined && !status.done;
+}
+
+// #140: "Pair with a JGer and fix the flaky test"'s "pair-with-jger" step.
+// Presence positions are live-only (never recorded), so this is entirely
+// client-side: while in The Icebox and the step isn't yet met, poll the
+// local Penguin's tile against every other Penguin shown there (or, solo,
+// against Paul Carnival's own tile -- the ticket's fallback), and mark the
+// step the instant `src/quests/pairing.ts` reports 10 continuous seconds
+// near someone.
+const PAUL_ICEBOX_TILE = theIcebox.npcSlots.find((slot) => slot.npcId === 'paul-carnival')!.tile;
+const pairingTracker = createPairingTracker();
+let pairingStepMet = false;
+let pairingMarkInFlight = false;
+const PAIRING_POLL_MS = 500;
+
+function pairingTick(): void {
+  if (pairingStepMet || pairingMarkInFlight) return;
+  if (!roomScene || roomScene.currentRoomId !== 'the-icebox') return;
+  const localTile = roomScene.localTile();
+  if (!localTile) return;
+
+  const others = roomScene.remotePenguinTiles();
+  const candidates: PairingCandidate[] =
+    others.length > 0
+      ? others.map((p) => ({ id: p.playerId, tile: p.tile }))
+      : [{ id: 'paul-carnival', tile: PAUL_ICEBOX_TILE }];
+
+  const now = e2eHooksEnabled ? devNow() : Date.now();
+  if (!pairingTracker.tick(localTile, candidates, now)) return;
+
+  pairingMarkInFlight = true;
+  void questAwareStore.markPaired().finally(() => {
+    pairingMarkInFlight = false;
+  });
+}
+window.setInterval(pairingTick, PAIRING_POLL_MS);
+gameEvents.on('room:leave', () => pairingTracker.reset());
+quests.onChange((view) => {
+  pairingStepMet =
+    view.statuses
+      .find((s) => s.quest.id === 'pair-flaky-test')
+      ?.steps.find((step) => step.step.id === 'pair-with-jger')?.done ?? false;
+});
+
 declare global {
   interface Window {
     /** Test-only (#46); see `src/quests/quests-test-handle.ts`. */
@@ -1046,6 +1220,55 @@ if (e2eHooksEnabled) {
     },
     async purchase(itemId) {
       await questAwareStore.purchase(itemId);
+    },
+    async markCaseyTalked() {
+      await questAwareStore.markCaseyTalked();
+    },
+    async setSlot(slot, itemId) {
+      await progressStore.setSlot(slot as IglooSlot, itemId);
+      void quests.refresh();
+    },
+    coffee() {
+      const view = coffee.view();
+      return {
+        carrying: view?.carrying ?? false,
+        secondsLeft: view?.secondsLeft ?? null,
+        cupRendered: roomScene?.localHasCarriedCup() ?? false,
+      };
+    },
+    advanceClock(ms) {
+      devClockOffsetMs += ms;
+    },
+    async balance() {
+      return (await progressStore.loadAll()).tokens;
+    },
+    async finishCoffeeRun() {
+      await coffee.talkToNicole();
+      await coffee.askTom();
+      await progressStore.deliverCoffee();
+      await coffee.start();
+      await quests.refresh();
+    },
+    async finishPitchHack() {
+      await progressStore.markLindaTalked();
+      await progressStore.startPitch();
+      await progressStore.submitPitch(0, 0, 0);
+      await quests.refresh();
+    },
+    async markPaulTalked() {
+      await questAwareStore.markPaulTalked();
+    },
+    async markCiBoardChecked() {
+      await questAwareStore.markCiBoardChecked();
+    },
+    async markPaired() {
+      await questAwareStore.markPaired();
+    },
+    async reportToPaul() {
+      await questAwareStore.reportToPaul();
+    },
+    async pairFlakyTestSteps() {
+      return (await progressStore.questProgress()).questSteps['pair-flaky-test'] ?? {};
     },
   };
 }
@@ -1118,6 +1341,25 @@ createNpcDialog(getUiLayer(), {
     status: (questId) => quests.view()?.statuses.find((status) => status.quest.id === questId),
     canStart: hasQuestStarter,
   },
+  // #141: Tom's "Nicole's coffee" option while that Quest needs it, next to
+  // (never instead of) Coffee Rush. #142: Linda's "Pitch Linda" option once
+  // the Player has talked to her. #140: Paul's "Report back" option while
+  // "Pair with a JGer and fix the flaky test" is active; `reportToPaul`
+  // itself refuses (toasting) until steps 1-4 are met, so this shows
+  // whenever the Quest is in progress rather than re-deriving step
+  // completeness here.
+  extraActions: (npcId) => {
+    if (npcId === 'tom' && coffee.canAskTom()) {
+      return [{ label: TOM_COFFEE_ACTION_LABEL, run: () => void coffee.askTom() }];
+    }
+    if (npcId === 'linda-martin' && canPitchLinda()) {
+      return [{ label: 'Pitch Linda', run: () => pitchOverlay.open() }];
+    }
+    if (npcId === 'paul-carnival' && canReportToPaul()) {
+      return [{ label: 'Report back', run: () => void questAwareStore.reportToPaul() }];
+    }
+    return [];
+  },
 });
 gameEvents.on('npc:talked', ({ npcId }) => {
   recordNpcTalked(npcId);
@@ -1189,7 +1431,10 @@ const devAsPlayerActive = initDevAsPlayerHook();
 const devHookActive = devHudActive || devMinigameActive || devCreatorActive || devAsPlayerActive;
 // #46: the dev/e2e hooks never start a real Session, so Quest tracking
 // starts here instead, against the in-memory fallback store.
-if (devHookActive) void quests.start();
+if (devHookActive) {
+  void quests.start();
+  startCoffee();
+}
 
 gameEvents.on('ui:open-creator', () => {
   penguinEditor.edit();
