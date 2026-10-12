@@ -242,11 +242,13 @@ export function createRoomNavigator(deps: RoomNavigatorDeps): RoomNavigator {
     if (transitionInFlight) return;
     if (roomId === current) return;
     const leaving = current;
-    if (leaving) events.emit('room:leave', { roomId: leaving });
     // #170 D5: in the same synchronous step as the leave, so nothing (the
-    // Map, the keys, a door, a sign-out) can slip in during a fade unseen.
+    // Map, the keys, a door, a sign-out) can slip in during a fade unseen;
+    // and before it (review MINOR-1), so a `room:leave` listener already sees
+    // a transition in flight (the doors' keyboard layer goes inert there).
     transitionInFlight = true;
     const token = ++transitionToken;
+    if (leaving) events.emit('room:leave', { roomId: leaving });
     if (options.fade && fade) {
       // The target becomes `current` only once its restart starts
       // (`enterRoom`): a sign-out mid-fade has nothing left to leave.

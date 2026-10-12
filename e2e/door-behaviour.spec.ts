@@ -269,6 +269,8 @@ test('fade: a door fades to opaque before the restart, swallows Stage clicks, th
     floor,
   );
   expect(topmost).toContain('door-fade');
+  // The doors' keyboard layer is inert for the whole transition (review MINOR-1).
+  await expect(page.locator('.door-focus')).toHaveAttribute('inert', '');
   expect((await debugInfo(page))?.fade?.blocking).toBe(true);
   expect((await debugInfo(page))?.roomId).toBe('town-center');
   await page.mouse.click(floor.x, floor.y);

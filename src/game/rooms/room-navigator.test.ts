@@ -731,7 +731,7 @@ describe('createRoomNavigator', () => {
         fade,
         pickFloor: options.pickFloor,
       });
-      return { log, scene, fade, navigator };
+      return { log, events, scene, fade, navigator };
     }
 
     async function flush(): Promise<void> {
@@ -770,6 +770,24 @@ describe('createRoomNavigator', () => {
       await flush();
       expect(log.slice(5)).toEqual(['ready', 'fade:clear', 'enter:roof-deck']);
       expect(navigator.isTransitioning()).toBe(false);
+    });
+
+    it('is already transitioning when room:leave fires, faded or not (review MINOR-1)', async () => {
+      const { events, scene, fade, navigator } = setupLogged();
+      await boot(scene, navigator);
+      const transitioningAtLeave: boolean[] = [];
+      events.on('room:leave', () => transitioningAtLeave.push(navigator.isTransitioning()));
+
+      scene.triggerDoorReached(DEV_PIT_DOOR); // faded
+      fade.finishOut();
+      await flush();
+      scene.fireCreate();
+      await flush();
+      const p = navigator.changeRoom('town-center'); // unfaded
+      scene.fireCreate();
+      await p;
+
+      expect(transitioningAtLeave).toEqual([true, true]);
     });
 
     it('a same-floor door clears the fade once the Room is ready', async () => {
