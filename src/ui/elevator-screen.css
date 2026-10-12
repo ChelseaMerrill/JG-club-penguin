@@ -1,18 +1,18 @@
-/* Elevator loading screen (#52): design/Elevator.dc.html. Fills the 1600x900
-   #ui layer, so every size here is Stage pixels, following map-screen.css's
-   pattern. Unlike the Map/Market/Creator/Trophy Case (z-index 20), this
-   overlay sits at z-index 30 so it always paints over whichever of those
-   happened to trigger the Room change underneath it (#52 D6). */
+/* Elevator loading screen (#52, scenery and ride #163): design/Elevator.dc.html.
+   Fills the 1600x900 #ui layer, so every size here is Stage pixels, following
+   map-screen.css's pattern. Unlike the Map/Market/Creator/Trophy Case
+   (z-index 20), this overlay sits at z-index 30 so it always paints over
+   whichever of those happened to trigger the Room change underneath it
+   (#52 D6). Keyframes are the design's own, prefixed `elevator-`; DOM order
+   is the design's paint order. */
 
 .elevator-screen {
   position: absolute;
   inset: 0;
   z-index: 30;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  overflow: hidden;
   pointer-events: auto;
-  background: rgba(14, 16, 19, 0.94);
+  background: #0e1013;
   color: var(--jg-light);
   font-family: var(--font-body);
 }
@@ -21,13 +21,188 @@
   display: none;
 }
 
-.elevator-screen__frame {
+.elevator-screen__car {
+  position: absolute;
+  inset: 0;
+  background: #141618;
+}
+
+.elevator-screen__car > * {
+  position: absolute;
+}
+
+/* Walls, their shade and the warm wash share one box. */
+.elevator-screen__walls,
+.elevator-screen__walls-shade,
+.elevator-screen__wash {
+  inset: 120px 0 200px;
+}
+
+.elevator-screen__walls {
+  background: repeating-linear-gradient(90deg, #26292d 0 196px, #1b1d20 196px 204px);
+}
+
+.elevator-screen__walls-shade {
+  background: linear-gradient(
+    180deg,
+    rgba(244, 244, 244, 0.06),
+    transparent 40%,
+    rgba(0, 0, 0, 0.35)
+  );
+}
+
+.elevator-screen__wash {
+  background: linear-gradient(
+    180deg,
+    rgba(255, 196, 60, 0.55),
+    rgba(255, 196, 60, 0.12) 50%,
+    transparent
+  );
+  mix-blend-mode: screen;
+  opacity: 0;
+  pointer-events: none;
+  animation: elevator-wash 6s ease-in-out infinite;
+}
+
+.elevator-screen__top-bar {
+  inset: 0 0 auto;
+  height: 120px;
+  background: linear-gradient(180deg, #0e1013, #1b1d20);
+  border-bottom: 6px solid var(--jg-secondary);
+}
+
+.elevator-screen__lights {
+  inset: 22px 0 auto;
+  display: flex;
+  justify-content: center;
+  gap: 60px;
+}
+
+.elevator-screen__light {
+  width: 240px;
+  height: 40px;
+  background: var(--jg-light);
+  box-shadow: 0 0 40px 14px rgba(244, 244, 244, 0.18);
+  border: 3px solid var(--jg-secondary);
+  animation:
+    elevator-flicker 5s ease-in-out 0s infinite,
+    elevator-warm 6s ease-in-out 0s infinite;
+}
+
+.elevator-screen__light:nth-child(2) {
+  animation-delay: 1.7s, 0s;
+}
+
+.elevator-screen__light:nth-child(3) {
+  animation-delay: 3.4s, 0s;
+}
+
+.elevator-screen__floor-lip {
+  inset: auto 0 200px;
+  height: 14px;
+  background: var(--jg-secondary);
+  box-shadow: 0 -2px 0 var(--jg-primary);
+}
+
+.elevator-screen__deck,
+.elevator-screen__deck-grid {
+  inset: auto 0 200px;
+  height: 200px;
+}
+
+.elevator-screen__deck {
+  background: linear-gradient(180deg, #1d1f22, #0e1013);
+}
+
+.elevator-screen__deck-grid {
+  background:
+    repeating-linear-gradient(90deg, transparent 0 78px, rgba(12, 75, 95, 0.6) 78px 80px),
+    repeating-linear-gradient(180deg, transparent 0 38px, rgba(12, 75, 95, 0.6) 38px 40px);
+}
+
+.elevator-screen__handrail {
+  inset: 400px 120px auto;
+  height: 22px;
+  background: linear-gradient(180deg, #d9dcdf, #8c9196);
+  border-radius: 11px;
+  box-shadow: 0 6px 0 var(--jg-secondary);
+}
+
+/* The shaft windows: blue lights streaming past, reversed going down. */
+.elevator-screen__shaft {
+  top: 120px;
+  bottom: 200px;
+  width: 70px;
+  overflow: hidden;
+  background: #050607;
+  border: 4px solid var(--jg-secondary);
+}
+
+.elevator-screen__shaft--left {
+  left: 24px;
+}
+
+.elevator-screen__shaft--right {
+  left: 1506px;
+}
+
+.elevator-screen__shaft-lights {
+  position: absolute;
+  inset: -100% 0 auto;
+  height: 200%;
+  background: repeating-linear-gradient(
+    180deg,
+    transparent 0 150px,
+    rgba(0, 189, 255, 0.9) 150px 164px,
+    transparent 164px 190px
+  );
+  animation: elevator-passby 1.6s linear infinite;
+}
+
+.elevator-screen--down .elevator-screen__shaft-lights {
+  animation-direction: reverse;
+}
+
+.elevator-screen__shaft-shade {
+  position: absolute;
+  inset: 0;
+  box-shadow: inset 0 0 30px #000;
+}
+
+/* The indicator panel: GOING / arrow + floor / NEXT, over the floor strip. */
+.elevator-screen__indicator {
+  left: 50%;
+  top: 140px;
+  transform: translateX(-50%);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 28px;
-  width: 780px;
-  padding: 40px 48px;
+  gap: 10px;
+  padding: 14px 22px;
+  background: #0a0b0d;
+  border: 3px solid var(--jg-secondary);
+}
+
+.elevator-screen__indicator-row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.elevator-screen__going,
+.elevator-screen__next {
+  font: 400 12px var(--font-display);
+  letter-spacing: 0.24em;
+  color: var(--jg-inactive);
+}
+
+.elevator-screen__arrow {
+  font-family: var(--font-game-display);
+  font-size: 44px;
+  line-height: 1;
+  color: var(--jg-primary);
+  -webkit-text-stroke: 4px var(--jg-secondary);
+  paint-order: stroke fill;
 }
 
 .elevator-screen__strip {
@@ -35,8 +210,7 @@
   gap: 6px;
 }
 
-/* 46x52 with a 6px strip gap, matching the design's own floor chips
-   (`design/Elevator.dc.html`) rather than the earlier placeholder size. */
+/* 46x52 with a 6px strip gap, matching the design's own floor chips. */
 .elevator-screen__floor {
   width: 46px;
   height: 52px;
@@ -47,25 +221,191 @@
   background: transparent;
   border: 2px solid var(--jg-secondary);
   opacity: 1;
-  transition:
-    background-color 0.2s ease-out,
-    box-shadow 0.2s ease-out,
-    color 0.2s ease-out,
-    border-color 0.2s ease-out,
-    opacity 0.2s ease-out;
 }
 
-/* The destination floor: lit, matching the design's own current-floor chip. */
+/* The floor being left: dimmed a touch, no outline of its own (the design's). */
+.elevator-screen__floor--source {
+  opacity: 0.9;
+}
+
+/* The floors passed on the way flash in turn: floor k lights k floors' worth
+   of ride after the start (`animation-delay` is set inline per chip). */
+.elevator-screen__floor--between {
+  animation: elevator-floorlit 6s ease-in-out 0s 1 both;
+}
+
+/* The destination floor: lit from the start, matching the design. */
 .elevator-screen__floor--dest {
   background: var(--jg-primary);
   color: var(--jg-dark);
   border-color: var(--jg-primary);
-  box-shadow: 0 0 18px var(--jg-primary);
+  opacity: 1;
 }
 
-/* The floor being left: outlined only, never both lit and outlined (#52 D6). */
-.elevator-screen__floor--source {
-  border-color: var(--jg-light);
+/* The FLOORS panel: hexagon chips, R down to L, the passing floor lit. */
+.elevator-screen__floors-panel {
+  right: 150px;
+  top: 300px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 18px 16px;
+  background: #0a0b0d;
+  border: 3px solid var(--jg-secondary);
+}
+
+.elevator-screen__floors-label {
+  font: 400 10px var(--font-display);
+  letter-spacing: 0.24em;
+  color: var(--jg-inactive);
+}
+
+.elevator-screen__hex {
+  width: 44px;
+  height: 50px;
+  display: grid;
+  place-items: center;
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  background: var(--jg-secondary);
+  font: 400 17px var(--font-display);
+  color: var(--jg-light);
+}
+
+.elevator-screen__hex--lit {
+  background: var(--jg-primary);
+  color: var(--jg-dark);
+}
+
+.elevator-screen__floors-bar {
+  width: 44px;
+  height: 5px;
+  margin-top: 4px;
+  background: var(--jg-primary);
+}
+
+.elevator-screen__floors-dots {
+  display: flex;
+  gap: 6px;
+}
+
+.elevator-screen__floors-dot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--jg-light);
+}
+
+.elevator-screen__floors-dot--dim {
+  background: var(--jg-secondary);
+}
+
+/* Snow falling inside the car, parked at top -10px when motion is reduced. */
+.elevator-screen__snow {
+  inset: 0 0 200px;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.elevator-screen__flake {
+  position: absolute;
+  top: -10px;
+  border-radius: 50%;
+  background: var(--jg-light);
+  animation: elevator-fall 10s linear infinite;
+}
+
+.elevator-screen__sign {
+  left: 50%;
+  top: 112px;
+  transform: translateX(-50%);
+  padding: 5px 12px;
+  background: rgba(22, 23, 25, 0.9);
+  border: 2px solid var(--jg-secondary);
+  font: 400 10px var(--font-display);
+  letter-spacing: 0.2em;
+  color: var(--jg-inactive);
+}
+
+/* The Player's own Penguin: the design's 180x195 box, bobbing. The Look
+   renderer's padded frame is drawn at 1.5x and offset by its padding (sizes
+   are set inline as custom properties), so the 120x130 core fills the box. */
+.elevator-screen__penguin {
+  left: 50%;
+  bottom: 190px;
+  transform: translateX(-50%);
+  width: 180px;
+  height: 195px;
+}
+
+.elevator-screen__penguin-art {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  transform-origin: 50% 100%;
+  animation: elevator-bob 2.4s ease-in-out infinite;
+}
+
+.elevator-screen__penguin-art > svg {
+  position: absolute;
+  display: block;
+  left: var(--elevator-art-left);
+  top: var(--elevator-art-top);
+  width: var(--elevator-art-width);
+  height: var(--elevator-art-height);
+}
+
+.elevator-screen__penguin-shadow {
+  left: 50%;
+  bottom: 196px;
+  transform: translateX(-50%);
+  width: 200px;
+  height: 26px;
+  border-radius: 50%;
+  background: #000;
+  opacity: 0.45;
+}
+
+/* The Room's own name tag (`penguin-sprite.ts`), as DOM. */
+.elevator-screen__name-tag {
+  left: 50%;
+  bottom: 398px;
+  transform: translateX(-50%);
+  padding: 6px 16px;
+  background: var(--jg-primary);
+  border-radius: 999px;
+  font: 700 15px var(--font-body);
+  color: var(--jg-dark);
+  white-space: nowrap;
+}
+
+.elevator-screen__name-tag[hidden] {
+  display: none;
+}
+
+.elevator-screen__bubble {
+  left: 50%;
+  bottom: 428px;
+  margin-left: -120px;
+  transform: translateX(-100%);
+  padding: 8px 14px;
+  background: var(--jg-light);
+  border-radius: 8px;
+  font: 700 13px var(--font-body);
+  color: var(--jg-dark);
+  white-space: nowrap;
+}
+
+/* Heading, progress bar and status line, along the bottom. */
+.elevator-screen__bottom {
+  position: absolute;
+  left: 50%;
+  bottom: 56px;
+  transform: translateX(-50%);
+  width: 760px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .elevator-screen__heading {
@@ -88,6 +428,7 @@
   border: 3px solid var(--jg-secondary);
 }
 
+/* `style.width` is written by `elevator-screen.ts` from the one ride clock. */
 .elevator-screen__progress-bar {
   position: absolute;
   inset: 0 auto 0 0;
@@ -95,43 +436,121 @@
   background: repeating-linear-gradient(-45deg, var(--jg-primary) 0 12px, #33cbff 12px 24px);
 }
 
-@keyframes elevator-fill {
-  from {
-    width: 0;
-  }
-  to {
-    width: 100%;
-  }
+.elevator-screen__status-row {
+  display: flex;
+  justify-content: space-between;
+  font: 400 13px var(--font-display);
+  letter-spacing: 0.16em;
 }
 
-/* Drives the fill via a `@keyframes` animation rather than a `width`
-   transition (#52 review MAJOR): a transition never runs while the overlay
-   is still `hidden` (`display: none`), so the bar used to show full the
-   instant it appeared. `--elevator-fill-duration` is set inline per
-   `minDurationMs`; `elevator-screen.ts`'s `restartProgress` removes and
-   re-adds this class, with a forced reflow in between and only *after* the
-   overlay is unhidden, so the animation actually restarts and plays. */
-.elevator-screen__progress-bar--filling {
-  animation: elevator-fill var(--elevator-fill-duration, 1200ms) linear forwards;
+.elevator-screen__status {
+  color: var(--jg-light);
 }
 
 .elevator-screen__tip {
-  font: 400 13px var(--font-display);
-  letter-spacing: 0.16em;
   color: var(--jg-inactive);
-  text-align: center;
 }
 
-/* #52 D7: no floor-strip transition and no progress fill -- the final state
-   (destination lit, bar full) shows at once. The 1.2s JS minimum in
-   `elevator-screen.ts` still applies regardless of this media query. */
-@media (prefers-reduced-motion: reduce) {
-  .elevator-screen__floor {
-    transition: none;
+@keyframes elevator-passby {
+  to {
+    transform: translateY(50%);
   }
+}
 
-  .elevator-screen__progress-bar--filling {
+@keyframes elevator-floorlit {
+  0%,
+  2% {
+    background: transparent;
+    color: #f4f4f4;
+    box-shadow: none;
+    opacity: 0.6;
+  }
+  6%,
+  16% {
+    background: #f2c12e;
+    color: #161719;
+    box-shadow: 0 0 18px #f2c12e;
+    opacity: 1;
+  }
+  20%,
+  100% {
+    background: transparent;
+    color: #f4f4f4;
+    box-shadow: none;
+    opacity: 0.6;
+  }
+}
+
+@keyframes elevator-flicker {
+  0%,
+  92%,
+  100% {
+    opacity: 1;
+  }
+  94% {
+    opacity: 0.55;
+  }
+  96% {
+    opacity: 1;
+  }
+}
+
+@keyframes elevator-warm {
+  0% {
+    background: #f4f4f4;
+    box-shadow: 0 0 40px 14px rgba(244, 244, 244, 0.18);
+  }
+  80%,
+  92% {
+    background: #f2c12e;
+    box-shadow: 0 0 84px 30px rgba(242, 193, 46, 0.66);
+  }
+  100% {
+    background: #f4f4f4;
+    box-shadow: 0 0 40px 14px rgba(244, 244, 244, 0.18);
+  }
+}
+
+@keyframes elevator-wash {
+  0% {
+    opacity: 0;
+  }
+  80%,
+  92% {
+    opacity: 0.6;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes elevator-fall {
+  to {
+    transform: translateY(720px) translateX(24px);
+  }
+}
+
+@keyframes elevator-bob {
+  0%,
+  100% {
+    transform: translateY(0) rotate(-2deg);
+  }
+  50% {
+    transform: translateY(-6px) rotate(2deg);
+  }
+}
+
+/* The ride length is unchanged under reduced motion (the JS side still hides
+   at the later of the ride's end and `ready()`), but nothing moves: the
+   arrival state shows at once, the Penguin stands still and the snow stays
+   parked out of sight at the top. */
+@media (prefers-reduced-motion: reduce) {
+  .elevator-screen__shaft-lights,
+  .elevator-screen__light,
+  .elevator-screen__wash,
+  .elevator-screen__flake,
+  .elevator-screen__penguin-art,
+  .elevator-screen__floor--between {
     animation: none;
-    width: 100%;
   }
 }

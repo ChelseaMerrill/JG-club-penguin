@@ -9,6 +9,13 @@ import {
   type TankFish,
 } from './tank-fish';
 
+/**
+ * The name of the tank fish's top-level `Container`s (its nameplate and
+ * bubble), so `RoomScene`'s Penguin-only `penguinCount` never reads them as
+ * Penguins (#225).
+ */
+export const TANK_FISH_CONTAINER_NAME = 'tank-fish';
+
 /** The design's nameplate: Libre Franklin 700 10 px, cyan on near-black. */
 const NAMEPLATE_PADDING_X = 6;
 /** The design's "feed me" bubble text: Libre Franklin 700 12 px, near-black on white. */
@@ -68,6 +75,7 @@ export class RoomTankFish {
     pill.strokeRoundedRect(-width / 2, -height / 2, width, height, height / 2);
     this.nameplate = scene.add
       .container(TANK_FISH_NAMEPLATE.x, TANK_FISH_NAMEPLATE.y + height / 2, [pill, label])
+      .setName(TANK_FISH_CONTAINER_NAME)
       .setDepth(options.depth);
 
     const { dots, pill: bubblePill, text } = TANK_FISH_FEED_ME;
@@ -91,6 +99,7 @@ export class RoomTankFish {
       .setOrigin(0.5, 0.5);
     this.bubble = scene.add
       .container(0, 0, [bubbleShape, bubbleText])
+      .setName(TANK_FISH_CONTAINER_NAME)
       .setDepth(options.bubbleDepth)
       .setAlpha(0);
 
