@@ -746,7 +746,7 @@ describe('createNpcDialog: Quest buttons refresh while open (#224)', () => {
     expect(document.activeElement).toBe(before);
   });
 
-  it('keeps focus in the dialog when the focused Quest button is replaced', () => {
+  it('hands focus to the replacement button with the same label, not the first button', () => {
     const { root, state, notify } = setupLinda();
     gameEvents.emit('npc:arrived', { npcId: 'linda-martin' });
     questButton(root)!.focus();
@@ -754,7 +754,44 @@ describe('createNpcDialog: Quest buttons refresh while open (#224)', () => {
     state.talked = true;
     notify();
 
-    expect(box(root).contains(document.activeElement)).toBe(true);
+    // "Pitch Linda" is now first; focus stays on the rebuilt "Got any work for me?".
+    expect(document.activeElement).toBe(questButton(root));
+  });
+
+  it("leaves a Minigame NPC's own buttons alone and keeps them first (Tom)", () => {
+    const root = document.createElement('div');
+    document.body.append(root);
+    overlays = createOverlayManager();
+    const state = { errand: false };
+    const listeners = new Set<() => void>();
+    dialog = createNpcDialog(root, {
+      overlays,
+      actions: { launchMinigame: vi.fn(), openStall: vi.fn(), startQuest: vi.fn() },
+      extraActions: (npcId) =>
+        npcId === 'tom' && state.errand ? [{ label: "Nicole's oat latte?", run: vi.fn() }] : [],
+      onQuestStateChange: (listener) => {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      },
+      random: () => 0,
+    });
+    const notify = () => {
+      for (const listener of listeners) listener();
+    };
+    gameEvents.emit('npc:arrived', { npcId: 'tom' });
+    const buttons = () => Array.from(root.querySelectorAll('.npc-dialog__actions button'));
+    const [primary, decline] = buttons();
+
+    state.errand = true;
+    notify();
+    const errand = root.querySelector('.npc-dialog__button--extra');
+    expect(buttons()).toEqual([primary, decline, errand]);
+
+    // The coffee run notifies every second; nothing changed, so nothing is rebuilt.
+    notify();
+    notify();
+    expect(root.querySelector('.npc-dialog__button--extra')).toBe(errand);
+    expect(buttons()).toEqual([primary, decline, errand]);
   });
 
   it('ignores changes while closed, and unsubscribes on destroy', () => {

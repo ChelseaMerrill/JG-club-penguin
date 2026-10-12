@@ -137,6 +137,8 @@ async function buttonFits(page: Page) {
         const rect = button.getBoundingClientRect();
         return {
           label: button.textContent,
+          // CSS px: the #ui layer is scaled to the letterboxed Stage, so rects aren't.
+          height: button.offsetHeight,
           clipped:
             button.scrollWidth > button.clientWidth || button.scrollHeight > button.clientHeight,
           inside: rect.left >= panel.left && rect.right <= panel.right,
@@ -169,6 +171,8 @@ test("The Melt: Tom's three dialog buttons wrap onto rows without clipping a lab
 
   const fits = await buttonFits(page);
   expect(fits).toHaveLength(3);
+  // Single-line buttons keep the design's 48px chevron height.
+  for (const fit of fits) expect(fit.height, String(fit.label)).toBe(48);
   for (const fit of fits) {
     expect(fit, String(fit.label)).toMatchObject({ clipped: false, inside: true });
   }
