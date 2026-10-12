@@ -1440,6 +1440,10 @@ body {
 
 .npc-dialog__actions {
   display: flex;
+  /* #224: a third button (a Quest errand next to a Minigame's two) wraps to
+     its own row instead of squeezing every label onto two clipped lines. */
+  flex-wrap: wrap;
+  justify-content: center;
   gap: 10px;
   margin-top: 4px;
 }
@@ -1452,6 +1456,7 @@ body {
 .npc-dialog__button {
   height: 48px;
   padding: 0 24px;
+  white-space: nowrap;
   border: none;
   clip-path: polygon(
     14px 0,
