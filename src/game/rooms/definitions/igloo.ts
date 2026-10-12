@@ -50,6 +50,7 @@ export const igloo: RoomDefinition = {
     {
       label: 'TOWN CENTER',
       hotspot: { x: 680, y: 145, ...DOOR_HOTSPOT_SIZE },
+      wall: 'left',
       targetRoomId: 'town-center',
       // Town Center has no door of its own back to the Igloo (see above), so
       // this lands on Town Center's own spawn tile (#16 fix 4) -- a

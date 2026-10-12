@@ -60,6 +60,7 @@ export const bathroom: RoomDefinition = {
     {
       label: 'HALLWAY',
       hotspot: { x: 1100, y: 405, ...DOOR_HOTSPOT_SIZE },
+      wall: 'right',
       targetRoomId: 'office-hallway',
       // The Hallway draws no Bathroom door of its own, so this lands on the
       // Hallway's own spawn tile, as the Igloo's TOWN CENTER door does (#16

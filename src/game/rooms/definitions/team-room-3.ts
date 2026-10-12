@@ -61,6 +61,7 @@ export const teamRoom3: RoomDefinition = {
     {
       label: 'HALLWAY',
       hotspot: { x: 1035, y: 335.5, ...DOOR_HOTSPOT_SIZE },
+      wall: 'right',
       targetRoomId: 'office-hallway',
       // The tile just inside the Hallway's own TEAM ROOM 3 door: that door's
       // hotspot bottom-centre (the sill) projected into the Hallway's own

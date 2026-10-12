@@ -55,6 +55,10 @@ describe('door-ui (#170)', () => {
     ]);
   });
 
+  it('never glows a pill, even a twin that kept the wall of its door', () => {
+    expect(doorGlowPolygon(door('A', { wall: 'left', kind: 'pill' }))).toBeNull();
+  });
+
   it("puts a focused door's pill at its hotspot's top centre", () => {
     expect(doorFocusPoint(HOTSPOT)).toEqual({ x: 135, y: 200 });
   });

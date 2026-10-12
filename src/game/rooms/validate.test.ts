@@ -559,6 +559,31 @@ describe('validateRoomDefinitions', () => {
   });
 });
 
+// #170 plan step 6 (PR A): the existing doors carry the fields door
+// behaviour reads, with no change to where any of them goes.
+describe('#170 door kinds and walls on the registered Rooms', () => {
+  it("gives every in-scene door() frame a wall (70x165, and Town Center's 90x175 Elevator)", () => {
+    for (const definition of ROOM_DEFINITIONS) {
+      for (const door of definition.doors) {
+        const frame =
+          (door.hotspot.width === 70 && door.hotspot.height === 165) ||
+          (door.hotspot.width === 90 && door.hotspot.height === 175);
+        if (frame) expect(door.wall, `${definition.id} ${door.label}`).toMatch(/^(left|right)$/);
+        if (frame) expect(door.kind ?? 'door', `${definition.id} ${door.label}`).toBe('door');
+      }
+    }
+  });
+
+  it('tags every Stairwell exit pill (40 px tall) kind pill, twins included, and nothing else', () => {
+    for (const definition of ROOM_DEFINITIONS.filter((r) => r.id.startsWith('stairwell-'))) {
+      for (const door of definition.doors) {
+        const pill = door.hotspot.height === 40;
+        expect(door.kind === 'pill', `${definition.id} ${door.label}`).toBe(pill);
+      }
+    }
+  });
+});
+
 // #16 fix 3: the verification-map assertions the execution plan named but
 // the original PR never actually wrote as tests.
 describe('ROOM_DEFINITIONS registry', () => {

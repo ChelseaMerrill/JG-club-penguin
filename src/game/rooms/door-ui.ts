@@ -38,10 +38,14 @@ export interface DoorPoint {
  * The glow over a door on a back wall (the design's hover `clip-path`): the
  * hotspot slanted along its wall plane, half a pixel down per pixel across,
  * as the isometric walls are. A right-wall door drops to the right, a
- * left-wall door to the left. `null` for a door with no `wall`.
+ * left-wall door to the left. `null` for a door with no `wall`, and for a
+ * pill (a twin spread from its door keeps the door's `wall`, but pills never
+ * glow).
  */
-export function doorGlowPolygon(door: Pick<RoomDoor, 'hotspot' | 'wall'>): DoorPoint[] | null {
-  if (!door.wall) return null;
+export function doorGlowPolygon(
+  door: Pick<RoomDoor, 'hotspot' | 'wall' | 'kind'>,
+): DoorPoint[] | null {
+  if (!door.wall || !isInSceneDoor(door)) return null;
   const { x, y, width, height } = door.hotspot;
   const slant = width / 2;
   return door.wall === 'right'

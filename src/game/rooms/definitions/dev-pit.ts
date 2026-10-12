@@ -53,6 +53,7 @@ export const devPit: RoomDefinition = {
     {
       label: 'THE ICEBOX',
       hotspot: { x: 830, y: 135, ...DOOR_HOTSPOT_SIZE },
+      wall: 'right',
       targetRoomId: 'the-icebox',
       // The tile just inside the Icebox's own "DEV PIT" door: project that
       // door's own hotspot bottom-centre (the door sill, not its centre)
@@ -65,6 +66,7 @@ export const devPit: RoomDefinition = {
     {
       label: 'TOWN CENTER',
       hotspot: { x: 700, y: 135, ...DOOR_HOTSPOT_SIZE },
+      wall: 'left',
       targetRoomId: 'town-center',
       // The tile just inside Town Center's own "DEV PIT" door (#16 fix 4):
       // the nearest walkable tile to that door's hotspot centre in Town

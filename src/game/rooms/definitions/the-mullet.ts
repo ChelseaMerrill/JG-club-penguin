@@ -73,6 +73,7 @@ export const theMullet: RoomDefinition = {
     {
       label: 'HALLWAY',
       hotspot: { x: 700, y: 133, ...DOOR_HOTSPOT_SIZE },
+      wall: 'left',
       targetRoomId: 'office-hallway',
       // The Hallway draws no door back into the Mullet, so this lands on the
       // Hallway's own spawn tile (#51 D5; the Bathroom precedent).
@@ -81,6 +82,7 @@ export const theMullet: RoomDefinition = {
     {
       label: 'DEV PIT',
       hotspot: { x: 1410, y: 423, ...DOOR_HOTSPOT_SIZE },
+      wall: 'right',
       targetRoomId: 'dev-pit',
       // The Dev Pit draws no Mullet door either, so this lands on the Dev
       // Pit's own spawn tile.

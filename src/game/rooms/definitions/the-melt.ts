@@ -57,6 +57,7 @@ export const theMelt: RoomDefinition = {
     {
       label: 'TOWN CENTER',
       hotspot: { x: 420, y: 275, ...DOOR_HOTSPOT_SIZE },
+      wall: 'left',
       targetRoomId: 'town-center',
       // Town Center has no door of its own back to the Kitchen (see below),
       // so this lands on Town Center's own spawn tile (#16 fix 4) -- a
@@ -67,6 +68,7 @@ export const theMelt: RoomDefinition = {
     {
       label: 'ROOF DECK',
       hotspot: { x: 1290, y: 365, ...DOOR_HOTSPOT_SIZE },
+      wall: 'right',
       targetRoomId: 'roof-deck',
       // Roof Deck has no door/elevator of its own drawn in the design (only
       // a HUD exit pill); lands on Roof Deck's own spawn tile, matching
