@@ -37,7 +37,8 @@ const AWAITING_BA_LINE: readonly string[] = [
   // Linda Martin, placed in The Icebox with one card line (owner request,
   // 2026-10-09).
   'linda-martin',
-  // The 19 LATAM JGers (7 Café, 6 Disco Hall, 6 Futebol Field) are NOT here
+  // The remaining 18 LATAM JGers (7 Café, 5 Disco Hall -- Hector Grecco now
+  // hosts Carnaval Parade, #219 -- 6 Futebol Field) are NOT here
   // (owner request, 2026-10-09): their character sheet gives no quote at all,
   // and rather than inventing placeholder flavor text pending BA copy, they
   // carry `dialog: { kind: 'none' }` and no `dialogLines` -- there is no
@@ -149,7 +150,8 @@ describe('dialogLinePool', () => {
         'vinicius-martins',
         'ygor-azevedo',
         'lucas-varani',
-        'hector-grecco',
+        // Hector Grecco now hosts Carnaval Parade, a `kind: 'minigame'`
+        // dialog, not `'none'` (#219) -- covered by `npcs.test.ts` instead.
         'jose-acosta',
         'fernando-possebon',
         'fernando-garagnani',

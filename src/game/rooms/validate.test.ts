@@ -570,6 +570,15 @@ describe('ROOM_DEFINITIONS registry', () => {
     expect(roofDeck.npcSlots.map((npc) => npc.npcId)).toContain('casey');
   });
 
+  it('gives the LATAM Disco Hall a disco-turntable hotspot and a hector-grecco NPC slot (#219)', () => {
+    const latamDiscoHall = getRoomDefinition('latam-disco-hall');
+
+    expect((latamDiscoHall.hotspots ?? []).map((hotspot) => hotspot.id)).toContain(
+      'disco-turntable',
+    );
+    expect(latamDiscoHall.npcSlots.map((npc) => npc.npcId)).toContain('hector-grecco');
+  });
+
   it('connects each Room only to its enabled (non-null) door targets', () => {
     const connections = Object.fromEntries(
       ROOM_DEFINITIONS.map((room) => [

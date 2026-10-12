@@ -908,6 +908,21 @@ describe('NPCS', () => {
     });
   });
 
+  it("includes Hector Grecco in the LATAM Disco Hall with a Carnaval Parade dialog and the trigger design's own quote/subtitle (#219)", () => {
+    const hector = NPCS['hector-grecco'];
+    expect(hector.name).toBe('Hector Grecco');
+    expect(hector.roomId).toBe('latam-disco-hall');
+    expect(hector.dialog).toEqual({
+      kind: 'minigame',
+      minigameId: 'carnaval-parade',
+      actionLabel: 'JOIN THE PARADE',
+      declineLabel: 'JUST WATCHING',
+      triggerLine:
+        'Vem pro desfile! Grab the feathers, dodge the barriers and keep the beat going. Score 400 and you earn the Passista badge.',
+      subtitle: 'LATAM DISCO HALL · CARNAVAL PARADE',
+    });
+  });
+
   it('includes Casey in Roof Deck with an Igloo Gear stall dialog', () => {
     const casey = NPCS.casey;
     expect(casey.name).toBe('Casey Snow');
@@ -925,6 +940,8 @@ describe('NPCS', () => {
       'tom',
       'michael',
       'anthony',
+      // #219: Hector hosts Carnaval Parade, so he's checked by his own test above.
+      'hector-grecco',
     ];
     const latamNpcIds: NpcId[] = [];
     for (const npc of Object.values(NPCS)) {
@@ -947,7 +964,8 @@ describe('NPCS', () => {
       }
       expect(npc.dialog).toMatchObject({ kind: 'line' });
     }
-    expect(latamNpcIds).toHaveLength(19);
+    // 18, not 19: Hector Grecco now hosts Carnaval Parade (#219).
+    expect(latamNpcIds).toHaveLength(18);
   });
 
   it('gives a human NPC a figure spec and a penguin-kind NPC a fixed look', () => {

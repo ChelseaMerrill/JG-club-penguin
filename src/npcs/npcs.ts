@@ -475,6 +475,23 @@ const BEYSTADIUM_DIALOG: NpcMinigameDialog = {
   subtitle: 'THE POD · IT ASSOCIATE · BEYSTADIUM CHAMP',
 };
 
+/**
+ * Hector Grecco's Carnaval Parade trigger dialog (#219), verbatim from
+ * `design/Minigame Carnaval Parade.dc.html`'s trigger phase: the design's
+ * "MESTRE DE BATERIA" card is Hector's own Characters-sheet figure in a pink
+ * parade shirt (owner decision, 2026-10-09), so his name replaces that
+ * title here; its badge, line and buttons otherwise carry over unchanged.
+ */
+const CARNAVAL_PARADE_DIALOG: NpcMinigameDialog = {
+  kind: 'minigame',
+  minigameId: 'carnaval-parade',
+  actionLabel: 'JOIN THE PARADE',
+  declineLabel: 'JUST WATCHING',
+  triggerLine:
+    'Vem pro desfile! Grab the feathers, dodge the barriers and keep the beat going. Score 400 and you earn the Passista badge.',
+  subtitle: 'LATAM DISCO HALL · CARNAVAL PARADE',
+};
+
 const IGLOO_GEAR_STALL_DIALOG: NpcStallDialog = { kind: 'stall', stallId: 'igloo-gear' };
 
 const LINE_DIALOG: NpcLineDialog = { kind: 'line' };
@@ -2492,6 +2509,12 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     dialog: NO_DIALOG,
     figure: { card: 'lucasVarani' },
   },
+  // #219: Hector hosts Carnaval Parade (owner decision, 2026-10-09), so he's
+  // no longer one of the 19 LATAM JGers with no dialog at all -- his own
+  // `dialogLines`/`idleLines` are two verbatim fragments of his trigger
+  // dialog's own line (`CARNAVAL_PARADE_DIALOG.triggerLine`), the same way
+  // every `kind: 'minigame'` NPC's dialog pool is seeded (e.g. Michael's
+  // `dialogLines: ['3-0. Again.']`, from Beystadium's own banner text).
   'hector-grecco': {
     id: 'hector-grecco',
     name: 'Hector Grecco',
@@ -2499,9 +2522,10 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     roomId: 'latam-disco-hall',
     kind: 'human',
     tagName: 'Hector Grecco',
-    idleLines: [],
+    dialogLines: ['Vem pro desfile!'],
+    idleLines: staticLine('Score 400 and you earn the Passista badge.'),
     still: true,
-    dialog: NO_DIALOG,
+    dialog: CARNAVAL_PARADE_DIALOG,
     figure: { card: 'hectorGrecco' },
   },
   'jose-acosta': {

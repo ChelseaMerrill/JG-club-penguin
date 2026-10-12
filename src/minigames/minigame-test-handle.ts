@@ -32,6 +32,10 @@ export interface MinigameTestHandle {
    *  a loss), as if the shell's timer reached 0. A no-op when Beystadium
    *  isn't the loaded Minigame. */
   finishBeystadiumNow(): void;
+  /** Ends a Carnaval Parade round now, as if the shell's timer reached 0 or
+   *  all 3 lives were lost. A no-op when Carnaval Parade isn't the loaded
+   *  Minigame. */
+  finishCarnavalParadeNow(): void;
   /** Launches another registered Minigame in the same page once the
    *  current shell has closed (#46: finishing two different Minigames in one
    *  page for the Quest e2e). The `finish*` methods above then drive the

@@ -88,6 +88,8 @@ describe('orderBadgeTiles', () => {
       'stair-master',
       // #146: so is Phish Fry.
       'phish-fry',
+      // #219: so is Passista, seeded fresh (not a flipped "coming soon" row).
+      'passista',
       'snowmageddon',
       'rail-rider',
       'hexle-parent',
@@ -121,10 +123,10 @@ describe('createTrophyCase', () => {
     expect(q('[data-panel="badges"]').hidden).toBe(false);
     expect(q('[data-panel="trophies"]').hidden).toBe(true);
     expect(q('[data-panel="awards"]').hidden).toBe(true);
-    expect(q('.trophy-case__subtitle').textContent).toBe('YOUR IGLOO · BADGES · 1 / 15');
+    expect(q('.trophy-case__subtitle').textContent).toBe('YOUR IGLOO · BADGES · 1 / 16');
   });
 
-  it('shows 15 Badges over two pages: 12 on page 1 and 3 on page 2', async () => {
+  it('shows 16 Badges over two pages: 12 on page 1 and 4 on page 2', async () => {
     const { q, qa, trophyCase } = setup([]);
 
     await trophyCase.open();
@@ -135,7 +137,7 @@ describe('createTrophyCase', () => {
 
     q<HTMLButtonElement>('[aria-label="Next page"]').click();
 
-    expect(qa('.trophy-case__badge')).toHaveLength(3);
+    expect(qa('.trophy-case__badge')).toHaveLength(4);
   });
 
   it.each([
@@ -178,6 +180,10 @@ describe('createTrophyCase', () => {
       'ONLINE 2–5 AM ET',
     );
 
+    // Page 1 now holds the earned Badge plus all 11 locked ones (#219 grew
+    // the catalog to 16: 1 earned + 11 locked = exactly TROPHY_CASE_PAGE_SIZE),
+    // pushing every coming-soon Badge, snowmageddon included, onto page 2.
+    q<HTMLButtonElement>('[aria-label="Next page"]').click();
     const snowmageddon = q('[data-badge-id="snowmageddon"]');
     expect(snowmageddon.classList.contains('trophy-case__badge--coming-soon')).toBe(true);
     expect(snowmageddon.querySelector('.trophy-case__badge-tag')?.textContent).toBe('COMING SOON');
@@ -198,7 +204,8 @@ describe('createTrophyCase', () => {
     expect(q('[aria-label="Page 1"]').getAttribute('aria-current')).toBe('page');
 
     next.click();
-    expect(tileIds()).toEqual(['rail-rider', 'hexle-parent', 'mullet-mania']);
+    // #219 grew the catalog to 16: page 2 is now all 4 coming-soon Badges.
+    expect(tileIds()).toEqual(['snowmageddon', 'rail-rider', 'hexle-parent', 'mullet-mania']);
     expect(q<HTMLButtonElement>('[aria-label="Next page"]').disabled).toBe(true);
     expect(q('[aria-label="Page 2"]').getAttribute('aria-current')).toBe('page');
 
@@ -212,9 +219,9 @@ describe('createTrophyCase', () => {
     const firstPage = tileIds();
 
     press('ArrowRight');
-    expect(tileIds()).toHaveLength(3);
+    expect(tileIds()).toHaveLength(4);
     press('ArrowRight'); // Already on the last page.
-    expect(tileIds()).toHaveLength(3);
+    expect(tileIds()).toHaveLength(4);
     press('ArrowLeft');
     expect(tileIds()).toEqual(firstPage);
 

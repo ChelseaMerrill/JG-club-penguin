@@ -73,6 +73,14 @@ export const LEADERBOARD_SCORE_CEILINGS: Readonly<Record<MinigameId, number | nu
   // ring zone lands one), so, like Coffee Rush and Snow Cone Stand, this
   // excludes nothing rather than guess a number that could hide a real best.
   beystadium: null,
+  // Carnaval Parade's `best_score` is the round's own (bound-checked) score
+  // (`MINIGAME_RULES['carnaval-parade'].rawBest`). `record_round`'s own
+  // `invalid_stats` check ties a stored score to `feathers`/`stars` at the
+  // time it was recorded, but doesn't itself cap how high `feathers`/`stars`
+  // can honestly climb (the parade's spawn cadence does that, not a fixed
+  // engine constant this file could cite) -- so, like Coffee Rush, Snow Cone
+  // Stand and Beystadium, this excludes nothing rather than guess a number.
+  'carnaval-parade': null,
 };
 
 /**
