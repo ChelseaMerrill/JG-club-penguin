@@ -103,9 +103,10 @@ describe("The Mullet's NPC motions (owner request, 2026-10-01)", () => {
     motion.advance(5_000);
     expect(motion.pose().point.x).toBeGreaterThan(rest.x);
     expect(visible()).toEqual([0, 0]);
-    // At the far end (7s): (210, 133) from his rest, with the other cue.
+    // At the far end (7s): (280, 90) from his rest, at the table's short end
+    // (the design's (210, 133) left the far cue under the felt), with the other cue.
     motion.advance(2_000);
-    expectNear(motion.pose().point, { x: rest.x + 210, y: rest.y + 133 }, 0.01);
+    expectNear(motion.pose().point, { x: rest.x + 280, y: rest.y + 90 }, 0.01);
     expect(visible()).toEqual([0, 1]);
     // Back home at the end of the cycle.
     motion.advance(5_000);
