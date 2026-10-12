@@ -1182,6 +1182,8 @@ export class RoomScene extends Scene {
     if (on) {
       this.pendingArrival = null;
       if (this.queuedMove) this.queuedMove.onArrive = undefined;
+      // #170 D3: while aiming the pointer throws, so no door is hovered.
+      this.setHoveredDoor(null);
     }
     if (!on) this.cancelAim();
   }
