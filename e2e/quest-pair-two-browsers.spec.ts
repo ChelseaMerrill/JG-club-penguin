@@ -25,6 +25,7 @@ import { assertTestUsersAbsent, playerIdFromStorageState } from './support/prese
 import {
   completeCreatorIfShown,
   readOwnPlayerId,
+  moveToTownCenter,
   waitUntilJoined,
 } from './support/two-browser-session';
 import type { QuestsTestHandle } from '../src/quests/quests-test-handle';
@@ -99,6 +100,9 @@ test('quest-pair-two-browsers', async ({ browser, baseURL }) => {
 
     await waitUntilJoined(pageA);
     await waitUntilJoined(pageB);
+    // #169: both start in the Lobby; this spec uses Town Center's geometry.
+    await moveToTownCenter(pageA);
+    await moveToTownCenter(pageB);
 
     const idA = await readOwnPlayerId(pageA);
     const idB = await readOwnPlayerId(pageB);

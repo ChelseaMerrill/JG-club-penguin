@@ -78,7 +78,7 @@ async function setNow(page: Page, ms: number): Promise<void> {
 
 /** Boots a fixture Player into Town Center, with the fake clock at `nowMs`. */
 async function boot(page: Page, nowMs: number): Promise<void> {
-  await page.goto('/?asPlayer&hud&phishing');
+  await page.goto('/?asPlayer&hud&phishing&room=town-center');
   await expect(page.locator('#game canvas')).toBeVisible();
   await page.evaluate(() => {
     const landing = document.querySelector<HTMLElement>('#ui .landing');

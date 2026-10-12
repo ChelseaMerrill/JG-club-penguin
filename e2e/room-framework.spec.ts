@@ -29,6 +29,7 @@ async function hideLandingPage(page: Page): Promise<void> {
 test('room-framework', async ({ page }) => {
   const errors = collectErrors(page);
 
+  // With no `?room=`, the Stage boots into the spawn Room, the Lobby (#169).
   await page.goto('/');
   const canvas = page.locator('#game canvas');
   await expect(canvas).toBeVisible();
@@ -36,11 +37,11 @@ test('room-framework', async ({ page }) => {
   await expect
     .poll(() => page.evaluate(() => window.__roomDebug))
     .toMatchObject({
-      roomId: 'town-center',
+      roomId: 'lobby',
       scrollX: 0,
       scrollY: 0,
     });
-  await page.screenshot({ path: 'test-results/room-framework/town-center.png' });
+  await page.screenshot({ path: 'test-results/room-framework/lobby.png' });
 
   await page.goto('/?room=dev-pit');
   await expect(canvas).toBeVisible();

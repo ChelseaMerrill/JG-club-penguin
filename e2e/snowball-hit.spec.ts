@@ -10,6 +10,7 @@ import {
   completeCreatorIfShown,
   READY_TIMEOUT,
   readOwnPlayerId,
+  moveToTownCenter,
   waitUntilJoined,
 } from './support/two-browser-session';
 import type { RoomDebugInfo } from './support/room-debug-types';
@@ -109,6 +110,9 @@ test('snowball-hit', async ({ browser, baseURL }) => {
     await completeCreatorIfShown(pageB, 'Penguin B');
     await waitUntilJoined(pageA);
     await waitUntilJoined(pageB);
+    // #169: both start in the Lobby; this spec uses Town Center's geometry.
+    await moveToTownCenter(pageA);
+    await moveToTownCenter(pageB);
 
     const idA = await readOwnPlayerId(pageA);
     const idB = await readOwnPlayerId(pageB);

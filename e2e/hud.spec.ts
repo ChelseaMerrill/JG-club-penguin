@@ -193,7 +193,7 @@ test('snowball-escape-exits-the-mode', async ({ page }) => {
   const errors = collectErrors(page);
 
   await page.setViewportSize({ width: 1618, height: 918 });
-  await page.goto('/?asPlayer&hud');
+  await page.goto('/?asPlayer&hud&room=town-center');
   await expect(page.locator('.hud')).toBeVisible();
   await expect.poll(async () => (await snowballDebug(page))?.ammo).toBe(3);
 
@@ -236,7 +236,7 @@ test('snowball-third-throw-from-full-ammo-exits-the-mode', async ({ page }) => {
   const errors = collectErrors(page);
 
   await page.setViewportSize({ width: 1618, height: 918 });
-  await page.goto('/?asPlayer&hud');
+  await page.goto('/?asPlayer&hud&room=town-center');
   await expect(page.locator('.hud')).toBeVisible();
   await expect.poll(async () => (await snowballDebug(page))?.ammo).toBe(3);
 

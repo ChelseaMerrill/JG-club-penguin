@@ -1,12 +1,13 @@
 /**
  * Runs against the real shared Supabase project (#81): other Players can be
- * in Town Center at the same time, so this only asserts on the specific
+ * in the Lobby (where every Session starts, #169) at the same time, so this only asserts on the specific
  * test-user Player id (`idA`), never on a roster's total count. See
  * "Running the two-browser e2e specs" in the README.
  */
 import { mkdirSync, rmSync } from 'node:fs';
 import path from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
+import { SPAWN_ROOM_ID } from '../src/contracts/rooms';
 import { hasTestUsers, passwordSessionState } from './support/password-session';
 import { assertTestUsersAbsent, playerIdFromStorageState } from './support/presence-guard';
 
@@ -47,8 +48,8 @@ async function readOwnPlayerId(page: Page): Promise<string> {
   return decodeJwtSub(accessToken);
 }
 
-/** Waits until `page` is in `roomId` with its Room channel joined. */
-async function waitUntilJoined(page: Page, roomId = 'town-center'): Promise<void> {
+/** Waits until `page` is in `roomId` (by default the Lobby, where every Session starts, #169) with its Room channel joined. */
+async function waitUntilJoined(page: Page, roomId: string = SPAWN_ROOM_ID): Promise<void> {
   const overlay = page.locator('.debug-overlay');
   await expect(overlay).toHaveAttribute('data-current-room', roomId, {
     timeout: READY_TIMEOUT,
@@ -118,7 +119,7 @@ test('chat-two-browsers', async ({ browser, baseURL }) => {
   const stateB = haveStateFiles ? AUTH_STATE_B : await passwordSessionState('B', origin);
 
   // #81: fail fast if another run is still using this pair of test users
-  // in Town Center, before opening any browser context.
+  // in the Lobby, before opening any browser context.
   await assertTestUsersAbsent([
     { label: 'A', playerId: playerIdFromStorageState(stateA) },
     { label: 'B', playerId: playerIdFromStorageState(stateB) },
@@ -186,13 +187,13 @@ test('chat-two-browsers', async ({ browser, baseURL }) => {
 
     await new Promise((resolve) => setTimeout(resolve, RATE_LIMIT_CLEARANCE_MS));
 
-    // B moves to Dev Pit; wait until B has actually left Town Center and
+    // B moves to Dev Pit; wait until B has actually left the Lobby and
     // (re)joined Dev Pit's channel before A sends again (#44 review fix F3),
     // rather than inferring it from `__chatDebug` going empty.
     await pageB.click('button[data-room="dev-pit"]');
     await waitUntilJoined(pageB, 'dev-pit');
 
-    // A's next message (still in Town Center) must never reach B, in the
+    // A's next message (still in the Lobby) must never reach B, in the
     // debug snapshot or otherwise: sample repeatedly across the whole
     // window instead of checking once at the end, so a message that arrives
     // and is later cleared can't slip past a single end-of-window check.

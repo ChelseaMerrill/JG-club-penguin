@@ -65,7 +65,7 @@ test('Map opens from the HUD in every prototype Room, with exactly one current t
   test.setTimeout(120_000);
   const errors = collectErrors(page);
 
-  await page.goto('/?asPlayer&hud');
+  await page.goto('/?asPlayer&hud&room=town-center');
   await waitForBoot(page);
   await expect.poll(async () => (await debugInfo(page))?.roomId).toBe('town-center');
 
@@ -101,7 +101,7 @@ test('Clicking Dev Pit on the Map loads it: leave before enter, its own spawnTil
 }) => {
   const errors = collectErrors(page);
 
-  await page.goto('/?asPlayer&hud');
+  await page.goto('/?asPlayer&hud&room=town-center');
   await waitForBoot(page);
   await expect.poll(async () => (await debugInfo(page))?.roomId).toBe('town-center');
 
@@ -136,7 +136,7 @@ test('Clicking Dev Pit on the Map loads it: leave before enter, its own spawnTil
 test('every Map tile opens a Room now: none is COMING SOON (#51 slice 4)', async ({ page }) => {
   const errors = collectErrors(page);
 
-  await page.goto('/?asPlayer&hud');
+  await page.goto('/?asPlayer&hud&room=town-center');
   await waitForBoot(page);
 
   await page.locator('.hud__button--map').click();
@@ -150,7 +150,7 @@ test('every Map tile opens a Room now: none is COMING SOON (#51 slice 4)', async
 test('Clicking the current Room only closes the Map', async ({ page }) => {
   const errors = collectErrors(page);
 
-  await page.goto('/?asPlayer&hud');
+  await page.goto('/?asPlayer&hud&room=town-center');
   await waitForBoot(page);
 
   await page.locator('.hud__button--map').click();
@@ -173,7 +173,7 @@ test('Clicking the current Room only closes the Map', async ({ page }) => {
 test('ESC and the close button both close the Map', async ({ page }) => {
   const errors = collectErrors(page);
 
-  await page.goto('/?asPlayer&hud');
+  await page.goto('/?asPlayer&hud&room=town-center');
   await waitForBoot(page);
 
   await page.locator('.hud__button--map').click();
@@ -195,7 +195,7 @@ test('every defined Room is reachable from the Map, including the Roof Deck / Th
   test.setTimeout(60_000);
   const errors = collectErrors(page);
 
-  await page.goto('/?asPlayer&hud');
+  await page.goto('/?asPlayer&hud&room=town-center');
   await waitForBoot(page);
 
   // #33 revision 2's "dead ends": at the time this test was written, Roof

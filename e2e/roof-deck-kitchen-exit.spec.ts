@@ -54,7 +54,7 @@ test('roof-deck-kitchen-exit: clicking the KITCHEN arrow walks the Penguin to th
 }) => {
   const errors = collectErrors(page);
 
-  await page.goto('/?asPlayer&hud');
+  await page.goto('/?asPlayer&hud&room=town-center');
   await expect(page.locator('#game canvas')).toBeVisible();
   await expect(page.locator('.hud')).toBeVisible();
   await waitForBoot(page);

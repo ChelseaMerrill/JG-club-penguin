@@ -9,6 +9,7 @@ import { hasTestUsers, passwordSessionState } from './support/password-session';
 import {
   completeCreatorIfShown,
   readOwnPlayerId,
+  moveToTownCenter,
   waitUntilJoined,
 } from './support/two-browser-session';
 import type { RemotePenguinDebugInfo, RoomDebugInfo } from './support/room-debug-types';
@@ -99,6 +100,9 @@ test('movement-sync', async ({ browser, baseURL }) => {
 
     await waitUntilJoined(pageA);
     await waitUntilJoined(pageB);
+    // #169: both start in the Lobby; this spec uses Town Center's geometry.
+    await moveToTownCenter(pageA);
+    await moveToTownCenter(pageB);
 
     const idA = await readOwnPlayerId(pageA);
     expect((await debugInfo(pageA))?.localPenguin?.tile).toEqual(townCenter.spawnTile);
@@ -188,7 +192,7 @@ test('movement-sync', async ({ browser, baseURL }) => {
 
     await pageB.click('button[data-room="town-center"]');
     await expect.poll(() => shownRoomId(pageB), { timeout: 5_000 }).toBe('town-center');
-    await waitUntilJoined(pageB);
+    await waitUntilJoined(pageB, 'town-center');
 
     await expect
       .poll(async () => (await remoteInfo(pageB, idA)) !== undefined, { timeout: 5_000 })

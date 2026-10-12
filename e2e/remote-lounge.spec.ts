@@ -119,7 +119,7 @@ test('Remote Lounge: BACK TO HQ goes straight to Town Center and hides the loung
 }) => {
   // A Room change needs a Session: the dev fake Player's.
   const errors = collectErrors(page);
-  await page.goto('/?asPlayer');
+  await page.goto('/?asPlayer&room=town-center');
   await expect
     .poll(async () => (await debugInfo(page))?.roomId, { timeout: BOOT_TIMEOUT })
     .toBe('town-center');
@@ -143,7 +143,7 @@ test('Remote Lounge: the LATAM pin opens the LATAM Café (owner request, 2026-10
 }) => {
   // A Room change needs a Session: the dev fake Player's, as BACK TO HQ's own test uses.
   const errors = collectErrors(page);
-  await page.goto('/?asPlayer');
+  await page.goto('/?asPlayer&room=town-center');
   await expect
     .poll(async () => (await debugInfo(page))?.roomId, { timeout: BOOT_TIMEOUT })
     .toBe('town-center');

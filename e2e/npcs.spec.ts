@@ -80,6 +80,8 @@ for (const roomId of [
   'team-room-4',
   'bathroom',
   'the-mullet',
+  // #169: the JG HQ Lobby (Security).
+  'lobby',
   // #51 slice 4: the Stairwell's six floors.
   'stairwell-0',
   'stairwell-1',

@@ -5,6 +5,7 @@ import { roofDeck } from '../src/game/rooms/definitions/roof-deck';
 import { tileToScreen } from '../src/game/rooms/iso';
 import { GAME_HEIGHT, GAME_WIDTH } from '../src/game/stage-size';
 import type { RoomDebugInfo } from './support/room-debug-types';
+import { waitForElevatorHidden } from './support/elevator';
 
 const BOOT_TIMEOUT = 15_000;
 const WALK_TIMEOUT = 15_000;
@@ -31,7 +32,7 @@ async function waitForBoot(page: Page): Promise<void> {
     .not.toBeUndefined();
 }
 
-/** `?asPlayer`'s `enterSpawnRoom()` always lands on Town Center first (#15 D6), ignoring any `?room=`; every other Room is reached from there via `__roomDebug.changeRoom`. */
+/** `?asPlayer&room=town-center` spawns in Town Center (#169: the `?room=` spawn hook); every other Room is reached from there via `__roomDebug.changeRoom`. */
 async function changeRoom(page: Page, roomId: RoomId): Promise<void> {
   await page.evaluate((id) => window.__roomDebug?.changeRoom?.(id), roomId);
   await expect
@@ -65,7 +66,7 @@ async function buyBeanbagAtRoofDeck(page: Page): Promise<void> {
   await changeRoom(page, 'roof-deck');
   // Floor 5 -> the Roof Deck plays the elevator screen (#52) over the Stage
   // first; a click during it never reaches the stall.
-  await expect(page.locator('.elevator-screen')).toBeHidden();
+  await waitForElevatorHidden(page);
   await clickStagePoint(page, stallHotspotCenter);
   await expect(page.locator('.market')).toBeVisible();
   await page.locator('[data-item-id="beanbag"] .market__item-buy').click();
@@ -79,7 +80,7 @@ test('buying the Beanbag, placing it in slot 3 via edit mode, and it stays there
 }) => {
   const errors = collectErrors(page);
 
-  await page.goto('/?asPlayer&hud');
+  await page.goto('/?asPlayer&hud&room=town-center');
   await expect(page.locator('#game canvas')).toBeVisible();
   await expect(page.locator('.hud')).toBeVisible();
   await waitForBoot(page);
@@ -142,7 +143,7 @@ test('with no Furniture owned, edit mode shows the hint to visit the Igloo Gear 
 }) => {
   const errors = collectErrors(page);
 
-  await page.goto('/?asPlayer&hud');
+  await page.goto('/?asPlayer&hud&room=town-center');
   await waitForBoot(page);
   await changeRoom(page, 'igloo');
 

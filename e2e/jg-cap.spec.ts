@@ -52,8 +52,8 @@ async function waitForBoot(page: Page): Promise<void> {
  * the same maths `RoomScene` itself places a Penguin sprite with) and then
  * to page pixels via the canvas's own bounding box, the same scale
  * `room-transitions.spec.ts`'s `clickStagePoint` uses (#92 round 2 nit 8).
- * `?asPlayer` always spawns in Town Center (`enterSpawnRoom`), so this uses
- * that Room's own grid origin.
+ * `?asPlayer&room=town-center` spawns in Town Center (`enterSpawnRoom`), so
+ * this uses that Room's own grid origin.
  */
 async function localPenguinClip(
   page: Page,
@@ -107,7 +107,7 @@ test('jg-cap: Room Penguin', async ({ page }) => {
 
   await page.setViewportSize({ width: 1618, height: 918 });
   // `?asPlayer` binds a fixture Player with DEFAULT_LOOK (hat: JG CAP).
-  await page.goto('/?asPlayer&hud');
+  await page.goto('/?asPlayer&hud&room=town-center');
   await expect(page.locator('#game canvas')).toBeVisible();
   await waitForBoot(page);
 

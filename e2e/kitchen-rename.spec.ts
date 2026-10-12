@@ -33,7 +33,7 @@ async function waitForBoot(page: Page): Promise<void> {
 test('kitchen-rename: the-melt Room displays as THE KITCHEN in the HUD', async ({ page }) => {
   const errors = collectErrors(page);
 
-  await page.goto('/?asPlayer&hud');
+  await page.goto('/?asPlayer&hud&room=town-center');
   await expect(page.locator('#game canvas')).toBeVisible();
   await expect(page.locator('.hud')).toBeVisible();
   await waitForBoot(page);

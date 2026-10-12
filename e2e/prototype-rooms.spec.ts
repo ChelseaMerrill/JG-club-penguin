@@ -6,6 +6,7 @@ import { igloo } from '../src/game/rooms/definitions/igloo';
 import { latamCafe } from '../src/game/rooms/definitions/latam-cafe';
 import { latamDiscoHall } from '../src/game/rooms/definitions/latam-disco-hall';
 import { latamFutebolField } from '../src/game/rooms/definitions/latam-futebol-field';
+import { lobby } from '../src/game/rooms/definitions/lobby';
 import { officeHallway } from '../src/game/rooms/definitions/office-hallway';
 import { remoteLounge } from '../src/game/rooms/definitions/remote-lounge';
 import { roofDeck } from '../src/game/rooms/definitions/roof-deck';
@@ -49,6 +50,7 @@ const ROOM_DEFINITIONS: Record<RoomId, RoomDefinition> = {
   'team-room-4': teamRoom4,
   bathroom,
   'the-mullet': theMullet,
+  lobby,
   'stairwell-0': stairwell0,
   'stairwell-1': stairwell1,
   'stairwell-2': stairwell2,

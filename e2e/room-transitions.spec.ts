@@ -3,6 +3,7 @@ import type { RoomId } from '../src/contracts';
 import { bathroom } from '../src/game/rooms/definitions/bathroom';
 import { devPit } from '../src/game/rooms/definitions/dev-pit';
 import { igloo } from '../src/game/rooms/definitions/igloo';
+import { lobby } from '../src/game/rooms/definitions/lobby';
 import { officeHallway } from '../src/game/rooms/definitions/office-hallway';
 import { roofDeck } from '../src/game/rooms/definitions/roof-deck';
 import { STAIRWELL_DEFINITIONS } from '../src/game/rooms/definitions/stairwell';
@@ -40,6 +41,7 @@ const ROOMS_IN_REGISTRY_ORDER: readonly RoomDefinition[] = [
   teamRoom4,
   bathroom,
   theMullet,
+  lobby,
   ...STAIRWELL_DEFINITIONS,
 ];
 
@@ -102,13 +104,15 @@ test('room transitions: doors, changeRoom, HUD, reload (#15)', async ({ page }) 
   test.setTimeout(120_000);
   const errors = collectErrors(page);
 
-  await page.goto('/?asPlayer&hud');
+  // Every Session starts in the Lobby (#169); `&room=` spawns the fixture
+  // straight into Town Center instead (test-only), still with an enter and
+  // no preceding leave (`enterSpawnRoom`, #26 D6). The real spawn is checked
+  // by the reload test below.
+  await page.goto('/?asPlayer&hud&room=town-center');
   await expect(page.locator('#game canvas')).toBeVisible();
   await expect(page.locator('.hud')).toBeVisible();
   await waitForBoot(page);
 
-  // Every Session starts in Town Center (#15 acceptance criteria), with an
-  // enter and no preceding leave (`enterSpawnRoom`, #26 D6).
   await expect.poll(async () => (await debugInfo(page))?.roomId).toBe('town-center');
   await expect
     .poll(async () => (await debugInfo(page))?.roomEventLog)
@@ -255,12 +259,18 @@ test('room transitions: doors, changeRoom, HUD, reload (#15)', async ({ page }) 
   expect(errors).toEqual([]);
 });
 
-test('reload spawns back in Town Center (#15)', async ({ page }) => {
+test('a Session starts in the Lobby, and a reload spawns back there (#15, #169)', async ({
+  page,
+}) => {
+  test.setTimeout(60_000);
   const errors = collectErrors(page);
 
   await page.goto('/?asPlayer');
   await waitForBoot(page);
-  await expect.poll(async () => (await debugInfo(page))?.roomId).toBe('town-center');
+  await expect.poll(async () => (await debugInfo(page))?.roomId).toBe('lobby');
+  await expect
+    .poll(async () => (await debugInfo(page))?.roomEventLog)
+    .toEqual([{ type: 'room:enter', roomId: 'lobby' }]);
 
   // Move away from the boot Room first, so the reload check isn't trivially
   // true just because nothing ever changed it.
@@ -271,7 +281,10 @@ test('reload spawns back in Town Center (#15)', async ({ page }) => {
 
   await page.reload();
   await waitForBoot(page);
-  await expect.poll(async () => (await debugInfo(page))?.roomId).toBe('town-center');
+  await expect.poll(async () => (await debugInfo(page))?.roomId).toBe('lobby');
+  await expect
+    .poll(async () => (await debugInfo(page))?.roomEventLog)
+    .toEqual([{ type: 'room:enter', roomId: 'lobby' }]);
 
   expect(errors).toEqual([]);
 });

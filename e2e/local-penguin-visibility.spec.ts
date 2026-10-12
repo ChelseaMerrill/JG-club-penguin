@@ -70,7 +70,7 @@ test.describe('the own Penguin is visible whenever no Session is pending', () =>
 
   test('?asPlayer: shown at once, and still shown after a Room change', async ({ page }) => {
     const errors = collectErrors(page);
-    await page.goto('/?asPlayer');
+    await page.goto('/?asPlayer&room=town-center');
     await expect
       .poll(async () => (await debugInfo(page))?.roomEventLog, { timeout: BOOT_TIMEOUT })
       .toContainEqual({ type: 'room:enter', roomId: 'town-center' });
@@ -89,7 +89,7 @@ test.describe('the own Penguin is visible whenever no Session is pending', () =>
   test('?asPlayer under reduced motion: shown, with no body tween', async ({ page }) => {
     await page.emulateMedia({ reducedMotion: 'reduce' });
     const errors = collectErrors(page);
-    await page.goto('/?asPlayer');
+    await page.goto('/?asPlayer&room=town-center');
     await waitForVisible(page, true);
     expect((await debugInfo(page))?.localPenguin?.bodyTweenCount).toBe(0);
     await page.screenshot({ path: `${SHOTS}/reduced-motion.png` });

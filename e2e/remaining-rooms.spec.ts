@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import type { RoomId } from '../src/contracts';
 import { bathroom } from '../src/game/rooms/definitions/bathroom';
 import { devPit } from '../src/game/rooms/definitions/dev-pit';
+import { lobby } from '../src/game/rooms/definitions/lobby';
 import { officeHallway } from '../src/game/rooms/definitions/office-hallway';
 import { roofDeck } from '../src/game/rooms/definitions/roof-deck';
 import {
@@ -95,7 +96,7 @@ test('The Icebox: Town Center <-> Icebox through both doors, landing on each ent
   test.setTimeout(90_000);
   const errors = collectErrors(page);
 
-  await page.goto('/?asPlayer');
+  await page.goto('/?asPlayer&room=town-center');
   await waitForBoot(page);
   await expect.poll(async () => (await debugInfo(page))?.roomId).toBe('town-center');
 
@@ -120,7 +121,7 @@ test('The Icebox: Dev Pit <-> Icebox through both doors, landing on each entry t
   test.setTimeout(90_000);
   const errors = collectErrors(page);
 
-  await page.goto('/?asPlayer');
+  await page.goto('/?asPlayer&room=town-center');
   await waitForBoot(page);
   await changeRoom(page, 'dev-pit');
 
@@ -137,7 +138,7 @@ test('The Icebox: Map tile 03 loads it on its own spawn tile, with its HUD title
 }) => {
   const errors = collectErrors(page);
 
-  await page.goto('/?asPlayer&hud');
+  await page.goto('/?asPlayer&hud&room=town-center');
   await waitForBoot(page);
 
   await page.locator('.hud__button--map').click();
@@ -175,7 +176,7 @@ for (const { room, hallwayDoor } of TEAM_ROOMS) {
     test.setTimeout(90_000);
     const errors = collectErrors(page);
 
-    await page.goto('/?asPlayer');
+    await page.goto('/?asPlayer&room=town-center');
     await waitForBoot(page);
     await changeRoom(page, 'office-hallway');
 
@@ -193,7 +194,7 @@ test("The Hallway: its TOWN CENTER door lands on Town Center's spawn tile", asyn
   test.setTimeout(90_000);
   const errors = collectErrors(page);
 
-  await page.goto('/?asPlayer');
+  await page.goto('/?asPlayer&room=town-center');
   await waitForBoot(page);
   await changeRoom(page, 'office-hallway');
 
@@ -206,7 +207,7 @@ test("The Bathroom: its HALLWAY door lands on the Hallway's spawn tile", async (
   test.setTimeout(90_000);
   const errors = collectErrors(page);
 
-  await page.goto('/?asPlayer');
+  await page.goto('/?asPlayer&room=town-center');
   await waitForBoot(page);
   await changeRoom(page, 'bathroom');
   await page.screenshot({ path: 'test-results/room-bathroom/arrived.png' });
@@ -227,7 +228,7 @@ for (const { label, target } of [
     test.setTimeout(90_000);
     const errors = collectErrors(page);
 
-    await page.goto('/?asPlayer');
+    await page.goto('/?asPlayer&room=town-center');
     await waitForBoot(page);
     await changeRoom(page, 'the-mullet');
     await page.screenshot({ path: 'test-results/room-the-mullet/arrived.png' });
@@ -256,7 +257,7 @@ for (const { number, room } of MAP_TILES) {
   }) => {
     const errors = collectErrors(page);
 
-    await page.goto('/?asPlayer&hud');
+    await page.goto('/?asPlayer&hud&room=town-center');
     await waitForBoot(page);
 
     await page.locator('.hud__button--map').click();
@@ -291,7 +292,7 @@ test("The Stairwell: Town Center's STAIRWELL door opens floor 5 on its JG HQ sil
   test.setTimeout(90_000);
   const errors = collectErrors(page);
 
-  await page.goto('/?asPlayer');
+  await page.goto('/?asPlayer&room=town-center');
   await waitForBoot(page);
   await watchElevator(page);
 
@@ -310,7 +311,7 @@ test("The Stairwell: floor 5's upper flight leads to the Roof Deck's spawn tile,
   test.setTimeout(90_000);
   const errors = collectErrors(page);
 
-  await page.goto('/?asPlayer');
+  await page.goto('/?asPlayer&room=town-center');
   await waitForBoot(page);
   await changeRoom(page, 'stairwell-5');
   await watchElevator(page);
@@ -329,7 +330,7 @@ test('The Stairwell: up floor 0 to 5 and back down through every pill door, with
   test.setTimeout(240_000);
   const errors = collectErrors(page);
 
-  await page.goto('/?asPlayer');
+  await page.goto('/?asPlayer&room=town-center');
   await waitForBoot(page);
   await changeRoom(page, 'stairwell-0');
   await waitForElevatorHidden(page); // Town Center -> floor 0 crossed floors.
@@ -363,7 +364,7 @@ test('The Stairwell: Map tile 12 opens floor 0 from Town Center, by the Elevator
   test.setTimeout(60_000);
   const errors = collectErrors(page);
 
-  await page.goto('/?asPlayer&hud');
+  await page.goto('/?asPlayer&hud&room=town-center');
   await waitForBoot(page);
 
   await page.locator('.hud__button--map').click();
@@ -393,60 +394,59 @@ test('The Stairwell: Map tile 12 opens floor 0 from Town Center, by the Elevator
   expect(errors).toEqual([]);
 });
 
-test("The Stairwell: floor 0's LOBBY door is coming soon, clicked or by holding ↓ (UD-7)", async ({
+test("The Stairwell: floor 0's LOBBY door, its ↙ LOBBY pill and held ↓ each enter the Lobby (#169)", async ({
   page,
 }) => {
-  test.setTimeout(90_000);
+  test.setTimeout(120_000);
   const errors = collectErrors(page);
 
+  // The real spawn: every Session starts in the Lobby.
   await page.goto('/?asPlayer');
   await waitForBoot(page);
-  await changeRoom(page, 'stairwell-0');
-  await waitForElevatorHidden(page);
+  await expect.poll(async () => (await debugInfo(page))?.roomId).toBe('lobby');
+  await watchElevator(page);
 
-  const lobby = door(stairwell0, 'LOBBY');
-  await clickStagePoint(page, {
-    x: lobby.hotspot.x + lobby.hotspot.width / 2,
-    y: lobby.hotspot.y + lobby.hotspot.height / 2,
-  });
-  await expect
-    .poll(async () => (await debugInfo(page))?.comingSoonHint, {
-      timeout: WALK_TIMEOUT,
-      intervals: [50],
-    })
-    .toBe('LOBBY');
-  await page.screenshot({ path: 'test-results/room-stairwell-0/lobby-coming-soon.png' });
-  await expect
-    .poll(async () => (await debugInfo(page))?.comingSoonHint, { timeout: 15_000 })
-    .toBeNull();
+  const stairs = door(lobby, 'STAIRS · FLOOR L');
+  const [lobbyDoor, lobbyPill] = stairwell0.doors.filter((each) => each.label === 'LOBBY');
+  for (const [name, through] of [
+    ['door', lobbyDoor!],
+    ['pill', lobbyPill!],
+  ] as const) {
+    // The Lobby's STAIRS door lands on floor 0's LOBBY sill, (0,7)...
+    await walkThrough(page, stairs, 'stairwell-0');
+    // ...and floor 0's LOBBY exit lands on the Lobby's STAIRS sill, (0,4).
+    await walkThrough(page, through, 'lobby');
+    await page.screenshot({ path: `test-results/room-stairwell-0/lobby-by-${name}.png` });
+  }
 
+  await walkThrough(page, stairs, 'stairwell-0');
   await page.keyboard.down('ArrowDown');
   await expect
-    .poll(async () => (await debugInfo(page))?.comingSoonHint, {
-      timeout: WALK_TIMEOUT,
-      intervals: [50],
-    })
-    .toBe('LOBBY');
+    .poll(async () => (await debugInfo(page))?.roomId, { timeout: WALK_TIMEOUT })
+    .toBe('lobby');
   await page.keyboard.up('ArrowDown');
-  expect((await debugInfo(page))?.roomId).toBe('stairwell-0');
+  await expect
+    .poll(async () => (await debugInfo(page))?.localPenguin?.tile)
+    .toEqual({ col: 0, row: 4 });
 
+  // Lobby and floor 0 are both floor L: never the Elevator.
+  expect(await elevatorSeen(page)).toBe(false);
   expect(errors).toEqual([]);
 });
 
 // Every Stairwell door, pill or frame, clicked from the floor's spawn tile
 // (not from the approach tile a pill-to-pill climb lands on): the Penguin
-// walks there and changes Room, or (floor 0's LOBBY door and pill) shows the
-// coming-soon hint. Each floor is re-entered by `changeRoom`, which lands on
-// its spawn tile; a move between two Stairwell floors, or from Town Center or
-// the Roof Deck onto floor 5, never shows the Elevator, so after the first
-// visit there is nothing to wait out.
+// walks there and changes Room (floor 0's LOBBY door and pill into the Lobby,
+// #169), or a disabled one shows the coming-soon hint. Each floor is
+// re-entered by `changeRoom`, which lands on its spawn tile, waiting out any
+// Elevator ride (from the Lobby, Town Center or the Roof Deck).
 test('The Stairwell: every door and pill works when clicked from the spawn tile', async ({
   page,
 }) => {
   test.setTimeout(360_000);
   const errors = collectErrors(page);
 
-  await page.goto('/?asPlayer');
+  await page.goto('/?asPlayer&room=town-center');
   await waitForBoot(page);
 
   for (const room of STAIRWELL_DEFINITIONS) {

@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import './support/room-debug-types';
+import { SPAWN_ROOM_ID } from '../src/contracts/rooms';
 
 /** Fails the test on any uncaught page error or console error. */
 function collectErrors(page: Page): string[] {
@@ -72,6 +73,10 @@ test('a new Player is held on the Creator until they enter a name', async ({ pag
 
   await expect(page.locator('.hud')).toBeVisible();
   await expect(page.locator('.penguin-creator')).toBeHidden();
+  // #169: after WADDLE IN, the new Player is in the Lobby.
+  await expect
+    .poll(async () => (await page.evaluate(() => window.__roomDebug?.roomId)) ?? null)
+    .toBe(SPAWN_ROOM_ID);
   await page.screenshot({ path: 'test-results/name-gate/new-player/entered-world.png' });
 
   expect(errors).toEqual([]);
@@ -106,9 +111,11 @@ test('a returning, already-named Player skips the Creator', async ({ page }) => 
 
   await expect(page.locator('.hud')).toBeVisible();
   await expect(page.locator('.penguin-creator')).toBeHidden();
+  // #169: a returning Player's Session starts in the Lobby, like every Session.
   await expect
     .poll(async () => (await page.evaluate(() => window.__roomDebug?.roomId)) ?? null)
-    .toBe('town-center');
+    .toBe(SPAWN_ROOM_ID);
+  expect(SPAWN_ROOM_ID).toBe('lobby');
   await page.screenshot({ path: 'test-results/name-gate/returning-player/returning-player.png' });
 
   expect(errors).toEqual([]);

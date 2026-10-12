@@ -83,7 +83,7 @@ async function waitForBoot(page: Page): Promise<void> {
 }
 
 /**
- * Boots a real Session (`/?asPlayer&hud`, always Town Center, #15) and, for
+ * Boots a real Session (`/?asPlayer&hud&room=town-center`: Town Center, #169) and, for
  * any other `roomId`, gets there via `__roomDebug.changeRoom` -- a real
  * `room-navigator.ts` `changeRoom`, the same one a door click or the Map
  * drives (`e2e/room-transitions.spec.ts`'s own pattern). A plain `/?room=`
@@ -95,7 +95,7 @@ async function waitForBoot(page: Page): Promise<void> {
  */
 async function bootRoom(page: Page, roomId: RoomId): Promise<string[]> {
   const errors = collectErrors(page);
-  await page.goto('/?asPlayer&hud');
+  await page.goto('/?asPlayer&hud&room=town-center');
   await expect(page.locator('#game canvas')).toBeVisible();
   await waitForBoot(page);
   await expect.poll(async () => (await debugInfo(page))?.roomId).toBe('town-center');
@@ -278,12 +278,12 @@ test.describe('Minigame exit returns to the starting Room (#171)', () => {
     // Same flow as `e2e/beystadium.spec.ts`'s full-round test: the
     // `?minigame=` launcher, with `page.clock.install()` before navigation
     // so the shell's 50ms tick is faked from the first script run. The
-    // launcher boots the Room behind it the normal way (no `?room=`, so
-    // `SPAWN_ROOM_ID` -- Town Center), and the launcher's own "QUIT TO
+    // launcher boots the Room behind it the normal way (`?room=town-center`;
+    // without it, `SPAWN_ROOM_ID`, the Lobby), and the launcher's own "QUIT TO
     // <ROOM>" tracks whatever Room is actually live, the same as a real NPC
     // launch would (`minigame-launcher.ts`).
     await page.clock.install();
-    await page.goto('/?minigame=beystadium');
+    await page.goto('/?minigame=beystadium&room=town-center');
     await expect(page.locator('.minigame__howto')).toBeVisible();
     await page.locator('.minigame__button--start').click();
 
@@ -348,7 +348,7 @@ test.describe('Minigame exit returns to the starting Room (#171)', () => {
     const dir = proofDir('phishing-quiz-town-center');
     const errors = collectErrors(page);
 
-    await page.goto('/?asPlayer&hud&phishing');
+    await page.goto('/?asPlayer&hud&phishing&room=town-center');
     await expect(page.locator('#game canvas')).toBeVisible();
     await waitForBoot(page);
     await expect.poll(async () => (await debugInfo(page))?.roomId).toBe('town-center');

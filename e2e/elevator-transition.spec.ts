@@ -124,7 +124,7 @@ test('Elevator shows crossing Town Center -> Roof Deck via the door, hides once 
   test.setTimeout(60_000);
   const errors = collectErrors(page);
 
-  await page.goto('/?asPlayer');
+  await page.goto('/?asPlayer&room=town-center');
   await waitForBoot(page);
   await expect.poll(async () => (await debugInfo(page))?.roomId).toBe('town-center');
   await installElevatorObserver(page);
@@ -192,7 +192,7 @@ test('the progress bar fills gradually over the ride rather than showing full in
   test.setTimeout(30_000);
   const errors = collectErrors(page);
 
-  await page.goto('/?asPlayer');
+  await page.goto('/?asPlayer&room=town-center');
   await waitForBoot(page);
   await expect.poll(async () => (await debugInfo(page))?.roomId).toBe('town-center');
 
@@ -224,7 +224,7 @@ test('Elevator shows crossing Town Center -> Roof Deck via __roomDebug.changeRoo
   test.setTimeout(60_000);
   const errors = collectErrors(page);
 
-  await page.goto('/?asPlayer');
+  await page.goto('/?asPlayer&room=town-center');
   await waitForBoot(page);
   await expect.poll(async () => (await debugInfo(page))?.roomId).toBe('town-center');
   await installElevatorObserver(page);
@@ -255,7 +255,7 @@ test('same-floor changes never show the Elevator (Town Center -> Dev Pit -> Town
   test.setTimeout(60_000);
   const errors = collectErrors(page);
 
-  await page.goto('/?asPlayer');
+  await page.goto('/?asPlayer&room=town-center');
   await waitForBoot(page);
   await installElevatorObserver(page);
 
@@ -278,7 +278,7 @@ test('same-floor changes never show the Elevator (Town Center -> Dev Pit -> Town
 test('the Igloo never shows the Elevator (Town Center -> Igloo) (#52)', async ({ page }) => {
   const errors = collectErrors(page);
 
-  await page.goto('/?asPlayer');
+  await page.goto('/?asPlayer&room=town-center');
   await waitForBoot(page);
   await installElevatorObserver(page);
 
@@ -328,8 +328,9 @@ async function loadElevatorFonts(): Promise<boolean> {
   return loaded.every((list) => list.length > 0);
 }
 
+/** Boots the fixture Player straight into Town Center (`&room=`, #169: the real spawn is the Lobby). */
 async function bootAsPlayer(page: Page, query = '?asPlayer'): Promise<void> {
-  await page.goto(`/${query}`);
+  await page.goto(`/${query}&room=town-center`);
   await waitForBoot(page);
   await expect.poll(async () => (await debugInfo(page))?.roomId).toBe('town-center');
 }

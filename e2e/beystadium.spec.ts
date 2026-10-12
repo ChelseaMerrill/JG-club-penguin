@@ -4,6 +4,7 @@ import { tileToScreen } from '../src/game/rooms/iso';
 import { GAME_HEIGHT, GAME_WIDTH } from '../src/game/stage-size';
 import type { MinigameTestHandle } from '../src/minigames/minigame-test-handle';
 import type { RoomDebugInfo } from './support/room-debug-types';
+import { waitForElevatorHidden } from './support/elevator';
 
 declare global {
   interface Window {
@@ -139,7 +140,7 @@ test('Team Room 4: Michael challenges you, BACK AWAY SLOWLY closes, LET IT RIP o
     .not.toBeUndefined();
   expect((await debugInfo(page))?.roomId).toBe('team-room-4');
   // Team Room 4 is on another floor: wait out the elevator screen, if any.
-  await expect(page.locator('.elevator-screen')).toBeHidden();
+  await waitForElevatorHidden(page);
 
   const michael = teamRoom4.npcSlots.find((slot) => slot.npcId === 'michael');
   if (!michael) throw new Error('expected team-room-4 to have a "michael" NPC slot');

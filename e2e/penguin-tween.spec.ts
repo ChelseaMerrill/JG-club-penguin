@@ -73,7 +73,7 @@ async function clickTile(page: Page, tile: Tile): Promise<void> {
 /** Boots Town Center signed out (DEFAULT_LOOK: WADDLE, facing right) and waits for a decoded frame. */
 async function bootTownCenter(page: Page): Promise<string[]> {
   const errors = collectErrors(page);
-  await page.goto('/');
+  await page.goto('/?room=town-center');
   await expect(page.locator('#game canvas')).toBeVisible();
   await expect(page.locator('#ui .landing')).toBeVisible();
   await page.evaluate(() => {

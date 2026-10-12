@@ -5,6 +5,7 @@ import type { MinigameTestHandle } from '../src/minigames/minigame-test-handle';
 import type { QuestsTestHandle } from '../src/quests/quests-test-handle';
 import type { RoomDebugInfo } from './support/room-debug-types';
 import './support/badge-popup-types';
+import { waitForElevatorHidden } from './support/elevator';
 
 // `__roomDebug`'s ambient type comes from `./support/room-debug-types`.
 declare global {
@@ -34,13 +35,13 @@ async function debugInfo(page: Page): Promise<RoomDebugInfo | undefined> {
 }
 
 /**
- * `?asPlayer` binds a fixture Player and enters Town Center through the real
+ * `?asPlayer&room=town-center` binds a fixture Player and enters Town Center through the real
  * navigator (so `room:enter` fires); `?leaderboard=seed` gives the dev
  * store's Player a finished Penguin (the name gate, #75), so the main
  * Quest starts at 1 / 5 as it does for every real Player.
  */
 async function boot(page: Page, query: string): Promise<void> {
-  await page.goto(`/?asPlayer&leaderboard=seed&${query}`);
+  await page.goto(`/?asPlayer&leaderboard=seed&${query}&room=town-center`);
   await expect(page.locator('#game canvas')).toBeVisible();
   await page.evaluate(() => {
     const landing = document.querySelector<HTMLElement>('#ui .landing');
@@ -212,7 +213,7 @@ test('steps complete in any order with 3-second toasts; the main Quest pays 150 
   await changeRoom(page, 'roof-deck');
   // Floor 5 -> the Roof Deck plays the elevator screen (#52) over the Stage
   // first; a click during it never reaches the stall.
-  await expect(page.locator('.elevator-screen')).toBeHidden();
+  await waitForElevatorHidden(page);
   await clickStagePoint(page, {
     x: stallHotspot.rect.x + stallHotspot.rect.width / 2,
     y: stallHotspot.rect.y + stallHotspot.rect.height / 2,

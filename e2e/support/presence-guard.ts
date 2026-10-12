@@ -9,7 +9,7 @@
  */
 import { readFileSync } from 'node:fs';
 import { createClient } from '@supabase/supabase-js';
-import { roomChannelKey, type RoomId } from '../../src/contracts';
+import { roomChannelKey, SPAWN_ROOM_ID, type RoomId } from '../../src/contracts';
 import { readTestEnv, type StorageState, type TestUser } from './password-session';
 import { decodeJwtSub } from './two-browser-session';
 
@@ -78,7 +78,7 @@ function presentPlayerIds(state: Record<string, Array<Record<string, unknown>>>)
  */
 export async function assertTestUsersAbsent(
   users: TestUserId[],
-  roomId: RoomId = 'town-center',
+  roomId: RoomId = SPAWN_ROOM_ID,
 ): Promise<void> {
   const { supabaseUrl, anonKey } = readTestEnv();
   if (!supabaseUrl || !anonKey) {

@@ -151,7 +151,7 @@ test('the Stairs Challenge: only START CLIMB on floor L starts one, 10 a flight,
   test.setTimeout(300_000);
   const errors = collectErrors(page);
 
-  await page.goto('/?asPlayer&hud');
+  await page.goto('/?asPlayer&hud&room=town-center');
   await waitForBoot(page);
   // The fixture's in-memory balance is 100, but `?asPlayer` loads no
   // progress, so the HUD shows 0 until a write reports the balance: "0"
@@ -268,7 +268,7 @@ test("a climb left half-done can't be finished from floor 5 down (RT2-1)", async
   test.setTimeout(180_000);
   const errors = collectErrors(page);
 
-  await page.goto('/?asPlayer&hud');
+  await page.goto('/?asPlayer&hud&room=town-center');
   await waitForBoot(page);
 
   // Climb to floor 2 from tile 12's START CLIMB, then leave for Town Center.
@@ -301,7 +301,7 @@ test('the stair keys do nothing with the chat field focused or the Map open', as
   test.setTimeout(90_000);
   const errors = collectErrors(page);
 
-  await page.goto('/?asPlayer&hud');
+  await page.goto('/?asPlayer&hud&room=town-center');
   await waitForBoot(page);
   await page.evaluate(() => window.__roomDebug?.changeRoom?.('stairwell-2'));
   await roomIs(page, 'stairwell-2');
@@ -344,7 +344,7 @@ test('no stair key climbs, and no climb panel shows, under the Elevator (#163 re
   test.setTimeout(90_000);
   const errors = collectErrors(page);
 
-  await page.goto('/?asPlayer&hud');
+  await page.goto('/?asPlayer&hud&room=town-center');
   await waitForBoot(page);
 
   // Tile 12 from Town Center rides 5 -> L, and ↑ goes down at once.

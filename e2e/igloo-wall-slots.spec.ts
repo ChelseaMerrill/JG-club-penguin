@@ -8,6 +8,7 @@ import { GAME_HEIGHT, GAME_WIDTH } from '../src/game/stage-size';
 import { IGLOO_GEAR_CATALOG } from '../src/persistence/minigame-rules';
 import type { QuestsTestHandle } from '../src/quests/quests-test-handle';
 import type { RoomDebugInfo } from './support/room-debug-types';
+import { waitForElevatorHidden } from './support/elevator';
 
 declare global {
   interface Window {
@@ -41,7 +42,7 @@ async function debugInfo(page: Page): Promise<RoomDebugInfo | undefined> {
 }
 
 async function boot(page: Page): Promise<void> {
-  await page.goto('/?asPlayer&hud');
+  await page.goto('/?asPlayer&hud&room=town-center');
   await expect(page.locator('#game canvas')).toBeVisible();
   await expect
     .poll(async () => (await debugInfo(page))?.localPenguin, { timeout: BOOT_TIMEOUT })
@@ -53,7 +54,7 @@ async function changeRoom(page: Page, roomId: RoomId): Promise<void> {
   await expect
     .poll(async () => (await debugInfo(page))?.roomId, { timeout: WALK_TIMEOUT })
     .toBe(roomId);
-  await expect(page.locator('.elevator-screen')).toBeHidden();
+  await waitForElevatorHidden(page);
 }
 
 async function clickStagePoint(page: Page, point: { x: number; y: number }): Promise<void> {

@@ -61,7 +61,7 @@ test('click-to-move', async ({ page }) => {
 
   const errors = collectErrors(page);
 
-  await page.goto('/');
+  await page.goto('/?room=town-center');
   const canvas = page.locator('#game canvas');
   await expect(canvas).toBeVisible();
   await hideLandingPage(page);
@@ -370,7 +370,7 @@ test('sign-in updates the local Penguin look and playerId (#14 review fixes 1 an
 }) => {
   const errors = collectErrors(page);
 
-  await page.goto('/');
+  await page.goto('/?room=town-center');
   await expect(page.locator('#game canvas')).toBeVisible();
   await hideLandingPage(page);
   await waitForBoot(page);
@@ -399,7 +399,7 @@ test('sign-in updates the local Penguin look and playerId (#14 review fixes 1 an
 test('wave/dance evidence screenshot (#14 review fix 8)', async ({ page }) => {
   const errors = collectErrors(page);
 
-  await page.goto('/');
+  await page.goto('/?room=town-center');
   await expect(page.locator('#game canvas')).toBeVisible();
   await hideLandingPage(page);
   await waitForBoot(page);

@@ -52,10 +52,10 @@ async function debugInfo(page: Page): Promise<RoomDebugInfo | undefined> {
   return page.evaluate(() => window.__roomDebug);
 }
 
-/** `?asPlayer` enters Town Center through the real navigator, so `room:enter` fires on every change. */
+/** `?asPlayer&room=town-center` enters Town Center through the real navigator, so `room:enter` fires on every change. */
 async function boot(page: Page): Promise<void> {
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto('/?asPlayer&leaderboard=seed&hud');
+  await page.goto('/?asPlayer&leaderboard=seed&hud&room=town-center');
   await expect(page.locator('#game canvas')).toBeVisible();
   await page.evaluate(() => {
     const landing = document.querySelector<HTMLElement>('#ui .landing');

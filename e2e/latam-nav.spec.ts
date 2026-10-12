@@ -19,7 +19,7 @@ async function debugInfo(page: Page): Promise<RoomDebugInfo | undefined> {
 /** Boots with a fixture Player and the HUD shown, no sign-in (`?asPlayer&hud`). */
 async function bootWithHud(page: Page): Promise<string[]> {
   const errors = collectErrors(page);
-  await page.goto('/?asPlayer&hud');
+  await page.goto('/?asPlayer&hud&room=town-center');
   await expect(page.locator('#game canvas')).toBeVisible();
   await expect
     .poll(async () => (await debugInfo(page))?.roomId, { timeout: BOOT_TIMEOUT })

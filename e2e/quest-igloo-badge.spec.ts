@@ -46,7 +46,7 @@ async function debugInfo(page: Page): Promise<RoomDebugInfo | undefined> {
 /** Reduced motion keeps every NPC standing on its slot tile, so its click point is stable. */
 async function boot(page: Page): Promise<void> {
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  await page.goto('/?asPlayer&hud');
+  await page.goto('/?asPlayer&hud&room=town-center');
   await expect(page.locator('#game canvas')).toBeVisible();
   await page.evaluate(() => {
     const landing = document.querySelector<HTMLElement>('#ui .landing');
