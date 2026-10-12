@@ -496,20 +496,26 @@ test.describe('the JG HQ Lobby (#169)', () => {
     test.setTimeout(90_000);
     const errors = collectErrors(page);
 
+    // 1618x918 gives the Stage its exact 1600x900 (the ring sits outside
+    // it), so the game shot is 1:1 with the design.
+    await page.setViewportSize({ width: 1618, height: 918 });
     await page.goto('/?asPlayer=You&hud');
     await waitForBoot(page);
     await roomIs(page, 'lobby');
     await page.evaluate(() => document.fonts.ready);
     await page.waitForTimeout(1000);
-    const game = await page.screenshot({ path: `${LOBBY_DIR}/game.png` });
+    const stage = await page.locator('#game canvas').boundingBox();
+    if (!stage) throw new Error('canvas not visible');
+    expect([Math.round(stage.width), Math.round(stage.height)]).toEqual([GAME_WIDTH, GAME_HEIGHT]);
+    const game = await page.screenshot({ path: `${LOBBY_DIR}/game.png`, clip: stage });
     await drawDebugOverlay(page);
-    await page.screenshot({ path: `${LOBBY_DIR}/overlay.png` });
+    await page.screenshot({ path: `${LOBBY_DIR}/overlay.png`, clip: stage });
 
     const designPage = await browser.newPage({ viewport: { width: 1700, height: 1000 } });
     try {
       await designPage.goto(pathToFileURL(path.resolve('design/Room 00 JGHQ Lobby.dc.html')).href);
-      const stage = designPage.locator('[data-screen-label="JG HQ LOBBY"]');
-      const rendered = await stage
+      const designStage = designPage.locator('[data-screen-label="JG HQ LOBBY"]');
+      const rendered = await designStage
         .locator('svg')
         .first()
         .waitFor({ timeout: 15_000 })
@@ -520,7 +526,7 @@ test.describe('the JG HQ Lobby (#169)', () => {
         'BLOCKED: the design page needs its runtime from unpkg.com (network blocked?)',
       );
       await designPage.evaluate(() => document.fonts.ready);
-      const design = await stage.screenshot({ path: `${LOBBY_DIR}/design.png` });
+      const design = await designStage.screenshot({ path: `${LOBBY_DIR}/design.png` });
 
       const composer = await browser.newPage({
         viewport: { width: GAME_WIDTH * 2, height: GAME_HEIGHT },

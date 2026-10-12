@@ -268,7 +268,7 @@ test.describe('Minigame exit returns to the starting Room (#171)', () => {
     expect(errors).toEqual([]);
   });
 
-  test('Beystadium: a full match keeps its usual payout and Badge readout, and EXIT returns to Town Center', async ({
+  test('Beystadium: a full match keeps its usual payout and Badge readout, and EXIT returns to the Lobby it booted in', async ({
     page,
   }) => {
     const dir = proofDir('beystadium-done-exit');
@@ -278,12 +278,12 @@ test.describe('Minigame exit returns to the starting Room (#171)', () => {
     // Same flow as `e2e/beystadium.spec.ts`'s full-round test: the
     // `?minigame=` launcher, with `page.clock.install()` before navigation
     // so the shell's 50ms tick is faked from the first script run. The
-    // launcher boots the Room behind it the normal way (`?room=town-center`;
-    // without it, `SPAWN_ROOM_ID`, the Lobby), and the launcher's own "QUIT TO
+    // launcher boots the Room behind it the normal way (no `?room=`, so
+    // `SPAWN_ROOM_ID` -- the Lobby, #169), and the launcher's own "QUIT TO
     // <ROOM>" tracks whatever Room is actually live, the same as a real NPC
     // launch would (`minigame-launcher.ts`).
     await page.clock.install();
-    await page.goto('/?minigame=beystadium&room=town-center');
+    await page.goto('/?minigame=beystadium');
     await expect(page.locator('.minigame__howto')).toBeVisible();
     await page.locator('.minigame__button--start').click();
 
@@ -311,8 +311,8 @@ test.describe('Minigame exit returns to the starting Room (#171)', () => {
 
     await expect(page.locator('.minigame__done')).toBeVisible();
     // The same payout/Badge readouts `e2e/beystadium.spec.ts` asserts for
-    // this exact finish point: unaffected by quitting through to Town
-    // Center afterward.
+    // this exact finish point: unaffected by quitting through to the
+    // Lobby afterward.
     await expect(page.locator('.minigame__done-title')).toHaveText('3-0. AGAIN.');
     await expect(page.locator('[data-done-stat="score"] .minigame__done-stat-value')).toHaveText(
       '1',
@@ -329,14 +329,14 @@ test.describe('Minigame exit returns to the starting Room (#171)', () => {
     );
     await page.screenshot({ path: `${dir}/done.png` });
 
-    expect((await debugInfo(page))?.roomId).toBe('town-center');
+    expect((await debugInfo(page))?.roomId).toBe('lobby');
     await page
       .locator('.minigame__done')
-      .getByRole('button', { name: 'QUIT TO TOWN CENTER' })
+      .getByRole('button', { name: 'QUIT TO JG HQ LOBBY' })
       .click();
 
     await expect(page.locator('.minigame__done')).toBeHidden();
-    expect((await debugInfo(page))?.roomId).toBe('town-center');
+    expect((await debugInfo(page))?.roomId).toBe('lobby');
     await page.screenshot({ path: `${dir}/back-in-room.png` });
 
     expect(errors).toEqual([]);
