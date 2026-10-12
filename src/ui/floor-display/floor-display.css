@@ -1,0 +1,28 @@
+/* The Lobby elevator's floor display (`floor-display.ts`, #169): the
+   design's `{{ elevFloor }}` div from `design/Room 00 JGHQ Lobby.dc.html`,
+   in Stage pixels (the #ui layer is the 1600x900 Stage). Its box and skewY
+   come from the Room's `floorDisplay`; the type is the design's own (Anton
+   12px, 2px letter-spacing, #00BDFF). Decorative, so it never takes a click:
+   `#ui > *` opts children back into pointer events, and this opts out. */
+
+#ui > .floor-display {
+  pointer-events: none;
+}
+
+.floor-display {
+  position: absolute;
+  transform-origin: 0 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font: 400 12px var(--font-display);
+  letter-spacing: 2px;
+  line-height: 1;
+  color: var(--jg-primary);
+  white-space: nowrap;
+  user-select: none;
+}
+
+.floor-display[hidden] {
+  display: none;
+}
