@@ -19,6 +19,12 @@
 // to export only those (`npm run export:room-art -- the-icebox`), so adding
 // one Room never re-encodes the others' PNGs (#51 D3). Rerunning after a
 // design resync is safe and idempotent (same rules, same output paths).
+//
+// #170: before step 4, each Room's TEXT_RULES rewrite sign and exit-pill text
+// (no "HALLWAY A" anywhere, D10), and the export fails if a rewritten sign
+// overflows its plate. `--print-exit-rects` exports nothing: it prints every
+// `[data-door]` and `[data-exit]` rect on each named Room's Stage, measured
+// after those rewrites, for the Room definitions' hotspots (D10).
 import { chromium } from '@playwright/test';
 import { createServer } from 'node:http';
 import type { Server } from 'node:http';
@@ -220,6 +226,91 @@ type HideRule =
   | { kind: 'cluster'; anchor: string; companions: string[]; comment: string };
 
 /**
+ * #170 D10: a text rewrite applied to the rendered design before the hide
+ * rules, since `design/` is never edited. `sign` rewrites the one SVG `<text>`
+ * whose text is exactly `from`, dropping its `textLength` so the new text
+ * sets at its natural width; the export then fails if that width is more than
+ * its plate (the `<polygon>` drawn just before it) minus 8 px. `pill`
+ * rewrites the one `a[data-exit]` exit pill whose text is exactly `from`; a
+ * pill grows to fit, so its rect is measured after the rewrite
+ * (`--print-exit-rects`). Each rule must match exactly one element.
+ */
+interface TextRule {
+  target: 'sign' | 'pill';
+  from: string;
+  to: string;
+  comment: string;
+}
+
+/**
+ * Every design's exit pill (`<a data-exit>`): #170 Q5 bakes them into the art
+ * as doors (`RoomDoor.kind: 'pill'`), so the `blink` rules that hid them as
+ * HUD chrome except them, and `freezeAnimations` holds them in their visible
+ * 0% frame, as the Stairwell's already are (S4-D4).
+ */
+const EXIT_PILLS = 'a[data-exit]';
+
+/**
+ * The Roof Deck's in-scene KITCHEN floor arrow (#100), not its "↙ KITCHEN"
+ * exit pill, which links to the same file (#170: the old selector matched
+ * both).
+ */
+const ROOF_DECK_KITCHEN_ARROW = "a[href='Kitchen.dc.html']:not([data-exit])";
+
+/** How much narrower than its plate a rewritten sign's text must stay (D10). */
+const SIGN_PLATE_MARGIN_PX = 8;
+
+// The pre-approved fallback (Q4, RT170-8): "THE HALLWAY" overflows every
+// 80-93 px sign plate, so signs read "HALLWAY"; pills grow, so they read
+// "THE HALLWAY".
+const TEXT_RULES: Partial<Record<RoomId, TextRule[]>> = {
+  'town-center': [
+    {
+      target: 'sign',
+      from: 'HALLWAY A →',
+      to: 'HALLWAY →',
+      comment: "The Hallway door's sign on the back-right wall.",
+    },
+  ],
+  'dev-pit': [
+    {
+      target: 'sign',
+      from: '← HALLWAY A',
+      to: '← HALLWAY',
+      comment: "The Hallway door's sign on the back-left wall.",
+    },
+    {
+      target: 'pill',
+      from: '↙ HALLWAY A',
+      to: '↙ THE HALLWAY',
+      comment: "The Hallway door's exit pill.",
+    },
+  ],
+  bathroom: [
+    {
+      target: 'sign',
+      from: 'HALLWAY A →',
+      to: 'HALLWAY →',
+      comment: "The Hallway door's sign on the back-right wall.",
+    },
+    {
+      target: 'pill',
+      from: 'HALLWAY A ↘',
+      to: 'THE HALLWAY ↘',
+      comment: "The Hallway door's exit pill.",
+    },
+  ],
+};
+
+/** One rewritten sign's measurement (D10's overflow rule). */
+interface SignFit {
+  from: string;
+  to: string;
+  width: number;
+  plate: number;
+}
+
+/**
  * One Stairwell floor's hide rules (#51 slice 4). The six Stages of
  * `design/Stairwell.dc.html` share one layout: Dom (`domRun`), Jason
  * (`jasonPace`) and the floor's guest (`mingle`) each wrap their shadow,
@@ -351,7 +442,9 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
     {
       kind: 'animation',
       names: ['blink'],
-      comment: "Blinking 'KITCHEN' room-exit nav pill (HUD).",
+      except: [EXIT_PILLS],
+      comment:
+        "The 'KITCHEN ↘' exit pill blinks. #170 Q5: the exit pills are baked into the art as doors, frozen in their visible frame, so they're excepted.",
     },
     {
       kind: 'labels',
@@ -382,14 +475,10 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
       comment:
         'The Core Values poster\'s heading and four hexagon labels (#77): redrawn live by src/ui/wall-text/wall-text.ts, since the design bakes them at a font-size/letter-spacing that overflows their hexagons. The hexagon/banner backing shapes themselves are kept (only the exact-matching <text> is hidden, not preceding siblings) -- see the "text-only" HideRule kind above.',
     },
-    {
-      kind: 'selector',
-      selectors: [
-        'polygon[points="940,740 970,755 935,772.5 945,777.5 890,780 895,752.5 905,757.5"]',
-      ],
-      comment:
-        "#132: an unlabelled floor-arrow decal near the Front Desk that isn't a working door -- Town Center's real exits (The Icebox, Dev Pit, the elevator/stairwell) are the labelled wall signage, not this arrow.",
-    },
+    // #132's floor-arrow rule is gone (#170): the 2026-09-27 design resync
+    // removed that decal from the design itself, so the selector matched
+    // nothing and failed the export. `assertNoStrayArrowPolygons` still
+    // fails the export if one comes back.
     {
       kind: 'cluster',
       anchor: '← MAP',
@@ -452,7 +541,9 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
     {
       kind: 'animation',
       names: ['blink'],
-      comment: "Blinking '↙ TOWN CENTER' room-exit nav pill (HUD).",
+      except: [EXIT_PILLS],
+      comment:
+        "The '↙ HALLWAY A' (rewritten to '↙ THE HALLWAY' by TEXT_RULES) and 'THE MULLET ↘' exit pills blink. #170 Q5: the exit pills are baked into the art as doors, frozen in their visible frame, so they're excepted.",
     },
     {
       kind: 'labels',
@@ -494,8 +585,9 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
     {
       kind: 'animation',
       names: ['blink'],
+      except: [EXIT_PILLS],
       comment:
-        "Blinking '↙ TOWN CENTER' / 'ROOF DECK ↗' room-exit nav pills, and the new 'TALK · PANCAKE FLIP' / 'TALK · COFFEE RUSH' minigame prompt pills (all HUD).",
+        "The 'TALK · PANCAKE FLIP' / 'TALK · COFFEE RUSH' minigame prompt pills (HUD), and the '↙ TOWN CENTER' / 'ROOF DECK ↗' exit pills, which blink too. #170 Q5: the exit pills are baked into the art as doors, frozen in their visible frame, so they're excepted.",
     },
     {
       kind: 'animation',
@@ -521,14 +613,10 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
       comment:
         'Stationary NPCs/Penguins and their nameplates: the Chelsea and Tonya/Jesse penguin NPCs, and the local player.',
     },
-    {
-      kind: 'selector',
-      selectors: [
-        'polygon[points="395,467.5 330,500 395,532.5 420,520 385,502.5 445,502.5 445,482.5 400,495"]',
-      ],
-      comment:
-        "#132: an unlabelled floor-arrow decal by the left-wall counter that isn't a working door -- the Kitchen's real exits (Town Center, Roof Deck) are the labelled wall signage, each a framed door (not an elevator), not this arrow.",
-    },
+    // #132's floor-arrow rule is gone (#170): the 2026-09-27 design resync
+    // removed that decal from the design itself, so the selector matched
+    // nothing and failed the export. `assertNoStrayArrowPolygons` still
+    // fails the export if one comes back.
     {
       kind: 'cluster',
       anchor: '← MAP',
@@ -567,7 +655,9 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
       // (`hideAnimationNames`'s ancestor branch). Keeping the wrapper is safe
       // because `freezeAnimations` pins `idle` at its 0% frame,
       // `translateY(0)`, so the arrow isn't offset.
-      except: ["a[href='Kitchen.dc.html']"],
+      // #170: the selector names the arrow alone; the "↙ KITCHEN" exit pill
+      // links to the same file but sits outside every vendor wrapper.
+      except: [ROOF_DECK_KITCHEN_ARROW],
       comment: 'Subtle idle motion inside stationary vendor NPCs (Kevin, Ann Marie, Josh, Casey).',
     },
     {
@@ -583,8 +673,9 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
     },
     {
       kind: 'animation',
-      names: ['mkMillie'],
-      comment: "Millie's stationary vendor figure and nested name/speech.",
+      names: ['mkMichelle'],
+      comment:
+        "Millie's stationary vendor figure and nested name/speech (#170: the 2026-09-27 resync renamed its keyframe from mkMillie to mkMichelle).",
     },
     {
       kind: 'animation',
@@ -614,9 +705,10 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
       // #100: the new KITCHEN floor arrow's own polygon group also plays
       // `blink` (it's a real, in-scene door-equivalent, meant to stay in
       // the art); without this exception it would be hidden alongside the
-      // unrelated HUD nav pill below, which shares the same keyframe name.
-      except: ["a[href='Kitchen.dc.html']"],
-      comment: "Blinking '↙ ELEVATOR · STAIRS · KITCHEN' room-exit nav pill (HUD).",
+      // unrelated exit pills, which share the same keyframe name.
+      except: [ROOF_DECK_KITCHEN_ARROW, EXIT_PILLS],
+      comment:
+        "The '↙ KITCHEN', 'ELEVATOR' and 'STAIRS' exit pills blink. #170 Q5: the exit pills are baked into the art as doors, frozen in their visible frame, so they're excepted, with the arrow; nothing else in this Room blinks.",
     },
     {
       kind: 'cluster',
@@ -690,7 +782,9 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
     {
       kind: 'animation',
       names: ['blink'],
-      comment: "Blinking '↙ TOWN CENTER' room-exit nav pill (HUD).",
+      except: [EXIT_PILLS],
+      comment:
+        "The '↙ DEV PIT' exit pill blinks. #170 Q5: the exit pills are baked into the art as doors, frozen in their visible frame, so they're excepted.",
     },
     // #132's floor-arrow rule is gone: the 2026-09-27 design resync removed
     // that decal from `design/Room 03 The Icebox.dc.html` itself, so the
@@ -747,29 +841,27 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
       comment:
         'The local player, the Michael S., Samantha and Daniel Penguins, and Emily Smith and Anthony Conway, with their nameplates and speech bubbles.',
     },
-    {
-      kind: 'selector',
-      selectors: [
-        'polygon[points="720,384 655,416.5 720,449 745,436.5 710,419 770,419 770,399 725,411.5"]',
-      ],
-      comment:
-        "The Hallway's unlabelled floor arrow pointing toward TOWN CENTER (#132): unlike the labelled 'TEAM ROOM 7/8/9 ↓' floor markers (disabled doors, kept), clicking this one does nothing. The wall's own '↙ TOWN CENTER' door stays -- see the 'blink' rule below.",
-    },
+    // #132's floor-arrow rule is gone (#170): the 2026-09-27 design resync
+    // removed that decal from the design itself, so the selector matched
+    // nothing and failed the export. `assertNoStrayArrowPolygons` still
+    // fails the export if one comes back.
     {
       kind: 'animation',
       names: ['blink'],
-      comment: "Blinking '↙ TOWN CENTER' and 'TEAM ROOMS 1–6 ↘' room-exit nav pills (HUD).",
+      except: [EXIT_PILLS],
+      comment:
+        "The '↙ TOWN CENTER' and 'DEV PIT ↘' exit pills blink. #170 Q5: the exit pills are baked into the art as doors, frozen in their visible frame, so they're excepted.",
     },
     {
       kind: 'cluster',
       anchor: '← MAP',
-      companions: ['← MAP', '11 · OFFICE HALLWAY (O1–O9)'],
+      companions: ['← MAP', '11 · HALLWAY A (OFFICE HALLWAY)'],
       comment: 'Top-left breadcrumb nav (HUD).',
     },
     {
       kind: 'cluster',
       anchor: 'THE CORRIDOR',
-      companions: ['THE CORRIDOR', 'OFFICES 1–9 · KNOCK BEFORE YOU WADDLE · 4 PENGUINS'],
+      companions: ['THE CORRIDOR', 'HALLWAY A · TEAM ROOMS 1–4 · BATHROOM · DEV PIT'],
       comment: 'Room title/subtitle banner (HUD).',
     },
     {
@@ -810,7 +902,9 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
     {
       kind: 'animation',
       names: ['blink'],
-      comment: "Blinking 'HALLWAY ↓' room-exit nav pill (HUD).",
+      except: [EXIT_PILLS],
+      comment:
+        "The 'HALLWAY ↓' exit pill blinks. #170 Q5: the exit pills are baked into the art as doors, frozen in their visible frame, so they're excepted.",
     },
     {
       kind: 'cluster',
@@ -870,7 +964,9 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
     {
       kind: 'animation',
       names: ['blink'],
-      comment: "Blinking 'HALLWAY ↓' room-exit nav pill (HUD).",
+      except: [EXIT_PILLS],
+      comment:
+        "The 'HALLWAY ↓' exit pill blinks. #170 Q5: the exit pills are baked into the art as doors, frozen in their visible frame, so they're excepted.",
     },
     {
       kind: 'cluster',
@@ -932,7 +1028,9 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
     {
       kind: 'animation',
       names: ['blink'],
-      comment: "Blinking 'HALLWAY ↓' room-exit nav pill (HUD).",
+      except: [EXIT_PILLS],
+      comment:
+        "The 'HALLWAY ↓' exit pill blinks. #170 Q5: the exit pills are baked into the art as doors, frozen in their visible frame, so they're excepted.",
     },
     {
       kind: 'cluster',
@@ -986,18 +1084,16 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
       comment:
         'Michael Prete: a translated <g> of shadow, figure, nameplate and his Beyblade-challenge bubble.',
     },
-    {
-      kind: 'selector',
-      selectors: [
-        'polygon[points="700,605 730,620 695,637.5 705,642.5 650,645 655,617.5 665,622.5"]',
-      ],
-      comment:
-        "Non-working floor arrow decal (#132): this Room's only working exit is the 'HALLWAY ↓' HUD nav pill below, not this floor paint.",
-    },
+    // #132's floor-arrow rule is gone (#170): the 2026-09-27 design resync
+    // removed that decal from the design itself, so the selector matched
+    // nothing and failed the export. `assertNoStrayArrowPolygons` still
+    // fails the export if one comes back.
     {
       kind: 'animation',
       names: ['blink'],
-      comment: "Blinking 'HALLWAY ↓' room-exit nav pill (HUD).",
+      except: [EXIT_PILLS],
+      comment:
+        "The 'HALLWAY ↓' exit pill blinks. #170 Q5: the exit pills are baked into the art as doors, frozen in their visible frame, so they're excepted.",
     },
     {
       kind: 'cluster',
@@ -1034,18 +1130,16 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
       comment:
         'The local player and the Jessie Penguin, each a flat run of shadow, figure, nameplate and speech bubble. The Penguin icons on the wall signs are signage and stay.',
     },
-    {
-      kind: 'selector',
-      selectors: [
-        'polygon[points="940,675 970,690 935,707.5 945,712.5 890,715 895,687.5 905,692.5"]',
-      ],
-      comment:
-        "Non-working floor arrow decal (#132): this Room's only working exit is the 'HALLWAY ↘' HUD nav pill below, not this floor paint.",
-    },
+    // #132's floor-arrow rule is gone (#170): the 2026-09-27 design resync
+    // removed that decal from the design itself, so the selector matched
+    // nothing and failed the export. `assertNoStrayArrowPolygons` still
+    // fails the export if one comes back.
     {
       kind: 'animation',
       names: ['blink'],
-      comment: "Blinking 'HALLWAY ↘' room-exit nav pill (HUD).",
+      except: [EXIT_PILLS],
+      comment:
+        "The 'HALLWAY A ↘' exit pill blinks (rewritten to 'THE HALLWAY ↘' by TEXT_RULES). #170 Q5: the exit pills are baked into the art as doors, frozen in their visible frame, so they're excepted.",
     },
     {
       kind: 'cluster',
@@ -1113,19 +1207,16 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
       comment:
         "Nicole's and Ann Marie's floating laughs; Jon's, Brandon's and Dom's whole <g> of shadow, figure, nameplate and bubble (their ping-pong sway and Dom's lap); and the nameplates and bubbles of Jory, Ashley and Tony, which the design's runtime lifts into their own label-layer <g>s.",
     },
-    {
-      kind: 'selector',
-      selectors: [
-        'polygon[points="345,490.5 280,523 345,555.5 370,543 335,525.5 395,525.5 395,505.5 350,518"]',
-      ],
-      comment:
-        "Non-working floor arrow decal (#132): this Room's working exits are its HALLWAY and DEV PIT doors, not this floor paint.",
-    },
+    // #132's floor-arrow rule is gone (#170): the 2026-09-27 design resync
+    // removed that decal from the design itself, so the selector matched
+    // nothing and failed the export. `assertNoStrayArrowPolygons` still
+    // fails the export if one comes back.
     {
       kind: 'animation',
       names: ['blink', 'confetti'],
+      except: [EXIT_PILLS],
       comment:
-        "Blinking '↙ HALLWAY' and 'DEV PIT ↘' room-exit nav pills (HUD), and the after-party confetti layer.",
+        "The after-party confetti layer, and the '↙ HALLWAY B' and 'DEV PIT ↘' exit pills, which blink. #170 Q5: the exit pills are baked into the art as doors, frozen in their visible frame, so they're excepted.",
     },
     {
       kind: 'cluster',
@@ -1170,7 +1261,9 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
     {
       kind: 'animation',
       names: ['blink'],
-      comment: "Blinking '↙ TOWN CENTER' room-exit nav pill (HUD).",
+      except: [EXIT_PILLS],
+      comment:
+        "The '↙ TOWN CENTER' exit pill blinks. #170 Q5: the exit pills are baked into the art as doors, frozen in their visible frame, so they're excepted.",
     },
     {
       kind: 'labels',
@@ -1181,12 +1274,11 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
     {
       kind: 'selector',
       selectors: [
-        'polygon[points="395,467.5 330,500 395,532.5 420,520 385,502.5 445,502.5 445,482.5 400,495"]',
         'polygon[points="800,569 820,580 820,602 800,613 780,602 780,580"]',
         'ellipse[cx="800"][cy="615"]',
       ],
       comment:
-        "#132: an unlabelled floor-arrow decal by the left wall that isn't a working door -- the Igloo's only real exit (Town Center) is the labelled elevator, not this arrow. Also (#132 review fix) the pet Hexle Bit's body polygon and ground-shadow ellipse, left baked in by the `labels` rule above.",
+        "(#132 review fix) the pet Hexle Bit's body polygon and ground-shadow ellipse, left baked in by the `labels` rule above. #170: #132's floor-arrow selector is gone; the 2026-09-27 design resync removed that decal from the design itself.",
     },
     {
       kind: 'cluster',
@@ -1753,6 +1845,101 @@ function assertNoStrayArrowPolygons(roomId: string): void {
   }
 }
 
+// Runs in the browser context (page.evaluate), before the hide rules: applies
+// one Room's TEXT_RULES (#170 D10) and returns each rewritten sign's natural
+// width and its plate's width, for the overflow check in `applyTextRules`.
+function rewriteText(rules: TextRule[]): SignFit[] {
+  const fits: SignFit[] = [];
+  for (const rule of rules) {
+    const candidates =
+      rule.target === 'sign'
+        ? Array.from(document.querySelectorAll('text'))
+        : Array.from(document.querySelectorAll('a[data-exit]'));
+    const matches = candidates.filter((el) => el.textContent?.trim() === rule.from);
+    const el = matches[0];
+    if (matches.length !== 1 || !el) {
+      throw new Error(
+        `text rule expected exactly one ${rule.target} "${rule.from}", found ${matches.length}`,
+      );
+    }
+    el.textContent = rule.to;
+    if (rule.target === 'pill') continue;
+    el.removeAttribute('textLength');
+    el.removeAttribute('lengthAdjust');
+    const plate = el.previousElementSibling;
+    if (!plate || plate.tagName.toLowerCase() !== 'polygon') {
+      throw new Error(`text rule found no plate <polygon> just before sign "${rule.from}"`);
+    }
+    fits.push({
+      from: rule.from,
+      to: rule.to,
+      width: (el as SVGTextElement).getBBox().width,
+      plate: (plate as SVGPolygonElement).getBBox().width,
+    });
+  }
+  return fits;
+}
+
+// Runs in the browser context (page.evaluate), after every rule: no
+// displayed text anywhere on the Stage still reads "HALLWAY A" (#170: the
+// Hallway is THE HALLWAY, with no "Hallway A" text anywhere).
+function assertNoHallwayA(stage: string): void {
+  const root = document.querySelector(stage);
+  if (!root) throw new Error(`no Stage element: ${stage}`);
+  const isDisplayed = (el: Element): boolean => {
+    for (let n: Element | null = el; n; n = n.parentElement) {
+      if (getComputedStyle(n).display === 'none') return false;
+    }
+    return true;
+  };
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const offenders: string[] = [];
+  let node: Node | null;
+  while ((node = walker.nextNode())) {
+    const text = node.nodeValue ?? '';
+    if (/HALLWAY A\b/.test(text) && node.parentElement && isDisplayed(node.parentElement)) {
+      offenders.push(text.trim());
+    }
+  }
+  if (offenders.length > 0) {
+    throw new Error(`visible "HALLWAY A" text remains: ${offenders.join(' | ')}`);
+  }
+}
+
+/** One door or exit pill's rect on the Stage, in Stage pixels (`--print-exit-rects`). */
+interface ExitRect {
+  kind: 'door' | 'exit';
+  label: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+// Runs in the browser context (page.evaluate), after the text rules: every
+// displayed `[data-door]` and `[data-exit]` element's rect relative to the
+// Stage, rounded to 0.5 px.
+function measureExitRects(stage: string): ExitRect[] {
+  const root = document.querySelector(stage);
+  if (!root) throw new Error(`no Stage element: ${stage}`);
+  const origin = root.getBoundingClientRect();
+  const half = (n: number): number => Math.round(n * 2) / 2;
+  return Array.from(root.querySelectorAll<HTMLElement>('[data-door], [data-exit]'))
+    .filter((el) => getComputedStyle(el).display !== 'none')
+    .map((el) => {
+      const rect = el.getBoundingClientRect();
+      const door = el.getAttribute('data-door');
+      return {
+        kind: door === null ? ('exit' as const) : ('door' as const),
+        label: door ?? (el.textContent ?? '').trim(),
+        x: half(rect.left - origin.left),
+        y: half(rect.top - origin.top),
+        width: half(rect.width),
+        height: half(rect.height),
+      };
+    });
+}
+
 // Runs in the browser context (page.evaluate), before the hide rules, for a
 // Room in ISOLATED_STAGES (#51 slice 4): removes every other Stage of the
 // design file from the page, failing if `stage` doesn't match exactly one.
@@ -2024,6 +2211,13 @@ async function openRoomStage(
   const file = ROOM_FILES[roomId];
   const page = await browser.newPage({ viewport: { width: STAGE_WIDTH, height: STAGE_HEIGHT } });
 
+  // `hideCluster` only warns in the page when an anchor is missing (#170: a
+  // resync renamed several banners), so surface those warnings here.
+  page.on('console', (message) => {
+    if (message.type() === 'warning' && message.text().startsWith('[export-room-art]')) {
+      console.warn(`  ${roomId}: ${message.text()}`);
+    }
+  });
   const pageErrors: string[] = [];
   page.on('pageerror', (err) => {
     if (!BENIGN_PAGE_ERRORS.some((pattern) => pattern.test(err.message))) {
@@ -2053,20 +2247,50 @@ async function openRoomStage(
   return { page, stage };
 }
 
+/**
+ * Applies `roomId`'s TEXT_RULES (#170 D10), logs each rewritten sign's fit,
+ * and fails the export when one overflows: its natural width is more than its
+ * plate's width minus SIGN_PLATE_MARGIN_PX.
+ */
+async function applyTextRules(
+  page: import('@playwright/test').Page,
+  roomId: RoomId,
+): Promise<void> {
+  const fits = await page.evaluate(rewriteText, TEXT_RULES[roomId] ?? []);
+  const overflows: string[] = [];
+  for (const fit of fits) {
+    const limit = fit.plate - SIGN_PLATE_MARGIN_PX;
+    const ok = fit.width <= limit;
+    console.log(
+      `  overflow-check ${roomId}: "${fit.from}" -> "${fit.to}" width ${fit.width.toFixed(1)} px, plate ${fit.plate.toFixed(1)} px, limit ${limit.toFixed(1)} px: ${ok ? 'OK' : 'OVERFLOW'}`,
+    );
+    if (!ok) overflows.push(`"${fit.to}" (${fit.width.toFixed(1)} > ${limit.toFixed(1)} px)`);
+  }
+  if (overflows.length > 0) {
+    throw new Error(`${roomId}: sign text overflows its plate: ${overflows.join(', ')}`);
+  }
+}
+
+/** Prepares `roomId`'s Stage for its screenshot: other Stages gone, text rewritten, live elements hidden. */
+async function prepareStage(page: import('@playwright/test').Page, roomId: RoomId): Promise<void> {
+  const stageSelector = STAGE_SELECTORS[roomId] ?? STAGE_SELECTOR;
+  if (ISOLATED_STAGES.has(roomId)) {
+    await page.evaluate(removeOtherStages, stageSelector);
+  }
+  await applyTextRules(page, roomId);
+  await page.evaluate(hideLiveElements, LIVE_ELEMENT_RULES[roomId]);
+  await page.evaluate(applyArtFixes, ART_FIXES[roomId] ?? []);
+  await page.evaluate(assertNoStrayArrowPolygons, roomId);
+  await page.evaluate(assertNoHallwayA, stageSelector);
+}
+
 async function exportRoom(
   browser: import('@playwright/test').Browser,
   port: number,
   roomId: RoomId,
 ): Promise<{ roomId: RoomId; outPath: string; bytes: number }> {
-  const rules = LIVE_ELEMENT_RULES[roomId];
   const { page, stage } = await openRoomStage(browser, port, roomId);
-
-  if (ISOLATED_STAGES.has(roomId)) {
-    await page.evaluate(removeOtherStages, STAGE_SELECTORS[roomId] ?? STAGE_SELECTOR);
-  }
-  await page.evaluate(hideLiveElements, rules);
-  await page.evaluate(applyArtFixes, ART_FIXES[roomId] ?? []);
-  await page.evaluate(assertNoStrayArrowPolygons, roomId);
+  await prepareStage(page, roomId);
   await page.waitForTimeout(POST_HIDE_SETTLE_MS);
 
   const outPath = path.join(OUTPUT_DIR, `${roomId}.png`);
@@ -2117,11 +2341,42 @@ function selectRoomIds(args: readonly string[]): RoomId[] {
   return all.filter((id) => args.includes(id));
 }
 
+/**
+ * `--print-exit-rects` (#170 D10): prints each Room's door and exit-pill
+ * rects, one JSON line per Room, measured on the prepared Stage (after the
+ * text rules). Writes no file.
+ */
+async function printExitRects(
+  browser: import('@playwright/test').Browser,
+  port: number,
+  roomIds: readonly RoomId[],
+): Promise<void> {
+  for (const roomId of roomIds) {
+    const { page } = await openRoomStage(browser, port, roomId);
+    await prepareStage(page, roomId);
+    const rects = await page.evaluate(measureExitRects, STAGE_SELECTORS[roomId] ?? STAGE_SELECTOR);
+    await page.close();
+    console.log(JSON.stringify({ roomId, rects }));
+  }
+}
+
 async function main(): Promise<void> {
-  const roomIds = selectRoomIds(process.argv.slice(2));
+  const args = process.argv.slice(2);
+  const printOnly = args.includes('--print-exit-rects');
+  const roomIds = selectRoomIds(args.filter((arg) => arg !== '--print-exit-rects'));
   await mkdir(OUTPUT_DIR, { recursive: true });
   const { server, port } = await serveDesignDir();
   const browser = await chromium.launch();
+
+  if (printOnly) {
+    try {
+      await printExitRects(browser, port, roomIds);
+    } finally {
+      await browser.close();
+      server.close();
+    }
+    return;
+  }
 
   try {
     const results: Array<{ roomId: RoomId; outPath: string; bytes: number }> = [];
