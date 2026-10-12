@@ -578,6 +578,25 @@ describe('createProgressSession', () => {
         expect(panels()).toEqual(['Badge unlocked: Interior Penguin']);
       });
 
+      it('Snowmageddon at once when its Quest completes, with no Session check needed (#154)', async () => {
+        const { wrapped, panels, toasts } = await announceSetup();
+
+        for (let n = 1; n <= 5; n += 1) {
+          await wrapped.recordSnowballHit(`target-${n}`, `throw-${n}`);
+        }
+        const result = await wrapped.completeQuest('snowmageddon');
+
+        // The Badge isn't in the Quest's own badgesEarned (a trigger awards
+        // it); the wrapper's immediate check announces it, exactly once.
+        expect(result.badgesEarned).toEqual([]);
+        expect([...panels(), ...toasts]).toEqual(['Badge unlocked: Snowmageddon']);
+        await wrapped.completeQuest('snowmageddon');
+        await wrapped.checkBadges();
+        // `panels()` closed the first popup; nothing is announced again.
+        expect(panels()).toEqual([]);
+        expect(toasts).toEqual([]);
+      });
+
       it('Interior Penguin with a loadAll right after the sixth setSlot, as the igloo editor refreshes', async () => {
         const { registry, wrapped, controls, panels } = await announceSetup();
 

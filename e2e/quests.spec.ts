@@ -334,6 +334,8 @@ test('every Quest done: the widget shows ALL QUESTS DONE with a line and opens t
     await t.finishCoffeeRun();
     // #142: Linda's pitch, talked, started and submitted in time.
     await t.finishPitchHack();
+    // #154: Snowmageddon, five distinct Players hit today.
+    for (let n = 1; n <= 5; n += 1) await t.recordSnowballHit(`target-${n}`, `throw-${n}`);
   });
   // Beystadium's Quest is three match wins, and record_round's anti-farm
   // rule refuses a round less than 10 s after the previous one of the same
@@ -358,9 +360,9 @@ test('every Quest done: the widget shows ALL QUESTS DONE with a line and opens t
   await widget.click();
   const panel = page.locator('.quests');
   await expect(panel).toBeVisible();
-  await expect(panel.locator('[data-quests-tab="done"]')).toHaveText('DONE · 10');
+  await expect(panel.locator('[data-quests-tab="done"]')).toHaveText('DONE · 11');
   await expect(panel.locator('[data-quests-tab="done"]')).toHaveAttribute('aria-pressed', 'true');
-  await expect(panel.locator('.quests__row')).toHaveCount(10);
+  await expect(panel.locator('.quests__row')).toHaveCount(11);
 
   expect(errors).toEqual([]);
 });
