@@ -80,6 +80,13 @@ for (const roomId of [
   'team-room-4',
   'bathroom',
   'the-mullet',
+  // #51 slice 4: the Stairwell's six floors.
+  'stairwell-0',
+  'stairwell-1',
+  'stairwell-2',
+  'stairwell-3',
+  'stairwell-4',
+  'stairwell-5',
   'remote-lounge',
   'latam-cafe',
   'latam-disco-hall',

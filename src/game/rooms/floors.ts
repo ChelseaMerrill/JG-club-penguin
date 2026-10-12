@@ -39,6 +39,14 @@ export const ROOM_FLOORS: Record<RoomId, FloorId | null> = {
   bathroom: '5',
   // #51 slice 3: THE MULLET is the JG HQ floor's mezzanine.
   'the-mullet': '5',
+  // #51 slice 4: each Stairwell floor sits on its own floor of the building;
+  // its floor 0 is the lobby level.
+  'stairwell-0': 'L',
+  'stairwell-1': '1',
+  'stairwell-2': '2',
+  'stairwell-3': '3',
+  'stairwell-4': '4',
+  'stairwell-5': '5',
   // The Remote Lounge is where the JGers outside HQ hang out, not a room in
   // 108 State St, so like the Igloo it has no floor and never shows the
   // Elevator.

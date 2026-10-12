@@ -34,6 +34,8 @@ import {
   type ProgressStore,
   type PurchaseResult,
   type RoundResult,
+  type StairClimbProgress,
+  type StairFlightResult,
 } from '../progress-store';
 import type { ProgressStoreHarness } from './progress-store.contract';
 
@@ -59,6 +61,7 @@ export const MIGRATIONS = [
   ['quest-nicole-coffee', '20261006020000_quest_nicole_coffee.sql'],
   ['quest-pair-flaky-test', '20261009000000_quest_pair_flaky_test.sql'],
   ['quest-pitch-hack', '20261009010000_quest_pitch_hack.sql'],
+  ['stair-climb', '20261011000000_stair_climb.sql'],
 ] as const;
 
 export type MigrationName = (typeof MIGRATIONS)[number][0];
@@ -453,6 +456,26 @@ function createSqlProgressStore(db: PGliteInterface, playerId: string): Progress
     });
   }
 
+  // #51 slice 4: the Stairs Challenge RPCs, as the Supabase store calls them.
+  async function logStairFlight(floor: number): Promise<StairFlightResult> {
+    return runAsPlayer(async (tx) => {
+      const res = await tx.query<{ result: StairFlightResult }>(
+        'select public.log_stair_flight($1) as result',
+        [floor],
+      );
+      return res.rows[0].result;
+    });
+  }
+
+  async function getStairClimb(): Promise<StairClimbProgress> {
+    return runAsPlayer(async (tx) => {
+      const res = await tx.query<{ result: StairClimbProgress }>(
+        'select public.stair_climb_progress() as result',
+      );
+      return res.rows[0].result;
+    });
+  }
+
   return {
     loadAll,
     saveLook,
@@ -478,6 +501,8 @@ function createSqlProgressStore(db: PGliteInterface, playerId: string): Progress
     markLindaTalked: () => pitchRpc('mark_linda_talked'),
     startPitch: () => pitchRpc('start_pitch'),
     submitPitch,
+    logStairFlight,
+    getStairClimb,
   };
 }
 
@@ -541,6 +566,21 @@ export async function createPgliteProgressStoreHarness(): Promise<
         `update public.player_pitch_runs set started_at = now() - make_interval(secs => $1)
          where player_id = $2 and started_at is not null`,
         [seconds, playerId],
+      );
+      // #51 slice 4 (RT2-10): and the climb's last logged flight, for the
+      // 2 s pacing rule, the same way.
+      await db.query(
+        `update public.player_stair_climbs set updated_at = now() - make_interval(secs => $1)
+         where player_id = $2`,
+        [seconds, playerId],
+      );
+    },
+    async setStairTally(tokensToday: number, tokensDay?: string): Promise<void> {
+      await db.query(
+        `update public.player_stair_climbs
+         set tokens_today = $1, tokens_day = coalesce($2::date, tokens_day)
+         where player_id = $3`,
+        [tokensToday, tokensDay ?? null, playerId],
       );
     },
   };
