@@ -490,12 +490,32 @@ test("walking through an unguarded door that shares a guarded door's approach ti
     x: townCenterDoor.hotspot.x + townCenterDoor.hotspot.width / 2,
     y: townCenterDoor.hotspot.y + townCenterDoor.hotspot.height / 2,
   });
+  // A bump would be invisible once the Room changes: `room:leave` closes the
+  // dialog and the scene restart clears `npcArrivedLog`. So record both
+  // during the walk, while the Hallway is still running.
+  await page.evaluate(() => {
+    const w = window as unknown as { __rt1Bumped?: boolean };
+    w.__rt1Bumped = false;
+    const panel = document.querySelector<HTMLElement>('.npc-dialog');
+    if (panel) {
+      new MutationObserver(() => {
+        if (!panel.hidden) w.__rt1Bumped = true;
+      }).observe(panel, { attributes: true, attributeFilter: ['hidden'] });
+    }
+    const watch = (): void => {
+      const debug = window.__roomDebug;
+      if (debug?.npcArrivedLog?.includes('anthony')) w.__rt1Bumped = true;
+      if (debug?.roomId === 'office-hallway') requestAnimationFrame(watch);
+    };
+    watch();
+  });
   await page.mouse.click(click.x, click.y);
   await expect
     .poll(async () => (await debugInfo(page))?.roomId, { timeout: WALK_TIMEOUT })
     .toBe('town-center');
   expect((await debugInfo(page))?.localPenguin?.tile).toEqual(townCenterDoor.entryTile);
-  await expect(page.locator('.npc-dialog')).toBeHidden();
-  expect((await debugInfo(page))?.npcArrivedLog ?? []).not.toContain('anthony');
+  expect(
+    await page.evaluate(() => (window as unknown as { __rt1Bumped?: boolean }).__rt1Bumped),
+  ).toBe(false);
   expect(errors).toEqual([]);
 });
