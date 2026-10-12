@@ -123,8 +123,8 @@ test('ignores Stage clicks while the own Penguin is hidden, and takes them again
     y: npc.y + npcLayout({ kind: 'human' }).hitArea.centerY,
   });
 
-  const door = townCenter.doors.find((candidate) => candidate.label === 'DEV PIT');
-  if (!door) throw new Error('expected town-center to have a DEV PIT door');
+  const door = townCenter.doors.find((candidate) => candidate.label === 'THE HALLWAY');
+  if (!door) throw new Error('expected town-center to have a THE HALLWAY door');
   await clickStagePoint(page, {
     x: door.hotspot.x + door.hotspot.width / 2,
     y: door.hotspot.y + door.hotspot.height / 2,

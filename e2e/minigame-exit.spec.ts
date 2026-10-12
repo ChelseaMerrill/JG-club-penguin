@@ -27,14 +27,12 @@ import type { NpcMotionDebugInfo, RoomDebugInfo } from './support/room-debug-typ
  *
  * Anthony (the Phishing Quiz's door guard, #146) never has a static spot in
  * the Hallway any more -- he left it for good (owner request, 2026-10-02,
- * Track D; `office-hallway.ts`), and the Hallway was never one of his guard
- * posts to begin with (`fake-data.ts`'s `FAKE_GUARD_POSTS`,
- * `20260928020000_phishing_quiz.sql`'s seed): he only ever stands in Town
- * Center, the Dev Pit, The Melt or the Roof Deck. The "Phishing Quiz started
- * outside the Hallway" case this ticket asks for is therefore just his
- * normal guard duty, placed deterministically with the same
- * `window.__phishingTest.setNow` hook `e2e/phishing-quiz.spec.ts` uses --
- * no new hook needed.
+ * Track D; `office-hallway.ts`). Since #170 the Hallway's doors are guard
+ * posts too (`fake-data.ts`'s `FAKE_GUARD_POSTS`, #170's DN5 seed), so the
+ * "Phishing Quiz started outside the Hallway" case this ticket asks for picks
+ * a window whose post is in Town Center, placed deterministically with the
+ * same `window.__phishingTest.setNow` hook `e2e/phishing-quiz.spec.ts` uses
+ * -- no new hook needed.
  */
 
 declare global {
@@ -50,9 +48,9 @@ declare global {
 const BOOT_TIMEOUT = 15_000;
 const WALK_TIMEOUT = 15_000;
 const PROOF_ROOT = 'test-results/minigame-exit';
-/** Post 0 of `FAKE_GUARD_POSTS`: Town Center's THE ICEBOX door, one minute
- *  into its window -- never the Hallway, which has no guard post at all. */
-const TOWN_CENTER_ICEBOX = 60_000;
+/** Post 1 of `FAKE_GUARD_POSTS` (#170 DN5): Town Center's KITCHEN door, one
+ *  minute into its window -- not one of the Hallway's posts. */
+const TOWN_CENTER_KITCHEN = 600_000 + 60_000;
 const HIT_AREA = npcLayout({ kind: 'human' }).hitArea;
 
 function proofDir(name: string): string {
@@ -117,6 +115,23 @@ async function clickStagePoint(page: Page, point: { x: number; y: number }): Pro
   const scaleX = canvasBox.width / GAME_WIDTH;
   const scaleY = canvasBox.height / GAME_HEIGHT;
   await page.mouse.click(canvasBox.x + point.x * scaleX, canvasBox.y + point.y * scaleY);
+}
+
+/**
+ * Where Anthony stands while he's still: at a door he paces beside his post
+ * (#170 D14), so this samples his position until two reads 100 ms apart
+ * agree. `null` when he doesn't pace (he then stands on his post).
+ */
+async function anthonyAtRest(page: Page): Promise<{ x: number; y: number } | null> {
+  if (!(await page.evaluate(() => window.__roomDebug?.npcs?.anthony))) return null;
+  const deadline = Date.now() + 12_000;
+  while (Date.now() < deadline) {
+    const a = await page.evaluate(() => window.__roomDebug?.npcs?.anthony);
+    await page.waitForTimeout(100);
+    const b = await page.evaluate(() => window.__roomDebug?.npcs?.anthony);
+    if (a && b && Math.abs(a.x - b.x) < 0.5 && Math.abs(a.y - b.y) < 0.5) return { x: b.x, y: b.y };
+  }
+  throw new Error('Anthony never stood still');
 }
 
 /** Ian's click target follows him (he roams the Dev Pit, #113) -- his
@@ -342,7 +357,7 @@ test.describe('Minigame exit returns to the starting Room (#171)', () => {
     expect(errors).toEqual([]);
   });
 
-  test('Phishing Quiz: Anthony guarding Town Center (never the Hallway) -- BACK TO THE ROOM returns to Town Center', async ({
+  test('Phishing Quiz: Anthony guarding Town Center (not the Hallway) -- BACK TO THE ROOM returns to Town Center', async ({
     page,
   }) => {
     const dir = proofDir('phishing-quiz-town-center');
@@ -353,19 +368,20 @@ test.describe('Minigame exit returns to the starting Room (#171)', () => {
     await waitForBoot(page);
     await expect.poll(async () => (await debugInfo(page))?.roomId).toBe('town-center');
     await expect.poll(() => page.evaluate(() => Boolean(window.__phishingTest))).toBe(true);
-    await page.evaluate((at) => window.__phishingTest!.setNow(at), TOWN_CENTER_ICEBOX);
+    await page.evaluate((at) => window.__phishingTest!.setNow(at), TOWN_CENTER_KITCHEN);
     await page.evaluate(() => document.fonts.ready);
 
     await expect
       .poll(async () => (await debugInfo(page))?.guard)
-      .toMatchObject({ npcId: 'anthony', doorLabel: 'THE ICEBOX', blocking: true });
-    // Confirms this quiz starts outside the Hallway (#146's guard posts never
-    // include it; see the file header comment).
+      .toMatchObject({ npcId: 'anthony', doorLabel: 'KITCHEN', blocking: true });
+    // Confirms this quiz starts outside the Hallway (see the file header
+    // comment).
     expect((await debugInfo(page))?.roomId).toBe('town-center');
 
     const guardTile = (await debugInfo(page))?.guard?.tile;
     if (!guardTile) throw new Error('expected Anthony to be guarding');
-    const feet = tileToScreen(guardTile, townCenter.grid.origin);
+    // He paces beside his post (#170 D14): click where he stands still.
+    const feet = (await anthonyAtRest(page)) ?? tileToScreen(guardTile, townCenter.grid.origin);
     await clickStagePoint(page, { x: feet.x + HIT_AREA.centerX, y: feet.y + HIT_AREA.centerY });
 
     const dialog = page.locator('.npc-dialog');

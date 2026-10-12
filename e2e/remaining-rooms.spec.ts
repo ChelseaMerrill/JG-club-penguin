@@ -3,7 +3,7 @@ import type { RoomId } from '../src/contracts';
 import { bathroom } from '../src/game/rooms/definitions/bathroom';
 import { devPit } from '../src/game/rooms/definitions/dev-pit';
 import { officeHallway } from '../src/game/rooms/definitions/office-hallway';
-import { roofDeck } from '../src/game/rooms/definitions/roof-deck';
+import { ROOF_DECK_STAIRS_APPROACH, roofDeck } from '../src/game/rooms/definitions/roof-deck';
 import {
   STAIRWELL_DEFINITIONS,
   stairwell0,
@@ -89,26 +89,40 @@ async function changeRoom(page: Page, roomId: RoomId): Promise<void> {
     .toBe(roomId);
 }
 
-test('The Icebox: Town Center <-> Icebox through both doors, landing on each entry tile', async ({
+// #170 AC2: the Dev Pit is reached through THE HALLWAY, and the Icebox
+// through the Dev Pit.
+test('The Icebox: Town Center -> THE HALLWAY -> DEV PIT -> THE ICEBOX and back, landing on each entry tile (#170)', async ({
   page,
 }) => {
-  test.setTimeout(90_000);
+  test.setTimeout(120_000);
   const errors = collectErrors(page);
 
   await page.goto('/?asPlayer');
   await waitForBoot(page);
   await expect.poll(async () => (await debugInfo(page))?.roomId).toBe('town-center');
 
-  await walkThrough(page, door(townCenter, 'THE ICEBOX'), 'the-icebox');
-  await page.screenshot({ path: 'test-results/room-the-icebox/from-town-center.png' });
+  await walkThrough(page, door(townCenter, 'THE HALLWAY'), 'office-hallway');
+  await walkThrough(page, door(officeHallway, 'DEV PIT'), 'dev-pit');
+  await walkThrough(page, door(devPit, 'THE ICEBOX'), 'the-icebox');
+  await page.screenshot({ path: 'test-results/room-the-icebox/from-dev-pit-via-hallway.png' });
 
-  await walkThrough(page, door(theIcebox, 'TOWN CENTER'), 'town-center');
+  await walkThrough(page, door(theIcebox, 'DEV PIT'), 'dev-pit');
+  await walkThrough(page, door(devPit, 'THE HALLWAY'), 'office-hallway');
+  await walkThrough(page, door(officeHallway, 'TOWN CENTER'), 'town-center');
 
   expect((await debugInfo(page))?.roomEventLog).toEqual([
     { type: 'room:enter', roomId: 'town-center' },
     { type: 'room:leave', roomId: 'town-center' },
+    { type: 'room:enter', roomId: 'office-hallway' },
+    { type: 'room:leave', roomId: 'office-hallway' },
+    { type: 'room:enter', roomId: 'dev-pit' },
+    { type: 'room:leave', roomId: 'dev-pit' },
     { type: 'room:enter', roomId: 'the-icebox' },
     { type: 'room:leave', roomId: 'the-icebox' },
+    { type: 'room:enter', roomId: 'dev-pit' },
+    { type: 'room:leave', roomId: 'dev-pit' },
+    { type: 'room:enter', roomId: 'office-hallway' },
+    { type: 'room:leave', roomId: 'office-hallway' },
     { type: 'room:enter', roomId: 'town-center' },
   ]);
   expect(errors).toEqual([]);
@@ -182,14 +196,16 @@ for (const { room, hallwayDoor } of TEAM_ROOMS) {
     await walkThrough(page, door(officeHallway, hallwayDoor), room.id);
     await page.screenshot({ path: `test-results/room-${room.id}/from-hallway.png` });
 
-    await walkThrough(page, door(room, 'HALLWAY'), 'office-hallway');
+    await walkThrough(page, door(room, 'THE HALLWAY'), 'office-hallway');
     await page.screenshot({ path: `test-results/room-office-hallway/from-${room.id}.png` });
 
     expect(errors).toEqual([]);
   });
 }
 
-test("The Hallway: its TOWN CENTER door lands on Town Center's spawn tile", async ({ page }) => {
+test("The Hallway: its TOWN CENTER door lands on the sill inside Town Center's THE HALLWAY door", async ({
+  page,
+}) => {
   test.setTimeout(90_000);
   const errors = collectErrors(page);
 
@@ -202,7 +218,9 @@ test("The Hallway: its TOWN CENTER door lands on Town Center's spawn tile", asyn
   expect(errors).toEqual([]);
 });
 
-test("The Bathroom: its HALLWAY door lands on the Hallway's spawn tile", async ({ page }) => {
+test("The Bathroom: its THE HALLWAY door lands on the sill inside the Hallway's BATHROOM door", async ({
+  page,
+}) => {
   test.setTimeout(90_000);
   const errors = collectErrors(page);
 
@@ -211,33 +229,59 @@ test("The Bathroom: its HALLWAY door lands on the Hallway's spawn tile", async (
   await changeRoom(page, 'bathroom');
   await page.screenshot({ path: 'test-results/room-bathroom/arrived.png' });
 
-  await walkThrough(page, door(bathroom, 'HALLWAY'), 'office-hallway');
+  await walkThrough(page, door(bathroom, 'THE HALLWAY'), 'office-hallway');
   await page.screenshot({ path: 'test-results/room-office-hallway/from-bathroom.png' });
 
   expect(errors).toEqual([]);
 });
 
-// #51 slice 3: the Mullet's two doors lead out only (no Room draws a door
-// in, D5), so each test starts in the Mullet and walks out through one.
-for (const { label, target } of [
-  { label: 'HALLWAY', target: 'office-hallway' },
-  { label: 'DEV PIT', target: 'dev-pit' },
-] as const) {
-  test(`The Mullet: its ${label} door lands on ${target}'s spawn tile`, async ({ page }) => {
-    test.setTimeout(90_000);
-    const errors = collectErrors(page);
+// #170: the Mullet's DEV PIT door and the Dev Pit's "THE MULLET ↘" pill
+// lead into each other; its HALLWAY B door waits for #172.
+test("The Mullet: its DEV PIT door lands by the Dev Pit's THE MULLET pill, and the pill leads back", async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  const errors = collectErrors(page);
 
-    await page.goto('/?asPlayer');
-    await waitForBoot(page);
-    await changeRoom(page, 'the-mullet');
-    await page.screenshot({ path: 'test-results/room-the-mullet/arrived.png' });
+  await page.goto('/?asPlayer');
+  await waitForBoot(page);
+  await changeRoom(page, 'the-mullet');
+  await page.screenshot({ path: 'test-results/room-the-mullet/arrived.png' });
 
-    await walkThrough(page, door(theMullet, label), target);
-    await page.screenshot({ path: `test-results/room-the-mullet/to-${target}.png` });
+  await walkThrough(page, door(theMullet, 'DEV PIT'), 'dev-pit');
+  await page.screenshot({ path: 'test-results/room-the-mullet/to-dev-pit.png' });
+  await walkThrough(page, door(devPit, 'THE MULLET'), 'the-mullet');
 
-    expect(errors).toEqual([]);
+  expect(errors).toEqual([]);
+});
+
+test('The Mullet: its HALLWAY B door is UNDER CONSTRUCTION, with no walk (#170 D4)', async ({
+  page,
+}) => {
+  test.setTimeout(60_000);
+  const errors = collectErrors(page);
+
+  await page.goto('/?asPlayer');
+  await waitForBoot(page);
+  await changeRoom(page, 'the-mullet');
+
+  const hallwayB = door(theMullet, 'HALLWAY B');
+  expect(hallwayB.targetRoomId).toBeNull();
+  await clickStagePoint(page, {
+    x: hallwayB.hotspot.x + hallwayB.hotspot.width / 2,
+    y: hallwayB.hotspot.y + hallwayB.hotspot.height / 2,
   });
-}
+  await expect
+    .poll(async () => (await debugInfo(page))?.lockedHint, {
+      timeout: WALK_TIMEOUT,
+      intervals: [50],
+    })
+    .toBe('HALLWAY B');
+  expect((await debugInfo(page))?.localPenguin?.tile).toEqual(theMullet.spawnTile);
+  expect((await debugInfo(page))?.roomId).toBe('the-mullet');
+
+  expect(errors).toEqual([]);
+});
 
 // Each new Map tile loads its Room on the Room's own spawn tile.
 const MAP_TILES: readonly { number: string; room: RoomDefinition }[] = [
@@ -304,7 +348,7 @@ test("The Stairwell: Town Center's STAIRWELL door opens floor 5 on its JG HQ sil
   expect(errors).toEqual([]);
 });
 
-test("The Stairwell: floor 5's upper flight leads to the Roof Deck's spawn tile, with no Elevator", async ({
+test("The Stairwell: floor 5's upper flight leads to the Roof Deck's STAIRS pill, and the pill leads back, with no Elevator", async ({
   page,
 }) => {
   test.setTimeout(90_000);
@@ -316,8 +360,9 @@ test("The Stairwell: floor 5's upper flight leads to the Roof Deck's spawn tile,
   await watchElevator(page);
 
   await walkThrough(page, door(stairwell5, 'ROOF DECK'), 'roof-deck');
-  expect((await debugInfo(page))?.localPenguin?.tile).toEqual(roofDeck.spawnTile);
+  expect((await debugInfo(page))?.localPenguin?.tile).toEqual(ROOF_DECK_STAIRS_APPROACH);
   await page.screenshot({ path: 'test-results/room-roof-deck/from-stairwell-5.png' });
+  await walkThrough(page, door(roofDeck, 'STAIRS'), 'stairwell-5');
 
   expect(await elevatorSeen(page)).toBe(false);
   expect(errors).toEqual([]);

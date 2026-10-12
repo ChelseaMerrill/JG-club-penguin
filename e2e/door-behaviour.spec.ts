@@ -3,6 +3,7 @@ import { expect, test, type Page } from '@playwright/test';
 import type { RoomId } from '../src/contracts';
 import { STAIRWELL_DEFINITIONS } from '../src/game/rooms/definitions/stairwell';
 import { officeHallway } from '../src/game/rooms/definitions/office-hallway';
+import { theMullet } from '../src/game/rooms/definitions/the-mullet';
 import { townCenter } from '../src/game/rooms/definitions/town-center';
 import type { RoomDefinition, RoomDoor } from '../src/game/rooms/room-definition';
 import { GAME_HEIGHT, GAME_WIDTH } from '../src/game/stage-size';
@@ -20,10 +21,12 @@ test.use({ viewport: { width: GAME_WIDTH, height: GAME_HEIGHT } });
 
 const BOOT_TIMEOUT = 15_000;
 const WALK_TIMEOUT = 15_000;
-/** #146 post 3 (Town Center's DEV PIT door), one minute into its window. */
-const TOWN_CENTER_DEV_PIT = 3 * 600_000 + 60_000;
-/** #146 post 1 (the Dev Pit's THE ICEBOX door): no Anthony in Town Center. */
-const DEV_PIT_ICEBOX = 600_000 + 60_000;
+/** #170 DN5 post 7 (Town Center's THE HALLWAY door), one minute into its window. */
+const TOWN_CENTER_HALLWAY = 7 * 600_000 + 60_000;
+/** DN5 post 0 (the Hallway's TEAM ROOM 1 door), one minute into its window. */
+const HALLWAY_TEAM_ROOM_1 = 60_000;
+/** DN5 post 3 (the Dev Pit's THE ICEBOX door): no Anthony in Town Center. */
+const DEV_PIT_ICEBOX = 3 * 600_000 + 60_000;
 
 declare global {
   interface Window {
@@ -156,10 +159,10 @@ test('hover: "CLICK TO ENTER · X" follows the pointer over a door, and goes off
   const errors = collectErrors(page);
   await boot(page);
 
-  const devPit = door(townCenter, 'DEV PIT');
-  const at = await hoverDoor(page, devPit);
+  const hallway = door(townCenter, 'THE HALLWAY');
+  const at = await hoverDoor(page, hallway);
   await expect(pill(page)).toBeVisible();
-  await expect(pill(page)).toHaveText('CLICK TO ENTER · DEV PIT');
+  await expect(pill(page)).toHaveText('CLICK TO ENTER · THE HALLWAY');
   await expect(pill(page)).not.toHaveClass(/door-hover--locked/);
   expect(await pillLeftTop(page)).toEqual(near(at));
   await page.screenshot({ path: `${dir}/open.png` });
@@ -184,12 +187,12 @@ test('locked: grey "X · UNDER CONSTRUCTION", and a click shows the hint with no
   const dir = proofDir('locked');
   const errors = collectErrors(page);
   await boot(page);
-  await changeRoom(page, 'office-hallway');
+  await changeRoom(page, 'the-mullet');
 
-  const locked = door(officeHallway, 'TEAM ROOM 5');
+  const locked = door(theMullet, 'HALLWAY B');
   expect(locked.targetRoomId).toBeNull();
   const at = await hoverDoor(page, locked);
-  await expect(pill(page)).toHaveText('TEAM ROOM 5 · UNDER CONSTRUCTION');
+  await expect(pill(page)).toHaveText('HALLWAY B · UNDER CONSTRUCTION');
   await expect(pill(page)).toHaveClass(/door-hover--locked/);
   await page.screenshot({ path: `${dir}/hover-locked.png` });
 
@@ -198,15 +201,15 @@ test('locked: grey "X · UNDER CONSTRUCTION", and a click shows the hint with no
   await page.mouse.click(click.x, click.y);
   await expect
     .poll(async () => (await debugInfo(page))?.lockedHint, { intervals: [50] })
-    .toBe('TEAM ROOM 5');
+    .toBe('HALLWAY B');
   await expect(pill(page)).toHaveText('UNDER CONSTRUCTION');
   await page.screenshot({ path: `${dir}/under-construction-hint.png` });
   const after = await debugInfo(page);
-  expect(after?.roomId).toBe('office-hallway');
+  expect(after?.roomId).toBe('the-mullet');
   expect(after?.localPenguin?.tile).toEqual(before?.localPenguin?.tile);
   expect(after?.localPenguin?.moving).toBe(false);
   expect(after?.localPenguinMoveLog?.length).toBe(before?.localPenguinMoveLog?.length);
-  expect(after?.doorReachedLog ?? []).not.toContain('TEAM ROOM 5');
+  expect(after?.doorReachedLog ?? []).not.toContain('HALLWAY B');
   expect(errors).toEqual([]);
 });
 
@@ -233,12 +236,12 @@ test('fade: a door fades to opaque before the restart, swallows Stage clicks, th
     requestAnimationFrame(sample);
   });
 
-  // Dev Pit's art arrives 1.5 s late, so the restart (and the opaque fade
+  // The Hallway's art arrives 1.5 s late, so the restart (and the opaque fade
   // over it) lasts long enough to look at.
   // Its request is the first thing the restart does (`preload`), so it
   // marks when the restart started.
   let restartStartedAt = Infinity;
-  await page.route('**/rooms/dev-pit.png', async (route) => {
+  await page.route('**/rooms/office-hallway.png', async (route) => {
     restartStartedAt = Math.min(restartStartedAt, Date.now());
     await new Promise((resolve) => setTimeout(resolve, 1_500));
     await route.continue();
@@ -257,10 +260,10 @@ test('fade: a door fades to opaque before the restart, swallows Stage clicks, th
       }),
   );
 
-  const devPit = door(townCenter, 'DEV PIT');
+  const hallway = door(townCenter, 'THE HALLWAY');
   const click = await pagePoint(page, {
-    x: devPit.hotspot.x + devPit.hotspot.width / 2,
-    y: devPit.hotspot.y + devPit.hotspot.height / 2,
+    x: hallway.hotspot.x + hallway.hotspot.width / 2,
+    y: hallway.hotspot.y + hallway.hotspot.height / 2,
   });
   await page.mouse.click(click.x, click.y);
   expect(await partway).toBeGreaterThan(0);
@@ -289,17 +292,17 @@ test('fade: a door fades to opaque before the restart, swallows Stage clicks, th
 
   await expect
     .poll(async () => (await debugInfo(page))?.roomId, { timeout: WALK_TIMEOUT })
-    .toBe('dev-pit');
+    .toBe('office-hallway');
   await expect
     .poll(async () => (await debugInfo(page))?.fade?.state, { timeout: 5_000 })
     .toBe('hidden');
   const end = await debugInfo(page);
   // Landed on the door's entry tile, not walked off by the swallowed click.
-  expect(end?.localPenguin?.tile).toEqual(devPit.entryTile);
+  expect(end?.localPenguin?.tile).toEqual(hallway.entryTile);
   expect(end?.localPenguinMoveLog ?? []).toEqual([]);
   expect(end?.roomEventLog?.slice(-2)).toEqual([
     { type: 'room:leave', roomId: 'town-center' },
-    { type: 'room:enter', roomId: 'dev-pit' },
+    { type: 'room:enter', roomId: 'office-hallway' },
   ]);
 
   const samples = await page.evaluate(() => window.__fadeSamples ?? []);
@@ -309,8 +312,8 @@ test('fade: a door fades to opaque before the restart, swallows Stage clicks, th
   expect(firstOpaque!.at, 'opaque before the restart started').toBeLessThanOrEqual(
     restartStartedAt,
   );
-  const firstDevPit = samples.findIndex((sample) => sample.roomId === 'dev-pit');
-  expect(firstDevPit).toBeGreaterThan(0);
+  const firstHallway = samples.findIndex((sample) => sample.roomId === 'office-hallway');
+  expect(firstHallway).toBeGreaterThan(0);
   expect(samples.at(-1)?.opacity).toBe(0);
   expect(errors).toEqual([]);
 });
@@ -383,24 +386,24 @@ test('keyboard: Tab reaches each label once (twins skipped), focus shows the pil
   }
   expect(tabbed).toEqual(stops.filter((stop) => stop.tab === 0).map((stop) => stop.label));
 
-  // Back in Town Center: focus shows DEV PIT's pill, Enter walks there and changes Room.
+  // Back in Town Center: focus shows THE HALLWAY's pill, Enter walks there and changes Room.
   await changeRoom(page, 'town-center');
-  const devPit = door(townCenter, 'DEV PIT');
-  await page.locator('.door-focus__door[data-door-label="DEV PIT"]').focus();
-  await expect(pill(page)).toHaveText('CLICK TO ENTER · DEV PIT');
-  expect((await debugInfo(page))?.hoveredDoor).toBe('DEV PIT');
-  await expect(page.locator('.door-focus__door[data-door-label="DEV PIT"]')).toHaveAttribute(
+  const hallway = door(townCenter, 'THE HALLWAY');
+  await page.locator('.door-focus__door[data-door-label="THE HALLWAY"]').focus();
+  await expect(pill(page)).toHaveText('CLICK TO ENTER · THE HALLWAY');
+  expect((await debugInfo(page))?.hoveredDoor).toBe('THE HALLWAY');
+  await expect(page.locator('.door-focus__door[data-door-label="THE HALLWAY"]')).toHaveAttribute(
     'aria-label',
-    'CLICK TO ENTER · DEV PIT',
+    'CLICK TO ENTER · THE HALLWAY',
   );
-  await page.screenshot({ path: `${dir}/focus-dev-pit.png` });
+  await page.screenshot({ path: `${dir}/focus-the-hallway.png` });
   await page.keyboard.press('Enter');
   await expect
     .poll(async () => (await debugInfo(page))?.roomId, { timeout: WALK_TIMEOUT })
-    .toBe('dev-pit');
+    .toBe('office-hallway');
   await expect
     .poll(async () => (await debugInfo(page))?.localPenguin?.tile)
-    .toEqual(devPit.entryTile);
+    .toEqual(hallway.entryTile);
   expect(errors).toEqual([]);
 });
 
@@ -430,20 +433,20 @@ test('Anthony starting to guard a door mid-walk turns its Enter into his dialog,
   await page.evaluate((at) => window.__phishingTest!.setNow(at), DEV_PIT_ICEBOX);
   await expect.poll(async () => (await debugInfo(page))?.guard ?? null).toBeNull();
 
-  // Enter on DEV PIT walks there (no guard yet, so no redirect at the click)...
-  await page.locator('.door-focus__door[data-door-label="DEV PIT"]').focus();
+  // Enter on THE HALLWAY walks there (no guard yet, so no redirect at the click)...
+  await page.locator('.door-focus__door[data-door-label="THE HALLWAY"]').focus();
   await page.keyboard.press('Enter');
   await expect
     .poll(async () => (await debugInfo(page))?.localPenguin?.moving, { intervals: [20] })
     .toBe(true);
   // ...and partway there, his window moves to that very door. The arrival
-  // bumps him (his post is the door's approach tile until PR B), then the
-  // door's own use reaches `useDoor`, whose guard check must redirect it
-  // without opening him a second time.
-  await page.evaluate((at) => window.__phishingTest!.setNow(at), TOWN_CENTER_DEV_PIT);
+  // bumps him (his post (11,1) is next to the door's approach tile (10,0),
+  // #170 D14), then the door's own use reaches `useDoor`, whose guard check
+  // must redirect it without opening him a second time.
+  await page.evaluate((at) => window.__phishingTest!.setNow(at), TOWN_CENTER_HALLWAY);
   await expect
     .poll(async () => (await debugInfo(page))?.guard?.doorLabel, { intervals: [20] })
-    .toBe('DEV PIT');
+    .toBe('THE HALLWAY');
   expect((await debugInfo(page))?.localPenguin?.moving, 'still walking when he arrived').toBe(true);
 
   const dialog = page.locator('.npc-dialog');
@@ -451,7 +454,7 @@ test('Anthony starting to guard a door mid-walk turns its Enter into his dialog,
   await expect(dialog.locator('.npc-dialog__subtitle')).toHaveText('DOOR BOSS · PHISHING QUIZ');
   await expect
     .poll(async () => (await debugInfo(page))?.doorReachedLog, { timeout: WALK_TIMEOUT })
-    .toContain('DEV PIT');
+    .toContain('THE HALLWAY');
   // Give a second npc:arrived, or a Room change, the time to show up.
   await page.waitForTimeout(1_000);
   const info = await debugInfo(page);
@@ -464,6 +467,35 @@ test('Anthony starting to guard a door mid-walk turns its Enter into his dialog,
   await expect(dialog).toBeHidden();
   await expect
     .poll(() => page.evaluate(() => document.activeElement?.getAttribute('data-door-label')))
-    .toBe('DEV PIT');
+    .toBe('THE HALLWAY');
+  expect(errors).toEqual([]);
+});
+
+test("walking through an unguarded door that shares a guarded door's approach tile opens no dialog (RT170-1, D14)", async ({
+  page,
+}) => {
+  const errors = collectErrors(page);
+  await boot(page, '?asPlayer&hud&phishing');
+  await expect.poll(() => page.evaluate(() => Boolean(window.__phishingTest))).toBe(true);
+  // Anthony guards TEAM ROOM 1, whose approach tile (0,0) TOWN CENTER shares;
+  // he stands on his own guard tile, off it and not next to it.
+  await page.evaluate((at) => window.__phishingTest!.setNow(at), HALLWAY_TEAM_ROOM_1);
+  await changeRoom(page, 'office-hallway');
+  await expect
+    .poll(async () => (await debugInfo(page))?.guard)
+    .toMatchObject({ doorLabel: 'TEAM ROOM 1', blocking: true, tile: { col: 3, row: 2 } });
+
+  const townCenterDoor = door(officeHallway, 'TOWN CENTER');
+  const click = await pagePoint(page, {
+    x: townCenterDoor.hotspot.x + townCenterDoor.hotspot.width / 2,
+    y: townCenterDoor.hotspot.y + townCenterDoor.hotspot.height / 2,
+  });
+  await page.mouse.click(click.x, click.y);
+  await expect
+    .poll(async () => (await debugInfo(page))?.roomId, { timeout: WALK_TIMEOUT })
+    .toBe('town-center');
+  expect((await debugInfo(page))?.localPenguin?.tile).toEqual(townCenterDoor.entryTile);
+  await expect(page.locator('.npc-dialog')).toBeHidden();
+  expect((await debugInfo(page))?.npcArrivedLog ?? []).not.toContain('anthony');
   expect(errors).toEqual([]);
 });

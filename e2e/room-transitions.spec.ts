@@ -47,7 +47,7 @@ const ROOMS_IN_REGISTRY_ORDER: readonly RoomDefinition[] = [
  * The first locked door (`targetRoomId: null`) of any Room, in registry
  * order (#51 slice 4, A5 as amended): Town Center has none left since the
  * Stairwell enabled STAIRWELL, so the example moves on by itself as Rooms
- * land (the Hallway's TEAM ROOM 5 today).
+ * land (the Mullet's HALLWAY B since #170).
  */
 function firstLockedDoor(): { room: RoomDefinition; door: RoomDoor } {
   for (const room of ROOMS_IN_REGISTRY_ORDER) {
@@ -163,22 +163,22 @@ test('room transitions: doors, changeRoom, HUD, reload (#15)', async ({ page }) 
     await waitForElevatorHidden(page);
   }
 
-  // --- The DEV PIT door walks the Penguin there, then loads Dev Pit at the
-  // door's own entry tile (not Dev Pit's spawnTile).
-  const devPitDoor = townCenter.doors.find((door) => door.label === 'DEV PIT');
-  if (!devPitDoor) throw new Error('expected town-center to have a DEV PIT door');
-  await clickStagePoint(page, doorCenter(devPitDoor));
+  // --- THE HALLWAY door walks the Penguin there, then loads the Hallway at
+  // the door's own entry tile (not the Hallway's spawnTile).
+  const hallwayDoor = townCenter.doors.find((door) => door.label === 'THE HALLWAY');
+  if (!hallwayDoor) throw new Error('expected town-center to have a THE HALLWAY door');
+  await clickStagePoint(page, doorCenter(hallwayDoor));
   await expect
     .poll(async () => (await debugInfo(page))?.roomId, { timeout: WALK_TIMEOUT })
-    .toBe('dev-pit');
+    .toBe('office-hallway');
   await expect
     .poll(async () => (await debugInfo(page))?.localPenguin?.tile)
-    .toEqual(devPitDoor.entryTile);
-  await page.screenshot({ path: 'test-results/room-transitions/dev-pit.png' });
+    .toEqual(hallwayDoor.entryTile);
+  await page.screenshot({ path: 'test-results/room-transitions/office-hallway.png' });
 
-  // --- Dev Pit's own TOWN CENTER door sends the Penguin back, at its entry tile.
-  const townCenterDoor = devPit.doors.find((door) => door.label === 'TOWN CENTER');
-  if (!townCenterDoor) throw new Error('expected dev-pit to have a TOWN CENTER door');
+  // --- The Hallway's own TOWN CENTER door sends the Penguin back, at its entry tile.
+  const townCenterDoor = officeHallway.doors.find((door) => door.label === 'TOWN CENTER');
+  if (!townCenterDoor) throw new Error('expected office-hallway to have a TOWN CENTER door');
   await clickStagePoint(page, doorCenter(townCenterDoor));
   await expect
     .poll(async () => (await debugInfo(page))?.roomId, { timeout: WALK_TIMEOUT })
@@ -241,8 +241,8 @@ test('room transitions: doors, changeRoom, HUD, reload (#15)', async ({ page }) 
     { type: 'room:enter', roomId: 'town-center' },
     ...detourLog,
     { type: 'room:leave', roomId: 'town-center' },
-    { type: 'room:enter', roomId: 'dev-pit' },
-    { type: 'room:leave', roomId: 'dev-pit' },
+    { type: 'room:enter', roomId: 'office-hallway' },
+    { type: 'room:leave', roomId: 'office-hallway' },
     { type: 'room:enter', roomId: 'town-center' },
     { type: 'room:leave', roomId: 'town-center' },
     { type: 'room:enter', roomId: 'roof-deck' },

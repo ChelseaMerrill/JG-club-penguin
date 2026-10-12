@@ -233,11 +233,11 @@ test('core-values-poster', async ({ page }) => {
 
       // A door hotspot near the same area still walks to it and logs
       // door:reached -- hand-computed exactly like
-      // `e2e/click-to-move.spec.ts`'s own DEV PIT door case.
-      // By label, not "the first enabled door": THE ICEBOX became a real door
-      // in #51 and now comes first in Town Center's list.
-      const door = townCenter.doors.find((candidate) => candidate.label === 'DEV PIT');
-      if (!door) throw new Error('expected town-center to have a DEV PIT door');
+      // `e2e/click-to-move.spec.ts`'s own THE HALLWAY door case.
+      // By label, not "the first enabled door": KITCHEN (#170; THE ICEBOX before)
+      // comes first in Town Center's list.
+      const door = townCenter.doors.find((candidate) => candidate.label === 'THE HALLWAY');
+      if (!door) throw new Error('expected town-center to have a THE HALLWAY door');
       const doorApproachTile: Tile = { col: 10, row: 0 };
       const doorCenter = {
         x: door.hotspot.x + door.hotspot.width / 2,

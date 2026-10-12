@@ -271,7 +271,7 @@ test('click-to-move', async ({ page }) => {
   expect((await debugInfo(page))?.localPenguin).toMatchObject({ tile: npcInteractionTileNow });
 
   // --- Clicking a door hotspot walks to its approach tile and logs
-  // door:reached. Hand-computed like the NPC case above, against DEV PIT's
+  // door:reached. Hand-computed like the NPC case above, against THE HALLWAY's
   // real `door()`-styled hotspot (#16): centre (1270 + 35, 355 + 82.5) =
   // (1305, 437.5) inverts, via `screenToTile`'s linear map, to raw tile
   // (8, -2) -- off the 12x10 grid on the row axis only (col 8 is already in
@@ -282,10 +282,10 @@ test('click-to-move', async ({ page }) => {
   // row 1's has nothing at col 8). The lowest-row-then-column tie-break
   // reaches row 0 first, where col 10 (checked before the closer-looking but
   // unwalkable col 6) is the first walkable hit, so (10, 0) wins.
-  // By label, not "the first enabled door": THE ICEBOX became a real door
-  // in #51 and now comes first in Town Center's list.
-  const door = townCenter.doors.find((candidate) => candidate.label === 'DEV PIT');
-  if (!door) throw new Error('expected town-center to have a DEV PIT door');
+  // By label, not "the first enabled door": KITCHEN (#170; THE ICEBOX before)
+  // comes first in Town Center's list.
+  const door = townCenter.doors.find((candidate) => candidate.label === 'THE HALLWAY');
+  if (!door) throw new Error('expected town-center to have a THE HALLWAY door');
   const doorApproachTile: Tile = { col: 10, row: 0 };
   const doorCenter = {
     x: door.hotspot.x + door.hotspot.width / 2,
