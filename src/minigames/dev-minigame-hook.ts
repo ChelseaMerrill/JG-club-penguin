@@ -2,6 +2,7 @@ import type { MinigameId } from '../contracts';
 import { MINIGAME_RULES } from '../persistence/minigame-rules';
 import type { Hud } from '../ui/hud/hud';
 import type { BeystadiumTestHooks } from './beystadium/beystadium';
+import type { CarnavalParadeTestHooks } from './carnaval-parade/carnaval-parade';
 import type { CoffeeRushTestHooks } from './coffee-rush/coffee-rush';
 import type { LaunchedMinigame, MinigameLauncher } from './minigame-launcher';
 import type { MinigameTestHandle } from './minigame-test-handle';
@@ -42,6 +43,12 @@ function hasBeystadiumHooks(value: unknown): value is BeystadiumTestHooks {
 
 function hasPenaltyKickHooks(value: unknown): value is PenaltyKickTestHooks {
   return !!value && typeof (value as Partial<PenaltyKickTestHooks>).debugForceShot === 'function';
+}
+
+function hasCarnavalParadeHooks(value: unknown): value is CarnavalParadeTestHooks {
+  return (
+    !!value && typeof (value as Partial<CarnavalParadeTestHooks>).debugFinishNow === 'function'
+  );
 }
 
 /** True when `value` is one of `MINIGAME_RULES`'s registered ids. */
@@ -114,6 +121,10 @@ export function initDevMinigameHook(hud: Hud, launcher: MinigameLauncher): boole
     takePenaltyKickShot(outcome) {
       // Gated on the loaded id for the same reason as `finishPancakeFlipNow`.
       if (currentId === 'penalty-kick' && hasPenaltyKickHooks(hooks)) hooks.debugForceShot(outcome);
+    },
+    finishCarnavalParadeNow() {
+      // Gated on the loaded id for the same reason as `finishPancakeFlipNow`.
+      if (currentId === 'carnaval-parade' && hasCarnavalParadeHooks(hooks)) hooks.debugFinishNow();
     },
     launch(minigameId) {
       if (!isMinigameId(minigameId)) return;

@@ -5,7 +5,13 @@ import type { RoomEventMap, RoomId } from './rooms';
  * Producers: #37 (played), #27 `record_round`. Consumers: #27, #34, #42.
  */
 export type MinigameId =
-  'bug-squash' | 'pancake-flip' | 'coffee-rush' | 'snow-cone-stand' | 'beystadium' | 'penalty-kick';
+  | 'bug-squash'
+  | 'pancake-flip'
+  | 'coffee-rush'
+  | 'snow-cone-stand'
+  | 'beystadium'
+  | 'penalty-kick'
+  | 'carnaval-parade';
 
 /**
  * Every Badge seeded in `public.badges` (#138's migration; mirrored by
@@ -29,7 +35,8 @@ export type BadgeId =
   | 'let-it-rip'
   | 'stair-master'
   | 'phish-fry'
-  | 'goleador';
+  | 'goleador'
+  | 'passista';
 
 /**
  * Per-minigame stats keys. Producer: #37. Consumers: #27 (SQL keys), #32,
@@ -130,6 +137,20 @@ export interface MinigameStatsMap {
     saved: number;
     wide: number;
     over: number;
+  };
+  /** One Carnaval Parade round (#219): `feathers`/`stars` are pickups
+   *  collected, `barriersHit` is lives lost (0-3, the round ends once it
+   *  reaches 3), `bestStreak` is the longest unbroken run of pickups. The
+   *  round's own `score` (reported alongside these, `MinigameCompleted.score`)
+   *  already has the multiplier folded in; the server bounds it against
+   *  these stats rather than trusting it outright. Producer:
+   *  `carnaval-parade-engine.ts`. Consumer: `record_round`'s
+   *  `'carnaval-parade'` branch (`20261012020000_carnaval_parade.sql`). */
+  'carnaval-parade': {
+    feathers: number;
+    stars: number;
+    barriersHit: number;
+    bestStreak: number;
   };
 }
 

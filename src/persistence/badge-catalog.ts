@@ -120,6 +120,16 @@ export const BADGE_CATALOG: readonly (BadgeDefinition & { id: BadgeId })[] = [
     sortOrder: 16,
     available: true,
   },
+  // #219: 20261012020000_carnaval_parade.sql (rebased on #220's migration,
+  // see its header) also inserts this row fresh with `available` already
+  // true, so it too needs no `BADGE_AVAILABILITY_OVERRIDES` entry.
+  {
+    id: 'passista',
+    name: 'Passista',
+    howToEarn: 'SCORE 400 IN THE PARADE',
+    sortOrder: 17,
+    available: true,
+  },
 ];
 
 /**

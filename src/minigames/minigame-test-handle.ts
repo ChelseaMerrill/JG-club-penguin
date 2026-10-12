@@ -37,6 +37,10 @@ export interface MinigameTestHandle {
    *  wall-clock time and has no reason to fight a 16 ms-tick sweep to land
    *  an exact outcome. A no-op when Penalty Kick isn't the loaded Minigame. */
   takePenaltyKickShot(outcome: 'goal' | 'golazo' | 'save' | 'wide' | 'over'): void;
+  /** Ends a Carnaval Parade round now, as if the shell's timer reached 0 or
+   *  all 3 lives were lost. A no-op when Carnaval Parade isn't the loaded
+   *  Minigame. */
+  finishCarnavalParadeNow(): void;
   /** Launches another registered Minigame in the same page once the
    *  current shell has closed (#46: finishing two different Minigames in one
    *  page for the Quest e2e). The `finish*` methods above then drive the
