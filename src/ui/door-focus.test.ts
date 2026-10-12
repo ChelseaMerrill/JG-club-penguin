@@ -143,6 +143,22 @@ describe('createDoorFocus (#170 D6)', () => {
       expect(document.activeElement).toBe(buttons()[1]);
     });
 
+    it('also when the closed overlay only hid its focused button (focus not yet moved off it)', () => {
+      focus.render([JG_HQ, STAIRS]);
+      buttons()[1]!.focus();
+      const panel = document.createElement('div');
+      const inner = document.createElement('button');
+      panel.append(inner);
+      document.body.append(panel);
+      overlays.open('dialog', () => {
+        panel.hidden = true;
+      });
+      inner.focus();
+      overlays.close('dialog');
+      expect(document.activeElement).toBe(buttons()[1]);
+      panel.remove();
+    });
+
     it('also when the overlay takes focus just before it opens (a blur in the same task)', () => {
       focus.render([JG_HQ, STAIRS]);
       buttons()[0]!.focus();

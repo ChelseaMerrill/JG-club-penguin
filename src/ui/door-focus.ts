@@ -57,9 +57,15 @@ export function createDoorFocus(root: HTMLElement, deps: DoorFocusDeps): DoorFoc
     );
   }
 
+  /**
+   * Focus is on nothing a Player can see: no element, the body, or one just
+   * hidden or removed with its overlay (the browser only moves focus off a
+   * hidden element at its next style pass, after the close listeners ran).
+   */
   function focusIsNowhere(): boolean {
     const active = document.activeElement;
-    return active === null || active === document.body;
+    if (active === null || active === document.body) return true;
+    return !active.isConnected || active.closest('[hidden]') !== null;
   }
 
   /** Focuses the remembered exit again if focus was left nowhere; forgets it either way. */
