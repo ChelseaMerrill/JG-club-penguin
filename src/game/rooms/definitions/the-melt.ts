@@ -1,7 +1,5 @@
 import type { RoomDefinition } from '../room-definition';
 import { createStandardRoomGrid } from '../grid';
-import { roofDeck } from './roof-deck';
-import { townCenter } from './town-center';
 
 // The standard 12x10 grid every one of the five prototype Rooms shares
 // (#16 D2, `grid.ts`'s `createStandardRoomGrid`).
@@ -43,7 +41,10 @@ const WALKABLE: readonly (readonly boolean[])[] = [
  * Kitchen.dc.html`, Player-facing name renamed from THE MELT to THE
  * KITCHEN): a real door back to Town Center and a real door on to the Roof
  * Deck -- both doors are pixel-identical to the pre-resync design, so their
- * hotspots/entry tiles are unchanged.
+ * hotspots are unchanged. #170: the baked "↙ TOWN CENTER" and "ROOF DECK ↗"
+ * exit pills are their twins, each door lands on the sill inside the matching
+ * door of the Room it leads to (D8; Town Center now has a KITCHEN door), and
+ * each `guardTile` is where Anthony stands while he guards it (D14).
  */
 export const theMelt: RoomDefinition = {
   id: 'the-melt',
@@ -59,21 +60,36 @@ export const theMelt: RoomDefinition = {
       hotspot: { x: 420, y: 275, ...DOOR_HOTSPOT_SIZE },
       wall: 'left',
       targetRoomId: 'town-center',
-      // Town Center has no door of its own back to the Kitchen (see below),
-      // so this lands on Town Center's own spawn tile (#16 fix 4) -- a
-      // judgment call reported on the #16 execution plan, same as Roof
-      // Deck's doors below.
-      entryTile: townCenter.spawnTile,
+      // The sill inside Town Center's KITCHEN door (#170 D8).
+      entryTile: { col: 2, row: 0 },
+      // Beside the door, off its approach (0,5) and its sill (0,6).
+      guardTile: { col: 1, row: 6 },
     },
     {
       label: 'ROOF DECK',
       hotspot: { x: 1290, y: 365, ...DOOR_HOTSPOT_SIZE },
       wall: 'right',
       targetRoomId: 'roof-deck',
-      // Roof Deck has no door/elevator of its own drawn in the design (only
-      // a HUD exit pill); lands on Roof Deck's own spawn tile, matching
-      // Town Center's elevator door (see the #16 execution plan).
-      entryTile: roofDeck.spawnTile,
+      // The sill of the Roof Deck's KITCHEN floor arrow (#170 D8).
+      entryTile: { col: 6, row: 9 },
+      // Below the door, off its approach and sill (10,0).
+      guardTile: { col: 11, row: 1 },
+    },
+    {
+      // The "↙ TOWN CENTER" exit pill: the TOWN CENTER door's twin.
+      label: 'TOWN CENTER',
+      hotspot: { x: 36, y: 748, width: 136.5, height: 40 },
+      kind: 'pill',
+      targetRoomId: 'town-center',
+      entryTile: { col: 2, row: 0 },
+    },
+    {
+      // The "ROOF DECK ↗" exit pill: the ROOF DECK door's twin.
+      label: 'ROOF DECK',
+      hotspot: { x: 1445.5, y: 748, width: 118.5, height: 40 },
+      kind: 'pill',
+      targetRoomId: 'roof-deck',
+      entryTile: { col: 6, row: 9 },
     },
   ],
   npcSlots: [

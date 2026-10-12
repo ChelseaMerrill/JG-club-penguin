@@ -8,7 +8,7 @@ import { createStandardRoomGrid } from '../grid';
 // (800,250)->(300,500) (10 rows) and (800,250)->(1400,550) (12 columns)
 // (#51 D2).
 
-// The shape both door hotspots in this Room use: the design's shared
+// The shape this Room's door hotspot uses: the design's shared
 // `door()` frame, 70x165 on screen.
 const DOOR_HOTSPOT_SIZE = { width: 70, height: 165 };
 
@@ -47,12 +47,13 @@ const WALKABLE: readonly (readonly boolean[])[] = [
 ];
 
 /**
- * Traced from `design/Room 03 The Icebox.dc.html` (#51). Doors: "← TOWN
- * CENTER" on the back-left wall and "DEV PIT →" on the back-right wall, each
- * hotspot the bounding box of the design's own door-frame polygon
- * (`775,262.5 705,297.5 705,167.5 775,132.5` and `1290,495 1360,530
- * 1360,400 1290,365`). The design's "ASK JETHRO FOR A PHOTO" panel is a
- * photo mechanic, not a door or Minigame, and is out of this Room's scope.
+ * Traced from `design/Room 03 The Icebox.dc.html` (#51). Its one door is
+ * "DEV PIT →" on the back-right wall, the bounding box of the design's own
+ * door-frame polygon (`1290,495 1360,530 1360,400 1290,365`), with the baked
+ * "↙ DEV PIT" exit pill as its twin: the 2026-09-27 resync removed the "←
+ * TOWN CENTER" door, so the Icebox is reached only from the Dev Pit (#170).
+ * The design's "ASK JETHRO FOR A PHOTO" panel is a photo mechanic, not a door
+ * or Minigame, and is out of this Room's scope.
  */
 export const theIcebox: RoomDefinition = {
   id: 'the-icebox',
@@ -67,18 +68,6 @@ export const theIcebox: RoomDefinition = {
   spawnTile: { col: 5, row: 7 },
   doors: [
     {
-      label: 'TOWN CENTER',
-      hotspot: { x: 705, y: 132.5, ...DOOR_HOTSPOT_SIZE },
-      wall: 'left',
-      targetRoomId: 'town-center',
-      // The tile just inside Town Center's own "THE ICEBOX" door: project
-      // that door's own hotspot bottom-centre (the door sill, not its
-      // centre) into Town Center's own grid, then the nearest walkable tile
-      // (#16 fix 4, #51 review fix 2). Unchanged by that fix -- the sill and
-      // centre projections land on the same tile here.
-      entryTile: { col: 2, row: 0 },
-    },
-    {
       label: 'DEV PIT',
       hotspot: { x: 1290, y: 365, ...DOOR_HOTSPOT_SIZE },
       wall: 'right',
@@ -87,6 +76,14 @@ export const theIcebox: RoomDefinition = {
       // door's own hotspot bottom-centre (the door sill, not its centre)
       // into Dev Pit's own grid, then the nearest walkable tile (#16 fix 4,
       // #51 review fix 2).
+      entryTile: { col: 1, row: 0 },
+    },
+    {
+      // The "↙ DEV PIT" exit pill: the DEV PIT door's twin.
+      label: 'DEV PIT',
+      hotspot: { x: 36, y: 748, width: 98.5, height: 40 },
+      kind: 'pill',
+      targetRoomId: 'dev-pit',
       entryTile: { col: 1, row: 0 },
     },
   ],
