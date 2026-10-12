@@ -1,6 +1,7 @@
 import type { Tile } from '../../../contracts';
 import type { RoomDefinition } from '../room-definition';
 import { createStandardRoomGrid } from '../grid';
+import { LOBBY_FLOOR_CHOICE } from './elevator-choices';
 
 // The standard 12x10 grid every one of the five prototype Rooms shares
 // (#16 D2, `grid.ts`'s `createStandardRoomGrid`).
@@ -129,11 +130,20 @@ export const roofDeck: RoomDefinition = {
       label: 'ELEVATOR',
       hotspot: ELEVATOR_PILL,
       kind: 'pill',
-      // #170 PR C makes this pill ask for a floor first (Q3, D9); until then it
-      // goes straight to Town Center, landing on the sill inside its
-      // ELEVATOR · ROOF DECK door.
+      // #170 D9: the pill asks for a floor first. Its own target is the
+      // unlocked choice (5: Town Center, landing on the sill inside its
+      // ELEVATOR · ROOF DECK door); L is locked until the Lobby is built (#169).
       targetRoomId: 'town-center',
       entryTile: { col: 0, row: 7 },
+      floorChoices: [
+        {
+          floor: '5',
+          label: 'TOWN CENTER',
+          targetRoomId: 'town-center',
+          entryTile: { col: 0, row: 7 },
+        },
+        LOBBY_FLOOR_CHOICE,
+      ],
     },
     {
       label: 'STAIRS',
