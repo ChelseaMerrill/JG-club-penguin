@@ -22,6 +22,8 @@ const BOOT_TIMEOUT = 15_000;
 const WALK_TIMEOUT = 15_000;
 /** #146 post 3 (Town Center's DEV PIT door), one minute into its window. */
 const TOWN_CENTER_DEV_PIT = 3 * 600_000 + 60_000;
+/** #146 post 1 (the Dev Pit's THE ICEBOX door): no Anthony in Town Center. */
+const DEV_PIT_ICEBOX = 600_000 + 60_000;
 
 declare global {
   interface Window {
@@ -29,7 +31,12 @@ declare global {
       setNow(ms: number): Promise<void>;
       correctChoice(): number | null;
     };
-    __fadeSamples?: { opacity: number; roomId: string | undefined; state: string | undefined }[];
+    __fadeSamples?: {
+      opacity: number;
+      roomId: string | undefined;
+      state: string | undefined;
+      at: number;
+    }[];
   }
 }
 
@@ -219,6 +226,7 @@ test('fade: a door fades to opaque before the restart, swallows Stage clicks, th
         opacity: Number(getComputedStyle(layer).opacity),
         roomId: window.__roomDebug?.roomId,
         state: window.__roomDebug?.fade?.state,
+        at: Date.now(),
       });
       requestAnimationFrame(sample);
     };
@@ -227,7 +235,11 @@ test('fade: a door fades to opaque before the restart, swallows Stage clicks, th
 
   // Dev Pit's art arrives 1.5 s late, so the restart (and the opaque fade
   // over it) lasts long enough to look at.
+  // Its request is the first thing the restart does (`preload`), so it
+  // marks when the restart started.
+  let restartStartedAt = Infinity;
   await page.route('**/rooms/dev-pit.png', async (route) => {
+    restartStartedAt = Math.min(restartStartedAt, Date.now());
     await new Promise((resolve) => setTimeout(resolve, 1_500));
     await route.continue();
   });
@@ -291,10 +303,12 @@ test('fade: a door fades to opaque before the restart, swallows Stage clicks, th
   ]);
 
   const samples = await page.evaluate(() => window.__fadeSamples ?? []);
-  const opaqueInTownCenter = samples.filter(
-    (sample) => sample.roomId === 'town-center' && sample.opacity >= 0.99,
+  expect(Number.isFinite(restartStartedAt), 'the restart requested the art').toBe(true);
+  const firstOpaque = samples.find((sample) => sample.opacity >= 0.99);
+  expect(firstOpaque, 'the fade reached opaque').toBeDefined();
+  expect(firstOpaque!.at, 'opaque before the restart started').toBeLessThanOrEqual(
+    restartStartedAt,
   );
-  expect(opaqueInTownCenter.length, 'opaque before the restart').toBeGreaterThan(0);
   const firstDevPit = samples.findIndex((sample) => sample.roomId === 'dev-pit');
   expect(firstDevPit).toBeGreaterThan(0);
   expect(samples.at(-1)?.opacity).toBe(0);
@@ -311,6 +325,7 @@ test('the Map never fades (D5)', async ({ page }) => {
         opacity: 0,
         roomId: window.__roomDebug?.roomId,
         state: window.__roomDebug?.fade?.state,
+        at: Date.now(),
       });
       requestAnimationFrame(sample);
     };
@@ -405,28 +420,50 @@ test('keyboard: the doors are inert while an overlay is open, and wake when it c
   expect(errors).toEqual([]);
 });
 
-test('Enter on a door Anthony guards opens him once, with no Room change (D7, n3)', async ({
+test('Anthony starting to guard a door mid-walk turns its Enter into his dialog, opened once (D7, n3)', async ({
   page,
 }) => {
   const errors = collectErrors(page);
   await boot(page, '?asPlayer&hud&phishing');
   await expect.poll(() => page.evaluate(() => Boolean(window.__phishingTest))).toBe(true);
-  await page.evaluate((at) => window.__phishingTest!.setNow(at), TOWN_CENTER_DEV_PIT);
-  await expect
-    .poll(async () => (await debugInfo(page))?.guard?.doorLabel, { timeout: WALK_TIMEOUT })
-    .toBe('DEV PIT');
+  // Anthony is in the Dev Pit to begin with.
+  await page.evaluate((at) => window.__phishingTest!.setNow(at), DEV_PIT_ICEBOX);
+  await expect.poll(async () => (await debugInfo(page))?.guard ?? null).toBeNull();
 
+  // Enter on DEV PIT walks there (no guard yet, so no redirect at the click)...
   await page.locator('.door-focus__door[data-door-label="DEV PIT"]').focus();
   await page.keyboard.press('Enter');
+  await expect
+    .poll(async () => (await debugInfo(page))?.localPenguin?.moving, { intervals: [20] })
+    .toBe(true);
+  // ...and partway there, his window moves to that very door. The arrival
+  // bumps him (his post is the door's approach tile until PR B), then the
+  // door's own use reaches `useDoor`, whose guard check must redirect it
+  // without opening him a second time.
+  await page.evaluate((at) => window.__phishingTest!.setNow(at), TOWN_CENTER_DEV_PIT);
+  await expect
+    .poll(async () => (await debugInfo(page))?.guard?.doorLabel, { intervals: [20] })
+    .toBe('DEV PIT');
+  expect((await debugInfo(page))?.localPenguin?.moving, 'still walking when he arrived').toBe(true);
+
   const dialog = page.locator('.npc-dialog');
   await expect(dialog).toBeVisible({ timeout: WALK_TIMEOUT });
   await expect(dialog.locator('.npc-dialog__subtitle')).toHaveText('DOOR BOSS · PHISHING QUIZ');
   await expect
-    .poll(async () => (await debugInfo(page))?.localPenguin?.moving, { timeout: WALK_TIMEOUT })
-    .toBe(false);
+    .poll(async () => (await debugInfo(page))?.doorReachedLog, { timeout: WALK_TIMEOUT })
+    .toContain('DEV PIT');
+  // Give a second npc:arrived, or a Room change, the time to show up.
+  await page.waitForTimeout(1_000);
   const info = await debugInfo(page);
   expect(info?.roomId).toBe('town-center');
+  expect(info?.roomEventLog).toEqual([{ type: 'room:enter', roomId: 'town-center' }]);
   expect((info?.npcArrivedLog ?? []).filter((id) => id === 'anthony')).toEqual(['anthony']);
-  expect(info?.doorReachedLog ?? []).not.toContain('DEV PIT');
+
+  // Review MINOR-2: closing his dialog gives focus back to the door.
+  await page.keyboard.press('Escape');
+  await expect(dialog).toBeHidden();
+  await expect
+    .poll(() => page.evaluate(() => document.activeElement?.getAttribute('data-door-label')))
+    .toBe('DEV PIT');
   expect(errors).toEqual([]);
 });

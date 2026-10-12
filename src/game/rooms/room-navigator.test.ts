@@ -860,12 +860,16 @@ describe('createRoomNavigator', () => {
     it('drops every other change while fading: changeRoom, useDoor, a locked door and Anthony (RT170-10)', async () => {
       const { log, scene, fade, navigator } = setupLogged();
       await boot(scene, navigator);
-      scene.guardedLabels.add('THE ICEBOX');
       log.length = 0;
 
       scene.triggerDoorReached(DEV_PIT_DOOR);
+      const redirectChecks = vi.mocked(scene.redirectGuardedDoor).mock.calls.length;
+      // Anthony takes up the Roof Deck door mid-fade: using it, by the keys
+      // or by arriving at it, must not reach his redirect either.
+      scene.guardedLabels.add(ROOF_DOOR.label);
       await navigator.changeRoom('igloo');
       navigator.useDoor(ROOF_DOOR);
+      scene.triggerDoorReached(ROOF_DOOR);
       navigator.useDoor(DISABLED_DOOR);
       scene.triggerDoorReached(DISABLED_DOOR);
       fade.finishOut();
@@ -878,6 +882,7 @@ describe('createRoomNavigator', () => {
       );
       expect(scene.lockedDoors).toEqual([]);
       expect(scene.redirected).toEqual([]);
+      expect(vi.mocked(scene.redirectGuardedDoor).mock.calls.length).toBe(redirectChecks);
     });
 
     it('the stair keys (useDoor with no options), the Map and the debug changeRoom never fade', async () => {
