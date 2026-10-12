@@ -106,6 +106,7 @@ import { createMapScreen } from './ui/map-screen';
 import { createRemoteLounge } from './ui/remote-lounge/remote-lounge';
 import { createLatamNav } from './ui/latam-nav/latam-nav';
 import { createElevatorScreen } from './ui/elevator-screen';
+import type { ElevatorTestHandle } from './ui/elevator-test-handle';
 import { createMarket, MARKET_OVERLAY_ID } from './ui/market';
 import { createIglooEditor, type IglooEditor } from './ui/igloo-editor';
 import { wireBadgeToast } from './ui/badge-toast';
@@ -136,6 +137,10 @@ import { createPhishingController } from './phishing/phishing-controller';
 import { createPhishingQuiz, PHISHING_QUIZ_OVERLAY_ID } from './phishing/phishing-quiz';
 import { createSecurityTrainingBanner } from './phishing/security-training-banner';
 import { exposePhishingTestHandle } from './phishing/dev-phishing-hook';
+import { stairwellExit } from './game/rooms/definitions/stairwell';
+import { createStairClimbTracker } from './game/rooms/stair-climb-tracker';
+import { createStairKeys, installStairKeys, isEditableElement } from './game/rooms/stair-keys';
+import { createStairClimbPanel, gateStairPanel } from './ui/stair-climb-panel';
 
 // Fail fast on a missing or malformed .env before anything boots.
 loadEnv();
@@ -160,7 +165,19 @@ const uiLayer = getUiLayer();
  */
 const elevatorScreen = createElevatorScreen(uiLayer, {
   resolveFloor: (roomId) => ROOM_FLOORS[roomId],
+  // #163: the Player's own Look rides in the car.
+  resolveLook: () => (game.registry.get('player') as Player | undefined)?.look ?? null,
 });
+
+// Test-only (#163): drives the real Elevator screen with no Room change.
+if (HOOKS_ENABLED) {
+  const elevatorTest: ElevatorTestHandle = {
+    ride: (from, to) => elevatorScreen.previewRide(from, to),
+    freezeAt: (elapsedMs) => elevatorScreen.freezeAt(elapsedMs),
+    hide: () => elevatorScreen.cancel(),
+  };
+  window.__elevatorTest = elevatorTest;
+}
 
 /**
  * A stable `EmoteRoomChannel` (#47), unlike `ChatRoomChannel`: an Emote must
@@ -277,7 +294,9 @@ const sceneReady = whenSceneReady(game).then((scene) => {
     scene: {
       showRoom: (roomId, entryTile, force) => scene.showRoom(roomId, entryTile, force),
       whenNextReady: () => scene.whenNextReady(),
-      onDoorReached: (handler) => scene.onDoorReached(handler),
+      // #51 slice 4 (RT2-7): a door's Room change is tagged as one.
+      onDoorReached: (handler) =>
+        scene.onDoorReached((door) => stairClimb.withSource('door', () => handler(door))),
       showComingSoonHint: (door) => scene.showComingSoonHint(door),
     },
     events: gameEvents,
@@ -555,6 +574,12 @@ function endSession(): RoomChannel | null {
   stopBadgeChecks = null;
   // #146: Anthony, the Map lock and the training banner go with it.
   phishing.stop();
+  // #51 slice 4 (N7): after the sign-out `room:leave` above, so the Stairs
+  // Challenge forgets the Room it recorded, along with any held stair key.
+  stairClimb.reset();
+  stairKeys.reset();
+  gatedStairClimbPanel.hide();
+  stairClimbPanel.reset();
   questWidget.render(null);
   hud.overlays.close(QUESTS_OVERLAY_ID);
   return channel;
@@ -692,12 +717,14 @@ function wireSession(player: Player, view: Awaited<typeof sceneReady>): Promise<
  */
 function initDevAsPlayerHook(): boolean {
   if (!HOOKS_ENABLED) return false;
-  if (!new URLSearchParams(window.location.search).has('asPlayer')) return false;
+  const params = new URLSearchParams(window.location.search);
+  if (!params.has('asPlayer')) return false;
 
   const fixturePlayer: Player = {
     id: 'e2e-fixture-player',
     displayName: 'E2E Fixture Player',
-    look: DEFAULT_LOOK,
+    // #163: `?asPlayer=<name>` names the fixture Penguin (a bare `?asPlayer` stays unnamed).
+    look: { ...DEFAULT_LOOK, name: params.get('asPlayer') ?? '' },
   };
   bindPlayer(game.registry, fixturePlayer);
   // #162: the fixture's look is its saved look, so show it (and accept Stage
@@ -784,7 +811,9 @@ createMapScreen(uiLayer, {
     // #146: leaving by the Map may be a bypass of Anthony; the server decides.
     const leaving = roomNavigator?.currentRoomId();
     if (leaving) void phishing.mapUsed(leaving);
-    void roomNavigator?.changeRoom(roomId);
+    // #51 slice 4 (RT2-7): tagged as a Map change, which never logs a flight
+    // (a climb starts only from floor L's START CLIMB, 2026-10-11).
+    stairClimb.withSource('map', () => void roomNavigator?.changeRoom(roomId));
   },
   currentRoomId: () => roomNavigator?.currentRoomId() ?? null,
 });
@@ -853,6 +882,56 @@ if (e2eHooksEnabled) {
 // Built once at boot for the long-lived consumers below; every call forwards
 // to the signed-in Player's Supabase store (#34), or to the dev fallback.
 const progressStore = createActiveProgressStore(game.registry, () => devFallbackStore);
+
+// #51 slice 4: the Stairs Challenge. The climb panel shows on Stairwell
+// floors once each arrival's flight (or read) comes back; the tracker logs
+// the flights this visit climbs; the ↑/↓ keys climb on Stairwell floors only
+// (S4-D10), never while a text field has focus, a HUD overlay is open or a
+// transition is in flight.
+// Floor L's START CLIMB button is the only way a climb starts (owner
+// decision, 2026-10-11); `stairClimb` is declared below and only read on a
+// press.
+const stairClimbPanel = createStairClimbPanel(uiLayer, {
+  onStart: () => stairClimb.startClimb(),
+});
+// Held back while the Elevator is still up (#163 review): its ride can
+// outlast the Room becoming ready (6 s from Town Center to floor 0).
+const gatedStairClimbPanel = gateStairPanel(stairClimbPanel, {
+  isBlocked: () => elevatorScreen.isShowing(),
+  setTimer: (callback, ms) => setTimeout(callback, ms),
+  clearTimer: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>),
+});
+const stairClimb = createStairClimbTracker({
+  store: progressStore,
+  currentRoomId: () => roomNavigator?.currentRoomId() ?? null,
+  now: () => Date.now(),
+  setTimer: (callback, ms) => setTimeout(callback, ms),
+  onPanel: (_roomId, input) => gatedStairClimbPanel.show(input),
+  onError: (err) => console.error('[main] Stairs Challenge call failed', err),
+});
+const stairKeys = createStairKeys({
+  currentRoomId: () => roomNavigator?.currentRoomId() ?? null,
+  exitFor: stairwellExit,
+  useDoor: (door) => stairClimb.withSource('keys', () => roomNavigator?.useDoor(door)),
+  // The navigator's transition ends when the Room is ready; the Elevator can
+  // stay up for the rest of its ride (#163), and no key climbs under it.
+  isTransitioning: () => (roomNavigator?.isTransitioning() ?? true) || elevatorScreen.isShowing(),
+  overlayOpen: () => hud.overlays.current() !== null,
+  editableFocused: () => isEditableElement(document.activeElement),
+  now: () => Date.now(),
+  setTimer: (callback, ms) => setTimeout(callback, ms),
+  clearTimer: (handle) => clearTimeout(handle as ReturnType<typeof setTimeout>),
+  onMove: () => stairClimbPanel.dismissHint(),
+});
+installStairKeys(window, stairKeys);
+gameEvents.on('room:leave', ({ roomId }) => {
+  stairClimb.roomLeave(roomId);
+  gatedStairClimbPanel.hide();
+});
+gameEvents.on('room:enter', ({ roomId }) => {
+  stairClimb.roomEnter(roomId);
+  stairKeys.roomReady();
+});
 
 // #146: the Phishing Quiz. The signed-in Player's calls go to the server's
 // RPCs; the dev/e2e hooks (no sign-in) use the in-memory fake server, on a
@@ -1333,6 +1412,17 @@ createNpcDialog(getUiLayer(), {
   // itself refuses (toasting) until steps 1-4 are met, so this shows
   // whenever the Quest is in progress rather than re-deriving step
   // completeness here.
+  // #224: an open dialog rebuilds these buttons when Quest progress or the
+  // coffee run changes, so a step recorded by the dialog's own click (Linda's
+  // "talk to Linda") shows its button without reopening.
+  onQuestStateChange: (listener) => {
+    const offQuests = quests.onChange(listener);
+    const offCoffee = coffee.onChange(listener);
+    return () => {
+      offQuests();
+      offCoffee();
+    };
+  },
   extraActions: (npcId) => {
     if (npcId === 'tom' && coffee.canAskTom()) {
       return [{ label: TOM_COFFEE_ACTION_LABEL, run: () => void coffee.askTom() }];

@@ -103,9 +103,10 @@ describe("The Mullet's NPC motions (owner request, 2026-10-01)", () => {
     motion.advance(5_000);
     expect(motion.pose().point.x).toBeGreaterThan(rest.x);
     expect(visible()).toEqual([0, 0]);
-    // At the far end (7s): (210, 133) from his rest, with the other cue.
+    // At the far end (7s): (280, 90) from his rest, at the table's short end
+    // (the design's (210, 133) left the far cue under the felt), with the other cue.
     motion.advance(2_000);
-    expectNear(motion.pose().point, { x: rest.x + 210, y: rest.y + 133 }, 0.01);
+    expectNear(motion.pose().point, { x: rest.x + 280, y: rest.y + 90 }, 0.01);
     expect(visible()).toEqual([0, 1]);
     // Back home at the end of the cycle.
     motion.advance(5_000);
@@ -118,6 +119,7 @@ describe("The Mullet's NPC motions (owner request, 2026-10-01)", () => {
     // The cue's tip, design (505, 496) in his group: figure units of his
     // `<svg x="462.8" y="440.5">` at 0.62.
     const tip = { x: (505 - 462.8) / 0.62 - 115, y: (496 - 440.5) / 0.62 };
+    expect(npcScale(NPCS.tony)).toBe(0.62);
     const rest = stagePointOf('tony', motion, multiply(near.matrix, near.children[0].matrix), tip);
     expectNear(rest, { x: 505 - 30, y: 496 - 81 }, 0.2);
     // 40% of the 1.6s stroke: drawn back by (12, 1.4).
@@ -148,7 +150,9 @@ describe("The Mullet's NPC motions (owner request, 2026-10-01)", () => {
     const ballIndex = THE_MULLET_MOTIONS['jon-mullet']!.props!.findIndex((layer) =>
       layer.svg.includes('r="3.5"'),
     );
-    const ballCentre = { x: 60 + 30 / 0.62, y: 120 + 14 / 0.62 };
+    // Jon draws at 0.58, so the ball's (30, 14) Stage px from his feet is 1 / 0.58 of that in figure units.
+    expect(npcScale(NPCS['jon-mullet'])).toBe(0.58);
+    const ballCentre = { x: 60 + 30 / 0.58, y: 120 + 14 / 0.58 };
     const ball = () =>
       stagePointOf('jon-mullet', jon, jon.pose().props[ballIndex].matrix, ballCentre);
     expectNear(ball(), { x: 880, y: 612 }, 0.05);

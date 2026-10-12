@@ -203,6 +203,40 @@ export interface PitchSubmitResult {
 }
 
 /**
+ * Why `logStairFlight` logged nothing (#51 slice 4, SC9): the Player hasn't
+ * started a climb on floor 0, already logged that floor, skipped a floor, or
+ * logged the previous flight under 2 s ago.
+ */
+export type StairFlightReason = 'not_started' | 'already_logged' | 'out_of_order' | 'too_soon';
+
+/**
+ * The result of `log_stair_flight` (#51 slice 4, SC12), on every path.
+ * `flightsLogged` is the current climb's last floor logged (0-5).
+ * `tokensAwarded` is this flight's own pay (10, less at the daily cap);
+ * Stair Master's +50 is folded into `balance` but never into
+ * `tokensAwarded` or `flightTokensToday` (RT2-15). `flightTokensToday` is
+ * today's (America/New_York) flight Tokens, 0-100. `badgesEarned` is
+ * `['stair-master']` on the first full climb, `[]` otherwise.
+ */
+export interface StairFlightResult {
+  logged: boolean;
+  reason: StairFlightReason | null;
+  flightsLogged: number;
+  tokensAwarded: number;
+  flightTokensToday: number;
+  badgesEarned: BadgeId[];
+  balance: number;
+}
+
+/** The Player's climb as `stair_climb_progress` reads it (#51 slice 4, SC13). */
+export interface StairClimbProgress {
+  flightsLogged: number;
+  /** Whether the Player has ever finished a full climb (and so holds Stair Master). */
+  completed: boolean;
+  flightTokensToday: number;
+}
+
+/**
  * The main Quest's reward, paid once by `complete_quest` (#46;
  * `public.quests`' 'main' row since 20261006000000_quest_registry.sql).
  */
@@ -274,6 +308,8 @@ export const PROGRESS_ERROR_CODES = [
   // (20261009000000_quest_pair_flaky_test.sql P5/P6) before steps 1-4 (talk
   // to Paul, check the CI board, pair up, squash 3 flaky bugs) are all met.
   'quest_steps_incomplete',
+  // #51 slice 4: `log_stair_flight` with a floor outside 0-5.
+  'invalid_floor',
 ] as const;
 
 export type ProgressErrorCode = (typeof PROGRESS_ERROR_CODES)[number];
@@ -571,4 +607,19 @@ export interface ProgressStore {
    * Paying is still `completeQuest`'s.
    */
   submitPitch(problem: number, solution: number, ask: number): Promise<PitchSubmitResult>;
+
+  /**
+   * Logs a Stairs Challenge flight (#51 slice 4, SC8-SC12): `floor` 0
+   * (re)starts a climb; floor k (1-5) logs flight k when floor k-1 was the
+   * last one logged, at least 2 s ago. Otherwise it logs nothing and says
+   * why (`reason`). Each flight pays 10 Tokens, up to 100 a day
+   * (America/New_York); the first full climb earns Stair Master and its +50.
+   * Rejects with `invalid_floor` outside 0-5. Emits `badge:earned` once for
+   * each id in `badgesEarned`, and `tokens:changed` with the balance when it
+   * paid anything or earned a Badge.
+   */
+  logStairFlight(floor: number): Promise<StairFlightResult>;
+
+  /** The Player's climb (#51 slice 4, SC13). Read-only: a failure never emits `ui:toast`. */
+  getStairClimb(): Promise<StairClimbProgress>;
 }

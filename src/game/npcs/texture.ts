@@ -42,7 +42,7 @@ export function ensureNpcTexture(
   // #113: a designed motion can draw its own moving version of what a Human
   // NPC holds (Anthony's rod), so that variant omits `prop`; or of a prop's
   // static resting pose (Jon's cards, the Dev Pit markers), so that variant
-  // omits `cards`/`marker`. Either way the NPC shows exactly one of each.
+  // omits `cards`/`marker`/`paddle`/`arcadeHands`. Either way the NPC shows exactly one of each.
   const isHuman = npc.kind === 'human';
   const omitProp = options.omitProp === true && isHuman;
   const omitRestPose = options.omitRestPose === true && isHuman;
@@ -63,6 +63,8 @@ export function ensureNpcTexture(
                   cameraRaise: npc.figure.cameraRaise ? ('raising' as const) : undefined,
                   // The Mullet's Jason: his hands belong to his arcade layers.
                   arcadeHands: npc.figure.arcadeHands ? ('playing' as const) : undefined,
+                  // Jon's and Brandon's paddles belong to their swing layers.
+                  paddle: undefined,
                 }
               : {}),
           },

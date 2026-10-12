@@ -1,8 +1,12 @@
 import { expect, test, type Page } from '@playwright/test';
 import type { RoomId } from '../src/contracts';
+import { npcLayout } from '../src/game/npcs/npc-layout';
+import { officeHallway } from '../src/game/rooms/definitions/office-hallway';
 import { roofDeck } from '../src/game/rooms/definitions/roof-deck';
+import { teamRoom4 } from '../src/game/rooms/definitions/team-room-4';
 import { theMelt } from '../src/game/rooms/definitions/the-melt';
-import { tileToScreen } from '../src/game/rooms/iso';
+import { npcSlotPoint, tileToScreen } from '../src/game/rooms/iso';
+import { NPCS, type NpcId } from '../src/npcs/npcs';
 import { GAME_HEIGHT, GAME_WIDTH } from '../src/game/stage-size';
 import type { NpcMotionDebugInfo, RoomDebugInfo } from './support/room-debug-types';
 
@@ -76,6 +80,13 @@ for (const roomId of [
   'team-room-4',
   'bathroom',
   'the-mullet',
+  // #51 slice 4: the Stairwell's six floors.
+  'stairwell-0',
+  'stairwell-1',
+  'stairwell-2',
+  'stairwell-3',
+  'stairwell-4',
+  'stairwell-5',
   'remote-lounge',
   'latam-cafe',
   'latam-disco-hall',
@@ -172,6 +183,52 @@ test('Dev Pit: clicking Ian arrives, opens his dialog, and NOT MY TICKET shows h
 // Team Room 2's Ian, and his Bug Squash dialog there, went when he left the
 // Room (owner request, 2026-10-02, Track D); the Dev Pit's Ian test above
 // covers that dialog.
+
+/**
+ * #149: the Hallway's and Team Room 4's NPCs draw at their own scales, with
+ * hand-placed nameplates, so a click at the middle of each one's own click
+ * area still has to arrive and open its dialog. Emily walks laps of the
+ * Hallway, so that click runs under reduced motion, which plays no motion and
+ * leaves her standing at her slot. Michael's Beystadium launch is
+ * `beystadium.spec.ts`.
+ */
+const HAND_PLACED_CLICKS: {
+  room: RoomId;
+  definition: typeof officeHallway;
+  npcId: NpcId;
+  name: string;
+  reducedMotion?: boolean;
+}[] = [
+  {
+    room: 'office-hallway',
+    definition: officeHallway,
+    npcId: 'emily',
+    name: 'Emily Smith',
+    reducedMotion: true,
+  },
+  { room: 'team-room-4', definition: teamRoom4, npcId: 'michael', name: 'Michael Prete' },
+];
+for (const { room, definition, npcId, name, reducedMotion } of HAND_PLACED_CLICKS) {
+  test(`${room}: clicking ${name} arrives and opens the dialog (#149)`, async ({ page }) => {
+    if (reducedMotion) await page.emulateMedia({ reducedMotion: 'reduce' });
+    const errors = await bootRoom(page, room);
+
+    const slot = definition.npcSlots.find((s) => s.npcId === npcId);
+    if (!slot) throw new Error(`expected ${room} to have a "${npcId}" NPC slot`);
+    const feet = npcSlotPoint(slot, definition.grid.origin);
+    await clickStagePoint(page, { x: feet.x, y: feet.y + npcLayout(NPCS[npcId]).hitArea.centerY });
+
+    await expect
+      .poll(async () => (await debugInfo(page))?.npcArrivedLog, { timeout: LONG_WALK_TIMEOUT })
+      .toContain(npcId);
+
+    const dialog = page.locator('.npc-dialog');
+    await expect(dialog).toBeVisible();
+    await expect(dialog.locator('.npc-dialog__name')).toHaveText(name);
+
+    expect(errors).toEqual([]);
+  });
+}
 
 /**
  * Clicking near Ian's head (not just his own tile centre) still opens his

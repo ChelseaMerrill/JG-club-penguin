@@ -666,3 +666,143 @@ describe('createNpcDialog: the Nicole coffee Quest (#141)', () => {
     expect(root.querySelector('.npc-dialog__button--extra')).toBeNull();
   });
 });
+
+describe('createNpcDialog: Quest buttons refresh while open (#224)', () => {
+  /** A dialog whose Quest state is driven by the test: `talked` gates Linda's "Pitch Linda". */
+  function setupLinda() {
+    const root = document.createElement('div');
+    document.body.append(root);
+    overlays = createOverlayManager();
+    const state = { talked: false };
+    const listeners = new Set<() => void>();
+    const startQuest = vi.fn();
+    const pitchStatus = (): QuestStatus =>
+      evaluateQuests(QUEST_DEFINITIONS, {
+        profileCreatedAt: '2026-10-11T09:00:00.000Z',
+        bests: {},
+        badges: [],
+        ownedItems: [],
+        devPitVisited: false,
+        roundsFinished: [],
+        completedQuests: [],
+        questSteps: { 'pitch-hack': { 'talk-to-linda': state.talked, 'pitch-under-60': false } },
+      }).find((s) => s.quest.id === 'pitch-hack')!;
+    const quests: NpcDialogQuests = {
+      status: (id) => (id === 'pitch-hack' ? pitchStatus() : undefined),
+      canStart: (id) => id === 'pitch-hack',
+    };
+    dialog = createNpcDialog(root, {
+      overlays,
+      actions: { launchMinigame: vi.fn(), openStall: vi.fn(), startQuest },
+      quests,
+      extraActions: (npcId) =>
+        npcId === 'linda-martin' && state.talked ? [{ label: 'Pitch Linda', run: vi.fn() }] : [],
+      onQuestStateChange: (listener) => {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      },
+      random: () => 0,
+    });
+    const notify = () => {
+      for (const listener of listeners) listener();
+    };
+    return { root, state, notify, listeners, startQuest };
+  }
+
+  function extraLabels(root: HTMLElement): string[] {
+    return Array.from(root.querySelectorAll('.npc-dialog__button--extra')).map(
+      (b) => b.textContent ?? '',
+    );
+  }
+
+  it('shows "Pitch Linda" in the same dialog once the step lands, keeping her start line', () => {
+    const { root, state, notify, startQuest } = setupLinda();
+    gameEvents.emit('npc:arrived', { npcId: 'linda-martin' });
+    expect(extraLabels(root)).toEqual([]);
+
+    questButton(root)!.click();
+    expect(startQuest).toHaveBeenCalledWith('pitch-hack');
+    const startLine = lineText(root);
+    expect(startLine).toBe('Every room is a pitch. Smile.');
+
+    // The step is recorded asynchronously, then Quest progress refreshes.
+    state.talked = true;
+    notify();
+
+    expect(extraLabels(root)).toEqual(['Pitch Linda']);
+    expect(lineText(root)).toBe(startLine);
+    expect(panel(root).hidden).toBe(false);
+  });
+
+  it('leaves the buttons untouched when nothing they read has changed', () => {
+    const { root, notify } = setupLinda();
+    gameEvents.emit('npc:arrived', { npcId: 'linda-martin' });
+    const before = questButton(root);
+    before!.focus();
+
+    notify();
+
+    expect(questButton(root)).toBe(before);
+    expect(document.activeElement).toBe(before);
+  });
+
+  it('hands focus to the replacement button with the same label, not the first button', () => {
+    const { root, state, notify } = setupLinda();
+    gameEvents.emit('npc:arrived', { npcId: 'linda-martin' });
+    questButton(root)!.focus();
+
+    state.talked = true;
+    notify();
+
+    // "Pitch Linda" is now first; focus stays on the rebuilt "Got any work for me?".
+    expect(document.activeElement).toBe(questButton(root));
+  });
+
+  it("leaves a Minigame NPC's own buttons alone and keeps them first (Tom)", () => {
+    const root = document.createElement('div');
+    document.body.append(root);
+    overlays = createOverlayManager();
+    const state = { errand: false };
+    const listeners = new Set<() => void>();
+    dialog = createNpcDialog(root, {
+      overlays,
+      actions: { launchMinigame: vi.fn(), openStall: vi.fn(), startQuest: vi.fn() },
+      extraActions: (npcId) =>
+        npcId === 'tom' && state.errand ? [{ label: "Nicole's oat latte?", run: vi.fn() }] : [],
+      onQuestStateChange: (listener) => {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      },
+      random: () => 0,
+    });
+    const notify = () => {
+      for (const listener of listeners) listener();
+    };
+    gameEvents.emit('npc:arrived', { npcId: 'tom' });
+    const buttons = () => Array.from(root.querySelectorAll('.npc-dialog__actions button'));
+    const [primary, decline] = buttons();
+
+    state.errand = true;
+    notify();
+    const errand = root.querySelector('.npc-dialog__button--extra');
+    expect(buttons()).toEqual([primary, decline, errand]);
+
+    // The coffee run notifies every second; nothing changed, so nothing is rebuilt.
+    notify();
+    notify();
+    expect(root.querySelector('.npc-dialog__button--extra')).toBe(errand);
+    expect(buttons()).toEqual([primary, decline, errand]);
+  });
+
+  it('ignores changes while closed, and unsubscribes on destroy', () => {
+    const { root, state, notify, listeners } = setupLinda();
+    state.talked = true;
+    notify();
+    expect(panel(root).hidden).toBe(true);
+    expect(extraLabels(root)).toEqual([]);
+
+    dialog!.destroy();
+    dialog = undefined;
+    expect(listeners.size).toBe(0);
+  });
+});

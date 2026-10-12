@@ -892,9 +892,9 @@ export class RoomScene extends Scene {
       localPenguinArrivedLog: this.localPenguinArrivedLog,
       restartRoom: () => this.scene.restart(),
       restartCount: this.restartCount,
-      penguinCount: this.countPenguinContainers(
-        (name) => name !== REMOTE_PENGUIN_NAME && name !== NPC_CONTAINER_NAME,
-      ),
+      // Only the local and debug Penguins are unnamed (#225): every other
+      // top-level Container (remote Penguins, NPCs, the tank fish) carries a name.
+      penguinCount: this.countPenguinContainers((name) => name === ''),
       remotePenguinCount: this.countPenguinContainers((name) => name === REMOTE_PENGUIN_NAME),
       remotePenguins: this.penguins.debugRemotePenguins(),
       setRegisteredPlayer: (player) => this.registry.set(PLAYER_REGISTRY_KEY, player),
@@ -938,8 +938,9 @@ export class RoomScene extends Scene {
    * Penguin `Container`s in the Scene's display list whose name matches
    * (#14 review fix 8's restart-leak check). Remote Penguins (#28) are named
    * `REMOTE_PENGUIN_NAME`; the local and debug Penguins are unnamed; NPCs
-   * (#36) are named `NPC_CONTAINER_NAME`, excluded from `penguinCount` the
-   * same way remote Penguins are.
+   * (#36) are named `NPC_CONTAINER_NAME` and the tank fish
+   * `TANK_FISH_CONTAINER_NAME` (#225), so `penguinCount` counts only the
+   * unnamed ones.
    */
   private countPenguinContainers(matches: (name: string) => boolean): number {
     return this.children.list.filter(
@@ -1889,7 +1890,14 @@ export class RoomScene extends Scene {
     const paces = motion !== undefined;
     if (paces) {
       this.npcMotions?.add(
-        { npcId: spec.npcId, sprite, zone, zoneOffsetY: hitArea.centerY, rest: point },
+        {
+          npcId: spec.npcId,
+          sprite,
+          zone,
+          zoneOffsetX: hitArea.centerX,
+          zoneOffsetY: hitArea.centerY,
+          rest: point,
+        },
         motion,
       );
     }
@@ -2044,6 +2052,7 @@ export class RoomScene extends Scene {
           npcId: slot.npcId,
           sprite: npcSprite,
           zone,
+          zoneOffsetX: hitArea.centerX,
           zoneOffsetY: hitArea.centerY,
           rest: point,
         },

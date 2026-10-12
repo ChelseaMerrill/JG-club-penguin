@@ -39,6 +39,14 @@ export const ROOM_FLOORS: Record<RoomId, FloorId | null> = {
   bathroom: '5',
   // #51 slice 3: THE MULLET is the JG HQ floor's mezzanine.
   'the-mullet': '5',
+  // #51 slice 4: each Stairwell floor sits on its own floor of the building;
+  // its floor 0 is the lobby level.
+  'stairwell-0': 'L',
+  'stairwell-1': '1',
+  'stairwell-2': '2',
+  'stairwell-3': '3',
+  'stairwell-4': '4',
+  'stairwell-5': '5',
   // The Remote Lounge is where the JGers outside HQ hang out, not a room in
   // 108 State St, so like the Igloo it has no floor and never shows the
   // Elevator.
@@ -69,4 +77,30 @@ export function direction(from: FloorId, to: FloorId): 'up' | 'down' {
 /** The Elevator heading's own floor name: `'THE ROOF'` for `'R'`, `'FLOOR <id>'` otherwise (#52 D6). */
 export function floorLabel(floor: FloorId): string {
   return floor === 'R' ? 'THE ROOF' : `FLOOR ${floor}`;
+}
+
+/** How long the Elevator ride takes per floor crossed: 1.2s (#163). */
+export const MS_PER_FLOOR = 1200;
+
+/** How many floors a ride from `from` to `to` crosses: the absolute `FLOOR_ORDER` distance (#163). */
+export function floorsCrossed(from: FloorId, to: FloorId): number {
+  return Math.abs(FLOOR_ORDER.indexOf(to) - FLOOR_ORDER.indexOf(from));
+}
+
+/** The ride's length: `msPerFloor` for each floor crossed (5 to R 1.2s, L to 5 6s, L to R 7.2s; #163). */
+export function rideDurationMs(from: FloorId, to: FloorId, msPerFloor = MS_PER_FLOOR): number {
+  return floorsCrossed(from, to) * msPerFloor;
+}
+
+/** The floors strictly between `from` and `to`, in travel order (#163). */
+export function floorsBetween(from: FloorId, to: FloorId): FloorId[] {
+  const fromIndex = FLOOR_ORDER.indexOf(from);
+  const toIndex = FLOOR_ORDER.indexOf(to);
+  if (fromIndex === toIndex) return [];
+  const step = toIndex > fromIndex ? 1 : -1;
+  const between: FloorId[] = [];
+  for (let i = fromIndex + step; i !== toIndex && i >= 0 && i < FLOOR_ORDER.length; i += step) {
+    between.push(FLOOR_ORDER[i]!);
+  }
+  return between;
 }

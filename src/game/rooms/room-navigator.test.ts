@@ -7,6 +7,7 @@ import {
   type Tile,
   type TypedEmitter,
 } from '../../contracts';
+import { direction, floorLabel, ROOM_FLOORS } from './floors';
 import { getRoomDefinition } from './registry';
 import type { RoomDoor } from './room-definition';
 import {
@@ -567,6 +568,111 @@ describe('createRoomNavigator', () => {
         { type: 'begin', from: 'town-center', to: 'roof-deck' },
         { type: 'cancel' },
       ]);
+    });
+
+    describe('the Stairwell (#51 slice 4, S4-D6)', () => {
+      /** A navigator booted into Town Center, then walked through `rooms` in turn. */
+      async function walk(rooms: RoomId[]): Promise<TransitionCall[]> {
+        const transitionScreen = createFakeTransitionScreen();
+        const scene = createFakeScene();
+        const navigator = createRoomNavigator({
+          scene,
+          events: createEmitter<RoomEventMap>(),
+          hasPlayer: () => true,
+          transitionScreen,
+        });
+        await boot(scene, navigator);
+        for (const roomId of rooms) {
+          const p = navigator.changeRoom(roomId);
+          scene.fireCreate();
+          await p;
+        }
+        return beginCalls(transitionScreen.calls);
+      }
+
+      it('shows no Elevator between Stairwell floors, up or down, a floor or several at a time', async () => {
+        expect(
+          await walk([
+            'stairwell-5',
+            'stairwell-4',
+            'stairwell-3',
+            'stairwell-2',
+            'stairwell-1',
+            'stairwell-0',
+            'stairwell-1',
+            'stairwell-4',
+          ]),
+        ).toEqual([]);
+      });
+
+      it('shows no Elevator between floor 5 and the Roof Deck, either way', async () => {
+        expect(await walk(['stairwell-5', 'roof-deck', 'stairwell-5'])).toEqual([]);
+      });
+
+      it('shows no Elevator from Town Center to floor 5, the same floor', async () => {
+        expect(await walk(['stairwell-5', 'town-center'])).toEqual([]);
+      });
+
+      it('still shows it from Town Center to floor 0, heading "WADDLING DOWN TO FLOOR L"', async () => {
+        const begins = await walk(['stairwell-0']);
+        expect(begins).toEqual([{ type: 'begin', from: 'town-center', to: 'stairwell-0' }]);
+        // The heading `elevator-screen.ts` builds from that begin() call.
+        const from = ROOM_FLOORS['town-center']!;
+        const to = ROOM_FLOORS['stairwell-0']!;
+        expect(`WADDLING ${direction(from, to).toUpperCase()} TO ${floorLabel(to)}`).toBe(
+          'WADDLING DOWN TO FLOOR L',
+        );
+      });
+
+      it('still shows it for any other floor change, e.g. Town Center to floor 3, then to the Roof Deck', async () => {
+        expect(await walk(['stairwell-3', 'roof-deck'])).toEqual([
+          { type: 'begin', from: 'town-center', to: 'stairwell-3' },
+          { type: 'begin', from: 'stairwell-3', to: 'roof-deck' },
+        ]);
+      });
+    });
+  });
+
+  describe('useDoor (#51 slice 4, RT2-5)', () => {
+    it('changes Room through an enabled door with no walk, exactly as reaching it does', async () => {
+      const { navigator, scene, seen } = setup();
+      await boot(scene, navigator);
+      seen.length = 0;
+
+      navigator.useDoor(DEV_PIT_DOOR);
+      expect(navigator.isTransitioning()).toBe(true);
+      scene.fireCreate();
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(navigator.isTransitioning()).toBe(false);
+      expect(seen).toEqual([
+        { type: 'leave', roomId: 'town-center' },
+        { type: 'enter', roomId: 'dev-pit', entryTile: DEV_PIT_DOOR.entryTile },
+      ]);
+    });
+
+    it("shows a disabled door's coming-soon hint and stays put", async () => {
+      const { navigator, scene, seen } = setup();
+      await boot(scene, navigator);
+      seen.length = 0;
+
+      navigator.useDoor(DISABLED_DOOR);
+
+      expect(scene.comingSoonDoors).toEqual([DISABLED_DOOR]);
+      expect(seen).toEqual([]);
+      expect(navigator.currentRoomId()).toBe('town-center');
+    });
+
+    it('does nothing before a Session is active', () => {
+      const { navigator, scene, seen } = setup();
+
+      navigator.useDoor(DEV_PIT_DOOR);
+      navigator.useDoor(DISABLED_DOOR);
+
+      expect(scene.showRoomCalls).toEqual([]);
+      expect(scene.comingSoonDoors).toEqual([]);
+      expect(seen).toEqual([]);
     });
   });
 });

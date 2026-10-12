@@ -1,7 +1,7 @@
 import { gameEvents, type RoomId } from '../contracts';
 import { getRoomDefinition } from '../game/rooms/registry';
 import type { OverlayManager } from './hud/overlay-manager';
-import { isMapTileClickable, MAP_ROOMS, type MapRoomTile } from './map-rooms';
+import { isMapTileClickable, MAP_ROOMS, mapTileRoomId, type MapRoomTile } from './map-rooms';
 import './map-screen.css';
 
 /** The id `main.ts` registers this overlay with on `hud.overlays`. */
@@ -132,8 +132,10 @@ export function createMapScreen(root: HTMLElement, options: MapScreenOptions): M
   root.append(overlay);
 
   function applyCurrent(current: RoomId): void {
+    // #51 slice 4: every Stairwell floor is tile 12's (RT2-4).
+    const currentTile = mapTileRoomId(current);
     for (const { tile, tileButton, pill, clickable } of entries) {
-      const isCurrent = clickable && tile.roomId === current;
+      const isCurrent = clickable && tile.roomId === currentTile;
       tileButton.classList.toggle('map-screen__tile--current', isCurrent);
       if (isCurrent) tileButton.setAttribute('aria-current', 'location');
       else tileButton.removeAttribute('aria-current');
@@ -166,7 +168,10 @@ export function createMapScreen(root: HTMLElement, options: MapScreenOptions): M
     // Moves focus into the dialog (`aria-modal="true"` requires it): the
     // current Room's own tile when there is one, or the close button
     // otherwise (defensive -- every real RoomId currently has a tile).
-    const currentEntry = entries.find((entry) => entry.clickable && entry.tile.roomId === current);
+    const currentTile = current === null ? null : mapTileRoomId(current);
+    const currentEntry = entries.find(
+      (entry) => entry.clickable && entry.tile.roomId === currentTile,
+    );
     (currentEntry?.tileButton ?? closeButton).focus();
   }
 

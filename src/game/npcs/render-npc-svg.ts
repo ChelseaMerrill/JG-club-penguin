@@ -13,10 +13,11 @@ import { NPC_TEXT_PATHS } from './text-paths';
  * roster (`src/npcs/npcs.ts`) actually uses, not every option `humans.js`
  * supports: #51 ported the `buzz` hairstyle, the `plaid` pattern and the
  * `camera` and `beyblade` props as its Rooms needed them, and #113 the
- * `survivor` hat/tee (Jory). The `curlyShort`/`slick` hairstyles, the
- * `henley` collar, the `yarn`/`basketball`/`survivor` props and the horse
- * `mount` composite are still never used by any Human NPC here, so they're
- * left unported; adding one later is a direct copy from `humans.js`.
+ * `survivor` hat/tee (Jory), and #149 the `slick` hairstyle and `henley`
+ * collar (Tony). The `curlyShort` hairstyle, the `yarn`/`basketball`/
+ * `survivor` props and the horse `mount` composite are still never used by
+ * any Human NPC here, so they're left unported; adding one later is a direct
+ * copy from `humans.js`.
  *
  * #113 also adds options that aren't in `humans.js` at all: the variations
  * a Room design draws for its own NPCs (Dev Pit's and Team Room 2's dotted
@@ -41,7 +42,9 @@ export interface HumanFigureSpec {
     | 'highBun'
     | 'bald'
     /** Chelsea's hair in the Kitchen design: wavy, textured and long. */
-    | 'texturedLong';
+    | 'texturedLong'
+    /** `humans.js`'s slick, combed-back hair with a highlight (Tony). */
+    | 'slick';
   /** `grey`: the Characters sheet's Steven (not in `humans.js`). */
   hair?: 'auburn' | 'ash' | 'caramel' | 'dark' | 'brown' | 'blond' | 'lblond' | 'sandy' | 'grey';
   skin?: 'light' | 'fair' | 'med';
@@ -58,7 +61,7 @@ export interface HumanFigureSpec {
   pattern?: 'stripes' | 'plaid' | 'dots';
   pattern2?: string;
   sleeveless?: boolean;
-  collar?: 'button' | 'polo' | 'zip' | 'crew' | 'shirtLight';
+  collar?: 'button' | 'polo' | 'zip' | 'crew' | 'shirtLight' | 'henley';
   necklace?: boolean;
   /** An earring colour; drawn only when given. */
   earrings?: string;
@@ -156,6 +159,13 @@ export interface HumanFigureSpec {
    * to his motion's hand layers (`src/npcs/motions/the-mullet.ts`).
    */
   arcadeHands?: 'resting' | 'playing';
+  /**
+   * The Mullet's ping-pong paddle in Jon's right (`'right'`) or Brandon's left
+   * (`'left'`) hand, at rest: the design swings it with a SMIL `rotate`, which
+   * starts at 0 (#149). A rest pose, so it shows under reduced motion;
+   * `replaceFigureRestPose` omits it for the motion's own paddle layer.
+   */
+  paddle?: 'right' | 'left';
   /**
    * Team Room 3's Sydney: a black headset with a mic boom, drawn over her
    * hair and held prop, verbatim from `design/Team Room 3.dc.html`.
@@ -503,6 +513,9 @@ function renderHumanFigure(spec: HumanFigureSpec, idPrefix: string): string {
   if (spec.collar === 'crew') {
     o += `<path d="M50 66 Q60 74 70 66" fill="none" stroke="${OUTLINE}" stroke-width="2"></path>`;
   }
+  if (spec.collar === 'henley') {
+    o += `<path d="M60 66 V82" stroke="${OUTLINE}" stroke-width="1.5"></path><circle cx="60" cy="72" r="1.5" fill="${OUTLINE}"></circle><circle cx="60" cy="78" r="1.5" fill="${OUTLINE}"></circle>`;
+  }
   if (spec.collar === 'shirtLight') {
     o += `<path d="M48 66 L60 80 L72 66 L66 62 L60 72 L54 62 Z" fill="#BFD6EE" stroke="${OUTLINE}" stroke-width="1.5"></path>`;
   }
@@ -542,6 +555,9 @@ function renderHumanFigure(spec: HumanFigureSpec, idPrefix: string): string {
   }
   if (style === 'curlyLong') {
     o += `<path d="M34 40 C30 16 50 8 62 12 C76 12 90 18 86 40 C82 30 74 24 60 26 C48 26 40 30 34 40 Z" fill="${hc}" stroke="${OUTLINE}" stroke-width="2.5"></path><circle cx="40" cy="26" r="6" fill="${hc}"></circle><circle cx="80" cy="26" r="6" fill="${hc}"></circle>`;
+  }
+  if (style === 'slick') {
+    o += `<path d="M35 34 C34 14 50 6 66 10 C82 12 88 20 85 34 C80 26 40 24 35 34 Z" fill="${hc}" stroke="${OUTLINE}" stroke-width="2.5"></path><path d="M40 22 Q60 12 82 20" fill="none" stroke="#F4F4F4" stroke-width="1.5" opacity=".35"></path>`;
   }
   if (style === 'texturedLong') {
     o += `<path d="M33 42 C30 18 48 9 60 11 C74 10 90 18 87 42 Q86 33 80 33 Q77 25 70 28 Q64 22 58 27 Q50 22 46 30 Q38 29 33 42 Z" fill="${hc}" stroke="${OUTLINE}" stroke-width="2.5"></path>`;
@@ -755,6 +771,14 @@ function renderHumanFigure(spec: HumanFigureSpec, idPrefix: string): string {
       `<circle cx="97" cy="91" r="6" fill="#0a3d4d" stroke="#00BDFF" stroke-width="2"></circle>` +
       `<circle cx="97" cy="91" r="2.5" fill="#00BDFF"></circle>` +
       `<rect x="104" y="85" width="3" height="3" fill="#D63C3C"></rect>`;
+  }
+  // The Mullet's ping-pong paddles (#149), at rest: the design's `<g>` swings
+  // one about the grip with a SMIL `rotate`, which starts at 0.
+  if (spec.paddle === 'right') {
+    o += `<g><rect x="87.5" y="88" width="5" height="14" rx="2" fill="#8B5A2B" stroke="${OUTLINE}" stroke-width="1.5"></rect><circle cx="90" cy="76" r="14" fill="#D9534F" stroke="${OUTLINE}" stroke-width="2"></circle></g>`;
+  }
+  if (spec.paddle === 'left') {
+    o += `<g><rect x="27.5" y="88" width="5" height="14" rx="2" fill="#8B5A2B" stroke="${OUTLINE}" stroke-width="1.5"></rect><circle cx="30" cy="76" r="14" fill="#D9534F" stroke="${OUTLINE}" stroke-width="2"></circle></g>`;
   }
   if (spec.cards) {
     o +=
