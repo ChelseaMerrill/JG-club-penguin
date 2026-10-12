@@ -173,12 +173,13 @@ describe('createStairKeys (#51 slice 4, S4-D10)', () => {
     expect(labels(h.used)).toEqual(['FLOOR 5']);
   });
 
-  it("uses floor 0's LOBBY door on ArrowDown: its coming-soon hint once per press, never on a held chain (UD-7, RT2-5)", () => {
+  it("uses floor 0's LOBBY door on ArrowDown into the Lobby, once per fresh press, never on a held chain (UD-7, RT2-5, #169)", () => {
     const h = setup('stairwell-1');
     h.keys.keydown(key('ArrowDown'));
     vi.advanceTimersByTime(STAIR_HOLD_MS);
     h.arrive('stairwell-0');
     vi.advanceTimersByTime(10_000);
+    // The held chain stops on floor 0: the door into the Lobby isn't a flight.
     expect(labels(h.used)).toEqual(['LOBBY']);
     expect(h.used[0]).toMatchObject({ targetRoomId: 'stairwell-0' });
 
@@ -186,11 +187,16 @@ describe('createStairKeys (#51 slice 4, S4-D10)', () => {
     h.keys.keydown(key('ArrowDown'));
     vi.advanceTimersByTime(STAIR_HOLD_MS);
     h.keys.keydown(key('ArrowDown', true));
+    h.arrive('lobby');
     vi.advanceTimersByTime(10_000);
 
     expect(h.used).toHaveLength(2);
-    expect(h.used[1]).toMatchObject({ label: 'LOBBY', targetRoomId: null });
-    expect(h.room.id).toBe('stairwell-0');
+    expect(h.used[1]).toMatchObject({
+      label: 'LOBBY',
+      targetRoomId: 'lobby',
+      entryTile: { col: 0, row: 4 },
+    });
+    expect(h.room.id).toBe('lobby');
   });
 
   it('only keeps a hold alive on auto-repeat: a repeat never starts a hold of its own', () => {

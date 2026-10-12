@@ -71,11 +71,12 @@ describe('MAP_ROOMS', () => {
     expect(isMapTileClickable(COMING_SOON_TILE)).toBe(false);
   });
 
-  it('gives every registered RoomDefinition exactly one clickable Map tile, except the LATAM section', () => {
+  it('gives every registered RoomDefinition exactly one clickable Map tile, except the LATAM section and the Lobby', () => {
     // The LATAM section (owner request, 2026-10-09) is reached only from the
     // Remote Lounge globe's LATAM pin and the Café's doors, never the Map -- unlike the Remote
     // Lounge itself, which does get a Map tile (`16 · REMOTE LOUNGE`, above).
-    const NOT_ON_THE_MAP = ['latam-cafe', 'latam-disco-hall', 'latam-futebol-field'];
+    // The Lobby (#169) has no tile until #174 adds one.
+    const NOT_ON_THE_MAP = ['latam-cafe', 'latam-disco-hall', 'latam-futebol-field', 'lobby'];
     for (const room of ROOM_DEFINITIONS) {
       // #51 slice 4 (RT2-4): the Stairwell's floors 1-5 have no tile of
       // their own; tile 12 opens floor 0 and stands for all six

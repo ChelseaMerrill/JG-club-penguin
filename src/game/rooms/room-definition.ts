@@ -160,6 +160,22 @@ export interface RoomWallText {
 }
 
 /**
+ * A decorative elevator floor display (#169): a live DOM label in `#ui`
+ * (`src/ui/floor-display/floor-display.ts`) over the plate the design draws
+ * above a Room's elevator doors, looping ▲/▼ through the floors as the
+ * design's own script does. Decorative only: it never follows a real ride.
+ * `x`/`y`/`width`/`height` are the design's div box in Stage pixels, before
+ * its `skewY` (degrees, the wall's slant, about its top-left corner).
+ */
+export interface RoomFloorDisplay {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  skewY: number;
+}
+
+/**
  * A Room is data: everything `RoomScene` needs to render and validate one
  * Room, and everything #14/#15/#16/#28 need to place Penguins, NPCs and
  * furniture in it.
@@ -187,4 +203,13 @@ export interface RoomDefinition {
   tankFish?: TankFish;
   /** Potted plants on these floor tiles, a decoration (`plants.ts`); each tile must be unwalkable. */
   plants?: readonly Tile[];
+  /**
+   * A line the local Player's own Penguin says once when a Session spawns
+   * into this Room (#169: the Lobby's "stairs or elevator?"). A local-only
+   * bubble, never sent on the Room channel, and not repeated on a later
+   * entry.
+   */
+  spawnLine?: string;
+  /** The elevator's decorative floor display (#169: the Lobby only). */
+  floorDisplay?: RoomFloorDisplay;
 }

@@ -71,6 +71,7 @@ type RoomId =
   | 'team-room-4'
   | 'bathroom'
   | 'the-mullet'
+  | 'lobby'
   | 'remote-lounge'
   | 'latam-cafe'
   | 'latam-disco-hall'
@@ -126,6 +127,7 @@ const ROOM_FILES: Record<RoomId, string> = {
   'team-room-4': 'Team Room 4.dc.html',
   bathroom: 'Room 13 Bathroom.dc.html', // #51 D1: the design calls it THE THAW ROOM.
   'the-mullet': 'The Mullet.dc.html', // #51 slice 3: THE MULLET (MEZZANINE).
+  lobby: 'Room 00 JGHQ Lobby.dc.html', // #169: the JG HQ Lobby, floor L.
   // #51 slice 4: one file, six Stages (`STAGE_SELECTORS` picks each floor's).
   'stairwell-0': 'Stairwell.dc.html',
   'stairwell-1': 'Stairwell.dc.html',
@@ -1213,6 +1215,50 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
       comment: 'Bottom chat/action toolbar (HUD).',
     },
   ],
+  // #169: the JG HQ Lobby. Security and the local player's "You" Penguin are
+  // static `peng()` sprites (shadow, figure, nameplate, then a speech
+  // bubble), so `labels` hides each figure and its bubble. Security is drawn
+  // live as a Human NPC behind the SIGN IN desk (`FOREGROUND_LAYERS.lobby`),
+  // and "stairs or elevator?" is the own Penguin's local spawn bubble. The
+  // elevator's floor display is a live DOM label (`src/ui/floor-display/`);
+  // its dark plate stays in the art. The two exit pills stay baked, frozen in
+  // their visible blink frame, like the Stairwell's: they are doors.
+  lobby: [
+    {
+      kind: 'labels',
+      texts: ['Security', 'Badge in. JG is on 5.', 'You', 'stairs or elevator?'],
+      comment:
+        "Security's and the local player's figures, nameplates and bubbles: each a flat run of shadow, figure, nameplate (and bubble) siblings.",
+    },
+    {
+      kind: 'selector',
+      selectors: [
+        'ellipse[cx="770"][cy="615"]',
+        'ellipse[cx="810"][cy="530"]',
+        'div[style*="skewY(26.565deg)"]',
+      ],
+      comment:
+        "Security's and the local player's ground shadows, pinned so a resync that moves them stops the export, and the elevator's live floor display (redrawn by `src/ui/floor-display/floor-display.ts`).",
+    },
+    {
+      kind: 'cluster',
+      anchor: 'JG HQ LOBBY',
+      companions: ['JG HQ LOBBY', '108 STATE ST · STREET LEVEL · JAHNEL GROUP IS ON 5'],
+      comment: 'Room title/subtitle banner (HUD).',
+    },
+    {
+      kind: 'cluster',
+      anchor: 'MENU',
+      companions: ['1,250', '12 ONLINE', 'MENU'],
+      comment: 'Top-right token/presence/menu HUD cluster.',
+    },
+    {
+      kind: 'cluster',
+      anchor: 'EMOTE',
+      companions: ['Say something…', 'EMOTE', 'SNOWBALL', 'QUESTS'],
+      comment: 'Bottom chat/action toolbar (HUD).',
+    },
+  ],
   'stairwell-0': stairwellRules(0),
   'stairwell-1': stairwellRules(1),
   'stairwell-2': stairwellRules(2),
@@ -1383,6 +1429,19 @@ type ArtFix = {
 const FOREGROUND_LAYERS: Partial<
   Record<RoomId, Array<{ name: string; selectors: string[]; comment: string }>>
 > = {
+  lobby: [
+    {
+      name: 'sign-in-desk',
+      selectors: [
+        'polygon[points="720,549 820,599 780,619 680,569"]',
+        'polygon[points="680,615 780,665 780,619 680,569"]',
+        'polygon[points="820,645 780,665 780,619 820,599"]',
+        'text[transform="matrix(1 -0.5 0 1 730 618)"]',
+      ],
+      comment:
+        'The SIGN IN desk: its top, two front faces and the "SIGN IN" lettering, drawn after Security, who stands behind it (#169).',
+    },
+  ],
   'dev-pit': [
     {
       name: 'nikolis-desk',

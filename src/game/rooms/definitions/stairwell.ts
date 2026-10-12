@@ -1,6 +1,7 @@
 import type { RoomId, Tile } from '../../../contracts';
 import type { DoorHotspot, RoomDefinition, RoomDoor, RoomNpcSlot } from '../room-definition';
 import { createGrid } from '../grid';
+import { LOBBY_STAIRS_SILL } from './lobby';
 import { roofDeck } from './roof-deck';
 
 // Not the standard 12x10 grid (#51 D2): every Stage of
@@ -170,18 +171,19 @@ function doorsFor(floor: number): FloorDoors {
       entryTile: UP_PILL_APPROACH,
     };
   } else {
-    // The Lobby (#169) isn't built yet, so this shows the coming-soon hint,
-    // as holding ↓ here does (UD-7). #169 sets its target.
+    // #169: floor 0's LOBBY door opens the Lobby, on the sill inside its
+    // STAIRS · FLOOR L door, which leads back here. Holding ↓ here uses it
+    // too (UD-7).
     down = {
       label: 'LOBBY',
       hotspot: LANDING_DOOR,
-      targetRoomId: null,
-      entryTile: { col: 0, row: 0 },
+      targetRoomId: 'lobby',
+      entryTile: LOBBY_STAIRS_SILL,
     };
   }
   doors.push(down);
   // Floor 0's "↙ LOBBY" pill shares the landing door's exit; ↓ still uses
-  // the door alone, so one press shows one hint.
+  // the door alone, so one press makes one Room change.
   if (floor === 0) doors.push({ ...down, hotspot: LOBBY_PILL });
   return { doors, up, down };
 }
@@ -234,10 +236,11 @@ function stairwellFloor({ floor, subtitle, guest }: StairwellFloorSpec): RoomDef
 /**
  * Traced from `design/Stairwell.dc.html`'s six Stages, "STAIRWELL · FLOOR
  * 0" to "STAIRWELL · FLOOR 5" (#51 slice 4, A2): one Room per Stairwell
- * floor. Floor 0 is the lobby level (`ROOM_FLOORS` 'L'), reached from the
- * Map; floor 5 is the JG HQ floor, reached from Town Center's STAIRWELL door.
- * "STAIRS CHALLENGE · SUBMIT" is baked into the art as decoration only, with
- * no door or hotspot over it (HD-3).
+ * floor. Floor 0 is floor L (`ROOM_FLOORS` 'L'), beside the Lobby, reached
+ * from the Lobby's STAIRS · FLOOR L door and the Map; floor 5 is the JG HQ
+ * floor, reached from Town Center's STAIRWELL door. "STAIRS CHALLENGE ·
+ * SUBMIT" is baked into the art as decoration only, with no door or hotspot
+ * over it (HD-3).
  */
 export const stairwell0 = stairwellFloor({
   floor: 0,

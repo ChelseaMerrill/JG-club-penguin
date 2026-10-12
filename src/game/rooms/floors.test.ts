@@ -34,6 +34,16 @@ describe('ROOM_FLOORS', () => {
     expect(ROOM_FLOORS.igloo).toBeNull();
   });
 
+  it('puts the Lobby on floor L, the same floor as Stairwell floor 0 (#169)', () => {
+    expect(ROOM_FLOORS.lobby).toBe('L');
+    expect(floorsDiffer(ROOM_FLOORS.lobby, ROOM_FLOORS['stairwell-0'])).toBe(false);
+  });
+
+  it('rides from the Lobby to Town Center in 6 s and to the Roof Deck in 7.2 s (#169)', () => {
+    expect(rideDurationMs(ROOM_FLOORS.lobby!, ROOM_FLOORS['town-center']!)).toBe(6000);
+    expect(rideDurationMs(ROOM_FLOORS.lobby!, ROOM_FLOORS['roof-deck']!)).toBe(7200);
+  });
+
   it('puts each Stairwell floor on its own floor, floor 0 on the lobby (#51 slice 4)', () => {
     expect(
       (

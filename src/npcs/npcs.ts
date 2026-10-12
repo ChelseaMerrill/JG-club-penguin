@@ -155,7 +155,10 @@ export type NpcId =
   | 'sydney-stairwell-2'
   | 'tony-stairwell-3'
   | 'jory-stairwell-4'
-  | 'ashley-stairwell-5';
+  | 'ashley-stairwell-5'
+  // #169: the Lobby's Security guard, behind the SIGN IN desk. Not a
+  // Characters-sheet person, so the id names the role and the Room.
+  | 'security-lobby';
 
 /**
  * A minigame-launching NPC's trigger dialog (#36 D4; round-1 review item 4
@@ -2459,6 +2462,33 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     bubbleOffsetX: 20,
     figure: ASHLEY_FIGURE,
   }),
+  // #169: the Lobby's Security, behind the SIGN IN desk. The design draws
+  // him as a Penguin, but NPCs the design draws as Penguins render as Humans
+  // (2026-09-29), and no Security figure exists in `humans.js` or on the
+  // Characters sheet, so his look is a proposed generic guard: a dark
+  // uniform polo and a buzz cut (to be approved from the #169 screenshots).
+  // His one static bubble is the design's own, and is his dialog line too.
+  'security-lobby': {
+    id: 'security-lobby',
+    name: 'Security',
+    title: null,
+    roomId: 'lobby',
+    kind: 'human',
+    tagName: 'Security',
+    dialogLines: ['Badge in. JG is on 5.'],
+    idleLines: staticLine('Badge in. JG is on 5.'),
+    dialog: LINE_DIALOG,
+    // The design's Security nameplate is the dark Penguin-NPC pill.
+    nameplate: 'dark',
+    still: true,
+    figure: {
+      style: 'buzz',
+      hair: 'dark',
+      skin: 'med',
+      top: '#161719',
+      collar: 'polo',
+    },
+  },
   // Jessie: the design draws her as a Penguin in the Bathroom, but only
   // Players appear as Penguins in the World (owner decision 2026-09-25; see
   // PR #133) -- dropped here and from the Bathroom's own npcSlots. Spelled

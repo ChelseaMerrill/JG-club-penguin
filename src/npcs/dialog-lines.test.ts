@@ -37,6 +37,8 @@ const AWAITING_BA_LINE: readonly string[] = [
   // Linda Martin, placed in The Icebox with one card line (owner request,
   // 2026-10-09).
   'linda-martin',
+  // #169: the Lobby's Security, whose design gives him one line.
+  'security-lobby',
   // The 19 LATAM JGers (7 Café, 6 Disco Hall, 6 Futebol Field) are NOT here
   // (owner request, 2026-10-09): their character sheet gives no quote at all,
   // and rather than inventing placeholder flavor text pending BA copy, they

@@ -101,6 +101,25 @@ describe('NPCS', () => {
     }
   });
 
+  it("places the Lobby's Security in the Lobby only, as a Human with the design's one line (#169)", () => {
+    const security = NPCS['security-lobby'];
+    const rooms = ROOM_DEFINITIONS.filter((room) =>
+      room.npcSlots.some((slot) => slot.npcId === 'security-lobby'),
+    ).map((room) => room.id);
+
+    expect(rooms).toEqual(['lobby']);
+    expect(security).toMatchObject({
+      kind: 'human',
+      roomId: 'lobby',
+      name: 'Security',
+      tagName: 'Security',
+      title: null,
+      dialog: { kind: 'line' },
+      dialogLines: ['Badge in. JG is on 5.'],
+      idleLines: [{ text: 'Badge in. JG is on 5.', periodS: 0, delayS: 0 }],
+    });
+  });
+
   it('no longer places Dom in the Dev Pit (owner request, 2026-09-25, Track D)', () => {
     expect(devPit.npcSlots.some((slot) => slot.npcId === 'dom')).toBe(false);
     expect(NPCS.dom).toBeDefined();
@@ -190,7 +209,8 @@ describe('NPCS', () => {
   });
 
   it("draws the Team Rooms' and the Mullet's Humans as their Room designs do (#149)", () => {
-    // Dark nameplates: every Team Room NPC still placed, and the Mullet's Jon and Brandon (not Tony).
+    // Dark nameplates: every Team Room NPC still placed, the Mullet's Jon and
+    // Brandon (not Tony), and the Lobby's Security (#169).
     const dark = Object.values(NPCS)
       .filter((npc) => npc.nameplate === 'dark')
       .map((npc) => npc.id)
@@ -205,6 +225,7 @@ describe('NPCS', () => {
         'ryan-team-room-4',
         'jon-mullet',
         'brandon-mullet',
+        'security-lobby',
       ].sort(),
     );
     expect(NPCS.tony.nameplate).toBeUndefined();

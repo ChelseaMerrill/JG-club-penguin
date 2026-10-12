@@ -39,6 +39,8 @@ export const ROOM_FLOORS: Record<RoomId, FloorId | null> = {
   bathroom: '5',
   // #51 slice 3: THE MULLET is the JG HQ floor's mezzanine.
   'the-mullet': '5',
+  // #169: the JG HQ Lobby is floor L, street level, beside Stairwell floor 0.
+  lobby: 'L',
   // #51 slice 4: each Stairwell floor sits on its own floor of the building;
   // its floor 0 is the lobby level.
   'stairwell-0': 'L',

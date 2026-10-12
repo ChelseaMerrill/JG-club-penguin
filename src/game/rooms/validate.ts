@@ -132,6 +132,33 @@ function checkWallTextInStage(room: RoomDefinition, errors: RoomValidationError[
 }
 
 /**
+ * A `spawnLine` must say something, and a `floorDisplay` must lie within
+ * the Stage with a positive size (#169).
+ */
+function checkSpawnLineAndFloorDisplay(room: RoomDefinition, errors: RoomValidationError[]): void {
+  if (room.spawnLine !== undefined && room.spawnLine.trim() === '') {
+    errors.push({ roomId: room.id, message: 'spawnLine must not be empty' });
+  }
+  const display = room.floorDisplay;
+  if (display) {
+    const { x, y, width, height } = display;
+    const valid =
+      width > 0 &&
+      height > 0 &&
+      x >= 0 &&
+      y >= 0 &&
+      x + width <= GAME_WIDTH &&
+      y + height <= GAME_HEIGHT;
+    if (!valid) {
+      errors.push({
+        roomId: room.id,
+        message: `floorDisplay { x: ${x}, y: ${y}, width: ${width}, height: ${height} } is outside the ${GAME_WIDTH}x${GAME_HEIGHT} Stage`,
+      });
+    }
+  }
+}
+
+/**
  * Checks the invariants #13's acceptance criteria name: unique ids; a
  * walkable spawn tile; a `walkable` mask shaped exactly `grid.rows` x
  * `grid.columns`; NPC/furniture/prop slots in bounds; and doors that either
@@ -154,6 +181,7 @@ export function validateRoomDefinitions(rooms: readonly RoomDefinition[]): RoomV
     checkSlotsInBounds(room, errors);
     checkHotspotsInStage(room, errors);
     checkWallTextInStage(room, errors);
+    checkSpawnLineAndFloorDisplay(room, errors);
 
     if (!isWalkable(room, room.spawnTile)) {
       errors.push({

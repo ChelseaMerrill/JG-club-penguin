@@ -56,8 +56,7 @@ describe('flightFor (S4-D2, UD-5, START CLIMB 2026-10-11)', () => {
   it('never starts a climb on arriving at floor 0: only its START CLIMB button does', () => {
     expect(flightFor('town-center', 'stairwell-0', 'map')).toBeNull();
     expect(flightFor('stairwell-3', 'stairwell-0', 'map')).toBeNull();
-    // A non-Stairwell Room standing in for #169's Lobby.
-    expect(flightFor('office-hallway', 'stairwell-0', 'door')).toBeNull();
+    expect(flightFor('lobby', 'stairwell-0', 'door')).toBeNull();
   });
 
   it('logs nothing for a descent onto floor 0, a key press, or a spawn', () => {
@@ -183,8 +182,19 @@ describe('Stairwell doors (S4-D4)', () => {
     }
   });
 
-  it("keeps floor 0's LOBBY door disabled until #169 builds the Lobby", () => {
-    expect(door(floors[0]!, 'LOBBY').targetRoomId).toBeNull();
+  it("opens the Lobby from floor 0's LOBBY door, on the sill inside its STAIRS door (#169)", () => {
+    const lobbyRoom = getRoomDefinition('lobby');
+    const stairs = lobbyRoom.doors.find((each) => each.label === 'STAIRS · FLOOR L')!;
+    const { x, y, width, height } = stairs.hotspot;
+    const sill = screenToTile({ x: x + width / 2, y: y + height }, lobbyRoom.grid.origin);
+    expect(door(floors[0]!, 'LOBBY')).toMatchObject({ targetRoomId: 'lobby', entryTile: sill });
+    expect(sill).toEqual({ col: 0, row: 4 });
+  });
+
+  it('logs no flight between the Lobby and floor 0, either way (#169)', () => {
+    expect(flightFor('lobby', 'stairwell-0', 'door')).toBeNull();
+    expect(flightFor('stairwell-0', 'lobby', 'door')).toBeNull();
+    expect(flightFor('stairwell-0', 'lobby', 'keys')).toBeNull();
   });
 
   it("gives each floor its ↑/↓ key exits: the pills, floor 5's Roof Deck flight and floor 0's LOBBY door", () => {
@@ -200,7 +210,7 @@ describe('Stairwell doors (S4-D4)', () => {
       ['FLOOR 5', 'FLOOR 3'],
       ['ROOF DECK', 'FLOOR 4'],
     ]);
-    expect(stairwellExit('stairwell-0', 'down')?.targetRoomId).toBeNull();
+    expect(stairwellExit('stairwell-0', 'down')?.targetRoomId).toBe('lobby');
     expect(stairwellExit('town-center' as RoomId, 'up')).toBeUndefined();
   });
 
@@ -212,9 +222,9 @@ describe('Stairwell doors (S4-D4)', () => {
       { x: 36, y: 748, width: 191, height: 40 },
     ]);
     for (const lobby of lobbies) {
-      expect(lobby).toMatchObject({ targetRoomId: null, entryTile: lobbies[0]!.entryTile });
+      expect(lobby).toMatchObject({ targetRoomId: 'lobby', entryTile: { col: 0, row: 4 } });
     }
-    // ↓ keeps the landing door alone, so one press shows one hint.
+    // ↓ keeps the landing door alone, so one press makes one Room change.
     expect(stairwellExit(bottom.id, 'down')).toBe(lobbies[0]);
 
     const jgHqs = top.doors.filter((each) => each.label === 'JG HQ');

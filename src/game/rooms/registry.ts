@@ -5,6 +5,7 @@ import { igloo } from './definitions/igloo';
 import { latamCafe } from './definitions/latam-cafe';
 import { latamDiscoHall } from './definitions/latam-disco-hall';
 import { latamFutebolField } from './definitions/latam-futebol-field';
+import { lobby } from './definitions/lobby';
 import { officeHallway } from './definitions/office-hallway';
 import { remoteLounge } from './definitions/remote-lounge';
 import { roofDeck } from './definitions/roof-deck';
@@ -42,6 +43,7 @@ export const ROOM_DEFINITIONS: readonly RoomDefinition[] = [
   teamRoom4,
   bathroom,
   theMullet,
+  lobby,
   stairwell0,
   stairwell1,
   stairwell2,

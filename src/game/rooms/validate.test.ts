@@ -441,6 +441,38 @@ describe('validateRoomDefinitions', () => {
 
     expect(validateRoomDefinitions(rooms)).toEqual([]);
   });
+
+  it('flags an empty spawnLine (#169)', () => {
+    expect(validateRoomDefinitions([room({ id: 'lobby', spawnLine: '  ' })])).toEqual([
+      { roomId: 'lobby', message: 'spawnLine must not be empty' },
+    ]);
+  });
+
+  it('flags a floorDisplay outside the Stage or with no size (#169)', () => {
+    const outside = { x: 1590, y: 317, width: 72, height: 20, skewY: 26.565 };
+    const empty = { x: 1044, y: 317, width: 0, height: 20, skewY: 26.565 };
+
+    expect(validateRoomDefinitions([room({ id: 'lobby', floorDisplay: outside })])).toEqual([
+      {
+        roomId: 'lobby',
+        message:
+          'floorDisplay { x: 1590, y: 317, width: 72, height: 20 } is outside the 1600x900 Stage',
+      },
+    ]);
+    expect(validateRoomDefinitions([room({ id: 'lobby', floorDisplay: empty })])).toHaveLength(1);
+  });
+
+  it('accepts a spawnLine and a floorDisplay inside the Stage (#169)', () => {
+    const rooms = [
+      room({
+        id: 'lobby',
+        spawnLine: 'stairs or elevator?',
+        floorDisplay: { x: 1044, y: 317, width: 72, height: 20, skewY: 26.565 },
+      }),
+    ];
+
+    expect(validateRoomDefinitions(rooms)).toEqual([]);
+  });
 });
 
 // #16 fix 3: the verification-map assertions the execution plan named but
@@ -599,11 +631,16 @@ describe('ROOM_DEFINITIONS registry', () => {
       bathroom: ['office-hallway'],
       // #51 slice 3: one-way doors out; nothing draws a door in (D5).
       'the-mullet': ['dev-pit', 'office-hallway'],
+      // #169: the Lobby's STAIRS · FLOOR L door and pill open floor 0; its
+      // ELEVATOR · FLOOR 5 door and pill ride to Town Center (until #170 C's
+      // floor picker).
+      lobby: ['stairwell-0', 'stairwell-0', 'town-center', 'town-center'],
       // #51 slice 4: each floor's ↑ pill and upper stair flight both climb a
-      // floor, and its ↓ pill descends one. Floor 0's LOBBY door waits for
-      // #169 (its "↙ LOBBY" pill too); floor 5's flight leads to the Roof
-      // Deck, and its JG HQ door and "↙ FLOOR 5 · JG HQ" pill to Town Center.
-      'stairwell-0': ['stairwell-1', 'stairwell-1'],
+      // floor, and its ↓ pill descends one. Floor 0's LOBBY door and its
+      // "↙ LOBBY" pill open the Lobby (#169); floor 5's flight leads to the
+      // Roof Deck, and its JG HQ door and "↙ FLOOR 5 · JG HQ" pill to Town
+      // Center.
+      'stairwell-0': ['lobby', 'lobby', 'stairwell-1', 'stairwell-1'],
       'stairwell-1': ['stairwell-0', 'stairwell-2', 'stairwell-2'],
       'stairwell-2': ['stairwell-1', 'stairwell-3', 'stairwell-3'],
       'stairwell-3': ['stairwell-2', 'stairwell-4', 'stairwell-4'],

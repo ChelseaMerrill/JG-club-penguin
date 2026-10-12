@@ -15,6 +15,8 @@ export const ROOM_IDS = [
   'team-room-4',
   'bathroom',
   'the-mullet',
+  // #169: the JG HQ Lobby, floor L (street level), where every Session starts.
+  'lobby',
   // #51 slice 4: one Room per Stairwell floor, floor 0 (the lobby level) to 5.
   'stairwell-0',
   'stairwell-1',
