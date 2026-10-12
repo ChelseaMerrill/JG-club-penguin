@@ -164,8 +164,12 @@ export const THE_MULLET_MOTIONS: Partial<Record<NpcId, NpcMotionSpec>> = {
   // Tony lines up a shot, walks round the pool table, and shoots again from
   // the far side, then walks back (`animateMotion` `M0 0 L0 83 L150 153 L210
   // 133`, `keyPoints` `0;0;1;1;0` at `keyTimes` `0;0.3333;0.5;0.8333;1` of
-  // 12s, linear: constant speed, so the corners fall at their 26.6% and
-  // 79.7% shares of the 311.8 px path). His slot `offset` puts him where the
+  // 12s, linear). The game ends his walk at (280, 90) instead of the design's
+  // (210, 133): there the design's far cue, which points along the table's
+  // long axis, sat 33 px below the felt beside the long side and stroked the
+  // table's front face; from the right short end it lies along the felt
+  // (2026-10-11, @milliehime; flagged for the design). Constant speed, so the
+  // corners fall at their 21.1% and 63.2% shares of the 393.0 px path. His slot `offset` puts him where the
   // design does. While he stands at each end, one of the design's two cues
   // shows (a discrete opacity: `1;0` at `0;0.3333`, then `0;1;0` at
   // `0;0.5;0.8333`) and strokes (`0 0;-12 -1.4;0 0;0 0`, and `0 0;12 6.4;0
@@ -176,7 +180,7 @@ export const THE_MULLET_MOTIONS: Partial<Record<NpcId, NpcMotionSpec>> = {
   tony: {
     path: {
       keyframes:
-        '@keyframes tonyRound { 0%,33.33% { transform: translate(0,0);} 37.77% { transform: translate(0,83px);} 46.62% { transform: translate(150px,153px);} 50%,83.33% { transform: translate(210px,133px);} 86.71% { transform: translate(150px,153px);} 95.56% { transform: translate(0,83px);} 100% { transform: translate(0,0);} }',
+        '@keyframes tonyRound { 0%,33.33% { transform: translate(0,0);} 36.85% { transform: translate(0,83px);} 43.87% { transform: translate(150px,153px);} 50%,83.33% { transform: translate(280px,90px);} 89.46% { transform: translate(150px,153px);} 96.48% { transform: translate(0,83px);} 100% { transform: translate(0,0);} }',
       animation: 'tonyRound 12s linear infinite',
     },
     props: [
