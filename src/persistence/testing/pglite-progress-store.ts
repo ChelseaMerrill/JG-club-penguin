@@ -62,6 +62,7 @@ export const MIGRATIONS = [
   ['quest-pair-flaky-test', '20261009000000_quest_pair_flaky_test.sql'],
   ['quest-pitch-hack', '20261009010000_quest_pitch_hack.sql'],
   ['stair-climb', '20261011000000_stair_climb.sql'],
+  ['door-network-guard-posts', '20261012000000_door_network_guard_posts.sql'],
 ] as const;
 
 export type MigrationName = (typeof MIGRATIONS)[number][0];
@@ -665,8 +666,15 @@ export interface PgliteLeaderboardFixture {
   runSqlAs<T>(playerId: string, sql: string, params?: unknown[]): Promise<{ rows: T[] }>;
 }
 
-export async function createPgliteLeaderboardFixture(): Promise<PgliteLeaderboardFixture> {
-  const db = await getSharedDb();
+/**
+ * The fixture over this test file's shared database, or over `options.db`
+ * (e.g. a fresh `createPgliteDb()`, which the caller closes) for a test that
+ * must not see what earlier tests left behind (#170 RT170-21/-25).
+ */
+export async function createPgliteLeaderboardFixture(
+  options: { db?: PGliteInterface } = {},
+): Promise<PgliteLeaderboardFixture> {
+  const db = options.db ?? (await getSharedDb());
 
   async function addPlayer(penguinName: string): Promise<string> {
     const playerId = randomUUID();
