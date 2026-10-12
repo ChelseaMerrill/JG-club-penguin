@@ -33,21 +33,57 @@ export interface DoorFocus {
  * buttons never take the pointer (`pointer-events: none`), and the whole
  * layer is `inert` while `isBlocked()`: `refresh()` is called on every event
  * that can change it (overlays opening and closing, Room changes, the
- * Elevator hiding), with no polling.
+ * Elevator hiding), with no polling. An exit focused when the layer was
+ * blocked gets focus back once it's unblocked, if focus was left nowhere
+ * (review MINOR-2: Enter on Anthony's door, then closing his dialog).
  */
 export function createDoorFocus(root: HTMLElement, deps: DoorFocusDeps): DoorFocus {
   const layer = document.createElement('div');
   layer.className = 'door-focus';
   root.append(layer);
 
+  /**
+   * Review MINOR-2: the exit whose button had focus when the layer was
+   * blocked (Anthony's dialog after Enter, PR C's picker), to focus again
+   * once it's unblocked if focus was left nowhere.
+   */
+  let rememberedLabel: string | null = null;
+  /** The button blurred in this task, for an overlay that takes focus just before it opens. */
+  let blurredLabel: string | null = null;
+
+  function buttonFor(label: string): HTMLButtonElement | undefined {
+    return Array.from(layer.querySelectorAll<HTMLButtonElement>('.door-focus__door')).find(
+      (button) => button.dataset.doorLabel === label,
+    );
+  }
+
+  function focusIsNowhere(): boolean {
+    const active = document.activeElement;
+    return active === null || active === document.body;
+  }
+
+  /** Focuses the remembered exit again if focus was left nowhere; forgets it either way. */
+  function restoreFocus(): void {
+    const label = rememberedLabel;
+    rememberedLabel = null;
+    if (label === null || !focusIsNowhere()) return;
+    buttonFor(label)?.focus();
+  }
+
   function refresh(): void {
     const blocked = deps.isBlocked();
-    const hadFocus = layer.contains(document.activeElement);
+    const active = document.activeElement as HTMLElement | null;
+    const hadFocus = active !== null && layer.contains(active);
+    if (blocked) {
+      if (hadFocus) rememberedLabel = active.dataset.doorLabel ?? null;
+      else if (blurredLabel !== null) rememberedLabel = blurredLabel;
+    }
     layer.toggleAttribute('inert', blocked);
     if (blocked && hadFocus) {
-      (document.activeElement as HTMLElement | null)?.blur();
+      active.blur();
       deps.focusChanged(null);
     }
+    if (!blocked) restoreFocus();
   }
 
   return {
@@ -66,7 +102,13 @@ export function createDoorFocus(root: HTMLElement, deps: DoorFocusDeps): DoorFoc
           button.style.width = `${door.hotspot.width}px`;
           button.style.height = `${door.hotspot.height}px`;
           button.addEventListener('focus', () => deps.focusChanged(door));
-          button.addEventListener('blur', () => deps.focusChanged(null));
+          button.addEventListener('blur', () => {
+            deps.focusChanged(null);
+            blurredLabel = door.label;
+            queueMicrotask(() => {
+              if (blurredLabel === door.label) blurredLabel = null;
+            });
+          });
           // Enter and Space both click a focused button; the pointer never can.
           button.addEventListener('click', () => {
             if (!deps.isBlocked()) deps.activate(door);

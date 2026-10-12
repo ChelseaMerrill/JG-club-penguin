@@ -119,4 +119,75 @@ describe('createDoorFocus (#170 D6)', () => {
     expect(focusChanged).toHaveBeenCalledWith(null);
     expect(buttons().map((b) => b.dataset.doorLabel)).toEqual(['STAIRS']);
   });
+
+  describe('focus return (review MINOR-2)', () => {
+    /** An overlay with one button, which takes focus as it opens (as the NPC dialog does). */
+    function openOverlay(focusFirst: boolean): { close: () => void } {
+      const panel = document.createElement('div');
+      const button = document.createElement('button');
+      panel.append(button);
+      document.body.append(panel);
+      const close = () => panel.remove();
+      if (focusFirst) button.focus();
+      overlays.open('dialog', close);
+      if (!focusFirst) button.focus();
+      return { close: () => overlays.close('dialog') };
+    }
+
+    it('re-focuses the exit used once its overlay closes and leaves focus nowhere', () => {
+      focus.render([JG_HQ, STAIRS]);
+      buttons()[1]!.focus();
+      const dialog = openOverlay(false);
+      expect(document.activeElement).not.toBe(buttons()[1]);
+      dialog.close();
+      expect(document.activeElement).toBe(buttons()[1]);
+    });
+
+    it('also when the overlay takes focus just before it opens (a blur in the same task)', () => {
+      focus.render([JG_HQ, STAIRS]);
+      buttons()[0]!.focus();
+      const dialog = openOverlay(true);
+      dialog.close();
+      expect(document.activeElement).toBe(buttons()[0]);
+    });
+
+    it('leaves focus alone when something else has it after the close', () => {
+      focus.render([JG_HQ, STAIRS]);
+      buttons()[1]!.focus();
+      overlays.open('menu', () => {});
+      const elsewhere = document.createElement('input');
+      document.body.append(elsewhere);
+      overlays.close('menu');
+      elsewhere.focus();
+      focus.refresh();
+      expect(document.activeElement).toBe(elsewhere);
+      elsewhere.remove();
+    });
+
+    it('never pulls focus back after a plain Tab away, with nothing blocking', async () => {
+      focus.render([JG_HQ]);
+      buttons()[0]!.focus();
+      buttons()[0]!.blur();
+      await Promise.resolve();
+      overlays.open('menu', () => {});
+      overlays.close('menu');
+      expect(document.activeElement).not.toBe(buttons()[0]);
+    });
+
+    it('re-focuses the same exit after a transition if the next Room has it, else forgets it', () => {
+      focus.render([JG_HQ, STAIRS]);
+      buttons()[1]!.focus();
+      blocked = true;
+      focus.refresh(); // room:leave mid-transition
+      blocked = false;
+      focus.render([STAIRS, JG_HQ]);
+      expect(document.activeElement).toBe(buttons()[0]);
+
+      blocked = true;
+      focus.refresh();
+      blocked = false;
+      focus.render([LOBBY]);
+      expect(document.activeElement).toBe(document.body);
+    });
+  });
 });
