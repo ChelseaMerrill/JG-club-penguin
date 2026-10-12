@@ -253,6 +253,15 @@ for (const [room, exits] of DESIGN) {
         continue;
       }
 
+      // #170 D9: an Elevator door asks which floor first; pick the one it links to.
+      const floor = door.floorChoices?.find((choice) => choice.targetRoomId === target)?.floor;
+      if (floor) {
+        await page
+          .getByRole('dialog', { name: 'ELEVATOR · PICK A FLOOR' })
+          .getByRole('button', { name: new RegExp(`^${floor} /`) })
+          .click({ timeout: WALK_TIMEOUT });
+      }
+
       await expect
         .poll(async () => (await debugInfo(page))?.roomId, { timeout: WALK_TIMEOUT, message: name })
         .toBe(target);
