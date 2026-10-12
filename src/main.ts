@@ -1412,6 +1412,17 @@ createNpcDialog(getUiLayer(), {
   // itself refuses (toasting) until steps 1-4 are met, so this shows
   // whenever the Quest is in progress rather than re-deriving step
   // completeness here.
+  // #224: an open dialog rebuilds these buttons when Quest progress or the
+  // coffee run changes, so a step recorded by the dialog's own click (Linda's
+  // "talk to Linda") shows its button without reopening.
+  onQuestStateChange: (listener) => {
+    const offQuests = quests.onChange(listener);
+    const offCoffee = coffee.onChange(listener);
+    return () => {
+      offQuests();
+      offCoffee();
+    };
+  },
   extraActions: (npcId) => {
     if (npcId === 'tom' && coffee.canAskTom()) {
       return [{ label: TOM_COFFEE_ACTION_LABEL, run: () => void coffee.askTom() }];

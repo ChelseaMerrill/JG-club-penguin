@@ -3,11 +3,13 @@ import { expect, test, type Page } from '@playwright/test';
 import type { RoomId } from '../src/contracts';
 import { npcLayout } from '../src/game/npcs/npc-layout';
 import { devPit } from '../src/game/rooms/definitions/dev-pit';
+import { theMelt } from '../src/game/rooms/definitions/the-melt';
 import { npcSlotPoint } from '../src/game/rooms/iso';
 import type { RoomDefinition } from '../src/game/rooms/room-definition';
 import { GAME_HEIGHT, GAME_WIDTH } from '../src/game/stage-size';
 import { dialogLinePool } from '../src/npcs/dialog-lines';
 import { NPCS, type NpcId } from '../src/npcs/npcs';
+import { TOM_COFFEE_ACTION_LABEL } from '../src/quests/coffee-run';
 import type { RoomDebugInfo } from './support/room-debug-types';
 
 /**
@@ -123,5 +125,81 @@ test('The Mullet: Jon offers "Got any work for me?" and answers with his nothing
   await expect(page.locator('.npc-dialog')).toBeVisible();
   await page.screenshot({ path: `${PROOF_DIR}/quest-giver-offer.png` });
 
+  expect(errors).toEqual([]);
+});
+
+/** Every dialog button's label, whether its text overflows the button, and whether the button stays inside the panel. */
+async function buttonFits(page: Page) {
+  return page.evaluate(() => {
+    const panel = document.querySelector('.npc-dialog__panel')!.getBoundingClientRect();
+    return Array.from(document.querySelectorAll<HTMLElement>('.npc-dialog__actions button')).map(
+      (button) => {
+        const rect = button.getBoundingClientRect();
+        return {
+          label: button.textContent,
+          // CSS px: the #ui layer is scaled to the letterboxed Stage, so rects aren't.
+          height: button.offsetHeight,
+          clipped:
+            button.scrollWidth > button.clientWidth || button.scrollHeight > button.clientHeight,
+          inside: rect.left >= panel.left && rect.right <= panel.right,
+        };
+      },
+    );
+  });
+}
+
+/** Adds an errand button with `label` and the real classes, as `extraActions` renders one. */
+async function addErrandButton(page: Page, label: string): Promise<void> {
+  await page.evaluate((text) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'npc-dialog__button npc-dialog__button--extra';
+    button.textContent = text;
+    document.querySelector('.npc-dialog__actions')!.append(button);
+  }, label);
+}
+
+test("The Melt: Tom's three dialog buttons wrap onto rows without clipping a label (#224)", async ({
+  page,
+}) => {
+  const errors = await bootRoom(page, 'the-melt');
+  await openDialog(page, theMelt, 'tom');
+  // Tom's own two Coffee Rush buttons, plus his Nicole's-coffee errand. That
+  // errand only shows mid-Quest, which needs a signed-in Player, so the test
+  // adds a button with its exact label and classes alongside the real two.
+  await addErrandButton(page, TOM_COFFEE_ACTION_LABEL);
+
+  const fits = await buttonFits(page);
+  expect(fits).toHaveLength(3);
+  // Single-line buttons keep the design's 48px chevron height.
+  for (const fit of fits) expect(fit.height, String(fit.label)).toBe(48);
+  for (const fit of fits) {
+    expect(fit, String(fit.label)).toMatchObject({ clipped: false, inside: true });
+  }
+  await page
+    .locator('.npc-dialog__panel')
+    .screenshot({ path: `${PROOF_DIR}/tom-three-buttons.png` });
+
+  // Keyboard focus shows as a light bottom bar, not an inset ring the chevron
+  // clips down to a white top edge and side tips (#224).
+  await page.keyboard.press('Tab');
+  await page.keyboard.press('Shift+Tab');
+  const focusShadow = await page.evaluate(() =>
+    document.activeElement?.matches('.npc-dialog__button:focus-visible')
+      ? getComputedStyle(document.activeElement).boxShadow
+      : null,
+  );
+  expect(focusShadow).not.toBeNull();
+  expect(focusShadow!.split('inset').length - 1).toBe(1);
+  await page.locator('.npc-dialog__panel').screenshot({ path: `${PROOF_DIR}/focused-button.png` });
+
+  // A label too long for a whole row wraps inside a taller button, never clipped.
+  await addErrandButton(page, 'Ask Tom for the extra-hot oat latte with two pumps of vanilla');
+  for (const fit of await buttonFits(page)) {
+    expect(fit, String(fit.label)).toMatchObject({ clipped: false, inside: true });
+  }
+  await page
+    .locator('.npc-dialog__panel')
+    .screenshot({ path: `${PROOF_DIR}/long-errand-label.png` });
   expect(errors).toEqual([]);
 });

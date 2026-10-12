@@ -54,6 +54,14 @@ export interface NpcDialogDeps {
   extraActions?: (npcId: NpcId) => readonly NpcExtraAction[];
   /** Omitted (tests, or before Quests are wired): every quest giver answers as if no Quest were connected. */
   quests?: NpcDialogQuests;
+  /**
+   * Subscribes to whatever `extraActions` and `quests` read; returns an
+   * unsubscribe (#224). While the dialog is open, each call re-reads them and
+   * rebuilds the Quest buttons if they changed, keeping the dialog's line: the
+   * click that starts a Quest records its first step asynchronously, so the
+   * step's own button (Linda's "Pitch Linda") appears in the same dialog.
+   */
+  onQuestStateChange?: (listener: () => void) => () => void;
   /** Picks each dialog line (#144 D3); `Math.random` by default, injected by tests. */
   random?: () => number;
 }
@@ -150,6 +158,8 @@ export function createNpcDialog(root: HTMLElement, deps: NpcDialogDeps): NpcDial
    * different one (#144 D3). In memory for the page's lifetime only.
    */
   const lastLineByNpc = new Map<string, string>();
+  /** The Quest buttons' labels as last rendered, so a refresh with nothing new is a no-op (#224). */
+  let shownQuestButtons: readonly string[] = [];
 
   function handleClose(): void {
     deps.overlays.close(NPC_DIALOG_OVERLAY_ID);
@@ -176,10 +186,11 @@ export function createNpcDialog(root: HTMLElement, deps: NpcDialogDeps): NpcDial
 
   /**
    * Appends "Got any work for me?" after any existing buttons (#144 D7/D8),
-   * when this appearance is a quest giver with something to say.
+   * when this appearance is a quest giver with something to say. Returns
+   * whether it did.
    */
-  function appendQuestGiverButton(npc: NpcDefinition): void {
-    if (questGiverResponse(npc) === null) return;
+  function appendQuestGiverButton(npc: NpcDefinition): boolean {
+    if (questGiverResponse(npc) === null) return false;
     actionsEl.append(
       actionButton('npc-dialog__button npc-dialog__button--quest', QUEST_GIVER_BUTTON_LABEL, () => {
         // Re-resolved on click: progress may have loaded since the dialog opened.
@@ -198,6 +209,7 @@ export function createNpcDialog(root: HTMLElement, deps: NpcDialogDeps): NpcDial
         lineEl.textContent = response.text;
       }),
     );
+    return true;
   }
 
   /** A fresh line for a line or stall NPC, never the one it showed last (#144 D3). */
@@ -273,7 +285,20 @@ export function createNpcDialog(root: HTMLElement, deps: NpcDialogDeps): NpcDial
       }
       // 'line': no extra action buttons; the panel's own close button covers it.
     }
-    for (const extra of deps.extraActions?.(npc.id) ?? []) {
+    appendQuestButtons(npc);
+  }
+
+  /** The Quest buttons' labels this NPC would show right now: its errands, then "Got any work for me?". */
+  function questButtonLabels(npc: NpcDefinition): string[] {
+    const labels = (deps.extraActions?.(npc.id) ?? []).map((extra) => extra.label);
+    if (questGiverResponse(npc) !== null) labels.push(QUEST_GIVER_BUTTON_LABEL);
+    return labels;
+  }
+
+  /** Appends the Quest errand buttons (#141) and "Got any work for me?" (#144) after the NPC's own. */
+  function appendQuestButtons(npc: NpcDefinition): void {
+    const extras = deps.extraActions?.(npc.id) ?? [];
+    for (const extra of extras) {
       actionsEl.append(
         actionButton('npc-dialog__button npc-dialog__button--extra', extra.label, () => {
           extra.run();
@@ -281,7 +306,46 @@ export function createNpcDialog(root: HTMLElement, deps: NpcDialogDeps): NpcDial
         }),
       );
     }
-    appendQuestGiverButton(npc);
+    const labels = extras.map((extra) => extra.label);
+    if (appendQuestGiverButton(npc)) labels.push(QUEST_GIVER_BUTTON_LABEL);
+    shownQuestButtons = labels;
+  }
+
+  /**
+   * Rebuilds the open dialog's Quest buttons when what they read has changed
+   * (#224), leaving its line and the NPC's own buttons alone. Focus stays in
+   * the dialog if a focused button is replaced.
+   */
+  function refreshQuestButtons(): void {
+    if (panel.hidden || openNpcId === null) return;
+    const npc = getNpcDefinition(openNpcId);
+    if (!npc) return;
+    const next = questButtonLabels(npc);
+    if (
+      next.length === shownQuestButtons.length &&
+      next.every((label, i) => label === shownQuestButtons[i])
+    ) {
+      return;
+    }
+    const focused = document.activeElement;
+    const focusedLabel =
+      focused instanceof HTMLButtonElement && actionsEl.contains(focused)
+        ? focused.textContent
+        : null;
+    for (const button of actionsEl.querySelectorAll(
+      '.npc-dialog__button--extra, .npc-dialog__button--quest',
+    )) {
+      button.remove();
+    }
+    appendQuestButtons(npc);
+    // A replaced button hands focus to its replacement (same label), so a
+    // keyboard Player's next Enter doesn't land on a different button.
+    if (focusedLabel !== null && !actionsEl.contains(document.activeElement)) {
+      const same = Array.from(actionsEl.querySelectorAll('button')).find(
+        (button) => button.textContent === focusedLabel,
+      );
+      (same ?? firstFocusable()).focus();
+    }
   }
 
   /** The first action button when there is one, else the close button (#36 round-1 review item 9). */
@@ -328,10 +392,13 @@ export function createNpcDialog(root: HTMLElement, deps: NpcDialogDeps): NpcDial
     deps.overlays.close(NPC_DIALOG_OVERLAY_ID);
   });
 
+  const unsubscribeQuestState = deps.onQuestStateChange?.(refreshQuestButtons);
+
   return {
     destroy() {
       unsubscribeArrived();
       unsubscribeRoomLeave();
+      unsubscribeQuestState?.();
       panel.remove();
     },
   };
