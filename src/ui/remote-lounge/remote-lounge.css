@@ -58,18 +58,22 @@
   pointer-events: auto;
 }
 
-.remote-lounge__roster-item {
+.remote-lounge__roster-item,
+.remote-lounge__roster-latam {
   all: unset;
   display: flex;
   align-items: center;
   gap: 8px;
   padding: 3px 8px 3px 3px;
-  border: 2px solid var(--jg-secondary);
   background: rgba(var(--jg-dark-rgb), 0.88);
   cursor: pointer;
   transition:
     background 250ms ease,
     border-color 250ms ease;
+}
+
+.remote-lounge__roster-item {
+  border: 2px solid var(--jg-secondary);
 }
 
 .remote-lounge__roster-item:hover,
@@ -80,6 +84,25 @@
 .remote-lounge__roster-item[aria-pressed='true'] {
   background: var(--jg-secondary);
   border-color: var(--jg-primary);
+}
+
+/* The LATAM roster card (owner request, 2026-10-12): the globe's own LATAM
+   pin colour (`globe.ts`'s `RIO_LOCATION`/`.globe__latam-pin`) in place of
+   the JGer rows' blue/teal outline, with the pressed state purple-tinted
+   instead of blue. A sibling of `.remote-lounge__roster-item`, so the JGer
+   rows' own selectors, order and count are unaffected. */
+.remote-lounge__roster-latam {
+  border: 2px solid #c9a8ff;
+}
+
+.remote-lounge__roster-latam:hover,
+.remote-lounge__roster-latam:focus-visible {
+  border-color: #e4d6ff;
+}
+
+.remote-lounge__roster-latam[aria-pressed='true'] {
+  background: rgba(201, 168, 255, 0.28);
+  border-color: #e4d6ff;
 }
 
 .remote-lounge__roster-face {
@@ -131,6 +154,13 @@
 
 .remote-lounge__card[hidden] {
   display: none;
+}
+
+/* The LATAM card (owner request, 2026-10-12): the roster row's same purple
+   outline in place of the JGer cards' blue/teal one. Everything else
+   (size, fonts, layout) matches a person card. */
+.remote-lounge__card--latam {
+  border-color: #c9a8ff;
 }
 
 .remote-lounge__card-head {
@@ -267,6 +297,14 @@
   background: var(--jg-primary);
   color: var(--jg-dark);
   box-shadow: inset 0 -4px 0 var(--jg-secondary);
+}
+
+/* The LATAM card's VISIT LATAM + GLOBE pair is wider than a JGer card's
+   PREV/GLOBE/NEXT, so its two buttons run a little smaller to fit the card. */
+.remote-lounge__card--latam .remote-lounge__hex {
+  flex: 1 1 auto;
+  padding: 0 14px;
+  font-size: 13px;
 }
 
 .remote-lounge__hex:hover {

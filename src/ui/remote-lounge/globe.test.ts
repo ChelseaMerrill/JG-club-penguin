@@ -80,3 +80,44 @@ describe("the globe's LATAM pin (owner request, 2026-10-09)", () => {
     expect(onPinClick).not.toHaveBeenCalled();
   });
 });
+
+describe('flyToLocation (the LATAM roster card, owner request, 2026-10-12)', () => {
+  it("tweens to an arbitrary point, bringing Rio's LATAM pin into view, without selecting a JGer pin", async () => {
+    globe = createGlobe(HQ, [NEAR_RIO_PIN], {
+      onPinClick: vi.fn(),
+      onLatamPinClick: vi.fn(),
+      reducedMotion: true,
+    });
+
+    globe.flyToLocation(RIO_LOCATION.lon, RIO_LOCATION.lat);
+    await nextFrame();
+
+    const latamPin = globe.element.querySelector<SVGGElement>('.globe__latam-pin')!;
+    expect(latamPin.style.display).not.toBe('none');
+
+    // NEAR_RIO_PIN's own JGer pin, right alongside Rio, is visible but never
+    // highlighted "on" by flying here -- flyToLocation selects no JGer pin.
+    const jgerHex = globe.element.querySelector<SVGPolygonElement>(
+      '.globe__pin:not(.globe__pin--hq) polygon',
+    )!;
+    expect(jgerHex.getAttribute('fill')).toBe('#00BDFF');
+  });
+
+  it("never disturbs flyTo(index)'s own JGer selection afterwards", async () => {
+    globe = createGlobe(HQ, [NEAR_RIO_PIN], {
+      onPinClick: vi.fn(),
+      onLatamPinClick: vi.fn(),
+      reducedMotion: true,
+    });
+
+    globe.flyToLocation(RIO_LOCATION.lon, RIO_LOCATION.lat);
+    await nextFrame();
+    globe.flyTo(0);
+    await nextFrame();
+
+    const jgerHex = globe.element.querySelector<SVGPolygonElement>(
+      '.globe__pin:not(.globe__pin--hq) polygon',
+    )!;
+    expect(jgerHex.getAttribute('fill')).toBe('#F4F4F4');
+  });
+});
