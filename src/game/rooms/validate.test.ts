@@ -625,22 +625,6 @@ describe('ROOM_DEFINITIONS registry', () => {
     });
   });
 
-  it('keeps every Stairwell door and hotspot off the baked "STAIRS CHALLENGE · SUBMIT" sign (HD-3)', () => {
-    // The sign's own rect in design/Stairwell.dc.html, the same on every
-    // floor: decoration only, so nothing clickable may cover it.
-    const submit = { x: 517.5, y: 449, width: 205, height: 22 };
-    const overlaps = (a: typeof submit, b: typeof submit): boolean =>
-      a.x < b.x + b.width && b.x < a.x + a.width && a.y < b.y + b.height && b.y < a.y + a.height;
-    for (const room of ROOM_DEFINITIONS.filter((each) => each.id.startsWith('stairwell-'))) {
-      for (const door of room.doors) {
-        expect(overlaps(door.hotspot, submit), `${room.id} / ${door.label}`).toBe(false);
-      }
-      for (const hotspot of room.hotspots ?? []) {
-        expect(overlaps(hotspot.rect, submit), `${room.id} / ${hotspot.id}`).toBe(false);
-      }
-    }
-  });
-
   it.each(ROOM_DEFINITIONS.map((room) => [room.id, room]))(
     '%s has a title/subtitle with no fabricated live figure',
     (_id, room) => {

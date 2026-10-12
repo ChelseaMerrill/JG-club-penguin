@@ -236,8 +236,8 @@ function stairwellFloor({ floor, subtitle, guest }: StairwellFloorSpec): RoomDef
  * 0" to "STAIRWELL · FLOOR 5" (#51 slice 4, A2): one Room per Stairwell
  * floor. Floor 0 is the lobby level (`ROOM_FLOORS` 'L'), reached from the
  * Map; floor 5 is the JG HQ floor, reached from Town Center's STAIRWELL door.
- * "STAIRS CHALLENGE · SUBMIT" is baked into the art as decoration only, with
- * no door or hotspot over it (HD-3).
+ * The design's decorative "STAIRS CHALLENGE · SUBMIT" sign is left out of the
+ * exported art (owner request, 2026-10-12).
  */
 export const stairwell0 = stairwellFloor({
   floor: 0,
