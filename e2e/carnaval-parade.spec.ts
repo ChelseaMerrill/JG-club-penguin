@@ -1,6 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
 import { latamDiscoHall } from '../src/game/rooms/definitions/latam-disco-hall';
-import { tileToScreen } from '../src/game/rooms/iso';
 import { GAME_HEIGHT, GAME_WIDTH } from '../src/game/stage-size';
 import type { MinigameTestHandle } from '../src/minigames/minigame-test-handle';
 import type { RoomDebugInfo } from './support/room-debug-types';
@@ -114,9 +113,14 @@ test('Carnaval Parade: clicking Hector Grecco himself opens the same trigger as 
   page,
 }) => {
   const errors = await bootDiscoHall(page);
-  const hectorPoint = tileToScreen(hectorSlot.tile, latamDiscoHall.grid.origin);
-
-  await clickStagePoint(page, hectorPoint);
+  // His live click point (slot offset and dance included), as npcs.spec.ts
+  // clicks Tony; the Penguin walks over before the dialog opens.
+  const hector = (await debugInfo(page))?.npcs?.['hector-grecco'];
+  if (!hector) throw new Error('no __roomDebug.npcs entry for hector-grecco');
+  await clickStagePoint(page, { x: hector.x, y: hector.y });
+  await expect
+    .poll(async () => (await debugInfo(page))?.npcArrivedLog, { timeout: 15_000 })
+    .toContain('hector-grecco');
 
   const dialog = page.locator('.npc-dialog');
   await expect(dialog).toBeVisible();
