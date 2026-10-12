@@ -18,8 +18,9 @@ const PROOF_ROOT = 'test-results/npc-motion-the-icebox';
 /** The centre of `RoomScene`'s click zone for a Human NPC, relative to its feet. */
 const HIT_ZONE_OFFSET_Y = npcLayout({ kind: 'human' }).hitArea.centerY;
 /** Nicole and Jethro roam a loop around their slot point; Millie, Jason and
- *  Darrin left the Icebox (owner request, 2026-10-02, Track D). */
-const MOVING_NPCS = ['nicole', 'jethro'];
+ *  Darrin left the Icebox (owner request, 2026-10-02, Track D). Linda Martin
+ *  (owner request, 2026-10-09) walks a lap. */
+const MOVING_NPCS = ['nicole', 'jethro', 'linda-martin'];
 /** New from the Characters sheet: they sit at the conference table. */
 const SEATED_NPCS = ['dan-bedian', 'paul-carnival', 'greg-westover'];
 /**

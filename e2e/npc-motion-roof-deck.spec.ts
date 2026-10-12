@@ -1,18 +1,22 @@
 import { mkdirSync, rmSync } from 'node:fs';
 import { expect, test, type Page } from '@playwright/test';
 import { roofDeck } from '../src/game/rooms/definitions/roof-deck';
-import { npcSlotPoint } from '../src/game/rooms/iso';
+import { npcSlotPoint, tileToScreen } from '../src/game/rooms/iso';
+import { BICH_WATERING_OFFSET } from '../src/npcs/motions/roof-deck';
 import type { RoomDebugInfo } from './support/room-debug-types';
 
 /**
- * #113: the Roof Deck's NPCs and their motions (none walk since Brandon and
- * Millie left, owner request, 2026-10-02, Track D). Screenshots
+ * #113: the Roof Deck's NPCs and their motions: since Brandon and Millie left
+ * (owner request, 2026-10-02, Track D), Bich Dudla and Eva Trimboli are the
+ * ones who walk. Screenshots
  * (and a short video) go under `test-results/npc-motion-roof-deck/`, one
  * directory per test so a rerun replaces its own stale proof.
  */
 
 const BOOT_TIMEOUT = 15_000;
 const PROOF_ROOT = 'test-results/npc-motion-roof-deck';
+/** The two Market NPCs who walk (owner requests, 2026-10-02, Track D). */
+const WALKERS = ['bich-dudla', 'eva-trimboli'];
 test.use({ viewport: { width: 1600, height: 900 } });
 
 function proofDir(name: string): string {
@@ -51,16 +55,50 @@ async function bootRoofDeck(page: Page): Promise<string[]> {
   return errors;
 }
 
-test("the Market's NPCs stand at their stalls among the potted plants", async ({ page }) => {
+test("the Market's stallholders stay put while Bich waters the plants and Eva walks", async ({
+  page,
+}) => {
   const dir = proofDir('market');
   const errors = await bootRoofDeck(page);
 
-  // Brandon and Millie left the Market (owner request, 2026-10-02, Track D):
-  // nobody here walks a path now.
+  // Brandon and Millie left the Market; Bich Dudla and Eva Trimboli joined
+  // it, the only two who walk (owner requests, 2026-10-02, Track D).
   const npcs = (await debugInfo(page))?.npcs ?? {};
   expect(Object.keys(npcs).sort()).toEqual(roofDeck.npcSlots.map((s) => s.npcId).sort());
-  for (const id of Object.keys(npcs)) expect(npcs[id]!.moving, id).toBe(false);
-  await page.screenshot({ path: `${dir}/plants.png` });
+  for (const id of Object.keys(npcs)) expect(npcs[id]!.moving, id).toBe(WALKERS.includes(id));
+
+  // Each walks on, though it pauses at corners and stops to water: sampled
+  // every half second for 5 s, it gets more than 20 px from where it was.
+  const start = (await debugInfo(page))?.npcs ?? {};
+  const furthest: Record<string, number> = {};
+  for (let sample = 0; sample < 10; sample += 1) {
+    await page.waitForTimeout(500);
+    const now = (await debugInfo(page))?.npcs ?? {};
+    for (const id of WALKERS) {
+      const moved = Math.hypot(now[id]!.x - start[id]!.x, now[id]!.y - start[id]!.y);
+      furthest[id] = Math.max(furthest[id] ?? 0, moved);
+    }
+  }
+  for (const id of WALKERS) expect(furthest[id], id).toBeGreaterThan(20);
+  await page.screenshot({ path: `${dir}/walking.png` });
+
+  // Bich's first stop: watering the plant by the back-left wall.
+  const plant = tileToScreen({ col: 0, row: 2 }, roofDeck.grid.origin);
+  const stop = { x: plant.x + BICH_WATERING_OFFSET.x, y: plant.y + BICH_WATERING_OFFSET.y };
+  await expect
+    .poll(
+      async () => {
+        const bich = (await debugInfo(page))?.npcs?.['bich-dudla'];
+        return bich ? Math.hypot(bich.x - stop.x, bich.y - stop.y) : Infinity;
+      },
+      { timeout: 30_000, intervals: [100] },
+    )
+    .toBeLessThan(1);
+  await page.waitForTimeout(1_000);
+  await page.screenshot({
+    path: `${dir}/bich-watering.png`,
+    clip: { x: stop.x - 130, y: stop.y - 150, width: 260, height: 200 },
+  });
 
   expect(errors).toEqual([]);
 });

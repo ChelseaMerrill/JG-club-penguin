@@ -1,36 +1,82 @@
 import { describe, expect, it } from 'vitest';
 import {
   compileCssAnimation,
-  decomposeAffine,
   sampleCssAnimation,
   transformPoint,
 } from '../../game/npcs/css-keyframes';
-import { npcScale } from '../../game/npcs/npc-layout';
+import { renderCardFigure } from '../../game/npcs/card-figures';
+import { teamRoom2 } from '../../game/rooms/definitions/team-room-2';
 import { getNpcMotion } from '../npc-motions';
-import { NPCS } from '../npcs';
-import { TEAM_ROOM_1_MOTIONS } from './team-room-1';
 import { TEAM_ROOM_2_MOTIONS } from './team-room-2';
 
-describe('Team Room 2 NPC motions (#149)', () => {
-  it("registers Ian's bob only, reachable through the registry", () => {
-    expect(Object.keys(TEAM_ROOM_2_MOTIONS)).toEqual(['ian-team-room-2']);
-    expect(getNpcMotion('ian-team-room-2')).toBe(TEAM_ROOM_2_MOTIONS['ian-team-room-2']);
-    // Dev Pit's Ian keeps his own motion.
-    expect(getNpcMotion('ian')).not.toBe(TEAM_ROOM_2_MOTIONS['ian-team-room-2']);
+/** The rotation (degrees) of a sampled CSS transform matrix. */
+function degrees(matrix: { a: number; b: number }): number {
+  return (Math.atan2(matrix.b, matrix.a) * 180) / Math.PI;
+}
+
+describe('Team Room 2 (owner requests, 2026-10-02)', () => {
+  it('seats Nick, Frank and Aleksandr at their desks, bobbing, and stands Chris Pence by the back wall', () => {
+    expect(teamRoom2.npcSlots.map((slot) => slot.npcId).sort()).toEqual([
+      'aleksandr-molchagin',
+      'chris-pence',
+      'frank-nardone',
+      'nick-brown',
+    ]);
+    expect(Object.keys(TEAM_ROOM_2_MOTIONS).sort()).toEqual([
+      'aleksandr-molchagin',
+      'chris-pence',
+      'frank-nardone',
+      'nick-brown',
+    ]);
+    for (const id of ['nick-brown', 'frank-nardone', 'aleksandr-molchagin'] as const) {
+      expect(getNpcMotion(id)?.path, id).toBeUndefined();
+      const bob = compileCssAnimation(TEAM_ROOM_2_MOTIONS[id]!.figure!);
+      const half = bob.durationMs / 2;
+      expect(transformPoint(sampleCssAnimation(bob, half), { x: 0, y: 0 }).y).toBeCloseTo(-3.41);
+    }
+    expect(teamRoom2.foregrounds?.map((layer) => layer.overNpcId).sort()).toEqual([
+      'aleksandr-molchagin',
+      'frank-nardone',
+      'nick-brown',
+    ]);
   });
 
-  it("bobs Ian as Team Room 1's Jethro does: 2.4s, delayed -0.6s, 6 Stage px up and 2deg tilted at its top", () => {
-    const spec = TEAM_ROOM_2_MOTIONS['ian-team-room-2']!;
-    expect(spec.figure).toEqual(TEAM_ROOM_1_MOTIONS['jethro-team-room-1']!.figure);
-    expect(spec.figure!.animation).toBe('bob 2.4s ease-in-out -0.6s infinite');
-    expect(spec.path).toBeUndefined();
-    // The -0.6s delay puts the 50% peak at 0.6 s.
-    const matrix = sampleCssAnimation(compileCssAnimation(spec.figure!), 600);
-    expect((decomposeAffine(matrix).rotation * 180) / Math.PI).toBeCloseTo(2);
-    const feet = transformPoint(matrix, { x: 60, y: 130 });
+  it('has no couch any more: the tile only it blocked is walkable again', () => {
+    expect(teamRoom2.walkable[5]![2]).toBe(true);
+  });
+
+  it('turns Chris from his feet to look round the Room, holding at each side', () => {
+    const scan = compileCssAnimation(TEAM_ROOM_2_MOTIONS['chris-pence']!.figure!);
+    expect(scan.durationMs).toBe(14_000);
+    expect(degrees(sampleCssAnimation(scan, 0))).toBeCloseTo(0);
+    expect(degrees(sampleCssAnimation(scan, 0.3 * 14_000))).toBeCloseTo(-9);
+    expect(degrees(sampleCssAnimation(scan, 0.54 * 14_000))).toBeCloseTo(0);
+    expect(degrees(sampleCssAnimation(scan, 0.78 * 14_000))).toBeCloseTo(9);
+    // About his feet: they stay put while he turns.
+    const feet = transformPoint(sampleCssAnimation(scan, 0.3 * 14_000), { x: 60, y: 120 });
     expect(feet.x).toBeCloseTo(60);
-    // He draws at the Room design's 70/120, so that is 6 Stage px.
-    expect(npcScale(NPCS['ian-team-room-2'])).toBeCloseTo(70 / 120, 10);
-    expect((feet.y - 130) * npcScale(NPCS['ian-team-room-2'])).toBeCloseTo(-6, 1);
+    expect(feet.y).toBeCloseTo(120);
+  });
+
+  it("moves Chris's binoculars, and the hands holding them, on their own as he looks", () => {
+    const [glasses] = TEAM_ROOM_2_MOTIONS['chris-pence']!.props!;
+    expect(glasses!.svg).toContain('<rect x="43" y="34" width="13" height="15" rx="4"');
+    expect(glasses!.svg).toContain('<circle cx="43.5" cy="51.5" r="5.5"');
+    const motion = compileCssAnimation(glasses!.motion!);
+    expect(transformPoint(sampleCssAnimation(motion, 0.28 * 14_000), { x: 0, y: 0 })).toEqual({
+      x: expect.closeTo(-2.5) as number,
+      y: expect.closeTo(-1.5) as number,
+    });
+    expect(transformPoint(sampleCssAnimation(motion, 0.76 * 14_000), { x: 0, y: 0 }).x).toBeCloseTo(
+      2.5,
+    );
+  });
+
+  it("raises Chris's arms on his card, leaving the binoculars to the moving layer", () => {
+    const svg = renderCardFigure('chrisPenceArmsRaised', 'x');
+    expect(svg).toContain('transform="rotate(-149 30 74)"');
+    expect(svg).toContain('transform="rotate(149 90 74)"');
+    expect(svg).not.toContain('<rect x="43" y="34" width="13" height="15"');
+    expect(svg).not.toContain('<rect x="47" y="78" width="11" height="16"');
   });
 });

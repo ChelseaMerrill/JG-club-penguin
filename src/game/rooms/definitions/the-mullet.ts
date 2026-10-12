@@ -26,17 +26,19 @@ const DOOR_HOTSPOT_SIZE = { width: 70, height: 165 };
 // The snack counter against the back-right wall covers at most 0.18 of
 // (10,0), so it stays walkable. The rug under the couch, the dashed floor
 // path and the confetti are flat floor art. Every NPC's own tile (see
-// `npcSlots` below) is additionally blocked (#16 fix 5): Jason (1,1), Nicole
-// (6,2) and Ann Marie (8,2) on the couch, Dom (5,4), Jon (7,6), Brandon
-// (11,6), Jory (13,6), Tony (0,7) and Ashley (7,10).
+// `npcSlots` below) is additionally blocked (#16 fix 5): Abby (3,0), Adam
+// (11,1), Jon (7,6), Brandon (11,6), Tony (0,7) and Bryan (7,10), where Ashley stood. Jason's
+// (1,1), Dom's (5,4) and Jory's (13,6) are open again (they
+// left, owner request, 2026-10-02, Track D); Nicole's and Ann Marie's are on
+// the couch, so they stay blocked.
 const WALKABLE: readonly (readonly boolean[])[] = [
-  [false, false, true, true, true, true, true, true, true, true, true, true, true, true],
-  [true, false, true, true, true, true, true, true, true, true, true, true, true, true],
+  [false, false, true, false, true, true, true, true, true, true, true, true, true, true],
+  [true, true, true, true, true, true, true, true, true, true, true, false, true, true],
   [true, true, true, true, true, false, false, false, false, true, true, true, true, true],
   [true, true, true, true, true, true, true, true, true, true, true, true, true, true],
-  [true, true, true, true, true, false, true, true, true, true, true, true, true, true],
+  [true, true, true, true, true, true, true, true, true, true, true, true, true, true],
   [true, false, false, false, true, true, true, true, true, true, true, true, true, true],
-  [true, false, false, false, true, true, true, false, false, false, false, false, true, false],
+  [true, false, false, false, true, true, true, false, false, false, false, false, true, true],
   [false, true, true, true, true, true, true, true, true, false, false, true, true, true],
   [true, true, true, true, true, true, true, true, true, true, true, true, true, true],
   [true, true, true, true, true, true, true, true, true, true, true, true, true, true],
@@ -103,15 +105,21 @@ export const theMullet: RoomDefinition = {
     // at (470, 433.9) and Ashley at (620, 698.26). Jon's slot is already
     // within 2.4 px of his, and Jory's lap is re-expressed relative to her
     // on-floor slot instead (see her motion).
-    { npcId: 'jason-mullet', tile: { col: 1, row: 1 } },
-    { npcId: 'nicole-mullet', tile: { col: 6, row: 2 } },
-    { npcId: 'ann-marie-mullet', tile: { col: 8, row: 2 } },
-    { npcId: 'dom-mullet', tile: { col: 5, row: 4 }, offset: { x: 10, y: -19.74 } },
+    //
+    // Ashley, Jory, Dom, Jason, Nicole and Ann Marie left the Mullet so that
+    // each person appears in one Room only (owner request, 2026-10-02,
+    // Track D), and three people from the Characters sheet joined: Abby
+    // Rivera paints the bare stretch of back wall between the Ms. Pac-Man
+    // and the AFTER-PARTY screen, at (3,0) against it; Adam Wilson-Hwang
+    // walks laps of the open floor on the right, from (11,1); Bryan Sambrook
+    // walks laps of the front, past the ping-pong table, from (7,10). See
+    // `src/npcs/motions/the-mullet.ts`.
+    { npcId: 'abby-rivera', tile: { col: 3, row: 0 } },
+    { npcId: 'adam-wilson-hwang', tile: { col: 11, row: 1 } },
     { npcId: 'jon-mullet', tile: { col: 7, row: 6 } },
     { npcId: 'brandon-mullet', tile: { col: 11, row: 6 }, offset: { x: 12, y: 13.6 } },
-    { npcId: 'jory-mullet', tile: { col: 13, row: 6 } },
     { npcId: 'tony', tile: { col: 0, row: 7 }, offset: { x: 20, y: -14.1 } },
-    { npcId: 'ashley-mullet', tile: { col: 7, row: 10 }, offset: { x: -30, y: 0.26 } },
+    { npcId: 'bryan-sambrook', tile: { col: 7, row: 10 } },
     // "You" is the local Player's own Penguin, never a static NPC slot.
   ],
 };

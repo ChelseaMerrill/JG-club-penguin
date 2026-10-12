@@ -39,6 +39,21 @@ export const ROOM_FLOORS: Record<RoomId, FloorId | null> = {
   bathroom: '5',
   // #51 slice 3: THE MULLET is the JG HQ floor's mezzanine.
   'the-mullet': '5',
+  // The Remote Lounge is where the JGers outside HQ hang out, not a room in
+  // 108 State St, so like the Igloo it has no floor and never shows the
+  // Elevator.
+  'remote-lounge': null,
+  // The LATAM Café (owner request, 2026-10-09): reached from the Remote
+  // Lounge globe's LATAM pin, not a Room in 108 State St, so like the Remote
+  // Lounge it has no floor and never shows the Elevator.
+  'latam-cafe': null,
+  // The LATAM section (reached from the LATAM Café, not the Map) is likewise
+  // not a room in 108 State St.
+  'latam-disco-hall': null,
+  // The LATAM Futebol Field is reached from the LATAM Cafe, not the Map, and
+  // like the Remote Lounge is not a room in 108 State St: no floor, no
+  // Elevator.
+  'latam-futebol-field': null,
 };
 
 /** Whether `a` and `b` are both real (non-null) floors and differ -- the Elevator's own show condition (#52 D3). */

@@ -97,6 +97,8 @@ export interface NpcMotionDebugInfo {
   paused: boolean;
   /** The live transform of its figure plus name tag, relative to its feet (#150). */
   body: { x: number; y: number; scaleX: number; scaleY: number; rotation: number };
+  /** The live rotation of its figure about its feet, in radians (+ turns right). */
+  figureRotation: number;
 }
 
 declare global {

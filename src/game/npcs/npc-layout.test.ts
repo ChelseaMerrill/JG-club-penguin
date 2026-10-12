@@ -25,7 +25,7 @@ describe('npcScale', () => {
     expect(npcScale({ kind: 'human', scale: 0.5 })).toBe(0.5);
     expect(npcScale(NPCS['jethro-team-room-1'])).toBeCloseTo(70 / 120, 10);
     expect(npcScale(NPCS.michael)).toBe(0.5);
-    expect(npcScale(NPCS['jason-mullet'])).toBe(0.5);
+    expect(npcScale(NPCS['sydney-team-room-3'])).toBe(0.58);
     expect(npcScale(NPCS['jon-mullet'])).toBe(0.58);
     // Tony keeps the Human default.
     expect(npcScale(NPCS.tony)).toBe(0.62);
@@ -33,7 +33,6 @@ describe('npcScale', () => {
 
   it("uses an NPC's own scale when its Room design draws it at another (Team Room 3's 0.58)", () => {
     expect(npcScale({ kind: 'human', scale: 0.58 })).toBe(0.58);
-    expect(npcScale(NPCS['millie-team-room-3'])).toBe(0.58);
     expect(npcScale(NPCS.millie)).toBe(0.62);
   });
 });
@@ -95,8 +94,15 @@ describe('npcLayout with a per-NPC scale and nameplate offset (#149)', () => {
     expect(sam.nameplateCenterX).toBe(0);
   });
 
-  it("widens the click area to take in a nameplate shifted sideways (Jason's -55.5)", () => {
-    const jason = npcLayout(NPCS['jason-mullet']);
+  it('widens the click area to take in a nameplate shifted sideways (-55.5)', () => {
+    // A nameplate hand-placed 55.5 px left of a 0.5-scale Human (once Jason's;
+    // no placed NPC has an x offset now, but a Room design may set one again).
+    const jason = npcLayout({
+      kind: 'human',
+      scale: 0.5,
+      nameplateOffset: { x: -55.5, y: 15 },
+      tagName: 'Jason',
+    });
     expect(jason.nameplateCenterX).toBe(-55.5);
     // The bounding box of the plain 48-wide area (-24..24) and "Jason"'s
     // nameplate (59.5 wide, -85.25..-25.75), from its top (-70) to feet + 5.
@@ -125,12 +131,9 @@ describe('npcLayout with a per-NPC scale and nameplate offset (#149)', () => {
   });
 
   it("places each NPC's nameplate where its Room design does (feet-relative, from the audit)", () => {
-    // Design nameplate tops relative to the feet: Millie -97.7, Casey -85.6.
-    expect(npcLayout(NPCS['millie-team-room-3']).nameplateTopY).toBeCloseTo(-97.6, 1);
-    expect(npcLayout(NPCS['casey-team-room-3']).nameplateTopY).toBeCloseTo(-85.6, 1);
+    // Design nameplate tops relative to the feet.
     expect(npcLayout(NPCS['sam-team-room-4']).nameplateTopY).toBeCloseTo(-94.5, 1);
     expect(npcLayout(NPCS['jon-mullet']).nameplateTopY).toBeCloseTo(-75.6, 1);
-    expect(npcLayout(NPCS['jason-mullet']).nameplateCenterX).toBe(-55.5);
   });
 });
 

@@ -21,9 +21,8 @@ import {
 import {
   clampLeaderboardRows,
   IGLOO_SLOTS,
-  MAIN_QUEST_REWARD,
-  SERVER_QUEST_IDS,
   type BadgeCheckResult,
+  type CoffeeRun,
   type CompleteQuestResult,
   type QuestProgress,
   ProgressStoreError,
@@ -33,11 +32,29 @@ import {
   validateLook,
   type IglooSlot,
   type LeaderboardEntry,
+  type PitchRun,
+  type PitchSubmitResult,
   type ProgressSnapshot,
   type ProgressStore,
   type PurchaseResult,
   type RoundResult,
 } from './progress-store';
+import { IN_MEMORY_STEPS_QUESTS, type InMemoryQuestState } from './in-memory-steps-quests';
+import {
+  askTom,
+  coffeeRunView,
+  deliverCoffee,
+  startCoffeeRun,
+  visitKitchen,
+  type CoffeeRunRecord,
+} from './coffee-run-rules';
+import {
+  pitchRunView,
+  startPitch as applyStartPitch,
+  startPitchRun,
+  submitPitch as applySubmitPitch,
+  type PitchRunRecord,
+} from './pitch-run-rules';
 
 function defaultLook(): PenguinLook {
   return { ...DEFAULT_LOOK };
@@ -70,8 +87,21 @@ interface PlayerState {
   slots: Record<IglooSlot, string | null>;
   /** #46: the Dev Pit visit flag (`player_quest_state.dev_pit_visited_at`). */
   devPitVisited: boolean;
+  /** #143: the Igloo Badge Quest's "talk to Casey" flag (`player_quest_state.casey_talked_at`). */
+  caseyTalked: boolean;
   /** #46: Quests `completeQuest` has paid (`player_quest_completions`). */
   completedQuests: Set<string>;
+  /** #141: the `player_coffee_runs` row, `null` before talking to Nicole. */
+  coffeeRun: CoffeeRunRecord | null;
+  /** #142: the `player_pitch_runs` row, `null` before talking to Linda. */
+  pitchRun: PitchRunRecord | null;
+  /** #140: the "pair with a JGer" Quest's four client-asserted/checked flags. */
+  paulTalked: boolean;
+  ciBoardChecked: boolean;
+  paired: boolean;
+  paulReported: boolean;
+  /** #140: sticky once any recorded `bug-squash` round's `flakyHits` reaches 3. */
+  bugSquashFlakyHitsMet: boolean;
 }
 
 /** One rival's Minigame best, for `InMemoryProgressStoreOptions.leaderboardRivals`. Test-only. */
@@ -143,7 +173,15 @@ export function createInMemoryProgressStoreWithControls(
     ownedItems: new Map(),
     slots: emptySlots(),
     devPitVisited: false,
+    caseyTalked: false,
     completedQuests: new Set(),
+    coffeeRun: null,
+    pitchRun: null,
+    paulTalked: false,
+    ciBoardChecked: false,
+    paired: false,
+    paulReported: false,
+    bugSquashFlakyHitsMet: false,
   };
 
   async function loadAll(): Promise<ProgressSnapshot> {
@@ -255,6 +293,13 @@ export function createInMemoryProgressStoreWithControls(
     if (newBest) {
       state.bests[minigameId] = rawBest;
       state.bestReachedAtMs[minigameId] = nowMs;
+    }
+
+    // #140 "squash-flakes": mirrors the server's `exists (...)` check over
+    // every recorded bug-squash round, sticky once any one round's
+    // `flakyHits` reaches 3.
+    if (minigameId === 'bug-squash' && (numericStats.flakyHits ?? 0) >= 3) {
+      state.bugSquashFlakyHitsMet = true;
     }
 
     // A 'match-wins' Badge counts this round's win too (the SQL counts the
@@ -416,14 +461,48 @@ export function createInMemoryProgressStoreWithControls(
   }
 
   // #46: mirrors `20260925000000_quests.sql`'s `quest_progress`,
-  // `mark_dev_pit_visited` and `complete_quest`. A finished round is any
-  // recorded round (`lastRoundFinishedAtMs` has an entry), best or not.
+  // `mark_dev_pit_visited` and `complete_quest`, as generalized by
+  // `20261006000000_quest_registry.sql` (every steps Quest comes from
+  // `IN_MEMORY_STEPS_QUESTS`). A finished round is any recorded round
+  // (`lastRoundFinishedAtMs` has an entry), best or not.
+  function roundsFinished(): MinigameId[] {
+    return (Object.keys(state.lastRoundFinishedAtMs) as MinigameId[]).sort();
+  }
+
+  function questState(): InMemoryQuestState {
+    return {
+      profileCreatedAt: state.profileCreatedAt,
+      devPitVisited: state.devPitVisited,
+      roundsFinished: roundsFinished(),
+      ownedItems: sortedByTimeThenId(state.ownedItems),
+      slots: { ...state.slots },
+      badges: sortedByTimeThenId(state.badges),
+      bests: { ...state.bests },
+      matchWins: { ...state.matchWins },
+      caseyTalked: state.caseyTalked,
+      coffeeRun: state.coffeeRun ? { ...state.coffeeRun } : null,
+      pitchRun: state.pitchRun ? { ...state.pitchRun } : null,
+      paulTalked: state.paulTalked,
+      ciBoardChecked: state.ciBoardChecked,
+      paired: state.paired,
+      paulReported: state.paulReported,
+      bugSquashFlakyHitsMet: state.bugSquashFlakyHitsMet,
+      nowMs: now(),
+    };
+  }
+
   async function questProgress(): Promise<QuestProgress> {
+    const view = questState();
+    const questSteps: Record<string, Record<string, boolean>> = {};
+    for (const [id, quest] of IN_MEMORY_STEPS_QUESTS) {
+      questSteps[id] = { ...quest.steps(view) };
+    }
     return {
       devPitVisited: state.devPitVisited,
-      roundsFinished: (Object.keys(state.lastRoundFinishedAtMs) as MinigameId[]).sort(),
+      roundsFinished: roundsFinished(),
       completedQuests: [...state.completedQuests].sort(),
       matchWins: { ...state.matchWins },
+      questSteps,
     };
   }
 
@@ -431,36 +510,98 @@ export function createInMemoryProgressStoreWithControls(
     state.devPitVisited = true;
   }
 
+  // #143: the Igloo Badge Quest's "talk to Casey" flag.
+  async function markCaseyTalked(): Promise<void> {
+    state.caseyTalked = true;
+  }
+
+  // #140: the "pair with a JGer" Quest's three client-asserted flags.
+  async function markPaulTalked(): Promise<void> {
+    state.paulTalked = true;
+  }
+
+  async function markCiBoardChecked(): Promise<void> {
+    state.ciBoardChecked = true;
+  }
+
+  async function markPaired(): Promise<void> {
+    state.paired = true;
+  }
+
+  // #140: mirrors report_to_paul() -- refuses until steps 1-4 are all met,
+  // writing nothing in that case; coalesces paulReported otherwise.
+  async function reportToPaul(): Promise<void> {
+    const quest = IN_MEMORY_STEPS_QUESTS.get('pair-flaky-test')!;
+    const steps = quest.steps(questState());
+    if (
+      !steps['talk-to-paul'] ||
+      !steps['check-ci-board'] ||
+      !steps['pair-with-jger'] ||
+      !steps['squash-flakes']
+    ) {
+      throw new ProgressStoreError('quest_steps_incomplete');
+    }
+    state.paulReported = true;
+  }
+
   async function completeQuest(questId: string): Promise<CompleteQuestResult> {
-    if (!(SERVER_QUEST_IDS as readonly string[]).includes(questId)) {
+    const quest = IN_MEMORY_STEPS_QUESTS.get(questId);
+    if (!quest) {
       throw new ProgressStoreError('unknown_quest');
     }
     if (state.completedQuests.has(questId)) {
       emitter?.emit('tokens:changed', { balance: state.tokens });
       return { tokensAwarded: 0, balance: state.tokens, alreadyCompleted: true, badgesEarned: [] };
     }
-    const stepsMet =
-      state.profileCreatedAt !== null &&
-      state.devPitVisited &&
-      state.lastRoundFinishedAtMs['bug-squash'] !== undefined &&
-      state.lastRoundFinishedAtMs['pancake-flip'] !== undefined &&
-      state.ownedItems.size > 0;
-    if (!stepsMet) {
+    const steps = Object.values(quest.steps(questState()));
+    if (steps.length === 0 || steps.some((met) => met !== true)) {
       throw new ProgressStoreError('quest_incomplete');
     }
-    state.tokens += MAIN_QUEST_REWARD;
+    state.tokens += quest.rewardTokens;
     state.completedQuests.add(questId);
-    const badgesEarned: BadgeId[] = awardBadge('ship-it') ? ['ship-it'] : [];
+    // #138: Ship It, for the main Quest only.
+    const badgesEarned: BadgeId[] = questId === 'main' && awardBadge('ship-it') ? ['ship-it'] : [];
     emitter?.emit('tokens:changed', { balance: state.tokens });
     for (const badgeId of badgesEarned) {
       emitter?.emit('badge:earned', { badgeId });
     }
     return {
-      tokensAwarded: MAIN_QUEST_REWARD,
+      tokensAwarded: quest.rewardTokens,
       balance: state.tokens,
       alreadyCompleted: false,
       badgesEarned,
     };
+  }
+
+  // #141: mirrors 20261006020000_quest_nicole_coffee.sql's RPCs. A refused
+  // step throws before anything is written, as the SQL's raise rolls back.
+  function applyCoffee(
+    step: (record: CoffeeRunRecord | null, nowMs: number) => CoffeeRunRecord,
+  ): CoffeeRun {
+    const nowMs = now();
+    state.coffeeRun = step(state.coffeeRun, nowMs);
+    return coffeeRunView(state.coffeeRun, nowMs);
+  }
+
+  // #142: mirrors 20261009010000_quest_pitch_hack.sql's RPCs. A refused
+  // step throws before anything is written, as the SQL's raise rolls back.
+  function applyPitch(
+    step: (record: PitchRunRecord | null, nowMs: number) => PitchRunRecord,
+  ): PitchRun {
+    const nowMs = now();
+    state.pitchRun = step(state.pitchRun, nowMs);
+    return pitchRunView(state.pitchRun);
+  }
+
+  async function submitPitch(
+    problem: number,
+    solution: number,
+    ask: number,
+  ): Promise<PitchSubmitResult> {
+    const nowMs = now();
+    const { record, result } = applySubmitPitch(state.pitchRun, nowMs, problem, solution, ask);
+    state.pitchRun = record;
+    return result;
   }
 
   // #138: mirrors `check_session_badges` / `evaluate_session_badges`, with
@@ -488,8 +629,22 @@ export function createInMemoryProgressStoreWithControls(
       leaderboard,
       questProgress,
       markDevPitVisited,
+      markCaseyTalked,
+      markPaulTalked,
+      markCiBoardChecked,
+      markPaired,
+      reportToPaul,
       completeQuest,
       checkBadges,
+      coffeeRun: async () => coffeeRunView(state.coffeeRun, now()),
+      talkToNicole: async () => applyCoffee(startCoffeeRun),
+      markKitchenVisited: async () => applyCoffee(visitKitchen),
+      askTomForCoffee: async () => applyCoffee(askTom),
+      deliverCoffee: async () => applyCoffee(deliverCoffee),
+      pitchRun: async () => pitchRunView(state.pitchRun),
+      markLindaTalked: async () => applyPitch(startPitchRun),
+      startPitch: async () => applyPitch(applyStartPitch),
+      submitPitch,
     },
     grantTokens(tokens: number): void {
       state.tokens += tokens;

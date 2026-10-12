@@ -22,9 +22,8 @@ describe('Team Room 3 NPC motions', () => {
     // Stage points from the design: Millie's and Sydney's shadow ellipses
     // (615,503) and (899,633.5); Casey, seated on the couch, has no shadow of
     // her own, so her figure's feet: x 807.2 + 69.6 / 2, y 325.2 + 75.4.
+    // Casey and Millie left (owner request, 2026-10-02); Sydney stays.
     const designFeet = {
-      'millie-team-room-3': { x: 615, y: 503 },
-      'casey-team-room-3': { x: 842, y: 400.6 },
       'sydney-team-room-3': { x: 899, y: 633.5 },
     };
     const slots = Object.fromEntries(teamRoom3.npcSlots.map((slot) => [slot.npcId, slot.tile]));
@@ -40,8 +39,6 @@ describe('Team Room 3 NPC motions', () => {
     // 120 130">`, whose feet (120,0 of the viewBox's 60,120) sit at x + 60 *
     // 0.58, y + 120 * 0.58 (owner request, 2026-09-30, Track D).
     const figureBoxes = {
-      'casey-team-room-3': { x: 807.2, y: 325.2 },
-      'millie-team-room-3': { x: 580.2, y: 426.1 },
       'sydney-team-room-3': { x: 864.2, y: 547.7 },
     };
     for (const [id, box] of Object.entries(figureBoxes)) {
@@ -55,11 +52,7 @@ describe('Team Room 3 NPC motions', () => {
 
   it('draws the furniture in front of each NPC from its own exported image, just in front of its tile', () => {
     const layers = teamRoom3.foregrounds ?? [];
-    expect(layers.map((layer) => layer.overNpcId).sort()).toEqual([
-      'casey-team-room-3',
-      'millie-team-room-3',
-      'sydney-team-room-3',
-    ]);
+    expect(layers.map((layer) => layer.overNpcId)).toEqual(['sydney-team-room-3']);
     for (const layer of layers) {
       expect(existsSync(path.join('public', layer.url)), layer.url).toBe(true);
       const slot = teamRoom3.npcSlots.find((candidate) => candidate.npcId === layer.overNpcId);

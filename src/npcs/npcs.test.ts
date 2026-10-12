@@ -69,6 +69,20 @@ describe('NPCS', () => {
       // Millie and Brandon left the Market (owner request, 2026-10-02).
       'millie',
       'brandon',
+      // Casey and Millie left Team Room 3 (owner request, 2026-10-02).
+      'casey-team-room-3',
+      'millie-team-room-3',
+      // Anthony left the Hallway (owner request, 2026-10-02).
+      'anthony-hallway',
+      // Six left the Mullet (owner request, 2026-10-02).
+      'ashley-mullet',
+      'jory-mullet',
+      'dom-mullet',
+      'jason-mullet',
+      'nicole-mullet',
+      'ann-marie-mullet',
+      // Ian left Team Room 2 (owner request, 2026-10-02).
+      'ian-team-room-2',
     ];
 
     for (const npc of Object.values(NPCS)) {
@@ -176,7 +190,7 @@ describe('NPCS', () => {
   });
 
   it("draws the Team Rooms' and the Mullet's Humans as their Room designs do (#149)", () => {
-    // Dark nameplates: every Team Room and Mullet NPC except Tony.
+    // Dark nameplates: every Team Room NPC still placed, and the Mullet's Jon and Brandon (not Tony).
     const dark = Object.values(NPCS)
       .filter((npc) => npc.nameplate === 'dark')
       .map((npc) => npc.id)
@@ -185,21 +199,12 @@ describe('NPCS', () => {
       [
         'jethro-team-room-1',
         'dom-team-room-1',
-        'ian-team-room-2',
-        'millie-team-room-3',
-        'casey-team-room-3',
         'sydney-team-room-3',
         'michael',
         'sam-team-room-4',
         'ryan-team-room-4',
-        'jason-mullet',
-        'nicole-mullet',
-        'ann-marie-mullet',
-        'jory-mullet',
-        'ashley-mullet',
         'jon-mullet',
         'brandon-mullet',
-        'dom-mullet',
       ].sort(),
     );
     expect(NPCS.tony.nameplate).toBeUndefined();
@@ -207,38 +212,25 @@ describe('NPCS', () => {
     const scales: [NpcId, number][] = [
       ['jethro-team-room-1', 70 / 120],
       ['dom-team-room-1', 70 / 120],
-      ['ian-team-room-2', 70 / 120],
       ['michael', 0.5],
       ['sam-team-room-4', 0.5],
       ['ryan-team-room-4', 0.5],
-      ['jason-mullet', 0.5],
-      ['nicole-mullet', 0.5],
-      ['ann-marie-mullet', 0.5],
-      ['jory-mullet', 0.58],
-      ['ashley-mullet', 0.58],
       ['jon-mullet', 0.58],
       ['brandon-mullet', 0.58],
-      ['dom-mullet', 0.58],
     ];
     for (const [id, scale] of scales) expect(NPCS[id].scale, id).toBeCloseTo(scale, 10);
     expect(NPCS.tony.scale).toBeUndefined();
 
     const offsets: [NpcId, { x?: number; y?: number }][] = [
-      ['millie-team-room-3', { y: -3 }],
-      ['casey-team-room-3', { y: 9 }],
       ['sydney-team-room-3', { y: 7 }],
       ['sam-team-room-4', { y: -9.5 }],
-      ['jason-mullet', { x: -55.5, y: 15 }],
       ['jon-mullet', { y: 19 }],
       ['brandon-mullet', { y: 19 }],
-      ['nicole-mullet', { y: -5 }],
-      ['ann-marie-mullet', { y: -5 }],
     ];
     for (const [id, offset] of offsets) expect(NPCS[id].nameplateOffset, id).toEqual(offset);
 
     expect(NPCS['sydney-team-room-3'].bubbleOffsetY).toBe(-8);
     expect(NPCS.michael.bubbleOffsetY).toBe(-23);
-    expect(NPCS['ashley-mullet'].bubbleOffsetY).toBe(-7.6);
 
     const michael = NPCS.michael;
     const tony = NPCS.tony;
@@ -324,18 +316,11 @@ describe('NPCS', () => {
           }
         }
       }
-      // Overlaps the Room design itself draws at rest, kept as designed: the
-      // Mullet's Jory stands where the design starts her lap (her slot
-      // `offset`, #189), where her bubble crosses Brandon's nameplate. She
-      // walks off it at once. (Dev Pit's old Steven-over-Ryan overlap went
-      // when Ryan left, 2026-09-30; the Mullet's Dom-over-Nicole one went when
-      // the Mullet's NPCs took their design scales and nameplate offsets, #149.)
-      const drawnByTheDesign: string[] = [
-        `the-mullet: jory-mullet "Tribe has spoken." x brandon-mullet's nameplate "Brandon"`,
-      ];
-      expect(collisions.filter((collision) => !drawnByTheDesign.includes(collision))).toEqual([]);
-      // Each allowed overlap still happens, so a stale entry can't linger.
-      for (const allowed of drawnByTheDesign) expect(collisions).toContain(allowed);
+      // The Mullet's two design-drawn overlaps (Dom over Nicole, Jory over
+      // Brandon) went when Dom, Nicole and Jory left (owner request,
+      // 2026-10-02); Dev Pit's Steven-over-Ryan went when Ryan left
+      // (2026-09-30).
+      expect(collisions).toEqual([]);
     },
   );
 
@@ -646,7 +631,7 @@ describe('NPCS', () => {
         throw new Error(`expected ${repeat} and ${first} to be Human NPCs`);
       }
       expect(again.figure, repeat).toBe(original.figure);
-      expect(again.dialogLines[0], repeat).toBe(original.dialogLines[0]);
+      expect(again.dialogLines![0], repeat).toBe(original.dialogLines![0]);
     }
   });
 
@@ -663,16 +648,11 @@ describe('NPCS', () => {
       // The Mullet's Jon and Brandon hold a ping-pong paddle at rest (#149).
       ['jon', 'jon-mullet', { cards: true, paddle: undefined }],
       ['brandon-mullet', 'brandon', { paddle: 'left' }],
-      // The Mullet's design draws Ashley's hair as curly volume (#149).
-      ['ashley-mullet', 'ashley', { style: 'curlyVolume' }],
       ['nicole', 'nicole-mullet', { seated: 'laptop' }],
       // Team Room 3's Casey holds an open laptop and its Sydney wears a
       // headset; the Roof Deck's and Town Center's designs draw neither.
       ['casey-team-room-3', 'casey', { prop: 'openLaptop' }],
       ['sydney-team-room-3', 'sydney', { headset: true }],
-      // The Mullet's Jason plays its arcade machine, his hands drawn by his
-      // motion's layers (owner request, 2026-10-01, Track D).
-      ['jason-mullet', 'jason', { arcadeHands: 'resting' }],
     ];
     for (const [roomOwn, other, added] of overrides) {
       const withOverride = NPCS[roomOwn];
@@ -681,7 +661,7 @@ describe('NPCS', () => {
         throw new Error(`expected ${roomOwn} and ${other} to be Human NPCs`);
       }
       expect(withOverride.figure, roomOwn).toEqual({ ...plain.figure, ...added });
-      expect(withOverride.dialogLines[0], roomOwn).toBe(plain.dialogLines[0]);
+      expect(withOverride.dialogLines![0], roomOwn).toBe(plain.dialogLines![0]);
     }
 
     // Team Room 1's design wins for its own two NPCs (owner request,
@@ -703,11 +683,11 @@ describe('NPCS', () => {
       collar: undefined,
       runner: true,
     });
-    expect(domTeamRoom1.dialogLines[0]).toBe(dom.dialogLines[0]);
+    expect(domTeamRoom1.dialogLines![0]).toBe(dom.dialogLines![0]);
     expect(jethro.figure.cameraRig).toBeUndefined();
     expect(jethroTeamRoom1.figure).toEqual(jethro.figure);
     expect(jethroTeamRoom1.figure).toMatchObject({ prop: undefined, cameraRaise: 'lowered' });
-    expect(jethroTeamRoom1.dialogLines[0]).toBe(jethro.dialogLines[0]);
+    expect(jethroTeamRoom1.dialogLines![0]).toBe(jethro.dialogLines![0]);
   });
 
   it('gives Front Desk a single static (periodS: 0) idle line', () => {
@@ -830,10 +810,28 @@ describe('NPCS', () => {
       'michael',
       'anthony',
     ];
+    const latamNpcIds: NpcId[] = [];
     for (const npc of Object.values(NPCS)) {
       if (talkers.includes(npc.id)) continue;
+      // The Remote Lounge's JGers open their person card instead.
+      if (npc.roomId === 'remote-lounge') {
+        expect(npc.dialog).toEqual({ kind: 'remote-card' });
+        continue;
+      }
+      // The 19 LATAM JGers carry no dialog at all (owner request, 2026-10-09):
+      // their character sheet gives no quote.
+      if (
+        npc.roomId === 'latam-cafe' ||
+        npc.roomId === 'latam-disco-hall' ||
+        npc.roomId === 'latam-futebol-field'
+      ) {
+        latamNpcIds.push(npc.id);
+        expect(npc.dialog).toEqual({ kind: 'none' });
+        continue;
+      }
       expect(npc.dialog).toMatchObject({ kind: 'line' });
     }
+    expect(latamNpcIds).toHaveLength(19);
   });
 
   it('gives a human NPC a figure spec and a penguin-kind NPC a fixed look', () => {

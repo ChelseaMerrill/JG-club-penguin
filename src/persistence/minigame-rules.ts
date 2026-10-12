@@ -301,3 +301,11 @@ export const IGLOO_GEAR_CATALOG: readonly ShopItem[] = [
     placement: 'floor',
   },
 ];
+
+/**
+ * The three JG award wall items (#135, seeded above). #143's Igloo Badge
+ * Quest counts owning any one of them as "buy-jg-award", and hanging any one
+ * of them (necessarily on a wall slot -- #135's placement guard admits no
+ * other kind of slot for an award item) as "hang-jg-award".
+ */
+export const JG_AWARD_ITEM_IDS = ['award-bptw', 'award-inc5000', 'award-top-workplaces'] as const;

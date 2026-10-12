@@ -1,5 +1,6 @@
 import { DEFAULT_LOOK, type MinigameId, type PenguinLook, type RoomId } from '../contracts';
 import type { HumanFigureSpec } from '../game/npcs/render-npc-svg';
+import { remoteLoungeNpcs, type RemoteLoungeNpcId } from './remote-lounge-npcs';
 
 /**
  * Every NPC slot id on `main` (#16's five prototype Rooms' `npcSlots`,
@@ -88,7 +89,52 @@ export type NpcId =
   | 'dan-bedian'
   | 'paul-carnival'
   | 'greg-westover'
-  | 'rebecca-congi';
+  | 'nick-brown'
+  | 'frank-nardone'
+  | 'chris-pence'
+  | 'aleksandr-molchagin'
+  | 'rebecca-congi'
+  | 'bich-dudla'
+  | 'eva-trimboli'
+  | 'abby-rivera'
+  | 'adam-wilson-hwang'
+  | 'bryan-sambrook'
+  // Linda Martin, placed in The Icebox by an explicit owner exception to the
+  // "don't place unplaced Characters-sheet people" rule (owner request,
+  // 2026-10-09): she walks laps of the open floor.
+  | 'linda-martin'
+  // The LATAM Café's seven JGers (`design/Characters LATAM.dc.html`'s cards
+  // whose location reads "LATAM Café Lounge"; owner request, 2026-10-09),
+  // placed where `design/Latam Cafe.dc.html` draws them.
+  | 'alexandre-nunes'
+  | 'fernanda-gioiosa'
+  | 'jean-rodrigues'
+  | 'joao-vitor-amorim'
+  | 'sander-nonaka'
+  | 'vinicius-martins'
+  | 'ygor-azevedo'
+  // LATAM Disco Hall's six dancers (`design/Characters LATAM.dc.html`'s
+  // cards whose location line reads "LATAM Disco Hall"), ids first+last
+  // name since none has a bare id elsewhere. Reached from the LATAM Café,
+  // not the Map (#<issue>).
+  | 'lucas-varani'
+  | 'hector-grecco'
+  | 'jose-acosta'
+  | 'fernando-possebon'
+  | 'fernando-garagnani'
+  | 'ricardo-cordeiro'
+  // The LATAM Futebol Field's six JGers (`design/Characters LATAM.dc.html`,
+  // cards 01/04/05/10/18/19): Thalles Stakonski, Bruno Amado, Washington
+  // Marino, Chrystian Rissoli, Paulo Ponciano, Gustavo Barska, each walking a
+  // ping-pong loop of `design/Latam Futebol Field.dc.html`'s own floor.
+  | 'thalles-stakonski'
+  | 'bruno-amado'
+  | 'washington-marino'
+  | 'chrystian-rissoli'
+  | 'paulo-ponciano'
+  | 'gustavo-barska'
+  // The Remote Lounge's JGers (`remote-lounge-npcs.ts`).
+  | RemoteLoungeNpcId;
 
 /**
  * A minigame-launching NPC's trigger dialog (#36 D4; round-1 review item 4
@@ -111,6 +157,13 @@ export interface NpcMinigameDialog {
   triggerLine: string;
   /** The minigame design's own name-badge text (e.g. "DEV PIT · VP OF ENGINEERING"). */
   subtitle: string;
+  /**
+   * The NPC's own line when the Player clicks `declineLabel`, shown in place
+   * of the trigger line before the dialog closes (#181's Ian: "Cool. Enjoy
+   * the red build."). Omitted (every other minigame NPC): decline just
+   * closes the dialog, unchanged.
+   */
+  declineLine?: string;
 }
 
 /** Casey's Igloo Gear stall trigger (#36 D4/D5, wired to #40's real Market panel). */
@@ -137,7 +190,37 @@ export interface NpcPhishingQuizDialog {
   subtitle: string;
 }
 
-export type NpcDialog = NpcMinigameDialog | NpcStallDialog | NpcLineDialog | NpcPhishingQuizDialog;
+/**
+ * A Remote Lounge JGer: walking up to them opens their person card and flies
+ * the lounge's globe to their city (`src/ui/remote-lounge/remote-lounge.ts`),
+ * never the NPC dialog.
+ */
+export interface NpcRemoteCardDialog {
+  kind: 'remote-card';
+}
+
+/**
+ * An NPC with no dialog at all (owner request, 2026-10-09): walking up to or
+ * clicking it opens nothing, exactly like `remote-card` (`npc-dialog.ts`
+ * skips both the same way). Used for the 19 LATAM JGers
+ * (`design/Characters LATAM.dc.html`): that sheet gives each of their cards
+ * no quote whatsoever (just a name and a location line), unlike the Remote
+ * Lounge's own sheet, which gives every person a real one-line quote -- there
+ * is no real line to show, so these carry no invented placeholder instead of
+ * fabricating one. A `NpcDefinition` with this dialog kind has no
+ * `dialogLines` at all (see that field's own comment).
+ */
+export interface NpcNoDialog {
+  kind: 'none';
+}
+
+export type NpcDialog =
+  | NpcMinigameDialog
+  | NpcStallDialog
+  | NpcLineDialog
+  | NpcPhishingQuizDialog
+  | NpcRemoteCardDialog
+  | NpcNoDialog;
 
 /**
  * One line of an NPC's idle speech-bubble cycle, ported from a Room design's
@@ -176,6 +259,12 @@ export interface NpcQuestGiver {
   startStepId?: string;
   /** The in-character "nothing right now" reply while no Quest is connected. BA copy only. */
   nothingRightNowLine?: string;
+  /**
+   * What the giver says when they give the Quest (#141's Nicole: "Client
+   * call in five. I need an oat latte."). With it the dialog stays open on
+   * this line; without it, starting the Quest closes the dialog.
+   */
+  startLine?: string;
 }
 
 interface NpcDefinitionBase {
@@ -213,8 +302,11 @@ interface NpcDefinitionBase {
    * `dialogLinePool()` of these plus this appearance's `idleLines`, one at
    * random, never the same line twice in a row. A `kind: 'minigame'` NPC's
    * dialog keeps its verbatim `dialog.triggerLine` instead (#144 Q15).
+   * Omitted entirely for a `dialog.kind === 'none'` NPC (owner request,
+   * 2026-10-09): there is no real line to show and no dialog ever opens, so
+   * this stays absent rather than holding an invented placeholder string.
    */
-  dialogLines: readonly [string, ...string[]];
+  dialogLines?: readonly [string, ...string[]];
   /**
    * `idleLines` texts left out of the dialog pool (#144 Q16): near-duplicates
    * of a `dialogLines` entry. They still show as bubbles in the Room.
@@ -256,9 +348,9 @@ interface NpcDefinitionBase {
   still?: boolean;
   /**
    * The Room design's draw scale for this NPC, when it isn't its kind's
-   * default (`npc-layout.ts`): Team Rooms 1 and 2 draw theirs at 70/120,
-   * Team Room 3 and most of the Mullet at 0.58 (`width="69.6"`) and Team Room
-   * 4 (and the Mullet's Jason, Nicole and Ann Marie) at 0.5, not 0.62 (owner
+   * default (`npc-layout.ts`): Team Room 1 draws its at 70/120,
+   * Team Room 3 and the Mullet's Jon and Brandon at 0.58 (`width="69.6"`) and
+   * Team Room 4 at 0.5, not 0.62 (owner
    * requests, 2026-09-30, Track D; #149).
    */
   scale?: number;
@@ -310,6 +402,8 @@ const BUG_SQUASH_DIALOG: NpcMinigameDialog = {
   triggerLine:
     "CI is red. Something's crawling through the test suite and I've got a 2 o'clock. Grab the hammer, squash what you find. 500 points and I'll put you on the Exterminator wall.",
   subtitle: 'DEV PIT · VP OF ENGINEERING',
+  // #181, verbatim from design/Minigame Bug Squash.dc.html's own `decline`.
+  declineLine: 'Cool. Enjoy the red build.',
 };
 
 const PANCAKE_FLIP_DIALOG: NpcMinigameDialog = {
@@ -363,6 +457,9 @@ const BEYSTADIUM_DIALOG: NpcMinigameDialog = {
 const IGLOO_GEAR_STALL_DIALOG: NpcStallDialog = { kind: 'stall', stallId: 'igloo-gear' };
 
 const LINE_DIALOG: NpcLineDialog = { kind: 'line' };
+
+/** The 19 LATAM JGers' shared dialog (owner request, 2026-10-09): see `NpcNoDialog`. */
+const NO_DIALOG: NpcNoDialog = { kind: 'none' };
 
 /** A single static line, for the NPCs whose Room design shows no `say` cycling animation at all. */
 function staticLine(text: string): NpcBubbleLine[] {
@@ -735,11 +832,7 @@ const BRANDON_LINES = ["Giddy up. Arcade's this way."] as const;
 const NICOLE_LINES = ["The client loved it. Next one's at 2."] as const;
 const JASON_LINES = ['Answer three and you may pass.'] as const;
 
-/**
- * How the Mullet's design draws its Humans (#149): Jason, Nicole and Ann Marie
- * at 0.5, everyone else but Tony at 0.58, all with dark nameplates.
- */
-const MULLET_SMALL = { scale: 0.5, nameplate: 'dark' } as const;
+/** How the Mullet's design draws Jon and Brandon (#149): at 0.58, with dark nameplates. */
 const MULLET_MEDIUM = { scale: 0.58, nameplate: 'dark' } as const;
 
 /**
@@ -1162,6 +1255,8 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     bubbleOffsetX: -90,
     dialog: IGLOO_GEAR_STALL_DIALOG,
     figure: CASEY_FIGURE,
+    // #143: the Igloo Badge Quest's giver; "talk to Casey" starts it.
+    questGiver: { questId: 'igloo-badge', startStepId: 'talk-to-casey' },
   },
   tom: {
     id: 'tom',
@@ -1292,7 +1387,12 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     kind: 'human',
     tagName: 'Nicole',
     dialogLines: NICOLE_LINES,
-    questGiver: {},
+    // #141: "Bring Nicole a coffee before kickoff", her line verbatim from the ticket.
+    questGiver: {
+      questId: 'nicole-coffee',
+      startStepId: 'talk-to-nicole',
+      startLine: 'Client call in five. I need an oat latte.',
+    },
     idleLines: [
       { text: 'Client call in 5. Shh.', periodS: 15, delayS: -2 },
       { text: 'Account manager mode: on.', periodS: 15, delayS: -7 },
@@ -1347,6 +1447,65 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
   // 2026-10-02, Track D): name, title and line from each one's card, drawn
   // from the card itself (`card-figures.ts`); their motions play the card's
   // bob instead of #36's. Greg's card title is "TITLE TBD".
+  // The Characters sheet's new people in Team Room 2 (owner request,
+  // 2026-10-02, Track D): name, title and line from each one's card, drawn
+  // from the card itself. Chris's card hangs his binoculars on his chest;
+  // here he holds them up to his eyes and looks round the Room through them
+  // (`motions/team-room-2.ts`).
+  'nick-brown': {
+    id: 'nick-brown',
+    name: 'Nick Brown',
+    title: 'Developer',
+    roomId: 'team-room-2',
+    kind: 'human',
+    tagName: 'Nick Brown',
+    dialogLines: ['Just one more commit. Then lunch.'],
+    idleLines: [{ text: 'Just one more commit. Then lunch.', periodS: 20, delayS: -4 }],
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'nickBrown' },
+  },
+  'frank-nardone': {
+    id: 'frank-nardone',
+    name: 'Frank Nardone',
+    title: 'Software Engineer',
+    roomId: 'team-room-2',
+    kind: 'human',
+    tagName: 'Frank Nardone',
+    dialogLines: ["LGTM. Didn't read it."],
+    idleLines: [{ text: "LGTM. Didn't read it.", periodS: 20, delayS: -11 }],
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'frankNardone' },
+  },
+  'chris-pence': {
+    id: 'chris-pence',
+    name: 'Chris Pence',
+    title: 'Software Engineer',
+    roomId: 'team-room-2',
+    kind: 'human',
+    tagName: 'Chris Pence',
+    dialogLines: ['Chris P. Bacon'],
+    idleLines: [{ text: 'Chris P. Bacon', periodS: 20, delayS: -17 }],
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'chrisPenceArmsRaised' },
+  },
+  // New from the Characters sheet (owner request, 2026-10-02, Track D):
+  // name, title and line from his card, drawn from the card itself.
+  'aleksandr-molchagin': {
+    id: 'aleksandr-molchagin',
+    name: 'Aleksandr Molchagin',
+    title: 'Developer',
+    roomId: 'team-room-2',
+    kind: 'human',
+    tagName: 'Aleksandr Molchagin',
+    dialogLines: ['This is not cold. This is spring.'],
+    idleLines: [{ text: 'This is not cold. This is spring.', periodS: 20, delayS: -8 }],
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'aleksandrMolchagin' },
+  },
   // New from the Characters sheet (owner request, 2026-10-02, Track D):
   // name, title and line from her card, drawn from the card itself.
   'rebecca-congi': {
@@ -1361,6 +1520,83 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     still: true,
     dialog: LINE_DIALOG,
     figure: { card: 'rebeccaCongi' },
+  },
+  // The Characters sheet's two QA Analysts, new in the Market (owner
+  // request, 2026-10-02, Track D): name, title and line from each one's
+  // card, drawn from the card itself. Bich waters the Market's potted
+  // plants and Eva walks the deck (`motions/roof-deck.ts`).
+  'bich-dudla': {
+    id: 'bich-dudla',
+    name: 'Bich Dudla',
+    title: 'QA Analyst',
+    roomId: 'roof-deck',
+    kind: 'human',
+    tagName: 'Bich Dudla',
+    // Her long line, at her slot, would cover Ann Marie's bubbles at her
+    // counter up and to the right; shifted left until it clears them.
+    bubbleOffsetX: -90,
+    dialogLines: ['I test the code. I water the plant. Both keep growing.'],
+    idleLines: [
+      { text: 'I test the code. I water the plant. Both keep growing.', periodS: 20, delayS: -3 },
+    ],
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'bichDudla' },
+  },
+  'eva-trimboli': {
+    id: 'eva-trimboli',
+    name: 'Eva Trimboli',
+    title: 'QA Analyst',
+    roomId: 'roof-deck',
+    kind: 'human',
+    tagName: 'Eva Trimboli',
+    dialogLines: ["It's not a bug until I say it's a bug."],
+    idleLines: [{ text: "It's not a bug until I say it's a bug.", periodS: 20, delayS: -13 }],
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'evaTrimboli' },
+  },
+  // The Characters sheet's new people in the Mullet (owner request,
+  // 2026-10-02, Track D): name, title and line from each one's card, drawn
+  // from the card itself. Abby paints the wall; Adam and Bryan walk laps.
+  'abby-rivera': {
+    id: 'abby-rivera',
+    name: 'Abby Rivera',
+    title: 'UI/UX',
+    roomId: 'the-mullet',
+    kind: 'human',
+    tagName: 'Abby Rivera',
+    dialogLines: ["Hold still, I'm sketching you."],
+    idleLines: [{ text: "Hold still, I'm sketching you.", periodS: 20, delayS: -3 }],
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'abbyRiveraPainting' },
+  },
+  'adam-wilson-hwang': {
+    id: 'adam-wilson-hwang',
+    name: 'Adam Wilson-Hwang',
+    title: 'Tech Lead',
+    roomId: 'the-mullet',
+    kind: 'human',
+    tagName: 'Adam Wilson-Hwang',
+    dialogLines: ["That's a three-pointer. Minimum."],
+    idleLines: [{ text: "That's a three-pointer. Minimum.", periodS: 20, delayS: -9 }],
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'adamWilsonHwang' },
+  },
+  'bryan-sambrook': {
+    id: 'bryan-sambrook',
+    name: 'Bryan Sambrook',
+    title: 'Principal Software Engineer',
+    roomId: 'the-mullet',
+    kind: 'human',
+    tagName: 'Bryan Sambrook',
+    dialogLines: ['Seen this bug before. Back in 2009.'],
+    idleLines: [{ text: 'Seen this bug before. Back in 2009.', periodS: 20, delayS: -15 }],
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'bryanSambrook' },
   },
   'dan-bedian': {
     id: 'dan-bedian',
@@ -1385,6 +1621,13 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     kind: 'human',
     tagName: 'Paul Carnival',
     dialogLines: ['Found one. Steps to reproduce: exist.'],
+    // #140: "Pair with a JGer and fix the flaky test", his line verbatim
+    // from the ticket.
+    questGiver: {
+      questId: 'pair-flaky-test',
+      startStepId: 'talk-to-paul',
+      startLine: "CI's flaky again. Pair up, squash the flakes, report back.",
+    },
     idleLines: [{ text: 'Found one. Steps to reproduce: exist.', periodS: 21, delayS: -12 }],
     // Clear of Dan's nameplate, one chair up-left of him at the table.
     bubbleOffsetX: 140,
@@ -1406,6 +1649,146 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     still: true,
     dialog: LINE_DIALOG,
     figure: { card: 'gregWestover' },
+  },
+  // Linda Martin (`design/Characters.dc.html` card 02: CSO, "QUEST GIVER ·
+  // CLOSER"), placed in The Icebox walking laps of the open floor by an
+  // explicit owner exception to the "don't place unplaced Characters-sheet
+  // people" rule (owner request, 2026-10-09).
+  'linda-martin': {
+    id: 'linda-martin',
+    name: 'Linda Martin',
+    title: 'CSO',
+    roomId: 'the-icebox',
+    kind: 'human',
+    tagName: 'Linda',
+    dialogLines: ['Every room is a pitch. Smile.'],
+    // #142: the pitch Quest's giver; "talk to Linda" starts it. Her own card
+    // quote doubles as her start line, as Nicole's does.
+    questGiver: {
+      questId: 'pitch-hack',
+      startStepId: 'talk-to-linda',
+      startLine: 'Every room is a pitch. Smile.',
+    },
+    idleLines: [{ text: 'Every room is a pitch. Smile.', periodS: 21, delayS: -9 }],
+    still: true,
+    dialog: LINE_DIALOG,
+    figure: { card: 'lindaMartin' },
+  },
+  // The LATAM Café's seven JGers (`design/Characters LATAM.dc.html`'s cards
+  // whose location reads "LATAM Café Lounge"; owner request, 2026-10-09), at
+  // the positions `design/Latam Cafe.dc.html` draws them
+  // (`rooms/definitions/latam-cafe.ts`). That sheet's cards carry no job
+  // title and no quote at all (confirmed: just a name, a "REMOTE · LATAM" tag
+  // and a location), unlike `Characters.dc.html`'s cards, and the Room design
+  // draws no speech bubble for any of them either -- so `title` is `null` for
+  // all seven (the sheet's own "TBD" precedent, e.g. Casey/Millie on the
+  // Remote Lounge), `idleLines` is empty (no bubble to show, no bubble
+  // invented) and `dialog` is `NO_DIALOG`: walking up to or clicking any of
+  // them opens nothing, rather than a placeholder quote the sheet never gave
+  // them (owner request, 2026-10-09; removed from `dialog-lines.test.ts`'s
+  // `AWAITING_BA_LINE`, since there is no dialog to await copy for). Alexandre
+  // Nunes, Ygor Azevedo, Fernanda Gioiosa and Jean Rodrigues stand still;
+  // Sander Nonaka stands still at the register; Joao Vitor Amorim and
+  // Vinicius Martins walk (`motions/latam-cafe.ts`) -- all seven keep their
+  // own designed motion instead of the default bob (`still: true`). The
+  // design draws every one of them at scale 0.58 (Sander at 0.72, behind the
+  // counter), not the Human default 0.62.
+  'alexandre-nunes': {
+    id: 'alexandre-nunes',
+    name: 'Alexandre Nunes',
+    title: null,
+    roomId: 'latam-cafe',
+    kind: 'human',
+    tagName: 'Alexandre Nunes',
+    idleLines: [],
+    still: true,
+    dialog: NO_DIALOG,
+    scale: 0.58,
+    figure: { card: 'alexandreNunes' },
+  },
+  'fernanda-gioiosa': {
+    id: 'fernanda-gioiosa',
+    name: 'Fernanda Gioiosa',
+    title: null,
+    roomId: 'latam-cafe',
+    kind: 'human',
+    tagName: 'Fernanda Gioiosa',
+    idleLines: [],
+    still: true,
+    dialog: NO_DIALOG,
+    scale: 0.58,
+    figure: { card: 'fernandaGioiosa' },
+  },
+  'jean-rodrigues': {
+    id: 'jean-rodrigues',
+    name: 'Jean Rodrigues',
+    title: null,
+    roomId: 'latam-cafe',
+    kind: 'human',
+    tagName: 'Jean Rodrigues',
+    idleLines: [],
+    still: true,
+    dialog: NO_DIALOG,
+    scale: 0.58,
+    figure: { card: 'jeanRodrigues' },
+  },
+  'joao-vitor-amorim': {
+    id: 'joao-vitor-amorim',
+    name: 'Joao Vitor Amorim',
+    title: null,
+    roomId: 'latam-cafe',
+    kind: 'human',
+    tagName: 'Joao Vitor Amorim',
+    idleLines: [],
+    still: true,
+    dialog: NO_DIALOG,
+    scale: 0.58,
+    figure: { card: 'joaoVitorAmorim' },
+  },
+  // At the register. The design's own "MATCH THE TREATS" bubble over him
+  // links to `Minigame Pao de Queijo Memory.dc.html`, triggered by clicking
+  // him at the register -- that minigame isn't built yet (ticket #218), so he
+  // carries no dialog for now, like his six LATAM Café castmates; wire his
+  // `dialog` to the minigame trigger (see `BUG_SQUASH_DIALOG` etc. above for
+  // the shape) when #218 lands.
+  'sander-nonaka': {
+    id: 'sander-nonaka',
+    name: 'Sander Nonaka',
+    title: null,
+    roomId: 'latam-cafe',
+    kind: 'human',
+    tagName: 'Sander Nonaka',
+    idleLines: [],
+    still: true,
+    dialog: NO_DIALOG,
+    scale: 0.72,
+    figure: { card: 'sanderNonaka' },
+  },
+  'vinicius-martins': {
+    id: 'vinicius-martins',
+    name: 'Vinicius Martins',
+    title: null,
+    roomId: 'latam-cafe',
+    kind: 'human',
+    tagName: 'Vinicius Martins',
+    idleLines: [],
+    still: true,
+    dialog: NO_DIALOG,
+    scale: 0.58,
+    figure: { card: 'viniciusMartins' },
+  },
+  'ygor-azevedo': {
+    id: 'ygor-azevedo',
+    name: 'Ygor Azevedo',
+    title: null,
+    roomId: 'latam-cafe',
+    kind: 'human',
+    tagName: 'Ygor Azevedo',
+    idleLines: [],
+    still: true,
+    dialog: NO_DIALOG,
+    scale: 0.58,
+    figure: { card: 'ygorAzevedo' },
   },
   'darrin-icebox': {
     id: 'darrin-icebox',
@@ -1450,7 +1833,9 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     // A near-duplicate of her dialog line; it stays a bubble in the Room.
     dialogOmit: ['Joining JG?'],
     idleLines: staticLine('Joining JG?'),
-    // The Hallway design draws her without any idle bob.
+    // The Hallway design draws her without any idle bob; she walks laps of
+    // the corridor instead (`motions/office-hallway.ts`, owner request,
+    // 2026-10-02, Track D), whose motion brings its own bob.
     still: true,
     dialog: LINE_DIALOG,
     figure: {
@@ -1495,8 +1880,8 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     idleLines: [
       { text: "Act natural. Camera's rolling.", periodS: 4, delayS: 0, window: [0.38, 0.76] },
     ],
-    // Team Rooms 1 and 2 draw their Humans at 70/120 (`width="70"`), and
-    // their nameplates dark (#149).
+    // Team Room 1 draws its Humans at 70/120 (`width="70"`), and their
+    // nameplates dark (#149).
     scale: 70 / 120,
     nameplate: 'dark',
     dialog: LINE_DIALOG,
@@ -1519,8 +1904,8 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     idleLines: [
       { text: 'you gotta be faster than that', periodS: 6, delayS: 0, window: [0.39, 0.66] },
     ],
-    // Team Rooms 1 and 2 draw their Humans at 70/120 (`width="70"`), and
-    // their nameplates dark (#149).
+    // Team Room 1 draws its Humans at 70/120 (`width="70"`), and their
+    // nameplates dark (#149).
     scale: 70 / 120,
     nameplate: 'dark',
     dialog: LINE_DIALOG,
@@ -1540,10 +1925,6 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     // ENGINEERING" (#51 review fix 2): the trigger line and action/decline
     // labels are still Ian's own Bug Squash copy, shared via
     // `BUG_SQUASH_DIALOG`.
-    // Team Rooms 1 and 2 draw their Humans at 70/120 (`width="70"`), and
-    // their nameplates dark (#149).
-    scale: 70 / 120,
-    nameplate: 'dark',
     dialog: { ...BUG_SQUASH_DIALOG, subtitle: 'TEAM ROOM 2 · VP OF ENGINEERING' },
     figure: IAN_FIGURE,
   },
@@ -1561,9 +1942,6 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     still: true,
     // Team Room 3 draws its Humans at 0.58, not 0.62 (`width="69.6"`).
     scale: 0.58,
-    // Its nameplate is dark and sits higher than the layout puts it (#149).
-    nameplate: 'dark',
-    nameplateOffset: { y: -3 },
     dialog: LINE_DIALOG,
     figure: MILLIE_FIGURE,
   },
@@ -1583,9 +1961,6 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     still: true,
     // Team Room 3 draws its Humans at 0.58, not 0.62 (`width="69.6"`).
     scale: 0.58,
-    // Its nameplate is dark and sits lower than the layout puts it (#149).
-    nameplate: 'dark',
-    nameplateOffset: { y: 9 },
     dialog: LINE_DIALOG,
     // The Room design hands her an open laptop, which the Roof Deck's
     // `casey` doesn't carry (owner request, 2026-09-30, Track D).
@@ -1717,14 +2092,9 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     idleLines: [],
     // The design jiggles him at the joystick rather than bobbing him.
     still: true,
-    ...MULLET_SMALL,
-    // Hand-placed, left of his head.
-    nameplateOffset: { x: -55.5, y: 15 },
     dialog: LINE_DIALOG,
-    // His hands are up at the controls, where the design's animation starts
-    // them: drawn at rest (as under reduced motion), and by his Mullet
-    // motion's hand layers while it plays (owner requests, 2026-10-01 and
-    // 2026-10-02, Track D).
+    // His hands go up to the controls while his Mullet motion plays (owner
+    // request, 2026-10-01, Track D); at rest they're at his sides as usual.
     figure: { ...JASON_FIGURE, arcadeHands: 'resting' },
   },
   'nicole-mullet': {
@@ -1739,8 +2109,6 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     // opacity `0;1;1;0;0` at `keyTimes` `0;0.05;0.35;0.4;1`, fully shown from
     // 5% to 35% (owner request, 2026-10-01, Track D; it was a static line).
     idleLines: [{ text: 'hehe', periodS: 3, delayS: 0, window: [0.05, 0.35] }],
-    ...MULLET_SMALL,
-    nameplateOffset: { y: -5 },
     dialog: LINE_DIALOG,
     figure: NICOLE_FIGURE,
   },
@@ -1754,8 +2122,6 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     dialogLines: ANN_MARIE_LINES,
     // As Nicole's laugh, half a cycle later (`begin="1.5s"`).
     idleLines: [{ text: 'haha', periodS: 3, delayS: -1.5, window: [0.05, 0.35] }],
-    ...MULLET_SMALL,
-    nameplateOffset: { y: -5 },
     dialog: LINE_DIALOG,
     figure: ANN_MARIE_FIGURE,
   },
@@ -1774,7 +2140,6 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     bubbleOffsetX: 20,
     // The design walks her a loop of the room rather than bobbing her.
     still: true,
-    ...MULLET_MEDIUM,
     dialog: LINE_DIALOG,
     figure: JORY_FIGURE,
   },
@@ -1794,12 +2159,8 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: 'Clucknelius coming at you!', periodS: 18, delayS: 0, window: [0.4111, 0.5333] },
       { text: 'Clucknelius coming at you!', periodS: 18, delayS: 0, window: [0.7056, 0.8278] },
     ],
-    ...MULLET_MEDIUM,
-    // Its bubble sits 7.6 px higher (#149).
-    bubbleOffsetY: -7.6,
     dialog: LINE_DIALOG,
-    // The Mullet design gives her curly volume hair (#149).
-    figure: { ...ASHLEY_FIGURE, style: 'curlyVolume' },
+    figure: ASHLEY_FIGURE,
   },
   tony: {
     id: 'tony',
@@ -1876,7 +2237,6 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: 'Undefeated. I always win.', periodS: 9.4, delayS: 0, window: [0, 0.1] },
       { text: 'Undefeated. I always win.', periodS: 9.4, delayS: 0, window: [0.88, 1] },
     ],
-    ...MULLET_MEDIUM,
     dialog: LINE_DIALOG,
     // The Room design dresses him in running gear for his lap of the room,
     // which the renderer now draws (owner request, 2026-09-30, Track D).
@@ -1887,6 +2247,185 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
   // PR #133) -- dropped here and from the Bathroom's own npcSlots. Spelled
   // "Jessie" there, unlike The Melt's "Jesse" (see that entry's own
   // comment), which remains.
+  // LATAM Disco Hall's six dancers (owner request, 2026-10-09), from
+  // `design/Characters LATAM.dc.html`. Unlike `design/Characters.dc.html`,
+  // that sheet gives each card only a name and a "LATAM Disco Hall" location
+  // line -- no title, no quote at all -- so `title` is `null` (the original
+  // sheet's own "TITLE TBD" precedent) and `dialog` is `NO_DIALOG`: walking
+  // up to or clicking any of them opens nothing, rather than inventing a
+  // personal quote the sheet never gave them (removed from
+  // `dialog-lines.test.ts`'s `AWAITING_BA_LINE`). `tagName` is each one's
+  // full name, the Room design's own nameplate text. Hector Grecco hosts the
+  // Carnaval Parade minigame (`design/Minigame Carnaval Parade.dc.html`'s
+  // "MESTRE DE BATERIA" intro card: its figure is his own
+  // head/hair/face/glasses/beard, just in a pink parade shirt instead of his
+  // black one) -- that minigame isn't built yet (ticket #219), so he carries
+  // no dialog for now too, like his five castmates; he gets his
+  // `dialog: { kind: 'minigame' }` trigger, with that card's own intro quote,
+  // once #219 lands.
+  'lucas-varani': {
+    id: 'lucas-varani',
+    name: 'Lucas Varani',
+    title: null,
+    roomId: 'latam-disco-hall',
+    kind: 'human',
+    tagName: 'Lucas Varani',
+    idleLines: [],
+    still: true,
+    dialog: NO_DIALOG,
+    figure: { card: 'lucasVarani' },
+  },
+  'hector-grecco': {
+    id: 'hector-grecco',
+    name: 'Hector Grecco',
+    title: null,
+    roomId: 'latam-disco-hall',
+    kind: 'human',
+    tagName: 'Hector Grecco',
+    idleLines: [],
+    still: true,
+    dialog: NO_DIALOG,
+    figure: { card: 'hectorGrecco' },
+  },
+  'jose-acosta': {
+    id: 'jose-acosta',
+    name: 'Jose Acosta',
+    title: null,
+    roomId: 'latam-disco-hall',
+    kind: 'human',
+    tagName: 'Jose Acosta',
+    idleLines: [],
+    still: true,
+    dialog: NO_DIALOG,
+    figure: { card: 'joseAcosta' },
+  },
+  'fernando-possebon': {
+    id: 'fernando-possebon',
+    name: 'Fernando Possebon',
+    title: null,
+    roomId: 'latam-disco-hall',
+    kind: 'human',
+    tagName: 'Fernando Possebon',
+    idleLines: [],
+    still: true,
+    dialog: NO_DIALOG,
+    figure: { card: 'fernandoPossebon' },
+  },
+  'fernando-garagnani': {
+    id: 'fernando-garagnani',
+    name: 'Fernando Garagnani',
+    title: null,
+    roomId: 'latam-disco-hall',
+    kind: 'human',
+    tagName: 'Fernando Garagnani',
+    idleLines: [],
+    still: true,
+    dialog: NO_DIALOG,
+    figure: { card: 'fernandoGaragnani' },
+  },
+  'ricardo-cordeiro': {
+    id: 'ricardo-cordeiro',
+    name: 'Ricardo Cordeiro',
+    title: null,
+    roomId: 'latam-disco-hall',
+    kind: 'human',
+    tagName: 'Ricardo Cordeiro',
+    idleLines: [],
+    still: true,
+    dialog: NO_DIALOG,
+    figure: { card: 'ricardoCordeiro' },
+  },
+  // The LATAM Futebol Field's six JGers (`design/Characters LATAM.dc.html`,
+  // cards 01/04/05/10/18/19, each a whole inline-SVG card drawing --
+  // `card-figures.ts`'s LATAM comment), placed at their own position in
+  // `design/Latam Futebol Field.dc.html` (owner request, 2026-10-09). None of
+  // the 19 LATAM cards carries a title or a quote (confirmed by inspection),
+  // so `title` is `null` and `dialog` is `NO_DIALOG` for all six: walking up
+  // to or clicking any of them opens nothing, rather than inventing a shared
+  // placeholder line the sheet never gave them (removed from
+  // `dialog-lines.test.ts`'s `AWAITING_BA_LINE`). Each walks the design's own
+  // ping-pong `<animateTransform>` path on its shared .6s/4px walk bob,
+  // ported in `src/npcs/motions/latam-futebol-field.ts`, at the design's own
+  // 0.58 draw scale (Team Room 3's precedent). Chrystian Rissoli stands
+  // closest to the design's "KICK IT · PENALTY SHOOTOUT" ball icon (90 Stage
+  // px away, the next-closest 147), so he will host the Penalty Kick
+  // minigame's trigger dialog once it's built (ticket #220); the minigame
+  // itself is not built yet (see `latam-futebol-field.ts`'s own comment).
+  'thalles-stakonski': {
+    id: 'thalles-stakonski',
+    name: 'Thalles Stakonski',
+    title: null,
+    roomId: 'latam-futebol-field',
+    kind: 'human',
+    tagName: 'Thalles Stakonski',
+    idleLines: [],
+    dialog: NO_DIALOG,
+    scale: 0.58,
+    figure: { card: 'thallesStakonski' },
+  },
+  'bruno-amado': {
+    id: 'bruno-amado',
+    name: 'Bruno Amado',
+    title: null,
+    roomId: 'latam-futebol-field',
+    kind: 'human',
+    tagName: 'Bruno Amado',
+    idleLines: [],
+    dialog: NO_DIALOG,
+    scale: 0.58,
+    figure: { card: 'brunoAmado' },
+  },
+  'washington-marino': {
+    id: 'washington-marino',
+    name: 'Washington Marino',
+    title: null,
+    roomId: 'latam-futebol-field',
+    kind: 'human',
+    tagName: 'Washington Marino',
+    idleLines: [],
+    dialog: NO_DIALOG,
+    scale: 0.58,
+    figure: { card: 'washingtonMarino' },
+  },
+  'chrystian-rissoli': {
+    id: 'chrystian-rissoli',
+    name: 'Chrystian Rissoli',
+    title: null,
+    roomId: 'latam-futebol-field',
+    kind: 'human',
+    tagName: 'Chrystian Rissoli',
+    idleLines: [],
+    dialog: NO_DIALOG,
+    scale: 0.58,
+    figure: { card: 'chrystianRissoli' },
+  },
+  'paulo-ponciano': {
+    id: 'paulo-ponciano',
+    name: 'Paulo Ponciano',
+    title: null,
+    roomId: 'latam-futebol-field',
+    kind: 'human',
+    tagName: 'Paulo Ponciano',
+    idleLines: [],
+    dialog: NO_DIALOG,
+    scale: 0.58,
+    figure: { card: 'pauloPonciano' },
+  },
+  'gustavo-barska': {
+    id: 'gustavo-barska',
+    name: 'Gustavo Barska',
+    title: null,
+    roomId: 'latam-futebol-field',
+    kind: 'human',
+    tagName: 'Gustavo Barska',
+    idleLines: [],
+    dialog: NO_DIALOG,
+    scale: 0.58,
+    figure: { card: 'gustavoBarska' },
+  },
+  // The Remote Lounge's JGers, built from its design's own people list
+  // (`remote-lounge-npcs.ts`).
+  ...remoteLoungeNpcs({ kind: 'remote-card' }),
 };
 
 const NPC_IDS = Object.keys(NPCS) as NpcId[];

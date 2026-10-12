@@ -72,31 +72,15 @@ describe('ensureNpcTexture: one of each prop while an NPC moves (#137 with PR #1
     expect(movingFigureSvg('anthony')).toContain(ROD);
   });
 
-  it("hands the Mullet's Jason's hands to his arcade layers, and Ashley's chicken to her throw, while they play (owner request, 2026-10-01)", () => {
-    const hand = '<circle cx="30" cy="101"';
-    expect(stillFigureSvg('jason-mullet')).toContain(hand);
-    expect(movingFigureSvg('jason-mullet')).not.toContain(hand);
-    expect(movingFigureSvg('jason-mullet')).toContain('<path d="M37 30 C40 20 50 16 60 16');
-    const chicken = '<ellipse cx="20" cy="98" rx="11" ry="9"';
-    expect(stillFigureSvg('ashley-mullet')).toContain(chicken);
-    expect(movingFigureSvg('ashley-mullet')).not.toContain(chicken);
-    // The Dev Pit's Ashley keeps hers: her toss draws its own chicken.
-    expect(movingFigureSvg('ashley')).toContain(chicken);
-  });
-
-  it("draws the Mullet's paddles and Jason's raised hands at rest, once only while their motions play (#149)", () => {
+  it("draws the Mullet's paddles at rest, once only while their motions play (#149)", () => {
     const paddle = '<rect x="87.5" y="88" width="5" height="14" rx="2" fill="#8B5A2B"';
     const brandonPaddle = '<rect x="27.5" y="88" width="5" height="14" rx="2" fill="#8B5A2B"';
-    const raisedHand = '<g transform="translate(10 -40)"><circle cx="30" cy="101"';
-    // At rest (and under reduced motion, which plays no motion) all three show.
+    // At rest (and under reduced motion, which plays no motion) both show.
     expect(stillFigureSvg('jon-mullet')).toContain(paddle);
     expect(stillFigureSvg('brandon-mullet')).toContain(brandonPaddle);
-    expect(stillFigureSvg('jason-mullet')).toContain(raisedHand);
     // While the motion plays, each belongs to its layer instead.
     expect(movingFigureSvg('jon-mullet')).not.toContain(paddle);
     expect(movingFigureSvg('brandon-mullet')).not.toContain(brandonPaddle);
-    expect(movingFigureSvg('jason-mullet')).not.toContain(raisedHand);
-    expect(movingFigureSvg('jason-mullet')).not.toContain('<circle cx="30" cy="101"');
     // Jon's other look is kept.
     expect(movingFigureSvg('jon-mullet')).toContain(JON_SCARF);
   });

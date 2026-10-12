@@ -15,6 +15,14 @@ export const ROOM_IDS = [
   'team-room-4',
   'bathroom',
   'the-mullet',
+  'remote-lounge',
+  // The LATAM section (owner request, 2026-10-09): reached from the Remote
+  // Lounge globe's LATAM pin, not the Map (`remote-lounge-latam-pin`'s own
+  // branch wires the pin itself); the Disco Hall and the Futebol Field are
+  // reached from the Café's doors.
+  'latam-cafe',
+  'latam-disco-hall',
+  'latam-futebol-field',
 ] as const;
 
 /**

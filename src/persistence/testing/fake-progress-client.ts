@@ -90,7 +90,20 @@ export interface FakeResponses {
   /** #46 */
   questProgress?: FakeResult<unknown>;
   markDevPitVisited?: FakeResult<unknown>;
+  /** #143 */
+  markCaseyTalked?: FakeResult<unknown>;
   completeQuest?: FakeResult<unknown>;
+  /** #141: every coffee RPC answers with this. */
+  coffeeRun?: FakeResult<unknown>;
+  /** #142: `pitch_run`/`mark_linda_talked`/`start_pitch` answer with this. */
+  pitchRun?: FakeResult<unknown>;
+  /** #142: `submit_pitch` answers with this. */
+  submitPitch?: FakeResult<unknown>;
+  /** #140 */
+  markPaulTalked?: FakeResult<unknown>;
+  markCiBoardChecked?: FakeResult<unknown>;
+  markPaired?: FakeResult<unknown>;
+  reportToPaul?: FakeResult<unknown>;
 }
 
 export type LoggedCall = [op: string, ...args: unknown[]];
@@ -160,12 +173,44 @@ export function makeFakeClient(responses: FakeResponses = {}): {
     } satisfies FakeResult<unknown>);
   const markDevPitVisited =
     responses.markDevPitVisited ?? ({ data: null, error: null } satisfies FakeResult<unknown>);
+  const markCaseyTalked =
+    responses.markCaseyTalked ?? ({ data: null, error: null } satisfies FakeResult<unknown>);
+  const markPaulTalked =
+    responses.markPaulTalked ?? ({ data: null, error: null } satisfies FakeResult<unknown>);
+  const markCiBoardChecked =
+    responses.markCiBoardChecked ?? ({ data: null, error: null } satisfies FakeResult<unknown>);
+  const markPaired =
+    responses.markPaired ?? ({ data: null, error: null } satisfies FakeResult<unknown>);
+  const reportToPaul =
+    responses.reportToPaul ?? ({ data: null, error: null } satisfies FakeResult<unknown>);
   const completeQuest =
     responses.completeQuest ??
     ({
       data: { tokensAwarded: 0, balance: 100, alreadyCompleted: true, badgesEarned: [] },
       error: null,
     } satisfies FakeResult<unknown>);
+
+  const coffeeRun =
+    responses.coffeeRun ??
+    ({
+      data: {
+        talkedToNicole: false,
+        kitchenVisited: false,
+        delivered: false,
+        handedOverAt: null,
+        secondsLeft: null,
+      },
+      error: null,
+    } satisfies FakeResult<unknown>);
+
+  const pitchRun =
+    responses.pitchRun ??
+    ({
+      data: { talkedToLinda: false, passed: false, bestSeconds: null },
+      error: null,
+    } satisfies FakeResult<unknown>);
+  const submitPitch =
+    responses.submitPitch ?? ({ data: { seconds: 0 }, error: null } satisfies FakeResult<unknown>);
 
   const client: ProgressClient = {
     from(table) {
@@ -324,11 +369,43 @@ export function makeFakeClient(responses: FakeResponses = {}): {
       if (fn === 'mark_dev_pit_visited') {
         return Promise.resolve(markDevPitVisited);
       }
+      if (fn === 'mark_casey_talked') {
+        return Promise.resolve(markCaseyTalked);
+      }
+      if (fn === 'mark_paul_talked') {
+        return Promise.resolve(markPaulTalked);
+      }
+      if (fn === 'mark_ci_board_checked') {
+        return Promise.resolve(markCiBoardChecked);
+      }
+      if (fn === 'mark_paired') {
+        return Promise.resolve(markPaired);
+      }
+      if (fn === 'report_to_paul') {
+        return Promise.resolve(reportToPaul);
+      }
       if (fn === 'complete_quest') {
         return Promise.resolve(completeQuest);
       }
       if (fn === 'check_session_badges') {
         return Promise.resolve(checkSessionBadges);
+      }
+      if (
+        [
+          'coffee_run',
+          'start_coffee_run',
+          'mark_kitchen_visited',
+          'ask_tom_for_coffee',
+          'deliver_coffee',
+        ].includes(fn)
+      ) {
+        return Promise.resolve(coffeeRun);
+      }
+      if (['pitch_run', 'mark_linda_talked', 'start_pitch'].includes(fn)) {
+        return Promise.resolve(pitchRun);
+      }
+      if (fn === 'submit_pitch') {
+        return Promise.resolve(submitPitch);
       }
       throw new Error(`unexpected rpc ${fn}`);
     },

@@ -181,13 +181,22 @@ begin
     v_names := array_append(v_names, 'quest_progress_reports_saved_state');
     v_pass := array_append(
       v_pass,
-      v_progress = jsonb_build_object(
+      v_progress - 'questSteps' = jsonb_build_object(
         'devPitVisited', true,
         'roundsFinished', jsonb_build_array('bug-squash', 'pancake-flip'),
         'completedQuests', jsonb_build_array('main'),
         -- Added by 20260928000000_beystadium.sql (B9): no Beystadium wins here.
         'matchWins', '{}'::jsonb
       )
+        -- Added by 20261006000000_quest_registry.sql (R6): every main step
+        -- met. Only 'main' is pinned: each later Quest adds its own key.
+        and v_progress -> 'questSteps' -> 'main' = jsonb_build_object(
+          'create-penguin', true,
+          'visit-dev-pit', true,
+          'finish-bug-squash', true,
+          'finish-pancake-flip', true,
+          'buy-igloo-gear', true
+        )
     );
     v_detail := array_append(v_detail, format('quest_progress=%s', v_progress));
 

@@ -293,8 +293,15 @@
 
 .quest-widget__count[hidden],
 .quest-widget__bar[hidden],
-.quest-widget__hint[hidden] {
+.quest-widget__hint[hidden],
+.quest-widget__timer[hidden] {
   display: none;
+}
+
+/* #141: the coffee countdown, white against the cyan hint so it reads at a glance. */
+.quest-widget__timer {
+  color: var(--fg-primary);
+  font-variant-numeric: tabular-nums;
 }
 
 .quest-widget__title {
