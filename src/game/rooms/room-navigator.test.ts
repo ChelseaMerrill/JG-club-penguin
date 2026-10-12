@@ -114,7 +114,7 @@ const DEV_PIT_DOOR: RoomDoor = {
   entryTile: { col: 1, row: 2 },
 };
 
-const DISABLED_DOOR: RoomDoor = {
+const LOCKED_DOOR: RoomDoor = {
   label: 'THE ICEBOX',
   hotspot: { x: 0, y: 0, width: 10, height: 10 },
   targetRoomId: null,
@@ -277,10 +277,10 @@ describe('createRoomNavigator', () => {
     await boot(scene, navigator);
     seen.length = 0;
 
-    scene.triggerDoorReached(DISABLED_DOOR);
+    scene.triggerDoorReached(LOCKED_DOOR);
     await Promise.resolve();
 
-    expect(scene.lockedDoors).toEqual([DISABLED_DOOR]);
+    expect(scene.lockedDoors).toEqual([LOCKED_DOOR]);
     expect(navigator.currentRoomId()).toBe(SPAWN_ROOM_ID);
     expect(seen).toEqual([]);
   });
@@ -289,7 +289,7 @@ describe('createRoomNavigator', () => {
     const { scene } = setup();
 
     scene.triggerDoorReached(DEV_PIT_DOOR);
-    scene.triggerDoorReached(DISABLED_DOOR);
+    scene.triggerDoorReached(LOCKED_DOOR);
 
     expect(scene.showRoomCalls).toEqual([]);
     expect(scene.lockedDoors).toEqual([]);
@@ -673,9 +673,9 @@ describe('createRoomNavigator', () => {
       await boot(scene, navigator);
       seen.length = 0;
 
-      navigator.useDoor(DISABLED_DOOR);
+      navigator.useDoor(LOCKED_DOOR);
 
-      expect(scene.lockedDoors).toEqual([DISABLED_DOOR]);
+      expect(scene.lockedDoors).toEqual([LOCKED_DOOR]);
       expect(seen).toEqual([]);
       expect(navigator.currentRoomId()).toBe('town-center');
     });
@@ -684,7 +684,7 @@ describe('createRoomNavigator', () => {
       const { navigator, scene, seen } = setup();
 
       navigator.useDoor(DEV_PIT_DOOR);
-      navigator.useDoor(DISABLED_DOOR);
+      navigator.useDoor(LOCKED_DOOR);
 
       expect(scene.showRoomCalls).toEqual([]);
       expect(scene.lockedDoors).toEqual([]);
@@ -870,8 +870,8 @@ describe('createRoomNavigator', () => {
       await navigator.changeRoom('igloo');
       navigator.useDoor(ROOF_DOOR);
       scene.triggerDoorReached(ROOF_DOOR);
-      navigator.useDoor(DISABLED_DOOR);
-      scene.triggerDoorReached(DISABLED_DOOR);
+      navigator.useDoor(LOCKED_DOOR);
+      scene.triggerDoorReached(LOCKED_DOOR);
       fade.finishOut();
       await flush();
       scene.fireCreate();
@@ -920,10 +920,10 @@ describe('createRoomNavigator', () => {
       await boot(scene, navigator);
       log.length = 0;
 
-      navigator.useDoor(DISABLED_DOOR);
-      scene.triggerDoorReached(DISABLED_DOOR);
+      navigator.useDoor(LOCKED_DOOR);
+      scene.triggerDoorReached(LOCKED_DOOR);
 
-      expect(scene.lockedDoors).toEqual([DISABLED_DOOR, DISABLED_DOOR]);
+      expect(scene.lockedDoors).toEqual([LOCKED_DOOR, LOCKED_DOOR]);
       expect(log).toEqual([]);
     });
 

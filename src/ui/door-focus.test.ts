@@ -66,6 +66,12 @@ describe('createDoorFocus (#170 D6)', () => {
       'LOBBY · UNDER CONSTRUCTION',
     ]);
     expect(buttons().map((b) => b.tabIndex)).toEqual([0, 0, -1, 0]);
+    expect(buttons().map((b) => b.getAttribute('aria-disabled'))).toEqual([
+      null,
+      null,
+      null,
+      'true',
+    ]);
     expect(buttons()[0]!.type).toBe('button');
     expect(buttons()[0]!.style.left).toBe('10px');
     expect(buttons()[0]!.style.height).toBe('165px');

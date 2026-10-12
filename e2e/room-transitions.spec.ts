@@ -49,7 +49,7 @@ const ROOMS_IN_REGISTRY_ORDER: readonly RoomDefinition[] = [
  * Stairwell enabled STAIRWELL, so the example moves on by itself as Rooms
  * land (the Hallway's TEAM ROOM 5 today).
  */
-function firstDisabledDoor(): { room: RoomDefinition; door: RoomDoor } {
+function firstLockedDoor(): { room: RoomDefinition; door: RoomDoor } {
   for (const room of ROOMS_IN_REGISTRY_ORDER) {
     const door = room.doors.find((candidate) => candidate.targetRoomId === null);
     if (door) return { room, door };
@@ -116,32 +116,32 @@ test('room transitions: doors, changeRoom, HUD, reload (#15)', async ({ page }) 
 
   // --- A locked door (`targetRoomId: null`) shows the UNDER CONSTRUCTION
   // hint straight away, with no walk (#170 D4, RT170-9), and leaves the Room
-  // unchanged: the first one in registry order (see `firstDisabledDoor`),
+  // unchanged: the first one in registry order (see `firstLockedDoor`),
   // entered by `__roomDebug.changeRoom` first when it isn't Town Center's.
-  const { room: disabledRoom, door: disabledDoor } = firstDisabledDoor();
-  const detour = disabledRoom.id !== 'town-center';
+  const { room: lockedRoom, door: lockedDoor } = firstLockedDoor();
+  const detour = lockedRoom.id !== 'town-center';
   if (detour) {
-    await page.evaluate((id) => window.__roomDebug?.changeRoom?.(id), disabledRoom.id);
+    await page.evaluate((id) => window.__roomDebug?.changeRoom?.(id), lockedRoom.id);
     await expect
       .poll(async () => (await debugInfo(page))?.roomId, { timeout: WALK_TIMEOUT })
-      .toBe(disabledRoom.id);
+      .toBe(lockedRoom.id);
     await waitForElevatorHidden(page);
   }
   const tileBefore = (await debugInfo(page))?.localPenguin?.tile;
   const movesBefore = (await debugInfo(page))?.localPenguinMoveLog?.length ?? 0;
-  await clickStagePoint(page, doorCenter(disabledDoor));
+  await clickStagePoint(page, doorCenter(lockedDoor));
   // Fast, fixed-interval polls: the default backoff (up to 1 s between
   // checks) could notice the hint up to a second late, eating most of its
   // 2 s window before the "still shown" check below.
   await expect
     .poll(async () => (await debugInfo(page))?.lockedHint, { intervals: [50] })
-    .toBe(disabledDoor.label);
+    .toBe(lockedDoor.label);
   const hintSeenAt = Date.now();
-  expect((await debugInfo(page))?.roomId).toBe(disabledRoom.id);
+  expect((await debugInfo(page))?.roomId).toBe(lockedRoom.id);
   // No walk: the Penguin never set off, and never "reached" the door.
   expect((await debugInfo(page))?.localPenguin?.tile).toEqual(tileBefore);
   expect((await debugInfo(page))?.localPenguinMoveLog?.length ?? 0).toBe(movesBefore);
-  expect((await debugInfo(page))?.doorReachedLog ?? []).not.toContain(disabledDoor.label);
+  expect((await debugInfo(page))?.doorReachedLog ?? []).not.toContain(lockedDoor.label);
   await page.screenshot({ path: 'test-results/room-transitions/under-construction-hint.png' });
 
   // DOOR_HINT_DURATION_MS (`RoomScene.ts`) is 2000ms: still shown partway
@@ -151,7 +151,7 @@ test('room transitions: doors, changeRoom, HUD, reload (#15)', async ({ page }) 
   // rather than a fixed wait, so parallel e2e workers' CPU contention can't
   // flake it.
   await page.waitForTimeout(Math.max(0, 1500 - (Date.now() - hintSeenAt)));
-  expect((await debugInfo(page))?.lockedHint).toBe(disabledDoor.label);
+  expect((await debugInfo(page))?.lockedHint).toBe(lockedDoor.label);
   await expect
     .poll(async () => (await debugInfo(page))?.lockedHint, { timeout: 15_000 })
     .toBeNull();
@@ -226,13 +226,13 @@ test('room transitions: doors, changeRoom, HUD, reload (#15)', async ({ page }) 
   // --- The event log is exactly this sequence: every room:leave's roomId
   // equals the room the previous room:enter just landed in, and the very
   // first enter (Session start, `enterSpawnRoom`) has no preceding leave
-  // (#26 D6). The disabled-door click above never changes Room, so it left
+  // (#26 D6). The locked-door click above never changes Room, so it left
   // no trace here beyond the detour to and from its Room.
   const detourLog: { type: 'room:enter' | 'room:leave'; roomId: RoomId }[] = detour
     ? [
         { type: 'room:leave', roomId: 'town-center' },
-        { type: 'room:enter', roomId: disabledRoom.id },
-        { type: 'room:leave', roomId: disabledRoom.id },
+        { type: 'room:enter', roomId: lockedRoom.id },
+        { type: 'room:leave', roomId: lockedRoom.id },
         { type: 'room:enter', roomId: 'town-center' },
       ]
     : [];

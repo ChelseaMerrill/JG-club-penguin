@@ -1,4 +1,4 @@
-import { doorHoverText, doorTabOrder } from '../game/rooms/door-ui';
+import { doorHoverText, doorTabOrder, isLockedDoor } from '../game/rooms/door-ui';
 import type { RoomDoor } from '../game/rooms/room-definition';
 import './door-ui.css';
 
@@ -103,6 +103,8 @@ export function createDoorFocus(root: HTMLElement, deps: DoorFocusDeps): DoorFoc
           button.tabIndex = tabbable ? 0 : -1;
           button.dataset.doorLabel = door.label;
           button.setAttribute('aria-label', doorHoverText(door));
+          // A locked door stays focusable (Enter shows UNDER CONSTRUCTION) but reads as disabled.
+          if (isLockedDoor(door)) button.setAttribute('aria-disabled', 'true');
           button.style.left = `${door.hotspot.x}px`;
           button.style.top = `${door.hotspot.y}px`;
           button.style.width = `${door.hotspot.width}px`;
