@@ -49,6 +49,7 @@ import {
 } from '../penguin';
 import { GAME_HEIGHT, GAME_WIDTH } from '../stage-size';
 import { planBackgroundDraw } from './background';
+import { RoomDiscoFloor } from './room-disco-floor';
 import {
   countActiveTextureListeners,
   exposeRoomDebug,
@@ -183,6 +184,13 @@ const STAGE_BACKGROUND_COLOR = '#0e1013';
 // everything, including the procedural walls; doors sit above the floor but
 // below their own label.
 const IMAGE_BACKGROUND_DEPTH = -2;
+/**
+ * A Room's `animatedFloorTiles` (owner request, 2026-10-09, the LATAM Disco
+ * Hall's dance floor): above the background image, below every `depthForTile` result
+ * (which bottoms out at `0`, for tile `{0, 0}`) and the `-1` floor/wall/door
+ * tier below, so a Penguin or NPC standing anywhere always draws over it.
+ */
+const ANIMATED_FLOOR_TILES_DEPTH = -1.5;
 /** How far in front of its NPC a `RoomForeground` sorts: under 1, the gap to the next tile's depth. */
 const FOREGROUND_DEPTH_OFFSET = 0.5;
 /** Town Center's desk tank stands on the floor here: the bottom of its desk's front corner. */
@@ -369,6 +377,8 @@ export class RoomScene extends Scene {
   private chickenToss: RoomChickenToss | null = null;
   /** The Room's tank fish (Town Center's Ghostfish Killa), when it has one. Rebuilt by every `create()`. */
   private tankFish: RoomTankFish | null = null;
+  /** The Room's animated dance floor (the LATAM Disco Hall), when it has one. Rebuilt by every `create()`. */
+  private discoFloor: RoomDiscoFloor | null = null;
   private npcClickPause: NpcClickPause | null = null;
   /** The `onArrive` of the latest NPC click (#113), to tell whether that walk is still pending. */
   private npcArrival: (() => void) | null = null;
@@ -523,6 +533,8 @@ export class RoomScene extends Scene {
     this.chickenToss = null;
     this.tankFish?.destroy();
     this.tankFish = null;
+    this.discoFloor?.destroy();
+    this.discoFloor = null;
     this.npcClickPause = null;
     this.npcArrival = null;
     this.guard?.sprite.destroy();
@@ -563,6 +575,7 @@ export class RoomScene extends Scene {
     this.npcMotions = null;
     this.chickenToss = null;
     this.tankFish = null;
+    this.discoFloor = null;
     this.npcClickPause = null;
     this.npcArrival = null;
     this.unsubscribeNpcDialog = [];
@@ -764,6 +777,7 @@ export class RoomScene extends Scene {
       this.drawWalls(room);
     }
     this.drawBackground(room);
+    this.drawDiscoFloor(room);
     this.drawDoors(room);
     this.drawHotspots(room);
     this.drawProps(room);
@@ -828,6 +842,7 @@ export class RoomScene extends Scene {
     this.npcMotions?.update(delta);
     this.chickenToss?.update(delta);
     this.tankFish?.update(delta);
+    this.discoFloor?.update(delta);
     const npcArrival = this.npcArrival;
     this.npcClickPause?.settle({
       arrivalPending:
@@ -896,6 +911,7 @@ export class RoomScene extends Scene {
           }
         : null,
       chickenToss: this.chickenToss?.debug() ?? null,
+      discoFloor: this.discoFloor?.debug() ?? null,
     });
   }
 
@@ -1980,6 +1996,15 @@ export class RoomScene extends Scene {
     this.tankFish = new RoomTankFish(this, room.tankFish, {
       depth,
       bubbleDepth: NPC_BUBBLE_LAYER + depth,
+      reducedMotion: prefersReducedMotion(),
+    });
+  }
+
+  /** Draws a Room's `animatedFloorTiles` (the LATAM Disco Hall's dance floor), when it has one. */
+  private drawDiscoFloor(room: RoomDefinition): void {
+    if (!room.animatedFloorTiles?.length) return;
+    this.discoFloor = new RoomDiscoFloor(this, room.animatedFloorTiles, {
+      depth: ANIMATED_FLOOR_TILES_DEPTH,
       reducedMotion: prefersReducedMotion(),
     });
   }

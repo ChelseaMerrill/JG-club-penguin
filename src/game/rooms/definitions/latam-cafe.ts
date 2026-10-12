@@ -22,13 +22,16 @@ import { createStandardRoomGrid } from '../grid';
 //     floor, so it blocks nothing).
 // Every NPC's own tile (see `npcSlots` below) is additionally blocked (#16
 // fix 5), including Joao Vitor Amorim's and Vinicius Martins' home slot
-// though they walk away from it: Sander Nonaka (6,0, already inside the
-// counter block), Alexandre Nunes (3,3, already inside table1's block),
-// Ygor Azevedo (3,6), Fernanda Gioiosa (5,7), Jean Rodrigues (8,3), Joao
-// Vitor Amorim (1,2) and Vinicius Martins (11,5).
+// though they walk away from it: Alexandre Nunes (3,3, already inside
+// table1's block), Ygor Azevedo (3,6), Fernanda Gioiosa (5,7), Jean
+// Rodrigues (8,3), Joao Vitor Amorim (1,2), Vinicius Martins (11,5) and
+// Sander Nonaka (8,1, owner request 2026-10-09: moved off the counter onto
+// the open floor tile beside its right/register end, between the front
+// lip's blocked (7,1) and the crates above at (8,0) -- genuinely newly
+// blocked, not already covered by a fixture).
 const WALKABLE: readonly (readonly boolean[])[] = [
   [true, true, true, true, false, false, false, false, false, false, false, true],
-  [true, true, true, true, true, false, false, false, true, true, true, true],
+  [true, true, true, true, true, false, false, false, false, true, true, true],
   [true, false, true, true, true, true, true, true, true, true, true, true],
   [true, true, true, false, false, true, false, false, false, true, true, true],
   [true, true, true, true, true, true, true, true, true, true, true, true],
@@ -104,12 +107,17 @@ export const latamCafe: RoomDefinition = {
       tile: { col: 11, row: 5 },
       offset: { x: -40, y: -5 },
     },
-    // At the register, behind the counter. The design's own "MATCH THE
-    // TREATS" bubble here links to `Minigame Pao de Queijo Memory.dc.html`,
-    // triggered by clicking Sander at the register -- not built yet (the
-    // packet's scope is the Room and its cast, not the minigame), so he
-    // gets a normal line dialog instead (`npcs.ts`); wire his minigame
-    // dialog here when Pão de Queijo Memory lands.
-    { npcId: 'sander-nonaka', tile: { col: 6, row: 0 }, offset: { x: -5, y: -22.5 } },
+    // Beside the counter, at its right (register) end, standing on the
+    // floor rather than on the counter itself (owner request, 2026-10-09:
+    // the design's own point, `(6,0)` with this same offset, rendered him
+    // standing on top of the counter). `(8,1)` is the nearest open floor
+    // tile to the register -- the design's own "MATCH THE TREATS" bubble
+    // (cx 1095, cy 372.5, inside tile `(6,0)`) links to `Minigame Pao de
+    // Queijo Memory.dc.html`, triggered by clicking Sander there -- clear of
+    // both the front lip's blocked `(7,1)` and the crates' tile `(8,0)`.
+    // The minigame isn't built yet (#218), so he opens no dialog for now
+    // (`npcs.ts`); wire his minigame dialog here when Pão de Queijo Memory
+    // lands.
+    { npcId: 'sander-nonaka', tile: { col: 8, row: 1 }, offset: { x: 0, y: 0 } },
   ],
 };
