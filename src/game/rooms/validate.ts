@@ -2,7 +2,7 @@ import type { Tile } from '../../contracts';
 import { GAME_HEIGHT, GAME_WIDTH } from '../stage-size';
 import { IGLOO_SLOT_PLACEMENT } from '../../persistence/progress-store';
 import { iglooSlotForSlotId } from './furniture-slots';
-import type { RoomDefinition, StagePoint } from './room-definition';
+import type { RoomDefinition, RoomDoor, StagePoint } from './room-definition';
 
 function isInStage(point: StagePoint): boolean {
   return point.x >= 0 && point.x <= GAME_WIDTH && point.y >= 0 && point.y <= GAME_HEIGHT;
@@ -162,28 +162,100 @@ export function validateRoomDefinitions(rooms: readonly RoomDefinition[]): RoomV
       });
     }
 
+    checkDoorFields(room, byId, errors);
+
     for (const door of room.doors) {
-      if (door.targetRoomId === null) continue;
-
-      const target = byId.get(door.targetRoomId);
-      if (!target) {
-        errors.push({
-          roomId: room.id,
-          message: `door "${door.label}" targets undefined room "${door.targetRoomId}"`,
-        });
-        continue;
-      }
-
-      if (!isWalkable(target, door.entryTile)) {
-        errors.push({
-          roomId: room.id,
-          message: `door "${door.label}" entryTile { col: ${door.entryTile.col}, row: ${door.entryTile.row} } is not walkable in target room "${door.targetRoomId}"`,
-        });
-      }
+      checkTarget(room, byId, `door "${door.label}"`, door, errors);
     }
   }
 
   return errors;
+}
+
+/**
+ * A non-null `targetRoomId` must name a Room in `byId`, and `entryTile` must
+ * be walkable there (`null` is a locked exit, #170 D4).
+ */
+function checkTarget(
+  room: RoomDefinition,
+  byId: ReadonlyMap<RoomDefinition['id'], RoomDefinition>,
+  name: string,
+  exit: Pick<RoomDoor, 'targetRoomId' | 'entryTile'>,
+  errors: RoomValidationError[],
+): void {
+  if (exit.targetRoomId === null) return;
+  const target = byId.get(exit.targetRoomId);
+  if (!target) {
+    errors.push({
+      roomId: room.id,
+      message: `${name} targets undefined room "${exit.targetRoomId}"`,
+    });
+    return;
+  }
+  if (!isWalkable(target, exit.entryTile)) {
+    errors.push({
+      roomId: room.id,
+      message: `${name} entryTile { col: ${exit.entryTile.col}, row: ${exit.entryTile.row} } is not walkable in target room "${exit.targetRoomId}"`,
+    });
+  }
+}
+
+function sameTile(a: Tile, b: Tile): boolean {
+  return a.col === b.col && a.row === b.row;
+}
+
+/**
+ * #170 D1's door rules:
+ * - a label repeats only as a twin (a pill duplicating a door) with the same
+ *   target and entry tile;
+ * - every `floorChoices` entry follows the target rules above;
+ * - a pill's rect lies inside the Stage;
+ * - a `guardTile` is in the grid and walkable.
+ */
+function checkDoorFields(
+  room: RoomDefinition,
+  byId: ReadonlyMap<RoomDefinition['id'], RoomDefinition>,
+  errors: RoomValidationError[],
+): void {
+  const firstByLabel = new Map<string, RoomDoor>();
+  for (const door of room.doors) {
+    const first = firstByLabel.get(door.label);
+    if (!first) {
+      firstByLabel.set(door.label, door);
+    } else if (
+      first.targetRoomId !== door.targetRoomId ||
+      !sameTile(first.entryTile, door.entryTile)
+    ) {
+      errors.push({
+        roomId: room.id,
+        message: `door "${door.label}" repeats a label with a different target or entry tile (a twin must match its door)`,
+      });
+    }
+
+    for (const choice of door.floorChoices ?? []) {
+      checkTarget(room, byId, `door "${door.label}" floor ${choice.floor}`, choice, errors);
+    }
+
+    if (door.kind === 'pill') {
+      const { x, y, width, height } = door.hotspot;
+      if (x < 0 || y < 0 || x + width > GAME_WIDTH || y + height > GAME_HEIGHT) {
+        errors.push({
+          roomId: room.id,
+          message: `pill "${door.label}" rect { x: ${x}, y: ${y}, width: ${width}, height: ${height} } is outside the ${GAME_WIDTH}x${GAME_HEIGHT} Stage`,
+        });
+      }
+    }
+
+    if (door.guardTile) {
+      const tile = door.guardTile;
+      if (!isInBounds(room, tile) || !isWalkable(room, tile)) {
+        errors.push({
+          roomId: room.id,
+          message: `door "${door.label}" guardTile { col: ${tile.col}, row: ${tile.row} } is not a walkable tile in the grid`,
+        });
+      }
+    }
+  }
 }
 
 /** Throws with every violation's message if `rooms` is invalid. */

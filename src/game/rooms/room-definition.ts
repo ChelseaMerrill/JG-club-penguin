@@ -1,5 +1,6 @@
 import type { HexColor, RoomId, Tile } from '../../contracts';
 import type { Placement } from '../../persistence/progress-store';
+import type { FloorId } from './floors';
 import type { TankFish } from './tank-fish';
 
 /**
@@ -32,19 +33,46 @@ export interface DoorHotspot {
 }
 
 /**
- * `targetRoomId: null` means the door is disabled (its destination Room has
- * no `RoomDefinition` yet); `validate.ts` requires a non-null target to name
- * a Room that is actually registered.
+ * One floor an Elevator door offers (#170 D9): `floor` is the chip's floor,
+ * `label` its text after the floor (e.g. "ROOF DECK · THE MARKET"), and
+ * `targetRoomId`/`entryTile` follow `RoomDoor`'s own rules, `null` meaning
+ * locked (UNDER CONSTRUCTION) until that Room is built.
+ */
+export interface FloorChoice {
+  floor: FloorId;
+  label: string;
+  targetRoomId: RoomId | null;
+  entryTile: Tile;
+}
+
+/**
+ * `targetRoomId: null` means the door is locked (#170 D4: its destination
+ * Room has no `RoomDefinition` yet, so it shows UNDER CONSTRUCTION and the
+ * Penguin never walks to it); `validate.ts` requires a non-null target to
+ * name a Room that is actually registered.
  *
  * `entryTile` is a tile in the **target** Room, not this one: the tile a
  * Player arrives on after passing through this door. `validate.ts` checks it
  * is walkable in the target Room's own `walkable` mask.
+ *
+ * #170 D1 adds four optional fields:
+ * - `kind`: a `'door'` drawn in the Room (the default) or a baked exit
+ *   `'pill'` at the bottom of the Stage. Only doors get the hover pill.
+ * - `wall`: the back wall a door sits on, which slants its hover glow.
+ * - `floorChoices`: an Elevator door's floors (D9); its own `targetRoomId` is
+ *   its unlocked choice.
+ * - `guardTile`: where Anthony stands while he guards this door (D14), instead
+ *   of its approach tile.
  */
 export interface RoomDoor {
   label: string;
   hotspot: DoorHotspot;
   targetRoomId: RoomId | null;
   entryTile: Tile;
+  kind?: 'door' | 'pill';
+  wall?: 'left' | 'right';
+  floorChoices?: readonly FloorChoice[];
+  guardTile?: Tile;
 }
 
 /** A placeholder slot for an NPC (#14, #36 fill in behavior). */
