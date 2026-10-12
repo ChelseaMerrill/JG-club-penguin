@@ -5,7 +5,7 @@ import type { RoomEventMap, RoomId } from './rooms';
  * Producers: #37 (played), #27 `record_round`. Consumers: #27, #34, #42.
  */
 export type MinigameId =
-  'bug-squash' | 'pancake-flip' | 'coffee-rush' | 'snow-cone-stand' | 'beystadium';
+  'bug-squash' | 'pancake-flip' | 'coffee-rush' | 'snow-cone-stand' | 'beystadium' | 'penalty-kick';
 
 /**
  * Every Badge seeded in `public.badges` (#138's migration; mirrored by
@@ -28,7 +28,8 @@ export type BadgeId =
   | 'mullet-mania'
   | 'let-it-rip'
   | 'stair-master'
-  | 'phish-fry';
+  | 'phish-fry'
+  | 'goleador';
 
 /**
  * Per-minigame stats keys. Producer: #37. Consumers: #27 (SQL keys), #32,
@@ -112,6 +113,23 @@ export interface MinigameStatsMap {
     strikes: number;
     perfectLaunches: number;
     bey: number;
+  };
+  /** Five penalties against the keeper (`design/Minigame Penalty Kick.dc.html`):
+   *  `goals` is plain goals (non-corner), `golazos` is top-corner goals,
+   *  counted separately because they pay differently (30 vs 50 Tokens) and
+   *  both count toward the personal best and the Goleador Badge
+   *  (`goals + golazos >= 4`). `saved`/`wide`/`over` are the round's other
+   *  four outcomes; every count is a shot (`goals + golazos + saved + wide +
+   *  over` is always 5 at the end of a round). Producer:
+   *  `penalty-kick-engine.ts`. Consumer: `record_round`'s `'penalty-kick'`
+   *  branch (`20261012010000_penalty_kick.sql`), which pays and validates
+   *  from these (`goals + golazos <= 5`). */
+  'penalty-kick': {
+    goals: number;
+    golazos: number;
+    saved: number;
+    wide: number;
+    over: number;
   };
 }
 

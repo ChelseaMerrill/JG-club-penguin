@@ -345,6 +345,51 @@ describe('the Beystadium Quest (Let It Rip: win 3 matches)', () => {
   });
 });
 
+describe('the Penalty Kick Quest (5 goals in one round)', () => {
+  it('is in the build once Penalty Kick is registered, located at Chrystian in the LATAM Futebol Field', () => {
+    const quests = questsInBuild(QUEST_DEFINITIONS, { 'penalty-kick': stubFactory });
+    const quest = quests.find((q) => q.id === 'penalty-kick');
+
+    expect(quest).toMatchObject({
+      title: 'PENALTY KICK · 5 GOALS',
+      location: 'LATAM FUTEBOL FIELD · TALK TO CHRYSTIAN',
+      roomId: 'latam-futebol-field',
+      hintLocation: 'LATAM FUTEBOL FIELD',
+      goalKind: 'best',
+      goal: 5,
+    });
+  });
+
+  it('counts the personal best (goals + golazos), not Goleador\'s own 4-goal threshold, as "x / 5" progress', () => {
+    const kick = status(
+      evaluateQuests(QUEST_DEFINITIONS, freshPlayer({ bests: { 'penalty-kick': 4 } })),
+      'penalty-kick',
+    );
+
+    // 4 already unlocks Goleador (the Badge threshold), but this Quest's
+    // own goal is a clean sheet: all 5 shots scored.
+    expect(kick.progress).toBe(4);
+    expect(kick.target).toBe(5);
+    expect(kick.done).toBe(false);
+    expect(kick.nextHint).toEqual({
+      text: 'Score 5 goals in one round',
+      location: 'LATAM FUTEBOL FIELD',
+    });
+  });
+
+  it('starts at 0 / 5, and is done once a round scores all 5', () => {
+    const none = status(evaluateQuests(QUEST_DEFINITIONS, freshPlayer()), 'penalty-kick');
+    const perfect = status(
+      evaluateQuests(QUEST_DEFINITIONS, freshPlayer({ bests: { 'penalty-kick': 5 } })),
+      'penalty-kick',
+    );
+
+    expect(none.progress).toBe(0);
+    expect(perfect.done).toBe(true);
+    expect(perfect.nextHint).toBeNull();
+  });
+});
+
 describe('questTransitions and step toasts', () => {
   it('reports each main step newly done, with the new count', () => {
     const before = evaluateQuests(QUEST_DEFINITIONS, freshPlayer({ ownedItems: ['beanbag'] }));

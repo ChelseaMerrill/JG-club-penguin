@@ -60,9 +60,15 @@ const WALKABLE: readonly (readonly boolean[])[] = [
  *
  * The design's six LATAM JGers (`design/Characters LATAM.dc.html`) each walk
  * a ping-pong path of the open pitch (`src/npcs/npcs.ts`,
- * `src/npcs/motions/latam-futebol-field.ts`). The "KICK IT · PENALTY
- * SHOOTOUT" ball-icon link to `Minigame Penalty Kick.dc.html` is not wired
- * up: the Penalty Kick minigame itself isn't built yet (ticket #220).
+ * `src/npcs/motions/latam-futebol-field.ts`). The design's "KICK IT ·
+ * PENALTY SHOOTOUT" ball icon (ticket #220) is `hotspots`' own
+ * `penalty-kick-ball`, a `RoomHotspot` the Igloo's `trophy-case` and the
+ * Roof Deck's `igloo-gear-stall` already use: a plain click (no walking
+ * there first, same convention as those two) over the ball baked into the
+ * exported art at Stage (855, 546) -- see this file's header comment above
+ * -- opens Chrystian Rissoli's Penalty Kick dialog (`main.ts` reuses his
+ * `npc:arrived` handler for this hotspot, since the intro card is identical
+ * either way).
  */
 export const latamFutebolField: RoomDefinition = {
   id: 'latam-futebol-field',
@@ -98,5 +104,17 @@ export const latamFutebolField: RoomDefinition = {
     { npcId: 'chrystian-rissoli', tile: { col: 4, row: 3 }, offset: { x: 0, y: 5 } },
     { npcId: 'paulo-ponciano', tile: { col: 9, row: 8 }, offset: { x: -30, y: -10 } },
     { npcId: 'gustavo-barska', tile: { col: 3, row: 7 }, offset: { x: -40, y: -5 } },
+  ],
+  hotspots: [
+    // Centered on the ball baked into the exported art at Stage (855, 546)
+    // (this file's header comment), a 140x140 click area -- comfortably
+    // larger than the 22px-radius ball itself, the same generous-hit-area
+    // convention the Igloo's trophy-case and the Roof Deck's
+    // igloo-gear-stall hotspots use over their own fixtures.
+    {
+      id: 'penalty-kick-ball',
+      label: 'Penalty Kick',
+      rect: { x: 785, y: 476, width: 140, height: 140 },
+    },
   ],
 };

@@ -212,6 +212,25 @@ export const QUEST_DEFINITIONS: readonly QuestDefinition[] = [
     'TALK TO MICHAEL',
     'Win 3 Beystadium matches',
   ),
+  // #220: the design's own "QUEST · PENALTY KICK · 0 / 5 GOALS" trigger-card
+  // line, styled the way Beystadium's title is -- not built with
+  // `minigameQuest()`'s `badgeGoal()` helper (every other Minigame Quest's
+  // threshold matches its Badge's own threshold) because this one
+  // deliberately doesn't: Goleador is 4 of 5 scored (the Badge catalog's "4
+  // OF 5"), but the design's own Quest line reads "0 / 5" -- a clean sheet,
+  // all five shots scored -- so this Quest's goal is 5, not Goleador's 4.
+  {
+    kind: 'minigame',
+    id: 'penalty-kick',
+    minigameId: 'penalty-kick',
+    title: 'PENALTY KICK · 5 GOALS',
+    location: `${roomTitle('latam-futebol-field')} · TALK TO CHRYSTIAN`,
+    goalKind: 'best',
+    goal: 5,
+    hint: 'Score 5 goals in one round',
+    roomId: 'latam-futebol-field',
+    hintLocation: roomTitle('latam-futebol-field'),
+  },
   // #141: Nicole's coffee run, steps in the ticket's order. The server's
   // `quest_steps__nicole_coffee` (20261006020000_quest_nicole_coffee.sql C4)
   // reports them; a cup that goes cold resets steps 3-5 until Tom hands over
