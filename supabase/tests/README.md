@@ -571,3 +571,85 @@ or a client role may execute an award function, before anything changes.
 3. Save the result table to
    `test-results/51-stair-climb-proof-supabase/output.txt`, and paste the same
    table on #51.
+
+## #170 Door network guard posts (gate H2)
+
+`170_guard_posts_proof.sql` proves `20261012000000_door_network_guard_posts.sql`
+(decisions DN1-DN10 in its header), in `51_stair_climb_proof.sql`'s style. As
+postgres it checks that `public.phishing_guard_posts` holds exactly DN5's 16
+posts, compared row by row by position, with positions contiguous from 0; that
+no two neighbouring windows share a Room or guard the two sides of one
+doorway, including the wrap; that the guarded Rooms are the five of
+`GUARD_ROOM_IDS`; that the check constraint `phishing_guard_posts_room_id_check`
+exists by that name and, by behaviour, accepts each of the five Room ids and
+rejects `igloo` with `23514`; that RLS is on with no policies, and `select` as
+`authenticated` or `anon` raises `42501`; and that `phishing_guard_at` maps
+sample windows to row `floor(epoch / 600) mod 16`, and the paste window (slot
+`mod 16 = 5`) to `the-melt / ROOF DECK`. It reads no Player data, so it needs
+no fixture id.
+
+The migration amends #146 P3, so it re-seeds the table #146's file also seeds:
+**a rerun of `20260928020000_phishing_quiz.sql` must be followed by a rerun of
+this file** (rerun #146, then rerun #170). `146_phishing_proof.sql` keeps
+running on the full chain; since #170 its seed checks read the posts from the
+table instead of naming them.
+
+**Apply it after #170 PR B's screenshots and review (gate H1), and before PR B
+merges or deploys.** Its first statement stops with `phishing_quiz_missing` or
+`room_check_name_mismatch`, before anything changes, if #146's objects or its
+named room check are missing.
+
+1. Local: covered automatically by `sql-phishing.test.ts`'s PGlite run in
+   `npm test`: both proofs on the full chain, a rerun of #146 then #170, a
+   rerun of #170 alone with a guard challenge open, and the
+   `guard_window_in_use` abort.
+2. Real Supabase (gate H2):
+   1. **The operator rule: paste only while
+      `select floor(extract(epoch from now()) / 600)::bigint % 16;` returns
+      `5`.** In that 10-minute window #146's 8-row seed and DN5 both put
+      Anthony at `the-melt / ROOF DECK`, so nothing remaps and the in-use
+      abort can't fire. It starts on a 10-minute UTC boundary, comes round
+      once every 160 minutes and lasts 10; rerun the query to see when.
+   2. Paste the whole of
+      `supabase/migrations/20261012000000_door_network_guard_posts.sql` into
+      the SQL editor and run it. It is one implicit transaction (no
+      `begin`/`commit`), waits at most 5 s for its table lock, and on any
+      error changes nothing. On `guard_window_in_use`, wait for the next slot
+      5 and paste again.
+   3. Run `170_guard_posts_proof.sql`, then PR B's edited
+      `146_phishing_proof.sql` (replace every
+      `00000000-0000-0000-0000-00000000f1f0` with the real #9 H1 fixture
+      Player's id first). Expect every row's `pass` column to read `true`,
+      including each final `ALL` row. Neither changes anything.
+   4. Post-check: `select position, room_id, door_label from
+      public.phishing_guard_posts order by position;` must equal DN5 row for
+      row:
+
+      | position | room_id | door_label |
+      | --- | --- | --- |
+      | 0 | office-hallway | TEAM ROOM 1 |
+      | 1 | town-center | KITCHEN |
+      | 2 | office-hallway | TEAM ROOM 2 |
+      | 3 | dev-pit | THE ICEBOX |
+      | 4 | office-hallway | DEV PIT |
+      | 5 | the-melt | ROOF DECK |
+      | 6 | office-hallway | TEAM ROOM 3 |
+      | 7 | town-center | THE HALLWAY |
+      | 8 | office-hallway | BATHROOM |
+      | 9 | dev-pit | THE HALLWAY |
+      | 10 | office-hallway | TEAM ROOM 4 |
+      | 11 | the-melt | TOWN CENTER |
+      | 12 | office-hallway | TOWN CENTER |
+      | 13 | town-center | STAIRWELL |
+      | 14 | roof-deck | KITCHEN |
+      | 15 | town-center | ELEVATOR · ROOF DECK |
+
+   5. Merge and deploy PR B promptly: until the deploy, the live client
+      recognises 11 of the 16 posts and doesn't draw Anthony at the rest
+      (DN6).
+3. Save both result tables and the post-check to
+   `test-results/170-guard-posts-proof-supabase/output.txt`, and paste them on
+   #170.
+4. Rollback (DN9): re-paste #146's guard-post block (its `delete` and 8-row
+   `insert`), only together with a pre-#170 client. The relaxed check can
+   stay.
