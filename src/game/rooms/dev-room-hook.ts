@@ -253,8 +253,8 @@ export function recordOpenStall(stallId: string): void {
 
 /**
  * #15's navigator-owned fields, set once by `registerRoomDebugNavigatorHooks`
- * and merged onto every `exposeRoomDebug` snapshot below; `fade` (#170) is
- * read fresh on every publish.
+ * and merged onto every `exposeRoomDebug` snapshot below; `fade` (#170) is a
+ * live getter on each snapshot.
  */
 interface NavigatorDebugHooks extends Pick<RoomDebugInfo, 'changeRoom' | 'roomEventLog'> {
   fade?: () => DoorFadeDebugInfo;
@@ -286,5 +286,9 @@ export function exposeRoomDebug(info: RoomDebugInfo): void {
     return;
   }
   const { fade, ...hooks } = navigatorHooks;
-  window.__roomDebug = { ...info, npcTalkedLog, openStallLog, ...hooks, fade: fade?.() };
+  const snapshot: RoomDebugInfo = { ...info, npcTalkedLog, openStallLog, ...hooks };
+  // #170: read live, since a Room's restart publishes nothing until its
+  // `create()`, which is exactly when the fade is up.
+  if (fade) Object.defineProperty(snapshot, 'fade', { get: fade, enumerable: true });
+  window.__roomDebug = snapshot;
 }
