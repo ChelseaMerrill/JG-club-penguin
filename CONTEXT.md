@@ -27,7 +27,10 @@ The screen where a Player creates and edits their Penguin look. It opens on firs
 The full multi-room office environment, modeled from the real JG office blueprint, spread over several floors. Composed of Rooms.
 
 **Room**
-One explorable, self-contained area of the World, drawn as an isometric scene that fills the Stage. Players move between Rooms through doors or the Map. Multiplayer Presence is scoped per-Room (who else is in *this* Room), not global. The prototype Rooms are Town Center (where every Session starts), Dev Pit, The Melt, Roof Deck and the Player's Igloo. #51 adds The Icebox, the Hallway, Team Rooms 1-4, the Bathroom, The Mullet and the Stairwell. The Stairwell is six Rooms, one per **Stairwell floor**: floor 0, the lobby level, up to floor 5, the JG HQ floor.
+One explorable, self-contained area of the World, drawn as an isometric scene that fills the Stage. Players move between Rooms through doors or the Map. Multiplayer Presence is scoped per-Room (who else is in *this* Room), not global. The prototype Rooms are the Lobby (floor L, where every Session starts, #169), Town Center, Dev Pit, The Melt, Roof Deck and the Player's Igloo. #51 adds The Icebox, the Hallway, Team Rooms 1-4, the Bathroom, The Mullet and the Stairwell. The Stairwell is six Rooms, one per **Stairwell floor**: floor 0 (floor L, beside the Lobby) up to floor 5, the JG HQ floor. Floor L's LOBBY door, its ↙ LOBBY pill and ↓ lead to the Lobby.
+
+**Lobby**
+The JG HQ Lobby, on floor L (street level) of 108 State St, where every Session starts. Its STAIRS · FLOOR L door opens the Stairwell on floor L; its ELEVATOR · FLOOR 5 door rides the Elevator up to Town Center (#170's floor picker will make it ask for a floor: 5 Town Center or R Roof Deck). Security, behind the SIGN IN desk, is a Human NPC. _Avoid:_ calling Town Center the lobby.
 
 **Igloo**
 The Player's own home Room. Only its owner is ever in it, so each Player's Igloo is a separate Room with its own Room channel. It holds the Player's Furniture and Trophy Case, and is reached from the HUD. Visiting other Players' Igloos is out of scope.
@@ -42,7 +45,7 @@ One cell of a Room's isometric grid (2:1, 100x50 pixels), addressed by column an
 Which way a Penguin is turned: left or right. The artwork is mirrored for the other direction. Baked lettering (HA HA, the JG LOGO/JG CAP "JG", WAR WEEK) is counter-mirrored before the mirror is applied, so it still reads correctly rather than backwards when the Penguin faces left (#147).
 
 **Map**
-The in-game map screen, opened from the HUD. Clicking a Room on the Map takes the Penguin there. Every tile opens a Room now, so none shows as coming soon. The Stairwell's tile opens it on floor 0 and shows YOU ARE HERE on every Stairwell floor.
+The in-game map screen, opened from the HUD. Clicking a Room on the Map takes the Penguin there. Every tile opens a Room now, so none shows as coming soon. The Stairwell's tile opens it on floor 0 and shows YOU ARE HERE on every Stairwell floor. The Lobby has no tile yet (#174).
 
 ### Screens and overlays
 
@@ -50,10 +53,10 @@ The in-game map screen, opened from the HUD. Clicking a Room on the Map takes th
 The heads-up display drawn over every Room: the Room title, the Token balance, the chat field, and buttons for the Penguin Creator, the Map, the Igloo and the menu. The Emote, Snowball mode and Quest buttons appear only when their stretch work lands. It is part of the DOM overlay layer on the Stage, not the game canvas, and clicks on it never move the Penguin.
 
 **Elevator screen**
-The full-Stage overlay shown whenever a Room change crosses floors, reached through a door or the Map like any other Room change. A ride lasts 1.2s for each floor crossed (5 to R 1.2s, L to 5 6s, L to R 7.2s); the screen hides at the later of the ride's end and the destination Room being ready (at most 10s). Town Center, Dev Pit and The Melt are floor 5; the Roof Deck is one floor up, R; the Igloo has no floor at all, so it never shows the Elevator. Each Stairwell floor is its own floor, floor 0 on L. Moving between Stairwell floors, or by the stairs between floor 5 and the Roof Deck, never shows it; the Stairwell's Map tile from Town Center shows "WADDLING DOWN TO FLOOR L".
+The full-Stage overlay shown whenever a Room change crosses floors, reached through a door or the Map like any other Room change. A ride lasts 1.2s for each floor crossed (5 to R 1.2s, L to 5 6s, L to R 7.2s); the screen hides at the later of the ride's end and the destination Room being ready (at most 10s). Town Center, Dev Pit and The Melt are floor 5; the Roof Deck is one floor up, R; the Igloo has no floor at all, so it never shows the Elevator. Each Stairwell floor is its own floor, floor 0 on L; the Lobby is floor L too, so moving between it and floor 0 never shows the Elevator. Moving between Stairwell floors, or by the stairs between floor 5 and the Roof Deck, never shows it; the Stairwell's Map tile from Town Center shows "WADDLING DOWN TO FLOOR L".
 
 **Landing page**
-The screen signed-out visitors see, with the logo and sign-in buttons (PLAY NOW and LOG IN, both Google sign-in). It covers the whole Stage and replaced the earlier login card.
+The screen signed-out visitors see, with the logo and sign-in buttons (PLAY NOW and LOG IN, both Google sign-in). It covers the whole Stage and replaced the earlier login card. After sign-in (and the Penguin Creator for a new Player) the Session starts in the Lobby.
 
 ### Multiplayer
 
@@ -133,7 +136,7 @@ A named game from the designs that is out of scope for the prototype. The term i
 
 - **Quests are part of the vocabulary; they are stretch for the prototype.** Supersedes the earlier "No Quest/Task system in v1" decision (2026-09-24). "Task" stays out of the vocabulary.
 - **Presence is scoped per-Room, not global.** A Player only sees/hears other Penguins in their current Room.
-- **Every Session starts in Town Center**, after sign-in, a reload or a reconnect that starts a new Session.
+- **Every Session starts in the Lobby** (floor L), after sign-in, the Penguin Creator, a reload or a reconnect that starts a new Session (#169; supersedes Town Center).
 - **Click-to-move with pathfinding; no keyboard movement, except on the Stairwell's floors, where holding ↑/↓ climbs or descends one flight.** Clicking a Tile, an NPC or a door walks the Penguin there. The stair keys never fire while a text field has focus or an overlay is open (amended by #51, HD-2).
 - **Isometric Rooms on a 1600x900 Stage, letterboxed, desktop only.** Small or touch-only screens see a "desktop only" notice instead of the game. Supersedes "2D top-down" and Tiled tilemaps.
 - **Chat and Presence are live only and never persisted.**
