@@ -152,7 +152,7 @@ begin
     v_names := array_append(v_names, 'fresh_progress_is_defaults');
     v_pass := array_append(
       v_pass,
-      array(select jsonb_object_keys(v_p) order by 1 collate "C") = v_progress_keys
+      array(select k from jsonb_object_keys(v_p) as k order by k collate "C") = v_progress_keys
         and v_p = '{"flightsLogged":0,"completed":false,"flightTokensToday":0}'::jsonb
     );
     v_detail := array_append(v_detail, v_p::text);
@@ -162,7 +162,7 @@ begin
     v_names := array_append(v_names, 'flight_before_a_start_is_not_started');
     v_pass := array_append(
       v_pass,
-      array(select jsonb_object_keys(v_r) order by 1 collate "C") = v_result_keys
+      array(select k from jsonb_object_keys(v_r) as k order by k collate "C") = v_result_keys
         and not (v_r ->> 'logged')::boolean
         and v_r ->> 'reason' = 'not_started'
         and (v_r ->> 'tokensAwarded')::int = 0
