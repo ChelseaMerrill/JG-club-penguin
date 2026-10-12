@@ -443,9 +443,9 @@ export function createHud(layer: HTMLElement, deps: HudDeps): Hud {
     subtitleEl.textContent = subtitle;
   }
 
-  // Every Session starts in Town Center (#32 D3/#15), so the HUD shows that
-  // title from creation rather than sitting blank until the first
-  // `room:enter`.
+  // Every Session starts in the Lobby (#169; Town Center before it, #32
+  // D3/#15), so the HUD shows that title from creation rather than sitting
+  // blank until the first `room:enter`.
   setRoom(SPAWN_ROOM_ID);
 
   const unsubscribeRoomEnter = gameEvents.on('room:enter', ({ roomId }) => setRoom(roomId));

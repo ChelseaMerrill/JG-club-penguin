@@ -85,9 +85,14 @@ function setup(hasPlayer: () => boolean = () => true): {
   return { navigator, scene, events, seen };
 }
 
-/** Boots the navigator into `SPAWN_ROOM_ID`, resolving the fake scene's ready signal itself. */
-async function boot(scene: FakeScene, navigator: RoomNavigator): Promise<void> {
-  const p = navigator.enterSpawnRoom();
+/**
+ * Boots the navigator into `SPAWN_ROOM_ID` (the Lobby, #169), or into
+ * `roomId` the way the test-only `?asPlayer&room=` spawn does, resolving the
+ * fake scene's ready signal itself. The transition tests written before the
+ * Lobby boot into Town Center (floor 5) this way.
+ */
+async function boot(scene: FakeScene, navigator: RoomNavigator, roomId?: RoomId): Promise<void> {
+  const p = navigator.enterSpawnRoom(roomId);
   scene.fireCreate();
   await p;
 }
@@ -109,7 +114,7 @@ const DISABLED_DOOR: RoomDoor = {
 describe('createRoomNavigator', () => {
   it('changeRoom emits room:leave for the current Room before room:enter for the target', async () => {
     const { navigator, scene, seen } = setup();
-    await boot(scene, navigator);
+    await boot(scene, navigator, 'town-center');
     seen.length = 0;
 
     const p = navigator.changeRoom('dev-pit', { col: 1, row: 2 });
@@ -148,7 +153,7 @@ describe('createRoomNavigator', () => {
   it('still suppresses room:enter if hasPlayer() goes false exactly as the transition completes (defensive, alongside active)', async () => {
     let playerPresent = true;
     const { navigator, scene, seen } = setup(() => playerPresent);
-    await boot(scene, navigator);
+    await boot(scene, navigator, 'town-center');
     seen.length = 0;
 
     const p = navigator.changeRoom('dev-pit', { col: 1, row: 2 });
@@ -172,6 +177,51 @@ describe('createRoomNavigator', () => {
       },
     ]);
     expect(navigator.currentRoomId()).toBe(SPAWN_ROOM_ID);
+  });
+
+  it('enterSpawnRoom enters the Lobby by default: every Session starts there (#169)', async () => {
+    const { navigator, scene, seen } = setup();
+
+    await boot(scene, navigator);
+
+    expect(SPAWN_ROOM_ID).toBe('lobby');
+    expect(scene.showRoomCalls).toEqual([{ roomId: 'lobby', entryTile: undefined, force: true }]);
+    expect(seen).toEqual([
+      { type: 'enter', roomId: 'lobby', entryTile: getRoomDefinition('lobby').spawnTile },
+    ]);
+  });
+
+  it("enterSpawnRoom('town-center') spawns straight into it: no room:leave and no Elevator (#169 L2)", async () => {
+    const calls: string[] = [];
+    const events = createEmitter<RoomEventMap>();
+    const seen: LoggedEvent[] = [];
+    events.on('room:leave', ({ roomId }) => seen.push({ type: 'leave', roomId }));
+    events.on('room:enter', ({ roomId, entryTile }) =>
+      seen.push({ type: 'enter', roomId, entryTile }),
+    );
+    const scene = createFakeScene();
+    const navigator = createRoomNavigator({
+      scene,
+      events,
+      hasPlayer: () => true,
+      transitionScreen: {
+        begin: (from, to) => calls.push(`begin:${from}->${to}`),
+        ready: () => calls.push('ready'),
+        cancel: () => calls.push('cancel'),
+      },
+    });
+
+    await boot(scene, navigator, 'town-center');
+
+    expect(seen).toEqual([
+      {
+        type: 'enter',
+        roomId: 'town-center',
+        entryTile: getRoomDefinition('town-center').spawnTile,
+      },
+    ]);
+    expect(calls).toEqual(['cancel']);
+    expect(navigator.currentRoomId()).toBe('town-center');
   });
 
   it('enterSpawnRoom forces a restart even when Town Center is already shown, so entryTile is the true spawn', async () => {
@@ -283,7 +333,7 @@ describe('createRoomNavigator', () => {
   describe('overlapping transitions', () => {
     it('drops a second changeRoom while the first is still in flight; leave still precedes the surviving enter', async () => {
       const { navigator, scene, seen } = setup();
-      await boot(scene, navigator);
+      await boot(scene, navigator, 'town-center');
       seen.length = 0;
       scene.showRoomCalls.length = 0;
 
@@ -307,7 +357,7 @@ describe('createRoomNavigator', () => {
 
     it('a later enterSpawnRoom supersedes an in-flight changeRoom: the earlier transition never emits its own room:enter', async () => {
       const { navigator, scene, seen } = setup();
-      await boot(scene, navigator);
+      await boot(scene, navigator, 'town-center');
       seen.length = 0;
 
       const changeP = navigator.changeRoom('dev-pit', { col: 1, row: 2 }); // subscribes its own whenNextReady; restart pending
@@ -331,7 +381,7 @@ describe('createRoomNavigator', () => {
 
     it('sign-out mid-transition emits no room:enter for the interrupted transition', async () => {
       const { navigator, scene, seen } = setup();
-      await boot(scene, navigator);
+      await boot(scene, navigator, 'town-center');
       seen.length = 0;
 
       const changeP = navigator.changeRoom('dev-pit', { col: 1, row: 2 });
@@ -376,7 +426,7 @@ describe('createRoomNavigator', () => {
         hasPlayer: () => true,
         transitionScreen,
       });
-      await boot(scene, navigator);
+      await boot(scene, navigator, 'town-center');
 
       const p = navigator.changeRoom('dev-pit', { col: 1, row: 2 });
       scene.fireCreate();
@@ -430,7 +480,7 @@ describe('createRoomNavigator', () => {
         hasPlayer: () => true,
         transitionScreen,
       });
-      await boot(scene, navigator);
+      await boot(scene, navigator, 'town-center');
 
       const p1 = navigator.changeRoom('dev-pit', { col: 1, row: 2 });
       // Dropped outright (transitionInFlight): a real floor crossing that,
@@ -464,7 +514,7 @@ describe('createRoomNavigator', () => {
         hasPlayer: () => true,
         transitionScreen,
       });
-      await boot(scene, navigator);
+      await boot(scene, navigator, 'town-center');
       order.length = 0;
 
       const p = navigator.changeRoom('roof-deck');
@@ -520,7 +570,7 @@ describe('createRoomNavigator', () => {
         hasPlayer: () => true,
         transitionScreen,
       });
-      await navigator.enterSpawnRoom(); // showRoom() false here too, so this also resolves at once
+      await navigator.enterSpawnRoom('town-center'); // showRoom() false here too, so this also resolves at once
       order.length = 0;
 
       await navigator.changeRoom('roof-deck');
@@ -555,7 +605,7 @@ describe('createRoomNavigator', () => {
         hasPlayer: () => true,
         transitionScreen,
       });
-      await boot(scene, navigator);
+      await boot(scene, navigator, 'town-center');
       transitionScreen.calls.length = 0;
 
       const p = navigator.changeRoom('roof-deck'); // begins the screen; restart still pending
@@ -581,7 +631,7 @@ describe('createRoomNavigator', () => {
           hasPlayer: () => true,
           transitionScreen,
         });
-        await boot(scene, navigator);
+        await boot(scene, navigator, 'town-center');
         for (const roomId of rooms) {
           const p = navigator.changeRoom(roomId);
           scene.fireCreate();
@@ -603,6 +653,19 @@ describe('createRoomNavigator', () => {
             'stairwell-4',
           ]),
         ).toEqual([]);
+      });
+
+      it('shows no Elevator between the Lobby and floor 0, both floor L (#169)', async () => {
+        expect(await walk(['stairwell-0', 'lobby', 'stairwell-0'])).toEqual([
+          { type: 'begin', from: 'town-center', to: 'stairwell-0' },
+        ]);
+      });
+
+      it('shows it between Town Center and the Lobby, both ways (#169)', async () => {
+        expect(await walk(['lobby', 'town-center'])).toEqual([
+          { type: 'begin', from: 'town-center', to: 'lobby' },
+          { type: 'begin', from: 'lobby', to: 'town-center' },
+        ]);
       });
 
       it('shows no Elevator between floor 5 and the Roof Deck, either way', async () => {
@@ -636,7 +699,7 @@ describe('createRoomNavigator', () => {
   describe('useDoor (#51 slice 4, RT2-5)', () => {
     it('changes Room through an enabled door with no walk, exactly as reaching it does', async () => {
       const { navigator, scene, seen } = setup();
-      await boot(scene, navigator);
+      await boot(scene, navigator, 'town-center');
       seen.length = 0;
 
       navigator.useDoor(DEV_PIT_DOOR);
@@ -654,7 +717,7 @@ describe('createRoomNavigator', () => {
 
     it("shows a disabled door's coming-soon hint and stays put", async () => {
       const { navigator, scene, seen } = setup();
-      await boot(scene, navigator);
+      await boot(scene, navigator, 'town-center');
       seen.length = 0;
 
       navigator.useDoor(DISABLED_DOOR);

@@ -39,8 +39,11 @@ export const ROOM_IDS = [
  */
 export type RoomId = (typeof ROOM_IDS)[number];
 
-/** Consumers: #15, #13. */
-export const SPAWN_ROOM_ID: RoomId = 'town-center';
+/**
+ * The Room every Session starts in (#169: the JG HQ Lobby, floor L; it was
+ * Town Center before). Consumers: #15, #13.
+ */
+export const SPAWN_ROOM_ID: RoomId = 'lobby';
 
 /**
  * A grid coordinate within a Room. Isometric tile coordinates, never pixels.

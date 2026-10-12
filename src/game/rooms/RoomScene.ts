@@ -715,8 +715,8 @@ export class RoomScene extends Scene {
    * Restarts this scene to show `roomId` (a Room change). A no-op for the
    * Room already shown, unless `force` (#15 review round 1: `enterSpawnRoom`
    * passes `true` so a repeat Session-start still truly restarts and
-   * respawns even when the Room already showing happens to be Town Center,
-   * e.g. after a dev `?room=` override), and always a no-op for a Room with
+   * respawns even when the Room already showing happens to be the spawn
+   * Room, e.g. after a dev `?room=` override), and always a no-op for a Room with
    * no `RoomDefinition` yet (#16), which leaves the current Room's art on
    * screen. Returns whether it switched. The local Penguin spawns at
    * `entryTile` when given, else at the Room's `spawnTile` (#14's `init`).

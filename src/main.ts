@@ -105,6 +105,8 @@ import { createTrophyCase, TROPHY_CASE_OVERLAY_ID } from './ui/trophy-case';
 import { createMapScreen } from './ui/map-screen';
 import { createRemoteLounge } from './ui/remote-lounge/remote-lounge';
 import { createLatamNav } from './ui/latam-nav/latam-nav';
+import { createFloorDisplay } from './ui/floor-display/floor-display';
+import { saySpawnLine } from './game/rooms/spawn-line';
 import { createElevatorScreen } from './ui/elevator-screen';
 import type { ElevatorTestHandle } from './ui/elevator-test-handle';
 import { createMarket, MARKET_OVERLAY_ID } from './ui/market';
@@ -258,6 +260,15 @@ const wallText: WallText = createWallText(uiLayer, {
   initialRoomId: resolveRoomIdFromLocation(window.location),
 });
 
+// #169: the Lobby elevator's decorative floor display, live over that Room
+// only. Mounted with the wall text, before the login overlay and the HUD, so
+// it paints below them; like the wall text, its first render matches the
+// Room `RoomScene` boots into.
+createFloorDisplay(uiLayer, {
+  resolve: (roomId) => getRoomDefinition(roomId).floorDisplay,
+  initialRoomId: resolveRoomIdFromLocation(window.location),
+});
+
 /**
  * The Room scene and its Penguin view, once `RoomScene.create()` has first run.
  *
@@ -356,6 +367,11 @@ let roomChannel: RoomChannel | null = null;
 let channelPlayerId: string | null = null;
 /** The signed-in Player's chat controller (#44), recreated alongside `roomChannel` each session. */
 let chatController: ChatController | null = null;
+/**
+ * The chat bubble view `chatController` draws through (#169: the spawn line
+ * says its local bubble through it too, so `__chatDebug` sees it).
+ */
+let chatView: ChatBubbleView | null = null;
 /** The signed-in Player's Snowball mode controller (#53), created and stopped alongside `chatController`. */
 let snowballController: SnowballController | null = null;
 /** Whether Snowball mode is on (#53 D6): only ever during a Session. */
@@ -555,6 +571,7 @@ function endSession(): RoomChannel | null {
   setSessionActive(false);
   chatController?.stop();
   chatController = null;
+  chatView = null;
   // `emoteController` (#47) is a boot-time singleton (see its declaration
   // above), never stopped: its `onRoomChange` forwarding above already
   // clears every active Emote once the real Room channel reports the leave.
@@ -622,10 +639,15 @@ async function startSession(player: Player, previous: RoomChannel | null): Promi
   // failure, so a broken start never leaves it hidden with the Stage gated.
   // A sign-out or newer sign-in in between keeps it hidden.
   let entered: Promise<void> | undefined;
+  const isCurrent = (): boolean => generation === signInGeneration;
   try {
     entered = wireSession(player, view);
   } finally {
-    void revealLocalPenguinAfter(entered, () => generation === signInGeneration, game.registry);
+    // #169: once the own Penguin is shown in the spawn Room, it says that
+    // Room's spawn line ("stairs or elevator?" in the Lobby), locally only.
+    void revealLocalPenguinAfter(entered, isCurrent, game.registry).then(() =>
+      sayOwnSpawnLine(SPAWN_ROOM_ID, isCurrent),
+    );
   }
   // #46: loads Quest progress from saved data (steps already done aren't toasted).
   void quests.start();
@@ -657,10 +679,8 @@ function wireSession(player: Player, view: Awaited<typeof sceneReady>): Promise<
     view: composeView(view),
   });
   roomChannel = channel;
-  chatController = createChatController({
-    channel,
-    view: composeChatView(view, () => channelPlayerId),
-  });
+  chatView = composeChatView(view, () => channelPlayerId);
+  chatController = createChatController({ channel, view: chatView });
   // Forwards this session's real Room channel into the boot-time
   // `emoteController`'s stable `emoteChannel` shim (#47; see its own doc
   // comment above for why the Emote controller itself isn't recreated here
@@ -691,6 +711,21 @@ function wireSession(player: Player, view: Awaited<typeof sceneReady>): Promise<
   // After the Room channel exists (#15 A2), so it sees the first `room:enter`
   // and joins Presence.
   return roomNavigator?.enterSpawnRoom();
+}
+
+/**
+ * Says `spawnRoomId`'s spawn line on the own Penguin, through `chatView`
+ * (#169, `spawn-line.ts`): once, after a spawn, and only while that Session
+ * is current and still in that Room.
+ */
+function sayOwnSpawnLine(spawnRoomId: RoomId, isCurrent: () => boolean): void {
+  saySpawnLine({
+    spawnRoomId,
+    isCurrent,
+    currentRoomId: () => roomNavigator?.currentRoomId() ?? null,
+    lineFor: (roomId) => getRoomDefinition(roomId).spawnLine,
+    say: (text) => chatView?.sayLocal(text) ?? false,
+  });
 }
 
 /**
@@ -731,7 +766,15 @@ function initDevAsPlayerHook(): boolean {
   // clicks) straight away, before any e2e click.
   setLocalPenguinVisible(game.registry, true);
   void sceneReady.then(() => {
-    void roomNavigator?.enterSpawnRoom();
+    // #169: `?room=` picks the spawn Room here (test-only), so a spec can
+    // start straight in, say, Town Center with no Elevator ride; without it,
+    // the fixture spawns in the Lobby like a real Session. The spawn line
+    // follows, as in `startSession`.
+    const spawnRoomId = resolveRoomIdFromLocation(window.location);
+    if (penguins) chatView = composeChatView(penguins, () => fixturePlayer.id);
+    void roomNavigator
+      ?.enterSpawnRoom(spawnRoomId)
+      .then(() => sayOwnSpawnLine(spawnRoomId, () => game.registry.get('player') !== undefined));
     if (!roomScene) return;
     const stubChannel: SnowballRoomChannel = {
       send: () => Promise.resolve(true),
@@ -1567,7 +1610,7 @@ const auth = startAuth({
       return;
     }
     overlay.showSignedIn();
-    // The HUD and the Session (Town Center, Presence) start in `onReady`:
+    // The HUD and the Session (the Lobby, Presence) start in `onReady`:
     // straight away for a returning Player, after the Penguin Creator's
     // first save for a new one.
     if (pendingPrevious) void stopChannel(pendingPrevious);

@@ -93,13 +93,15 @@ export interface RoomNavigator {
    */
   changeRoom(roomId: RoomId, entryTile?: Tile): Promise<void>;
   /**
-   * Enters `SPAWN_ROOM_ID` at its own `spawnTile`, with no preceding
-   * `room:leave` in the normal case (#26 D6: the first Room of a Session) —
-   * unless `current` is somehow already set, in which case it leaves that
-   * Room first, defensively. Always forces a real restart/respawn, even if
-   * the Scene already happens to show Town Center.
+   * Enters `roomId` (by default `SPAWN_ROOM_ID`, the Lobby, #169) at its own
+   * `spawnTile`, with no preceding `room:leave` in the normal case (#26 D6:
+   * the first Room of a Session) — unless `current` is somehow already set,
+   * in which case it leaves that Room first, defensively. Always forces a
+   * real restart/respawn, even if the Scene already happens to show that
+   * Room, and never shows the Elevator. A real Session always enters the
+   * default; only the test-only `?asPlayer` hook passes `?room=`'s Room.
    */
-  enterSpawnRoom(): Promise<void>;
+  enterSpawnRoom(roomId?: RoomId): Promise<void>;
   /** Emits `room:leave` for the current Room (if any), forgets it, and ends the Session (`active` becomes `false`). Call before `bindPlayer(null)` on sign-out. */
   leaveForSignOut(): void;
   /** The Room this navigator last entered (or is entering), or `null` before the first entry / after `leaveForSignOut`. */
@@ -239,7 +241,7 @@ export function createRoomNavigator(deps: RoomNavigatorDeps): RoomNavigator {
     changeRoom,
     useDoor,
     isTransitioning: () => transitionInFlight,
-    async enterSpawnRoom(): Promise<void> {
+    async enterSpawnRoom(roomId: RoomId = SPAWN_ROOM_ID): Promise<void> {
       active = true;
       // #52 review MINOR: cancel any transitionScreen state first, so a
       // transition superseded by this spawn entry (e.g. a sign-out and a
@@ -250,7 +252,7 @@ export function createRoomNavigator(deps: RoomNavigatorDeps): RoomNavigator {
       // `current` is already `null` here. If it somehow isn't, leave that
       // Room before forcing the fresh spawn entry.
       if (current) events.emit('room:leave', { roomId: current });
-      await enterRoom(SPAWN_ROOM_ID, undefined, true);
+      await enterRoom(roomId, undefined, true);
     },
     leaveForSignOut(): void {
       active = false;

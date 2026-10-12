@@ -50,12 +50,27 @@ describe('createHud', () => {
     expect(root.querySelector('.hud__tokens-value')?.textContent).toBe('1,250');
   });
 
-  it('shows the Town Center title and subtitle from creation, before any room:enter arrives', () => {
+  it('shows the Lobby title and subtitle from creation, before any room:enter arrives (#169)', () => {
     const { root, resolveRoomTitle } = setup();
 
-    expect(resolveRoomTitle).toHaveBeenCalledWith('town-center');
-    expect(root.querySelector('.hud__title')?.textContent).toBe('TOWN-CENTER');
-    expect(root.querySelector('.hud__subtitle')?.textContent).toBe('subtitle-town-center');
+    expect(resolveRoomTitle).toHaveBeenCalledWith('lobby');
+    expect(root.querySelector('.hud__title')?.textContent).toBe('LOBBY');
+    expect(root.querySelector('.hud__subtitle')?.textContent).toBe('subtitle-lobby');
+  });
+
+  it('shows "JG HQ LOBBY" from creation with the real Room titles (#169)', async () => {
+    const { getRoomDefinition } = await import('../../game/rooms/registry');
+    const { root } = setup({
+      resolveRoomTitle: (roomId) => {
+        const room = getRoomDefinition(roomId);
+        return { title: room.title, subtitle: room.subtitle };
+      },
+    });
+
+    expect(root.querySelector('.hud__title')?.textContent).toBe('JG HQ LOBBY');
+    expect(root.querySelector('.hud__subtitle')?.textContent).toBe(
+      '108 STATE ST · STREET LEVEL · JAHNEL GROUP IS ON 5',
+    );
   });
 
   it('updates the Room title and subtitle on room:enter via the injected resolveRoomTitle', () => {

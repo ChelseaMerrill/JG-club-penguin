@@ -16,7 +16,9 @@ import {
 describe('src/contracts barrel', () => {
   it('re-exports the runtime values Tracks B, C and D depend on', () => {
     expect(ROOM_IDS).toContain('town-center');
-    expect(SPAWN_ROOM_ID).toBe('town-center');
+    expect(ROOM_IDS).toContain('lobby');
+    // #169: every Session starts in the JG HQ Lobby.
+    expect(SPAWN_ROOM_ID).toBe('lobby');
     expect(DEFAULT_LOOK.body).toBe('#161719');
     expect(IDLE_EMOTES).toHaveLength(5);
     expect(PENGUIN_NAME_MAX).toBe(16);
