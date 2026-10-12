@@ -69,6 +69,9 @@ declare
   v_room text;
   v_other_room text;
   v_window timestamptz;
+  v_min int;
+  v_max int;
+  v_k int;
   v_available boolean;
   v_all boolean;
   v_total int;
@@ -107,10 +110,16 @@ begin
     -----------------------------------------------------------------------
     -- P3/P4: the schedule at fixed times (phishing_guard_at, as postgres).
     -----------------------------------------------------------------------
-    select count(*) into v_count from public.phishing_guard_posts;
-    v_names := array_append(v_names, 'eight_guard_posts_seeded');
-    v_pass := array_append(v_pass, v_count = 8);
-    v_detail := array_append(v_detail, format('%s posts (expected 8)', v_count));
+    -- #170 (RT170-7): the seed itself is #170's to prove
+    -- (170_guard_posts_proof.sql), so these checks read the posts from the
+    -- table instead of naming them: positions run contiguously from 0.
+    select count(*), coalesce(min(g.position), -1), coalesce(max(g.position), -1)
+      into v_count, v_min, v_max
+    from public.phishing_guard_posts g;
+    v_names := array_append(v_names, 'guard_posts_contiguous_from_0');
+    v_pass := array_append(v_pass, v_count > 0 and v_min = 0 and v_max = v_count - 1);
+    v_detail := array_append(
+      v_detail, format('%s posts, positions %s-%s', v_count, v_min, v_max));
 
     v_a := public.phishing_guard_at('2026-09-28 14:00:00+00');
     v_b := public.phishing_guard_at('2026-09-28 14:09:59.999+00');
@@ -136,22 +145,28 @@ begin
     );
     v_detail := array_append(v_detail, format('14:00 %s, 14:10 %s', v_a ->> 'roomId', v_c ->> 'roomId'));
 
-    -- floor(epoch / 600) mod 8: position 0 at the epoch, 7 in the 8th window,
-    -- 0 again in the 9th.
-    v_a := public.phishing_guard_at(to_timestamp(0));
-    v_b := public.phishing_guard_at(to_timestamp(600 * 7 + 1));
-    v_c := public.phishing_guard_at(to_timestamp(600 * 8 + 599));
+    -- floor(epoch / 600) mod n: position 0 at the epoch, n - 1 in the nth
+    -- window, 0 again in the (n + 1)th, each compared with the row at offset
+    -- k mod n read from the table.
+    v_ok := v_count > 0;
+    foreach v_k in array array[0, v_count - 1, v_count] loop
+      v_a := public.phishing_guard_at(to_timestamp(600 * v_k + 1));
+      select g.room_id, g.door_label into v_room, v_step
+      from public.phishing_guard_posts g
+      order by g.position
+      offset (v_k % greatest(v_count, 1))
+      limit 1;
+      if v_a ->> 'roomId' is distinct from v_room or v_a ->> 'doorLabel' is distinct from v_step then
+        v_ok := false;
+      end if;
+    end loop;
     v_names := array_append(v_names, 'post_index_is_epoch_window_mod_count');
-    v_pass := array_append(
-      v_pass,
-      v_a ->> 'roomId' = 'town-center' and v_a ->> 'doorLabel' = 'THE ICEBOX'
-        and v_b ->> 'roomId' = 'roof-deck' and v_b ->> 'doorLabel' = 'KITCHEN'
-        and v_c ->> 'roomId' = 'town-center' and v_c ->> 'doorLabel' = 'THE ICEBOX'
-    );
-    v_detail := array_append(v_detail, format('0: %s, 7: %s, 8: %s', v_a, v_b ->> 'doorLabel', v_c ->> 'doorLabel'));
+    v_pass := array_append(v_pass, v_ok);
+    v_detail := array_append(
+      v_detail, format('windows 0, %s and %s against the table''s rows', v_count - 1, v_count));
 
     v_ok := true;
-    for i in 0..8 loop
+    for i in 0..v_count loop
       v_a := public.phishing_guard_at(to_timestamp(600 * i));
       v_b := public.phishing_guard_at(to_timestamp(600 * (i + 1)));
       if v_a ->> 'roomId' = v_b ->> 'roomId' then
@@ -160,7 +175,8 @@ begin
     end loop;
     v_names := array_append(v_names, 'consecutive_windows_never_share_a_room');
     v_pass := array_append(v_pass, v_ok);
-    v_detail := array_append(v_detail, 'windows 0-9 checked, including the wrap');
+    v_detail := array_append(
+      v_detail, format('windows 0-%s checked, including the wrap', v_count + 1));
 
     -- The post right now, for the signed-in checks below.
     v_expected := public.phishing_guard_at(now());

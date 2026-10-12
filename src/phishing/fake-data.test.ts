@@ -5,23 +5,48 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { getRoomDefinition } from '../game/rooms/registry';
 import { FAKE_GUARD_POSTS, FAKE_PHISHING_QUESTIONS } from './fake-data';
+import { GUARD_ROOM_IDS } from './guard-placement';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
+const MIGRATIONS_DIR = path.join(REPO_ROOT, 'supabase/migrations');
 const MIGRATION_SQL = readFileSync(
-  path.join(REPO_ROOT, 'supabase/migrations/20260928020000_phishing_quiz.sql'),
+  path.join(MIGRATIONS_DIR, '20260928020000_phishing_quiz.sql'),
   'utf8',
 );
+
+/**
+ * The guard-post seed's insert, anchored at the start of a line (#170 nit):
+ * exactly one per migration that seeds the posts.
+ */
+const GUARD_POST_INSERT =
+  /^insert into public\.phishing_guard_posts \(position, room_id, door_label\) values$/gm;
+
+/**
+ * The latest migration that seeds `public.phishing_guard_posts` (#170's
+ * `20261012000000_door_network_guard_posts.sql`, replacing #146's seed),
+ * checking each seeding migration has exactly one anchored insert.
+ */
+function latestGuardPostMigration(): { file: string; sql: string } {
+  const seeding = readdirSync(MIGRATIONS_DIR)
+    .filter((name) => name.endsWith('.sql'))
+    .sort()
+    .map((file) => ({ file, sql: readFileSync(path.join(MIGRATIONS_DIR, file), 'utf8') }))
+    .filter(({ sql }) => (sql.match(GUARD_POST_INSERT) ?? []).length > 0);
+  for (const { file, sql } of seeding) {
+    expect(sql.match(GUARD_POST_INSERT), file).toHaveLength(1);
+  }
+  return seeding.at(-1)!;
+}
 
 /** A SQL string literal's text (`''` is one quote). */
 function unquote(literal: string): string {
   return literal.slice(1, -1).replace(/''/g, "'");
 }
 
-/** The migration's `insert into public.phishing_guard_posts` rows, in position order. */
+/** The latest seeding migration's `insert into public.phishing_guard_posts` rows, in position order. */
 function seededPosts(): { position: number; roomId: string; doorLabel: string }[] {
-  const insert = MIGRATION_SQL.slice(
-    MIGRATION_SQL.indexOf('insert into public.phishing_guard_posts'),
-  );
+  const { sql } = latestGuardPostMigration();
+  const insert = sql.slice(sql.search(GUARD_POST_INSERT));
   const values = insert.slice(0, insert.indexOf(';'));
   return [...values.matchAll(/\((\d+), '([^']+)', '([^']+)'\)/g)].map((match) => ({
     position: Number(match[1]),
@@ -53,16 +78,23 @@ function seededQuestions() {
 }
 
 /**
- * Enabled doors of the four shared Rooms that Anthony doesn't guard yet (#51
- * slice 4, S4-D12, decided as U2 on 2026-09-29): Town Center's STAIRWELL
- * door, which opens the Stairwell on floor 5. #170 chooses the final guarded
- * doors from the new door network, so the migration's seed is left as it is.
- * Until then, #146's P3 header ("every enabled door ... of the four shared
- * prototype Rooms") is stale by exactly this door.
+ * #146 P3 as amended by #170 (DN4): every enabled in-scene door (not an exit
+ * pill, not a locked door) of a Room in `GUARD_ROOM_IDS`, as
+ * "<roomId> / <label>".
  */
-const NOT_GUARDED_UNTIL_170: readonly string[] = ['town-center / STAIRWELL'];
+function guardableDoors(): string[] {
+  return GUARD_ROOM_IDS.flatMap((roomId) =>
+    getRoomDefinition(roomId)
+      .doors.filter((door) => door.targetRoomId !== null && door.kind !== 'pill')
+      .map((door) => `${roomId} / ${door.label}`),
+  );
+}
 
 describe('guard posts', () => {
+  it("are seeded by #170's migration, the latest that seeds them", () => {
+    expect(latestGuardPostMigration().file).toBe('20261012000000_door_network_guard_posts.sql');
+  });
+
   it('match the migration seed, in position order', () => {
     const seeded = seededPosts();
     expect(seeded.map((post) => post.position)).toEqual(seeded.map((_, index) => index));
@@ -71,29 +103,46 @@ describe('guard posts', () => {
     );
   });
 
-  it('name an existing, enabled door of a shared prototype Room for every seeded post', () => {
+  it('name an existing, enabled in-scene door of a guard Room for every seeded post, with its own guardTile', () => {
     for (const { roomId, doorLabel } of seededPosts()) {
-      expect(['town-center', 'dev-pit', 'the-melt', 'roof-deck']).toContain(roomId);
+      expect(GUARD_ROOM_IDS).toContain(roomId);
       const door = getRoomDefinition(roomId as 'town-center').doors.find(
         (candidate) => candidate.label === doorLabel,
       );
       expect(door, `${roomId} / ${doorLabel}`).toBeDefined();
       expect(door?.targetRoomId, `${roomId} / ${doorLabel} is enabled`).not.toBeNull();
+      expect(door?.kind, `${roomId} / ${doorLabel} is a door, not a pill`).not.toBe('pill');
+      expect(door?.guardTile, `${roomId} / ${doorLabel} has a guardTile`).toBeDefined();
     }
   });
 
-  it('cover every enabled door of Town Center, Dev Pit, The Melt and the Roof Deck, once each', () => {
-    const enabled = (['town-center', 'dev-pit', 'the-melt', 'roof-deck'] as const).flatMap(
-      (roomId) =>
-        getRoomDefinition(roomId)
-          .doors.filter((door) => door.targetRoomId !== null)
-          .map((door) => `${roomId} / ${door.label}`),
-    );
+  it('cover every enabled in-scene door of the guard Rooms, once each (DN4)', () => {
     const seeded = seededPosts().map((post) => `${post.roomId} / ${post.doorLabel}`);
-    for (const exempt of NOT_GUARDED_UNTIL_170) expect(enabled).toContain(exempt);
-    expect([...seeded].sort()).toEqual(
-      enabled.filter((door) => !NOT_GUARDED_UNTIL_170.includes(door)).sort(),
+    expect(new Set(seeded).size).toBe(seeded.length);
+    expect([...seeded].sort()).toEqual(guardableDoors().sort());
+  });
+
+  it("match the migration's room_id check to GUARD_ROOM_IDS", () => {
+    const { sql } = latestGuardPostMigration();
+    const check = sql.match(
+      /add constraint phishing_guard_posts_room_id_check\s+check \(room_id in \(([^)]*)\)\)/,
     );
+    expect(check, 'the relaxed room_id check').not.toBeNull();
+    const rooms = [...check![1].matchAll(/'([^']+)'/g)].map((match) => match[1]);
+    expect([...rooms].sort()).toEqual([...GUARD_ROOM_IDS].sort());
+  });
+
+  it('never put two neighbouring windows on the two sides of one doorway, including the wrap (DN5)', () => {
+    const posts = seededPosts();
+    // A door and the door it leads to, in the other guard Room.
+    const leadsTo = (a: { roomId: string; doorLabel: string }, b: { roomId: string }) =>
+      getRoomDefinition(a.roomId as 'town-center').doors.find((door) => door.label === a.doorLabel)
+        ?.targetRoomId === b.roomId;
+    posts.forEach((post, index) => {
+      const next = posts[(index + 1) % posts.length];
+      const sameDoorway = leadsTo(post, next) && leadsTo(next, post);
+      expect(sameDoorway, `window ${index} -> ${index + 1}`).toBe(false);
+    });
   });
 
   it('never put two neighbouring windows in the same Room, including the wrap', () => {
