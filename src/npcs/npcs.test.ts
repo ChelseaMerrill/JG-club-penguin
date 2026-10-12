@@ -189,6 +189,56 @@ describe('NPCS', () => {
     }
   });
 
+  it("draws the Team Rooms' and the Mullet's Humans as their Room designs do (#149)", () => {
+    // Dark nameplates: every Team Room NPC still placed, and the Mullet's Jon and Brandon (not Tony).
+    const dark = Object.values(NPCS)
+      .filter((npc) => npc.nameplate === 'dark')
+      .map((npc) => npc.id)
+      .sort();
+    expect(dark).toEqual(
+      [
+        'jethro-team-room-1',
+        'dom-team-room-1',
+        'sydney-team-room-3',
+        'michael',
+        'sam-team-room-4',
+        'ryan-team-room-4',
+        'jon-mullet',
+        'brandon-mullet',
+      ].sort(),
+    );
+    expect(NPCS.tony.nameplate).toBeUndefined();
+
+    const scales: [NpcId, number][] = [
+      ['jethro-team-room-1', 70 / 120],
+      ['dom-team-room-1', 70 / 120],
+      ['michael', 0.5],
+      ['sam-team-room-4', 0.5],
+      ['ryan-team-room-4', 0.5],
+      ['jon-mullet', 0.58],
+      ['brandon-mullet', 0.58],
+    ];
+    for (const [id, scale] of scales) expect(NPCS[id].scale, id).toBeCloseTo(scale, 10);
+    expect(NPCS.tony.scale).toBeUndefined();
+
+    const offsets: [NpcId, { x?: number; y?: number }][] = [
+      ['sydney-team-room-3', { y: 7 }],
+      ['sam-team-room-4', { y: -9.5 }],
+      ['jon-mullet', { y: 19 }],
+      ['brandon-mullet', { y: 19 }],
+    ];
+    for (const [id, offset] of offsets) expect(NPCS[id].nameplateOffset, id).toEqual(offset);
+
+    expect(NPCS['sydney-team-room-3'].bubbleOffsetY).toBe(-8);
+    expect(NPCS.michael.bubbleOffsetY).toBe(-23);
+
+    const michael = NPCS.michael;
+    const tony = NPCS.tony;
+    if (michael.kind !== 'human' || tony.kind !== 'human') throw new Error('expected Humans');
+    expect(michael.figure.beard).toBe('stubble');
+    expect(tony.figure).toMatchObject({ style: 'slick', collar: 'henley' });
+  });
+
   it(
     "never shows an NPC's bubble over another NPC's bubble or nameplate while every NPC " +
       'stands at its rest slot: any two lines whose visible windows overlap in time have ' +
@@ -221,8 +271,8 @@ describe('NPCS', () => {
             npcId: npc.id,
             tagName: npc.tagName,
             rect: {
-              left: feet.x - width / 2,
-              right: feet.x + width / 2,
+              left: feet.x + layout.nameplateCenterX - width / 2,
+              right: feet.x + layout.nameplateCenterX + width / 2,
               top: feet.y + layout.nameplateTopY,
               bottom: feet.y + layout.nameplateBottomY,
             },
@@ -571,8 +621,6 @@ describe('NPCS', () => {
       // #51 slice 3: the Mullet.
       ['ann-marie-mullet', 'ann-marie'],
       ['jory-mullet', 'jory'],
-      ['ashley-mullet', 'ashley'],
-      ['brandon-mullet', 'brandon'],
       // Both Dom's running-kit appearances (owner request, 2026-09-30).
       ['dom-mullet', 'dom-team-room-1'],
     ];
@@ -597,15 +645,14 @@ describe('NPCS', () => {
       ['sam', 'sam-team-room-4', { marker: expect.anything() }],
       // Town Center's Jon holds playing cards and the Icebox's Nicole has a
       // laptop on her lap; the Mullet's design draws neither (#51 slice 3).
-      ['jon', 'jon-mullet', { cards: true }],
+      // The Mullet's Jon and Brandon hold a ping-pong paddle at rest (#149).
+      ['jon', 'jon-mullet', { cards: true, paddle: undefined }],
+      ['brandon-mullet', 'brandon', { paddle: 'left' }],
       ['nicole', 'nicole-mullet', { seated: 'laptop' }],
       // Team Room 3's Casey holds an open laptop and its Sydney wears a
       // headset; the Roof Deck's and Town Center's designs draw neither.
       ['casey-team-room-3', 'casey', { prop: 'openLaptop' }],
       ['sydney-team-room-3', 'sydney', { headset: true }],
-      // The Mullet's Jason plays its arcade machine, his hands drawn by his
-      // motion's layers (owner request, 2026-10-01, Track D).
-      ['jason-mullet', 'jason', { arcadeHands: 'resting' }],
     ];
     for (const [roomOwn, other, added] of overrides) {
       const withOverride = NPCS[roomOwn];

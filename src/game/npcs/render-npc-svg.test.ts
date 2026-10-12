@@ -450,6 +450,33 @@ describe('renderNpcSvg', () => {
     expect(playing).toContain('<rect x="24" y="70" width="12" height="30" rx="6" fill="#F4F4F4"');
   });
 
+  it("draws Tony's slick hair and henley collar, verbatim from humans.js", () => {
+    const svg = renderRosterNpc('tony');
+    assertValidSvg(svg);
+    expect(svg).toContain(
+      '<path d="M35 34 C34 14 50 6 66 10 C82 12 88 20 85 34 C80 26 40 24 35 34 Z" fill="#2b2118" stroke="#0C4B5F" stroke-width="2.5"></path>',
+    );
+    expect(svg).toContain(
+      '<path d="M40 22 Q60 12 82 20" fill="none" stroke="#F4F4F4" stroke-width="1.5" opacity=".35"></path>',
+    );
+    expect(svg).toContain(
+      '<path d="M60 66 V82" stroke="#0C4B5F" stroke-width="1.5"></path><circle cx="60" cy="72" r="1.5" fill="#0C4B5F"></circle><circle cx="60" cy="78" r="1.5" fill="#0C4B5F"></circle>',
+    );
+    // The henley's placket is drawn instead of a crew neck.
+    expect(svg).not.toContain('<path d="M50 66 Q60 74 70 66"');
+  });
+
+  it("draws the Mullet's ping-pong paddles at rest in Jon's right and Brandon's left hand, but not Town Center's", () => {
+    const right =
+      '<g><rect x="87.5" y="88" width="5" height="14" rx="2" fill="#8B5A2B" stroke="#0C4B5F" stroke-width="1.5"></rect><circle cx="90" cy="76" r="14" fill="#D9534F" stroke="#0C4B5F" stroke-width="2"></circle></g>';
+    const left =
+      '<g><rect x="27.5" y="88" width="5" height="14" rx="2" fill="#8B5A2B" stroke="#0C4B5F" stroke-width="1.5"></rect><circle cx="30" cy="76" r="14" fill="#D9534F" stroke="#0C4B5F" stroke-width="2"></circle></g>';
+    expect(renderRosterNpc('jon-mullet')).toContain(right);
+    expect(renderRosterNpc('brandon-mullet')).toContain(left);
+    expect(renderRosterNpc('jon')).not.toContain(right);
+    expect(renderRosterNpc('brandon')).not.toContain(left);
+  });
+
   it("hands Team Room 3's Casey the design's open laptop, but not the Roof Deck's", () => {
     const svg = renderRosterNpc('casey-team-room-3');
     expect(svg).toContain(

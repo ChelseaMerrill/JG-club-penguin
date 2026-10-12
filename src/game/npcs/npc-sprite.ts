@@ -16,14 +16,16 @@ import { ensureNpcTexture } from './texture';
 const PLACEHOLDER_TEXTURE_KEY = '__DEFAULT';
 
 // Nameplate (#36 round-1 review item 5): 20px tall, `#00BDFF`-stroked. Human
-// NPCs use the design's light pill (every one of Town Center's/Dev Pit's own
-// nameplates, e.g. `design/Room 02 Dev Pit.dc.html`'s "Ian" tag: `fill=
+// NPCs use the design's light pill by default (every one of Town Center's/Dev
+// Pit's own nameplates, e.g. `design/Room 02 Dev Pit.dc.html`'s "Ian" tag: `fill=
 // "#F4F4F4" stroke="#00BDFF"`, text `fill="#161719"`). Penguin-kind
 // background NPCs use the design's own dark pill instead (e.g. "Front Desk"/
 // "Kevin": `fill="#161719" stroke="#0C4B5F"`, text `fill="#F4F4F4"`) --
-// matching #31's own Penguin name tag palette. Both are traced directly from
-// their own Room design, not a single guessed universal style. Where it sits
-// (above the head, #113) comes from `npc-layout.ts`.
+// matching #31's own Penguin name tag palette; the Team Rooms and the Mullet
+// draw their Humans' with the dark one too (`nameplate: 'dark'`, #149). Both
+// are traced directly from their own Room design, not a single guessed
+// universal style. Where it sits (above the head, #113) comes from
+// `npc-layout.ts`.
 const NAME_TAG_BORDER_WIDTH = 2;
 const NAME_TAG_HUMAN_BG = 0xf4f4f4;
 const NAME_TAG_HUMAN_BORDER = 0x00bdff;
@@ -149,16 +151,17 @@ export function createNpcSprite(
     });
   }
 
-  // Nameplate, above the head.
-  const isHuman = npc.kind === 'human';
-  const nameBg = isHuman ? NAME_TAG_HUMAN_BG : NAME_TAG_PENGUIN_BG;
-  const nameBorder = isHuman ? NAME_TAG_HUMAN_BORDER : NAME_TAG_PENGUIN_BORDER;
-  const nameTextColor = isHuman ? NAME_TAG_HUMAN_TEXT_COLOR : NAME_TAG_PENGUIN_TEXT_COLOR;
+  // Nameplate, above the head. `npc.nameplate` (#149) picks the style a Room
+  // design draws for a Human: the Team Rooms and the Mullet use the dark pill.
+  const isLight = (npc.nameplate ?? (npc.kind === 'human' ? 'light' : 'dark')) === 'light';
+  const nameBg = isLight ? NAME_TAG_HUMAN_BG : NAME_TAG_PENGUIN_BG;
+  const nameBorder = isLight ? NAME_TAG_HUMAN_BORDER : NAME_TAG_PENGUIN_BORDER;
+  const nameTextColor = isLight ? NAME_TAG_HUMAN_TEXT_COLOR : NAME_TAG_PENGUIN_TEXT_COLOR;
 
   const namePill = new GameObjects.Graphics(scene);
   const nameText = new GameObjects.Text(
     scene,
-    0,
+    layout.nameplateCenterX,
     layout.nameplateTopY + NAMEPLATE_HEIGHT / 2,
     npc.tagName,
     {
@@ -172,7 +175,7 @@ export function createNpcSprite(
   const nameWidth = nameText.width + NAME_TAG_PADDING_X * 2;
   namePill.fillStyle(nameBg, 1);
   namePill.fillRoundedRect(
-    -nameWidth / 2,
+    layout.nameplateCenterX - nameWidth / 2,
     layout.nameplateTopY,
     nameWidth,
     NAMEPLATE_HEIGHT,
@@ -180,7 +183,7 @@ export function createNpcSprite(
   );
   namePill.lineStyle(NAME_TAG_BORDER_WIDTH, nameBorder, 1);
   namePill.strokeRoundedRect(
-    -nameWidth / 2,
+    layout.nameplateCenterX - nameWidth / 2,
     layout.nameplateTopY,
     nameWidth,
     NAMEPLATE_HEIGHT,

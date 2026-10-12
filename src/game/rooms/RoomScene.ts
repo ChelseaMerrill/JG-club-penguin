@@ -1874,7 +1874,14 @@ export class RoomScene extends Scene {
     const paces = motion !== undefined;
     if (paces) {
       this.npcMotions?.add(
-        { npcId: spec.npcId, sprite, zone, zoneOffsetY: hitArea.centerY, rest: point },
+        {
+          npcId: spec.npcId,
+          sprite,
+          zone,
+          zoneOffsetX: hitArea.centerX,
+          zoneOffsetY: hitArea.centerY,
+          rest: point,
+        },
         motion,
       );
     }
@@ -2020,6 +2027,7 @@ export class RoomScene extends Scene {
           npcId: slot.npcId,
           sprite: npcSprite,
           zone,
+          zoneOffsetX: hitArea.centerX,
           zoneOffsetY: hitArea.centerY,
           rest: point,
         },
