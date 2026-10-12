@@ -248,13 +248,11 @@ const DOOR_HINT_STROKE_THICKNESS = 4;
 /** How long the UNDER CONSTRUCTION hint stays up (#15 D3, #170 D4). */
 export const DOOR_HINT_DURATION_MS = 2000;
 // #170 D3: the design's hover glow (`rgba(0,189,255,.32)`) over a door on a
-// back wall, and D4's grey veil over a locked door or pill, drawn at runtime
-// so unlocking one never needs a re-export.
+// back wall. A locked door looks like any other (owner decision H1,
+// 2026-10-12): only its hover pill and its UNDER CONSTRUCTION hint say so.
 const DOOR_GLOW_COLOR = 0x00bdff;
 const DOOR_GLOW_ALPHA = 0.32;
 const DOOR_GLOW_DEPTH = 0.5;
-const LOCKED_VEIL_COLOR = 0x494949;
-const LOCKED_VEIL_ALPHA = 0.55;
 
 // Snowball mode (#53), after `design/Club JenGuin HUD Menus.dc.html`'s
 // HUD-SNOWBALL screen: cyan reticle ellipse + ticks on the aimed Tile, a
@@ -1749,7 +1747,6 @@ export class RoomScene extends Scene {
       // is an invisible Zone (#16). Not an alpha-0 shape: Phaser drops
       // objects that won't render from input hit-testing, so an alpha-0
       // rectangle can never be clicked.
-      if (isLockedDoor(door)) this.drawLockedVeil(door);
       if (isImageBackground) {
         const zone = this.add
           .zone(centerX, centerY, door.hotspot.width, door.hotspot.height)
@@ -1779,23 +1776,6 @@ export class RoomScene extends Scene {
         })
         .setOrigin(0.5)
         .setDepth(DOOR_LABEL_DEPTH);
-    }
-  }
-
-  /**
-   * #170 D4: a grey veil over a locked door or pill, slanted along its wall
-   * when it has one, drawn at runtime so unlocking it never needs a
-   * re-export. Never interactive: the door's own hit area takes the click.
-   */
-  private drawLockedVeil(door: RoomDoor): void {
-    const veil = this.add.graphics().setDepth(DOOR_DEPTH);
-    veil.fillStyle(LOCKED_VEIL_COLOR, LOCKED_VEIL_ALPHA);
-    const polygon = doorGlowPolygon(door);
-    if (polygon) {
-      veil.fillPoints(polygon, true);
-    } else {
-      const { x, y, width, height } = door.hotspot;
-      veil.fillRect(x, y, width, height);
     }
   }
 
