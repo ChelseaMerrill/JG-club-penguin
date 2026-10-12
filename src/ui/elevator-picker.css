@@ -85,7 +85,9 @@
   border-color: var(--jg-primary);
 }
 
-.elevator-picker__chip--locked {
+.elevator-picker__chip--locked,
+.elevator-picker__chip--locked:hover {
+  border-style: dashed;
   border-color: #3a3d42;
   color: #7c8087;
   cursor: not-allowed;
