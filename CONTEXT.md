@@ -33,7 +33,7 @@ One explorable, self-contained area of the World, drawn as an isometric scene th
 The way from one Room into another: a door drawn in the Room, or an exit pill at the bottom of the Stage. Hovering a door shows CLICK TO ENTER · <Room>. Clicking walks the Penguin there; the screen fades (250 ms) and the Penguin arrives at the matching door. Tab and Enter reach and use doors (#170).
 
 **Locked door**
-A door to a Room not built yet: grey, UNDER CONSTRUCTION, no way in. Clicking one shows UNDER CONSTRUCTION and the Penguin doesn't walk; the Stairwell's floor 0 LOBBY door is one until the Lobby is built (#170).
+A door to a Room not built yet: no way in. It looks like any other door; only its grey hover pill (<Room> · UNDER CONSTRUCTION) says so. Clicking it, or Enter on it, shows UNDER CONSTRUCTION and the Penguin doesn't walk. The Stairwell's floor 0 LOBBY door is one until the Lobby is built (#170).
 
 **Igloo**
 The Player's own home Room. Only its owner is ever in it, so each Player's Igloo is a separate Room with its own Room channel. It holds the Player's Furniture and Trophy Case, and is reached from the HUD. Visiting other Players' Igloos is out of scope.
