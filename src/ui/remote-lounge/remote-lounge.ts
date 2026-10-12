@@ -6,13 +6,23 @@ import { HQ_LOCATION, REMOTE_JGERS } from '../../game/npcs/remote-lounge-figures
 import { getNpcDefinition } from '../../npcs/npcs';
 import { REMOTE_LOUNGE_NPC_IDS } from '../../npcs/remote-lounge-npcs';
 import type { OverlayManager } from '../hud/overlay-manager';
-import { createGlobe, milesBetween, type Globe, type GlobeMap } from './globe';
+import {
+  createGlobe,
+  LATAM_PIN_SHAPES,
+  milesBetween,
+  RIO_LOCATION,
+  type Globe,
+  type GlobeMap,
+} from './globe';
 import './remote-lounge.css';
 
 /** The person card's `OverlayManager` id: Escape and any other overlay close it. */
 export const REMOTE_CARD_OVERLAY_ID = 'remote-lounge-card';
 
 const ROOM: RoomId = 'remote-lounge';
+
+/** The LATAM roster card's line (owner request, 2026-10-12), in place of a person's quote. */
+const LATAM_LINE = '19 JGers across the Café, the Disco Hall and the Futebol Field.';
 
 /** Each person's NPC id, in the design's own order (the roster's and the card's ◀ ▶ order). */
 const NPC_IDS: readonly string[] = REMOTE_JGERS.map(
@@ -69,6 +79,16 @@ function avatar(
   return svg;
 }
 
+/** A small version of the globe's own LATAM pin marker (`LATAM_PIN_SHAPES`),
+ *  in place of a face, for the LATAM roster row and card. */
+function latamMark(viewBox: string): SVGSVGElement {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+  svg.setAttribute('viewBox', viewBox);
+  svg.setAttribute('aria-hidden', 'true');
+  svg.innerHTML = `<g>${LATAM_PIN_SHAPES}</g>`;
+  return svg;
+}
+
 /**
  * The Remote Lounge's live layer (`design/Remote Area.html`): the globe on
  * the pedestal, the roster of remote JGers down the left, the person card on
@@ -94,6 +114,29 @@ export function createRemoteLounge(uiLayer: HTMLElement, deps: RemoteLoungeDeps)
   roster.className = 'remote-lounge__roster';
   roster.setAttribute('role', 'list');
   roster.setAttribute('aria-label', 'Remote JGers');
+  // The LATAM roster card (owner request, 2026-10-12): the roster's first
+  // row, above every JGer. A sibling of `.remote-lounge__roster-item`, not
+  // one of them, so the JGer rows' own order, count and `n / N` indices
+  // (and the JGer-only tests pinning them) are unaffected.
+  const latamRow = document.createElement('button');
+  latamRow.type = 'button';
+  latamRow.className = 'remote-lounge__roster-latam';
+  latamRow.setAttribute('role', 'listitem');
+  latamRow.setAttribute('aria-pressed', 'false');
+  const latamFace = latamMark('-16 -16 32 32');
+  latamFace.classList.add('remote-lounge__roster-face');
+  const latamText = document.createElement('span');
+  latamText.className = 'remote-lounge__roster-text';
+  const latamName = document.createElement('span');
+  latamName.className = 'remote-lounge__roster-name';
+  latamName.textContent = 'LATAM';
+  const latamCity = document.createElement('span');
+  latamCity.className = 'remote-lounge__roster-city';
+  latamCity.textContent = 'Rio de Janeiro, Brazil';
+  latamText.append(latamName, latamCity);
+  latamRow.append(latamFace, latamText);
+  latamRow.addEventListener('click', () => selectLatam());
+  roster.appendChild(latamRow);
   const rosterButtons = REMOTE_JGERS.map((person, i) => {
     const b = document.createElement('button');
     b.type = 'button';
@@ -125,7 +168,6 @@ export function createRemoteLounge(uiLayer: HTMLElement, deps: RemoteLoungeDeps)
   const cardHead = document.createElement('div');
   cardHead.className = 'remote-lounge__card-head';
   const cardKicker = document.createElement('span');
-  cardKicker.textContent = 'REMOTE JGER';
   const cardIndex = document.createElement('span');
   cardIndex.className = 'remote-lounge__card-index';
   cardHead.append(cardKicker, cardIndex);
@@ -160,19 +202,23 @@ export function createRemoteLounge(uiLayer: HTMLElement, deps: RemoteLoungeDeps)
   const cardButtons = document.createElement('div');
   cardButtons.className = 'remote-lounge__card-buttons';
   const count = REMOTE_JGERS.length;
-  cardButtons.append(
-    button('remote-lounge__hex remote-lounge__hex--step', '◀', () =>
-      select((selected - 1 + count) % count),
-    ),
-    button('remote-lounge__hex remote-lounge__hex--globe', 'GLOBE', () =>
-      deps.overlays.close(REMOTE_CARD_OVERLAY_ID),
-    ),
-    button('remote-lounge__hex remote-lounge__hex--step', '▶', () =>
-      select((selected + 1) % count),
-    ),
+  const prevButton = button('remote-lounge__hex remote-lounge__hex--step', '◀', () =>
+    select((selected - 1 + count) % count),
   );
-  (cardButtons.children[0] as HTMLButtonElement).setAttribute('aria-label', 'Previous');
-  (cardButtons.children[2] as HTMLButtonElement).setAttribute('aria-label', 'Next');
+  prevButton.setAttribute('aria-label', 'Previous');
+  const nextButton = button('remote-lounge__hex remote-lounge__hex--step', '▶', () =>
+    select((selected + 1) % count),
+  );
+  nextButton.setAttribute('aria-label', 'Next');
+  const globeButton = button('remote-lounge__hex remote-lounge__hex--globe', 'GLOBE', () =>
+    deps.overlays.close(REMOTE_CARD_OVERLAY_ID),
+  );
+  // LATAM has no Prev/Next (its card has no index among 17 JGers to step
+  // through): VISIT LATAM takes the stepper's place and reuses GLOBE's own
+  // close behaviour, same as a person card's.
+  const visitButton = button('remote-lounge__hex remote-lounge__hex--globe', 'VISIT LATAM', () =>
+    deps.goToRoom('latam-cafe'),
+  );
   card.append(cardHead, cardWho, facts, cardLine, cardButtons);
 
   const exit = button('remote-lounge__exit', 'BACK TO HQ ↘', () => deps.goToRoom('town-center'));
@@ -192,6 +238,9 @@ export function createRemoteLounge(uiLayer: HTMLElement, deps: RemoteLoungeDeps)
   function showCard(i: number): void {
     const person = REMOTE_JGERS[i]!;
     const npc = getNpcDefinition(NPC_IDS[i]!);
+    card.classList.remove('remote-lounge__card--latam');
+    cardKicker.textContent = 'REMOTE JGER';
+    cardIndex.hidden = false;
     cardIndex.textContent = `${i + 1} / ${count}`;
     cardFace.replaceChildren(avatar(person.card, `remote-card-${person.key}`, '0 0 120 130'));
     cardName.textContent = person.name;
@@ -201,13 +250,35 @@ export function createRemoteLounge(uiLayer: HTMLElement, deps: RemoteLoungeDeps)
     cardCity.textContent = person.city;
     cardDistance.textContent = `${milesBetween(person, HQ_LOCATION)} mi`;
     cardLine.textContent = person.line;
+    cardButtons.replaceChildren(prevButton, globeButton, nextButton);
+    card.hidden = false;
+  }
+
+  /** The LATAM roster card (owner request, 2026-10-12): purple-outlined,
+   *  with no Prev/Next or `n / N` index among the 17 JGers, and VISIT LATAM
+   *  in their place. */
+  function showLatamCard(): void {
+    card.classList.add('remote-lounge__card--latam');
+    cardKicker.textContent = 'LATAM';
+    cardIndex.hidden = true;
+    cardIndex.textContent = '';
+    cardFace.replaceChildren(latamMark('-16 -16 32 32'));
+    cardName.textContent = 'LATAM';
+    cardTitle.textContent = '';
+    cardTitle.hidden = true;
+    cardCity.textContent = 'Rio de Janeiro, Brazil';
+    cardDistance.textContent = `${milesBetween(RIO_LOCATION, HQ_LOCATION)} mi`;
+    cardLine.textContent = LATAM_LINE;
+    cardButtons.replaceChildren(visitButton, globeButton);
     card.hidden = false;
   }
 
   function closeCard(): void {
     card.hidden = true;
+    card.classList.remove('remote-lounge__card--latam');
     selected = -1;
     rosterButtons.forEach((b) => b.setAttribute('aria-pressed', 'false'));
+    latamRow.setAttribute('aria-pressed', 'false');
     globe?.world();
     if (talkingNpcId) {
       gameEvents.emit('npc:dialog-closed', { npcId: talkingNpcId });
@@ -218,8 +289,18 @@ export function createRemoteLounge(uiLayer: HTMLElement, deps: RemoteLoungeDeps)
   function select(i: number): void {
     selected = i;
     rosterButtons.forEach((b, j) => b.setAttribute('aria-pressed', String(j === i)));
+    latamRow.setAttribute('aria-pressed', 'false');
     globe?.flyTo(i);
     showCard(i);
+    deps.overlays.open(REMOTE_CARD_OVERLAY_ID, closeCard);
+  }
+
+  function selectLatam(): void {
+    selected = -1;
+    rosterButtons.forEach((b) => b.setAttribute('aria-pressed', 'false'));
+    latamRow.setAttribute('aria-pressed', 'true');
+    globe?.flyToLocation(RIO_LOCATION.lon, RIO_LOCATION.lat);
+    showLatamCard();
     deps.overlays.open(REMOTE_CARD_OVERLAY_ID, closeCard);
   }
 
