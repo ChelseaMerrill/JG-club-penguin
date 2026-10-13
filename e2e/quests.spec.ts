@@ -111,10 +111,10 @@ test('the widget tracks the main Quest and opens the Quests panel; TRACK and BAD
   // Main, the Igloo Badge Quest (#143), Nicole's coffee (#141), Linda's
   // pitch (#142), "Pair with a JGer" (#140), Snowmageddon (#154) + one per
   // registered Minigame (Bug Squash, Pancake Flip, Snow Cone Stand, Coffee
-  // Rush, Beystadium).
-  await expect(panel.locator('[data-quests-tab="active"]')).toHaveText('ACTIVE · 12');
+  // Rush, Beystadium, Penalty Kick, Carnaval Parade).
+  await expect(panel.locator('[data-quests-tab="active"]')).toHaveText('ACTIVE · 13');
   await expect(panel.locator('[data-quests-tab="done"]')).toHaveText('DONE · 0');
-  await expect(panel.locator('.quests__row')).toHaveCount(12);
+  await expect(panel.locator('.quests__row')).toHaveCount(13);
   const bey = panel.locator('[data-quest-id="beystadium"]');
   await expect(bey.locator('.quests__row-title')).toHaveText('LET IT RIP · WIN 3 MATCHES');
   await expect(bey.locator('.quests__row-location')).toHaveText('TEAM ROOM 4 · TALK TO MICHAEL');
@@ -338,6 +338,13 @@ test('every Quest done: the widget shows ALL QUESTS DONE with a line and opens t
     for (let n = 1; n <= 5; n += 1) await t.recordSnowballHit(`target-${n}`, `throw-${n}`);
     // #220: Penalty Kick's Quest, all five shots scored.
     await t.recordRound('penalty-kick', 5, { goals: 5, golazos: 0, saved: 0, wide: 0, over: 0 });
+    // #219: Carnaval Parade's Quest, 400 points in one parade.
+    await t.recordRound('carnaval-parade', 400, {
+      feathers: 10,
+      stars: 0,
+      barriersHit: 0,
+      bestStreak: 10,
+    });
   });
   // Beystadium's Quest is three match wins, and record_round's anti-farm
   // rule refuses a round less than 10 s after the previous one of the same
@@ -362,9 +369,9 @@ test('every Quest done: the widget shows ALL QUESTS DONE with a line and opens t
   await widget.click();
   const panel = page.locator('.quests');
   await expect(panel).toBeVisible();
-  await expect(panel.locator('[data-quests-tab="done"]')).toHaveText('DONE · 12');
+  await expect(panel.locator('[data-quests-tab="done"]')).toHaveText('DONE · 13');
   await expect(panel.locator('[data-quests-tab="done"]')).toHaveAttribute('aria-pressed', 'true');
-  await expect(panel.locator('.quests__row')).toHaveCount(12);
+  await expect(panel.locator('.quests__row')).toHaveCount(13);
 
   expect(errors).toEqual([]);
 });

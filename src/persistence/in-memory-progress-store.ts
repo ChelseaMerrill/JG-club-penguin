@@ -304,7 +304,7 @@ export function createInMemoryProgressStoreWithControls(
       throw new ProgressStoreError('unknown_minigame');
     }
     const numericStats = statsRecord as Record<string, number>;
-    if (rule.validStats && !rule.validStats(numericStats)) {
+    if (rule.validStats && !rule.validStats(numericStats, score)) {
       throw new ProgressStoreError('invalid_stats');
     }
 

@@ -1100,6 +1100,15 @@ gameEvents.on('hotspot:click', ({ hotspotId }) => {
   gameEvents.emit('npc:arrived', { npcId: 'chrystian-rissoli' });
 });
 
+// #219: the LATAM Disco Hall's DJ turntable opens Carnaval Parade's trigger,
+// the same NPC dialog panel clicking Hector Grecco himself does (both are
+// `npc-dialog.ts`'s own `npc:arrived` handler, which it also uses for an
+// ordinary walk-up-and-click NPC).
+gameEvents.on('hotspot:click', ({ hotspotId }) => {
+  if (hotspotId !== 'disco-turntable') return;
+  gameEvents.emit('npc:arrived', { npcId: 'hector-grecco' });
+});
+
 /**
  * Reloads the signed-in Player's `ProgressSnapshot` and pushes its Furniture
  * layout/catalog into `RoomScene` (#41 resolved decision 1): called once on

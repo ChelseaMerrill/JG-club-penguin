@@ -92,6 +92,8 @@ describe('orderBadgeTiles', () => {
       'phish-fry',
       // #220: so is Goleador, seeded available at sortOrder 16.
       'goleador',
+      // #219: so is Passista, seeded fresh (not a flipped "coming soon" row).
+      'passista',
       'rail-rider',
       'hexle-parent',
       'mullet-mania',
@@ -124,10 +126,10 @@ describe('createTrophyCase', () => {
     expect(q('[data-panel="badges"]').hidden).toBe(false);
     expect(q('[data-panel="trophies"]').hidden).toBe(true);
     expect(q('[data-panel="awards"]').hidden).toBe(true);
-    expect(q('.trophy-case__subtitle').textContent).toBe('YOUR IGLOO · BADGES · 1 / 16');
+    expect(q('.trophy-case__subtitle').textContent).toBe('YOUR IGLOO · BADGES · 1 / 17');
   });
 
-  it('shows 16 Badges over two pages: 12 on page 1 and 4 on page 2', async () => {
+  it('shows 17 Badges over two pages: 12 on page 1 and 5 on page 2', async () => {
     const { q, qa, trophyCase } = setup([]);
 
     await trophyCase.open();
@@ -138,7 +140,7 @@ describe('createTrophyCase', () => {
 
     q<HTMLButtonElement>('[aria-label="Next page"]').click();
 
-    expect(qa('.trophy-case__badge')).toHaveLength(4);
+    expect(qa('.trophy-case__badge')).toHaveLength(5);
   });
 
   it.each([
@@ -213,8 +215,14 @@ describe('createTrophyCase', () => {
 
     next.click();
     // Snowmageddon (#154) is earnable and sorts onto page 1, so page 2 is
-    // Goleador (#220, the 13th earnable Badge) and the three coming-soon ones.
-    expect(tileIds()).toEqual(['goleador', 'rail-rider', 'hexle-parent', 'mullet-mania']);
+    // Goleador (#220), Passista (#219) and the three coming-soon ones.
+    expect(tileIds()).toEqual([
+      'goleador',
+      'passista',
+      'rail-rider',
+      'hexle-parent',
+      'mullet-mania',
+    ]);
     expect(q<HTMLButtonElement>('[aria-label="Next page"]').disabled).toBe(true);
     expect(q('[aria-label="Page 2"]').getAttribute('aria-current')).toBe('page');
 
@@ -228,9 +236,9 @@ describe('createTrophyCase', () => {
     const firstPage = tileIds();
 
     press('ArrowRight');
-    expect(tileIds()).toHaveLength(4); // #220: page 2 now has Goleador's displaced snowmageddon too.
+    expect(tileIds()).toHaveLength(5);
     press('ArrowRight'); // Already on the last page.
-    expect(tileIds()).toHaveLength(4);
+    expect(tileIds()).toHaveLength(5);
     press('ArrowLeft');
     expect(tileIds()).toEqual(firstPage);
 
