@@ -33,6 +33,7 @@ import {
   type ProgressStore,
   type PurchaseResult,
   type RoundResult,
+  type SnowballHitResult,
   type StairClimbProgress,
   type StairFlightReason,
   type StairFlightResult,
@@ -234,6 +235,7 @@ export interface ProgressClient {
       | 'check_session_badges'
       | 'log_stair_flight'
       | 'stair_climb_progress'
+      | 'record_snowball_hit'
       | CoffeeRpcName
       | PitchRpcName
       | 'submit_pitch',
@@ -484,6 +486,19 @@ function toStairFlightResult(data: unknown): StairFlightResult {
     ),
     balance: raw.balance,
   };
+}
+
+/**
+ * `record_snowball_hit`'s reply (#154 S4), checked field by field: a
+ * malformed one rejects with `invalid_response` rather than reading as an
+ * uncounted hit with a 0 count, which could otherwise mask the real count.
+ */
+function toSnowballHitResult(data: unknown): SnowballHitResult {
+  const raw = (data ?? {}) as Partial<Record<keyof SnowballHitResult, unknown>>;
+  if (typeof raw.counted !== 'boolean' || !isWholeNumber(raw.today)) {
+    throw new ProgressStoreError('invalid_response');
+  }
+  return { counted: raw.counted, today: raw.today };
 }
 
 /** Anything that isn't a typed `ProgressStoreError`: network failures, unrecognized errors. */
@@ -991,6 +1006,21 @@ export function createSupabaseProgressStore(
     };
   }
 
+  // #154: deliberately not wrapped in guarded() (logStairFlight's RT2-9
+  // reasoning): every snowball hit calls this, so a toast on each failure
+  // would be noisy, and the Snowball controller already catches and ignores
+  // a rejection (D5), never letting it affect the snowball itself.
+  async function recordSnowballHit(targetId: string, throwId: string): Promise<SnowballHitResult> {
+    const { data, error } = await client.rpc('record_snowball_hit', {
+      target_id: targetId,
+      throw_id: throwId,
+    });
+    if (error) {
+      throw toProgressError(error);
+    }
+    return toSnowballHitResult(data);
+  }
+
   return {
     loadAll,
     saveLook,
@@ -1018,6 +1048,7 @@ export function createSupabaseProgressStore(
     submitPitch,
     logStairFlight,
     getStairClimb,
+    recordSnowballHit,
   };
 }
 

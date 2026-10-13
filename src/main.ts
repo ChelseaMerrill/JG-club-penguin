@@ -597,7 +597,15 @@ function wireSnowballController(
   view: SnowballView,
   playerId: string,
 ): SnowballController {
-  const snowball = createSnowballController({ channel, view, playerId });
+  const snowball = createSnowballController({
+    channel,
+    view,
+    playerId,
+    // #154: reports a landed local hit for the Snowmageddon Quest, then
+    // refreshes Quests; a failed report never affects the snowball itself
+    // (the controller's own catch).
+    recordHit: (targetId, throwId) => questAwareStore.recordSnowballHit(targetId, throwId),
+  });
   snowballController = snowball;
   const ammo = snowball.ammo();
   hud.setSnowballAmmo(ammo.count, ammo.capacity);
@@ -1014,6 +1022,9 @@ const questAwareStore: ProgressStore = {
   markCiBoardChecked: () => refreshQuestsAfter(progressStore.markCiBoardChecked()),
   markPaired: () => refreshQuestsAfter(progressStore.markPaired()),
   reportToPaul: () => refreshQuestsAfter(progressStore.reportToPaul()),
+  // #154: the Snowmageddon Quest's hit reports.
+  recordSnowballHit: (targetId, throwId) =>
+    refreshQuestsAfter(progressStore.recordSnowballHit(targetId, throwId)),
 };
 
 // #143: Casey's "Got any work for me?" starts the Igloo Badge Quest by
@@ -1352,6 +1363,9 @@ if (e2eHooksEnabled) {
     },
     async pairFlakyTestSteps() {
       return (await progressStore.questProgress()).questSteps['pair-flaky-test'] ?? {};
+    },
+    async recordSnowballHit(targetId, throwId) {
+      return questAwareStore.recordSnowballHit(targetId, throwId);
     },
   };
 }

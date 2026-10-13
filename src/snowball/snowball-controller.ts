@@ -73,6 +73,14 @@ export interface SnowballControllerOptions {
   clearTimeout?: typeof clearTimeout;
   /** throwId generator, injectable for deterministic tests. Defaults to `generateThrowId` (`snowball-rules.ts`). */
   generateThrowId?: () => string;
+  /**
+   * Reports a landed local hit for the Snowmageddon Quest (#154): called
+   * with the hit target's playerId and the throw's own throwId right after
+   * the hat is applied locally and `snowball:hit` is sent. Optional
+   * (defaults to a no-op). A rejection is caught here and never affects the
+   * snowball itself -- no further view calls, no change to ammo or hats.
+   */
+  recordHit?: (targetId: string, throwId: string) => Promise<unknown>;
 }
 
 export interface SnowballController {
@@ -127,6 +135,7 @@ export function createSnowballController(options: SnowballControllerOptions): Sn
   const scheduleTimer = options.setTimeout ?? setTimeout;
   const cancelTimer = options.clearTimeout ?? clearTimeout;
   const nextThrowId = options.generateThrowId ?? (() => defaultGenerateThrowId());
+  const recordHit = options.recordHit ?? (() => Promise.resolve(undefined));
 
   const ammo = createSnowballAmmo(SNOWBALL_CAPACITY);
   const throwMemory = new ThrowMemory();
@@ -218,6 +227,13 @@ export function createSnowballController(options: SnowballControllerOptions): Sn
     // Best effort: a failed hit broadcast leaves the hat on the thrower's
     // screen only; swallow the rejection so it is not unhandled.
     void channel.send('snowball:hit', { throwId, targetId: hitId }).catch(() => undefined);
+    // #154: reports the hit for the Snowmageddon Quest. Best effort, exactly
+    // like the broadcast above: a failed report never affects the snowball
+    // itself (no hat change, no further view calls), and is never surfaced
+    // beyond this debug line.
+    void recordHit(hitId, throwId).catch((err: unknown) => {
+      console.debug('recordSnowballHit failed', err);
+    });
   }
 
   function handleIncomingThrow(payload: { playerId: string; throwId: string; target: Tile }): void {

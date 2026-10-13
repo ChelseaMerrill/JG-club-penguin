@@ -109,6 +109,7 @@ function deferredStore(): { store: ProgressStore; resolve: (snapshot: ProgressSn
       ...UNUSED_PAIR_FLAKY_TEST_METHODS,
       logStairFlight: () => Promise.reject(new Error('unused in this test')),
       getStairClimb: () => Promise.reject(new Error('unused in this test')),
+      recordSnowballHit: () => Promise.reject(new Error('unused in this test')),
     },
     resolve: resolveFn,
   };
@@ -133,6 +134,7 @@ function failingStore(): ProgressStore {
     ...UNUSED_PAIR_FLAKY_TEST_METHODS,
     logStairFlight: () => Promise.reject(new Error('unused in this test')),
     getStairClimb: () => Promise.reject(new Error('unused in this test')),
+    recordSnowballHit: () => Promise.reject(new Error('unused in this test')),
   };
 }
 
@@ -315,6 +317,7 @@ describe('createProgressSession', () => {
         ...UNUSED_PAIR_FLAKY_TEST_METHODS,
         logStairFlight: () => Promise.reject(new Error('unused in this test')),
         getStairClimb: () => Promise.reject(new Error('unused in this test')),
+        recordSnowballHit: () => Promise.reject(new Error('unused in this test')),
       };
       await session.start(PLAYER, store);
       const wrapped = registry.get(PROGRESS_STORE_KEY) as ProgressStore;
@@ -573,6 +576,25 @@ describe('createProgressSession', () => {
         await wrapped.checkBadges();
 
         expect(panels()).toEqual(['Badge unlocked: Interior Penguin']);
+      });
+
+      it('Snowmageddon at once when its Quest completes, with no Session check needed (#154)', async () => {
+        const { wrapped, panels, toasts } = await announceSetup();
+
+        for (let n = 1; n <= 5; n += 1) {
+          await wrapped.recordSnowballHit(`target-${n}`, `throw-${n}`);
+        }
+        const result = await wrapped.completeQuest('snowmageddon');
+
+        // The Badge isn't in the Quest's own badgesEarned (a trigger awards
+        // it); the wrapper's immediate check announces it, exactly once.
+        expect(result.badgesEarned).toEqual([]);
+        expect([...panels(), ...toasts]).toEqual(['Badge unlocked: Snowmageddon']);
+        await wrapped.completeQuest('snowmageddon');
+        await wrapped.checkBadges();
+        // `panels()` closed the first popup; nothing is announced again.
+        expect(panels()).toEqual([]);
+        expect(toasts).toEqual([]);
       });
 
       it('Interior Penguin with a loadAll right after the sixth setSlot, as the igloo editor refreshes', async () => {

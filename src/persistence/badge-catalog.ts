@@ -15,7 +15,7 @@ export const BADGE_CATALOG: readonly (BadgeDefinition & { id: BadgeId })[] = [
     name: 'Snowmageddon',
     howToEarn: '5 SNOWBALL HITS / DAY',
     sortOrder: 2,
-    available: false,
+    available: true,
   },
   {
     id: 'ship-it',
@@ -146,6 +146,8 @@ export const BADGE_AVAILABILITY_OVERRIDES: ReadonlySet<BadgeId> = new Set<BadgeI
   'phish-fry',
   // #51 slice 4: 20261011000000_stair_climb.sql turns Stair Master on.
   'stair-master',
+  // #154: 20261012000000_quest_snowmageddon.sql turns Snowmageddon on.
+  'snowmageddon',
 ]);
 
 /** The catalog row for `badgeId`, if there is one. */
