@@ -906,8 +906,12 @@ interface StairwellLine {
  * needs no BA copy. Its figure is its person's shared constant; the design
  * draws every Stairwell figure at 0.62 (`width="74.4"`), the Human default,
  * so none sets `scale` (HD-5). The design's motions (Dom's run up the
- * stairs, Jason's pacing, the guests' mingling) and Jason's pop-in are left
- * to #149/#150.
+ * stairs, Jason's pacing, the guests' mingling) are ported in
+ * `motions/stairwell.ts` (#182); that file's own header explains the two
+ * pieces left out (Dom's direction flip, his run's opacity fade). The
+ * climb panel's own "Jason pop-in" flourish (`scripts/export-room-art.ts`'s
+ * `pop` hide rule) isn't an NPC at all -- it's part of
+ * `src/ui/stair-climb-panel.ts`'s HUD, out of this audit (#182).
  */
 function stairwellNpc(
   npc: Omit<HumanNpcDefinition, 'kind' | 'dialog' | 'dialogLines' | 'idleLines'> & {
@@ -927,8 +931,7 @@ function stairwellNpc(
 
 /**
  * Dom on Stairwell floor `floor`, at the foot of the stairs. The design hops
- * him as he runs the flight; with no motion ported, the default bob stands
- * in for it.
+ * him as he runs the flight (`motions/stairwell.ts`'s `domRun`/`hop2`, #182).
  */
 function stairwellDom(floor: number, first: string, second: string): HumanNpcDefinition {
   return stairwellNpc({
