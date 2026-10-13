@@ -6,6 +6,7 @@ import {
   type RoomId,
 } from '../../contracts';
 import { createEmotePicker, EMOTE_OVERLAY_ID } from './emote-picker';
+import { renderHudTitleText } from './hud-title-text';
 import { createOverlayManager, type OverlayManager } from './overlay-manager';
 
 /** A Room's HUD header text: the big title and the small subtitle beneath it. */
@@ -439,7 +440,7 @@ export function createHud(layer: HTMLElement, deps: HudDeps): Hud {
 
   function setRoom(roomId: RoomId): void {
     const { title, subtitle } = deps.resolveRoomTitle(roomId);
-    titleEl.textContent = title;
+    renderHudTitleText(titleEl, title);
     subtitleEl.textContent = subtitle;
   }
 
