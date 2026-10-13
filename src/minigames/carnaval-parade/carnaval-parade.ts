@@ -319,7 +319,7 @@ function carnavalSceneSvg(): string {
   ).join('');
   const discoBalls = discoBallSvg(360) + discoBallSvg(1240);
   return (
-    '<svg class="carnaval-parade__scene" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">' +
+    '<svg class="carnaval-parade__scene" viewBox="0 150 1600 750" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">' +
     '<defs>' +
     '<linearGradient id="cp-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0A0C0F"></stop><stop offset="1" stop-color="#2a1250"></stop></linearGradient>' +
     '<pattern id="cp-crowd" width="27" height="52" patternUnits="userSpaceOnUse">' +

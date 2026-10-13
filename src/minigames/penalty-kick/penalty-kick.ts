@@ -120,7 +120,7 @@ function penaltyKickSceneSvg(): string {
     )
     .join('');
   return (
-    '<svg class="penalty-kick__scene" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">' +
+    '<svg class="penalty-kick__scene" viewBox="0 200 1600 700" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">' +
     '<defs>' +
     '<linearGradient id="pk-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0A0C0F"></stop><stop offset="1" stop-color="#0F3441"></stop></linearGradient>' +
     '<pattern id="pk-net" width="22" height="22" patternUnits="userSpaceOnUse"><path d="M0 0H22M0 0V22" stroke="#F4F4F4" stroke-width="1.2" opacity=".4" fill="none"></path></pattern>' +
