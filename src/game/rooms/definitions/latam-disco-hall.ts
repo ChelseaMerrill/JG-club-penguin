@@ -107,4 +107,38 @@ export const latamDiscoHall: RoomDefinition = {
       rect: { x: 1140, y: 425, width: 200, height: 100 },
     },
   ],
+  // Owner feedback 2026-10-13: the design's own "SPIN IT · CARNAVAL PARADE"
+  // sign (`a[href="Minigame Carnaval Parade.dc.html"]`, a 304x40 floating
+  // pill) was baked into `public/rooms/latam-disco-hall.png`, oversized
+  // against the DJ booth -- now hidden from the export
+  // (`scripts/export-room-art.ts`'s own `latam-disco-hall` rule) and replaced
+  // with a smaller highlight on one of the booth's own two turntables
+  // instead: traced from the design's own `<g transform="translate(1270 490)
+  // scale(1 .5)"><circle r="26" .../><circle r="9" fill="#FF3DA5"/>...</g>`
+  // (its right-hand disc; the left one is the identical group at
+  // translate(1195 452.5)) -- a dark platter, a pink centre label and a
+  // spinning tonearm line, drawn as its own element even though it's easy to
+  // miss in the markup (no `cx`/`cy` of its own; both coordinates come from
+  // the wrapping `<g>`'s `translate`). `disco-turntable`'s own rect (above)
+  // already covers this point, so the existing trigger needs no change.
+  // `depth` (9009) is `depthForTile({col:9,row:0})`, the booth's own riser
+  // tile under this disc -- nothing ever stands there (the riser is
+  // unwalkable), so this is mostly documentation, not a visible ordering
+  // concern.
+  minigameMarkers: [
+    {
+      id: 'disco-turntable-highlight',
+      anchor: { x: 1270, y: 490 },
+      depth: 9009,
+      glow: { color: '#FF3DA5', dx: 0, dy: 0, rx: 42, ry: 24, periodMs: 1400, peakOpacity: 0.3 },
+      callout: {
+        text: 'CARNAVAL PARADE',
+        color: '#FF3DA5',
+        width: 150,
+        height: 26,
+        dx: 0,
+        dy: -50,
+      },
+    },
+  ],
 };

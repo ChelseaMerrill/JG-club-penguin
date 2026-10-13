@@ -117,4 +117,38 @@ export const latamFutebolField: RoomDefinition = {
       rect: { x: 785, y: 476, width: 140, height: 140 },
     },
   ],
+  // Owner feedback 2026-10-13: "the ball should bounce up and down and be
+  // highlighted like the design" -- `a[href="Minigame Penalty Kick.dc.html"]`
+  // (the ball `<g>`, its pulsing `#00BDFF` glow and the "KICK IT · PENALTY
+  // SHOOTOUT" callout) is now hidden from the exported art along with its own
+  // ground shadow (`scripts/export-room-art.ts`'s own `latam-futebol-field`
+  // rule, replacing that file's previous "leave it baked in, static" call)
+  // and drawn live instead, animated exactly as the design does at the same
+  // Stage spot (855,546) -- this file's own header comment above. `depth`
+  // (11006) is `depthForTile({col:6,row:5})`, the ball's own blocked tile
+  // (see that same header comment), so it sorts against the three JGers whose
+  // wander path crosses near it the same way a Penguin/NPC on that tile
+  // would, rather than always drawing in front of or behind them.
+  minigameMarkers: [
+    {
+      id: 'penalty-kick-ball',
+      anchor: { x: 855, y: 546 },
+      depth: 11006,
+      glow: { color: '#00BDFF', dx: 0, dy: -1, rx: 46, ry: 46, periodMs: 1600, peakOpacity: 0.22 },
+      callout: {
+        text: 'KICK IT · PENALTY SHOOTOUT',
+        color: '#00BDFF',
+        width: 320,
+        height: 40,
+        dx: 0,
+        dy: -74,
+      },
+      ball: {
+        radius: 22,
+        bounceHeight: 34,
+        bouncePeriodMs: 900,
+        shadow: { dx: 0, dy: 16, rx: 14, ry: 6, squashedRx: 9 },
+      },
+    },
+  ],
 };

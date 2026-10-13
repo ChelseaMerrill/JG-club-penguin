@@ -598,6 +598,29 @@ body {
   text-transform: uppercase;
 }
 
+/* The É fix (owner feedback 2026-10-13, `hud-title-text.ts`'s own header
+   comment): Bumbastika has no accented-letter glyph at all, so the base
+   letter stays plain Bumbastika text (identical size to its neighbours) and
+   this draws the acute accent itself, a small stroked bar above it, echoing
+   `.hud__title`'s own fill/stroke/shadow colours. */
+.hud__title-accent {
+  position: relative;
+  display: inline-block;
+}
+
+.hud__title-accent::after {
+  content: '';
+  position: absolute;
+  top: -0.46em;
+  left: 50%;
+  width: 0.3em;
+  height: 0.09em;
+  border-radius: 2px;
+  background: var(--jg-primary);
+  box-shadow: 0 2px 0 var(--jg-secondary);
+  transform: translateX(-35%) rotate(-40deg);
+}
+
 .hud__subtitle {
   font: 400 13px var(--font-display);
   letter-spacing: 0.22em;

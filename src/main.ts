@@ -1109,6 +1109,15 @@ gameEvents.on('hotspot:click', ({ hotspotId }) => {
   gameEvents.emit('npc:arrived', { npcId: 'hector-grecco' });
 });
 
+// Owner feedback 2026-10-13: the LATAM Café's "MATCH THE TREATS" bubble
+// (`sander-treats-bubble`, `src/game/rooms/definitions/latam-cafe.ts`) opens
+// Sander Nonaka's own Pão de Queijo dialog, the same `npc:arrived` reuse this
+// file already does for the Disco Hall turntable and the Futebol Field ball.
+gameEvents.on('hotspot:click', ({ hotspotId }) => {
+  if (hotspotId !== 'sander-treats-bubble') return;
+  gameEvents.emit('npc:arrived', { npcId: 'sander-nonaka' });
+});
+
 /**
  * Reloads the signed-in Player's `ProgressSnapshot` and pushes its Furniture
  * layout/catalog into `RoomScene` (#41 resolved decision 1): called once on

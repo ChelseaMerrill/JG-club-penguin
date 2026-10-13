@@ -89,6 +89,15 @@ export interface RoomDebugInfo {
   chickenToss?: { tosses: number; lastTargetId: string | null; flying: boolean } | null;
   /** Each dance-floor tile's current fill colour, in design document order, or `null` for a Room with none (the LATAM Disco Hall only). */
   discoFloor?: readonly HexColor[] | null;
+  /** Each `minigameMarkers` entry's last-sampled pose, by id (owner feedback 2026-10-13); `null` for a Room with none. */
+  minigameMarkers?: Record<string, MinigameMarkerDebugPose> | null;
+}
+
+/** One minigame marker's live pose (owner feedback 2026-10-13): mirrors `src/game/rooms/room-minigame-markers.ts`'s `MinigameMarkerDebugPose`. */
+export interface MinigameMarkerDebugPose {
+  glowAlpha: number;
+  calloutDy: number | null;
+  ballDy: number | null;
 }
 
 /** One NPC's motion state (#113). */
