@@ -170,7 +170,7 @@ test('Carnaval Parade: START runs the round with lane controls, and the result s
   await expect(page.locator('.minigame__done-kicker')).toHaveText(
     /^(FIM DO DESFILE|OUT OF LIVES)$/,
   );
-  await expect(page.locator('.minigame__done-title')).toHaveText(/^(PASSISTA|FOLIÃO|APRENDIZ)$/);
+  await expect(page.locator('.minigame__done-title')).toHaveText(/^(PASSISTA|FOLI[AÃ]O|APRENDIZ)$/);
   await expect(page.locator('.minigame__done-quote')).toHaveText(/^Hector: /);
   await expect(page.locator('[data-done-stat="tokens"] .minigame__done-stat-value')).toBeVisible();
   await page.screenshot({ path: `${PROOF_ROOT}/result.png` });

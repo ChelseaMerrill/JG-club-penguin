@@ -8,6 +8,7 @@ import {
 import { MINIGAME_RULES } from '../persistence/minigame-rules';
 import { ProgressStoreError, type ProgressStore } from '../persistence/progress-store';
 import { renderBadgeUnlock } from '../ui/badge-unlock-panel';
+import { renderDisplayAccentText } from '../ui/display-accent-text';
 import type { OverlayManager } from '../ui/hud/overlay-manager';
 import { badgeDisplayName } from './badge-names';
 import { setMinigameOpen } from './is-minigame-open';
@@ -168,7 +169,7 @@ export function createMinigameShell<K extends MinigameId>(deps: MinigameShellDep
   header.className = 'minigame__header';
   const titleEl = document.createElement('div');
   titleEl.className = 'minigame__title';
-  titleEl.textContent = minigame.title;
+  renderDisplayAccentText(titleEl, minigame.title);
   const counters = document.createElement('div');
   counters.className = 'minigame__counters';
 
@@ -219,7 +220,7 @@ export function createMinigameShell<K extends MinigameId>(deps: MinigameShellDep
   doneKicker.textContent = 'ROUND COMPLETE';
   const doneTitle = document.createElement('div');
   doneTitle.className = 'minigame__done-title';
-  doneTitle.textContent = minigame.title;
+  renderDisplayAccentText(doneTitle, minigame.title);
 
   const doneStats = document.createElement('div');
   doneStats.className = 'minigame__done-stats';
@@ -424,7 +425,7 @@ export function createMinigameShell<K extends MinigameId>(deps: MinigameShellDep
       return;
     }
     doneKicker.textContent = summary.kicker;
-    doneTitle.textContent = summary.title;
+    renderDisplayAccentText(doneTitle, summary.title);
     if (summary.scoreLabel !== undefined) {
       const label = doneScore.row.querySelector('.minigame__done-stat-label');
       if (label) label.textContent = summary.scoreLabel;

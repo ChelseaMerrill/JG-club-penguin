@@ -1140,6 +1140,42 @@ body {
   text-shadow: 0 4px 0 var(--jg-secondary);
 }
 
+/* Accented letters in Bumbastika text (`src/ui/display-accent-text.ts`):
+   the base letter stays Bumbastika, so it matches its neighbours, and the
+   mark is drawn here in the text's own fill and stroke colours. */
+.display-accent {
+  position: relative;
+  display: inline-block;
+}
+
+.display-accent::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  background: var(--jg-primary);
+  box-shadow: 0 2px 0 var(--jg-secondary);
+}
+
+.display-accent--acute::after {
+  top: -0.46em;
+  width: 0.3em;
+  height: 0.09em;
+  border-radius: 2px;
+  transform: translateX(-35%) rotate(-40deg);
+}
+
+/* The tilde is an inline SVG, so its fill and outline repeat --jg-primary
+   (#00BDFF) and --jg-secondary (#0C4B5F) as literal colours. */
+.display-accent--tilde::after {
+  top: -0.36em;
+  width: 0.62em;
+  height: 0.28em;
+  transform: translateX(-50%);
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 44 20'%3E%3Cpath d='M5 14 C9 4 16 4 22 10 S35 16 39 6' fill='none' stroke='%230C4B5F' stroke-width='10' stroke-linecap='round'/%3E%3Cpath d='M5 14 C9 4 16 4 22 10 S35 16 39 6' fill='none' stroke='%2300BDFF' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E")
+    center / 100% 100% no-repeat;
+  box-shadow: none;
+}
+
 .minigame__counters {
   display: flex;
   gap: 28px;

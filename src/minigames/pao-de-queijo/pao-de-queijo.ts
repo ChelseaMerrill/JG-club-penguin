@@ -7,6 +7,7 @@ import {
   TOTAL_DURATION_SECONDS,
   type PaoDeQueijoCard,
   type PaoDeQueijoEngine,
+  type PaoDeQueijoRoundConfig,
   type TreatKey,
 } from './pao-de-queijo-engine';
 import './pao-de-queijo.css';
@@ -188,16 +189,133 @@ function buildIconSvg(key: TreatKey): SVGSVGElement {
   return svg;
 }
 
+/** The design's own fixed card footprint (`renderVals()`'s `W=130,H=140,
+ *  G=14`): every round's cards are this pixel size regardless of the
+ *  round's own `cols`/`rows` -- the whole board scales as one unit (this
+ *  file's `pao-de-queijo__scene` SVG, `preserveAspectRatio="xMidYMid
+ *  meet"`), not per-card. */
+const CARD_WIDTH = 130;
+const CARD_HEIGHT = 140;
+const CARD_GAP = 14;
+
+export interface PaoDeQueijoCardLayout {
+  readonly x: number;
+  readonly y: number;
+}
+
+/** The design's own card-grid centring formula, verbatim from
+ *  `renderVals()` (`x0=800-tw/2`, `y0=500-th/2+30`, laid out `cols` then
+ *  `rows`). Pure -- no DOM -- so a test can assert every round's own layout
+ *  without mounting the board. */
+export function paoDeQueijoCardLayout(
+  index: number,
+  config: PaoDeQueijoRoundConfig,
+): PaoDeQueijoCardLayout {
+  const { cols, rows } = config;
+  const tw = cols * CARD_WIDTH + (cols - 1) * CARD_GAP;
+  const th = rows * CARD_HEIGHT + (rows - 1) * CARD_GAP;
+  const x0 = 800 - tw / 2;
+  const y0 = 500 - th / 2 + 30;
+  return {
+    x: x0 + (index % cols) * (CARD_WIDTH + CARD_GAP),
+    y: y0 + Math.floor(index / cols) * (CARD_HEIGHT + CARD_GAP),
+  };
+}
+
+/** The design's own party-light string (one wavy `<path>` plus 22 bulbs),
+ *  verbatim positions and colours. Each bulb's blink becomes a CSS
+ *  animation (`pao-de-queijo__bulb`, staggered by the `--pq-bulb-i` custom
+ *  property set per bulb below) instead of the design's own per-bulb SMIL
+ *  `<animate>`, so one `prefers-reduced-motion` media query
+ *  (`pao-de-queijo.css`) can drop it -- decorative only, the same reasoning
+ *  `carnaval-parade.ts`'s own header comment gives for dropping its SMIL
+ *  animations. */
+const LIGHT_COLORS = ['#FFD23F', '#FF3DA5', '#00BDFF', '#3DDC84'] as const;
+/** The design's own per-bulb `cy`, verbatim (rounded to 2dp; cosmetic). */
+const LIGHT_Y = [
+  44, 54.97, 57.63, 49.98, 37.8, 30.31, 33.18, 44.24, 55.11, 57.58, 49.77, 37.59, 30.27, 33.33,
+  44.47, 55.25, 57.52, 49.55, 37.39, 30.22, 33.49, 44.71,
+];
+const LIGHTS: ReadonlyArray<{ x: number; y: number; color: string }> = LIGHT_Y.map((y, i) => ({
+  x: 40 + i * 72,
+  y,
+  color: LIGHT_COLORS[i % LIGHT_COLORS.length],
+}));
+
+/** A 1600x900 box the HUD and board are authored in, scaled with `transform:
+ *  scale()` to fit `.pao-de-queijo__field` exactly the way this file's
+ *  background SVG's own `preserveAspectRatio="xMidYMid meet"` fits it --
+ *  `Math.min` of the two axis ratios, 0 for a not-yet-laid-out (or jsdom)
+ *  field rather than `Infinity`/`NaN`. Deliberately a plain CSS `transform`
+ *  on an ordinary HTML element, not nested inside the background SVG's own
+ *  `<foreignObject>`: the same `transform: scale()` technique `src/ui/
+ *  stage.ts`'s `computeStageFit` already uses to fit the whole `#ui` layer
+ *  to the viewport, so the board's interactive, 3D-flipping cards stay
+ *  plain, accessible HTML the whole way down instead of relying on
+ *  `foreignObject`'s own (browser- and GPU-dependent) support for nested
+ *  CSS 3D transforms. Pure, so a test can assert it without mounting the
+ *  DOM or faking a `ResizeObserver`. */
+export function paoDeQueijoStageScale(fieldWidth: number, fieldHeight: number): number {
+  if (fieldWidth <= 0 || fieldHeight <= 0) return 0;
+  return Math.min(fieldWidth / 1600, fieldHeight / 900);
+}
+
+/** The background only -- the dark-to-amber gradient, the party lights, the
+ *  three warm glow pools and the red/cream checkered tablecloth panel --
+ *  ported from the design's static SVG verbatim apart from the bulbs' own
+ *  animation (see `LIGHTS` above). One inline SVG in the design's own
+ *  1600x900 coordinate space, the same technique `carnavalSceneSvg`/
+ *  `penaltyKickSceneSvg` use -- but `preserveAspectRatio="xMidYMid meet"`
+ *  (not their own `slice`), since the shell's own non-16:9 play area must
+ *  never crop a card off the board; it pillar/letterboxes instead. Purely
+ *  decorative (no interactive content), so it's safe inside an `<svg>` --
+ *  the HUD and the board live in a separate, plain-HTML `.pao-de-queijo__
+ *  stage` sibling instead (see `paoDeQueijoStageScale`'s own doc comment). */
+function paoDeQueijoSceneSvg(): string {
+  const lightsPath = 'M40 44 ' + LIGHTS.map((l) => `L${l.x} ${l.y}`).join(' ');
+  const bulbs = LIGHTS.map(
+    (l, i) =>
+      `<circle class="pao-de-queijo__bulb" cx="${l.x}" cy="${l.y}" r="7" fill="${l.color}" style="--pq-bulb-i:${i}"></circle>`,
+  ).join('');
+  return (
+    '<svg class="pao-de-queijo__scene" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid meet">' +
+    '<defs>' +
+    '<linearGradient id="pq-bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1b1d20"></stop><stop offset="1" stop-color="#3a2416"></stop></linearGradient>' +
+    '<pattern id="pq-chk" width="60" height="60" patternUnits="userSpaceOnUse"><rect width="60" height="60" fill="#8a2f26"></rect><rect width="30" height="30" fill="#e8d9c4"></rect><rect x="30" y="30" width="30" height="30" fill="#e8d9c4"></rect></pattern>' +
+    '<radialGradient id="pq-gl"><stop offset="0" stop-color="#FFC857" stop-opacity=".5"></stop><stop offset="1" stop-color="#FFC857" stop-opacity="0"></stop></radialGradient>' +
+    '</defs>' +
+    '<rect width="1600" height="900" fill="url(#pq-bg)"></rect>' +
+    `<path d="${lightsPath}" fill="none" stroke="#494949" stroke-width="2"></path>` +
+    bulbs +
+    '<ellipse cx="400" cy="200" rx="220" ry="120" fill="url(#pq-gl)"></ellipse>' +
+    '<ellipse cx="800" cy="200" rx="220" ry="120" fill="url(#pq-gl)"></ellipse>' +
+    '<ellipse cx="1200" cy="200" rx="220" ry="120" fill="url(#pq-gl)"></ellipse>' +
+    '<rect x="150" y="110" width="1300" height="760" rx="24" fill="url(#pq-chk)" opacity=".55"></rect>' +
+    '<rect x="150" y="110" width="1300" height="760" rx="24" fill="none" stroke="#0C4B5F" stroke-width="6"></rect>' +
+    '</svg>'
+  );
+}
+
 /**
  * Pão de Queijo Memory: a solo, three-round memory match, mirroring the
  * other Minigames' shape -- the pure `pao-de-queijo-engine.ts` under a thin
  * DOM layer ported from `design/Minigame Pao de Queijo Memory.dc.html`'s
  * play screen into the shell's play area (`createMinigameShell`'s
- * `playAreaEl`). The shell owns the how-to-play screen (with this game's
- * `howToSubtitle`), the round clock (a generous backstop; the game ends
- * itself via `context.finish()` once the third round clears or any round's
- * own timer runs out), PAUSE/P, QUIT and `recordRound`; its done screen
- * shows this game's own result title and Sander's line via `doneSummary()`.
+ * `playAreaEl`). The background (`paoDeQueijoSceneSvg()`) and the HUD/board
+ * (a plain-HTML `.pao-de-queijo__stage`) are both authored in the design's
+ * own 1600x900 coordinate space and both fit `.pao-de-queijo__field`
+ * identically -- the background via its own SVG `preserveAspectRatio=
+ * "xMidYMid meet"`, the stage via a `ResizeObserver`-driven CSS `transform:
+ * scale()` computing the same contain-fit (`paoDeQueijoStageScale`) -- so
+ * the whole scene scales into the shell's own non-16:9 play area without
+ * ever cropping a card. The shell owns the how-to-play screen (with this game's `howToSubtitle`), the round
+ * clock (a generous backstop; the game ends itself via `context.finish()`
+ * once the third round clears or any round's own timer runs out), PAUSE/P,
+ * QUIT and `recordRound`; its done screen shows this game's own result title
+ * and Sander's line via `doneSummary()`. The shell's own header already
+ * shows SCORE, so the design's own SCORE readout isn't re-shown in the play
+ * area -- only STREAK and MULTIPLIER, the same reconciliation
+ * `carnaval-parade.ts` and `penalty-kick.ts` make for their own HUDs.
  *
  * Not ported: the design's trigger screen (the "A Confeiteira" card, LET'S
  * EAT / JUST WATCHING) belongs to Sander Nonaka's own NPC dialog
@@ -216,6 +334,8 @@ export function createPaoDeQueijo(
   let context: MinigameContext<'pao-de-queijo'> | undefined;
   let intervalId: ReturnType<typeof setInterval> | undefined;
   let finished = false;
+  let resizeObserver: ResizeObserver | undefined;
+  let stopResizeFallback: (() => void) | undefined;
 
   const cardEls: HTMLButtonElement[] = [];
   const refs: Record<string, HTMLElement> = {};
@@ -275,8 +395,6 @@ export function createPaoDeQueijo(
     view.cards.forEach(renderCard);
 
     const config = ROUNDS[view.round];
-    refs.board.style.setProperty('--pao-de-queijo-cols', String(config.cols));
-    refs.board.style.setProperty('--pao-de-queijo-rows', String(config.rows));
 
     refs.round.textContent = `${view.round + 1} / ${ROUNDS.length}`;
     refs.subline.textContent = view.preview ? 'MEMORIZE THE TREATS' : 'FIND THE PAIRS';
@@ -298,9 +416,13 @@ export function createPaoDeQueijo(
   function buildBoard(container: HTMLElement): void {
     container.replaceChildren();
     cardEls.length = 0;
+    const config = ROUNDS[engine.view.round];
     engine.view.cards.forEach((card, index) => {
       const button = el('button', 'pao-de-queijo__card');
       button.type = 'button';
+      const { x, y } = paoDeQueijoCardLayout(index, config);
+      button.style.left = `${x}px`;
+      button.style.top = `${y}px`;
       const inner = el('div', 'pao-de-queijo__card-inner');
       const back = el('div', 'pao-de-queijo__card-face pao-de-queijo__card-face--back');
       back.append(el('span', 'pao-de-queijo__card-mark', 'JG'));
@@ -321,16 +443,22 @@ export function createPaoDeQueijo(
   function buildDom(container: HTMLElement): void {
     const root = el('div', 'pao-de-queijo');
 
-    const status = el('div', 'pao-de-queijo__status');
+    const field = el('div', 'pao-de-queijo__field');
+    field.innerHTML = paoDeQueijoSceneSvg();
+
+    const stage = el('div', 'pao-de-queijo__stage');
+
     const subline = el('div', 'pao-de-queijo__subline');
+
     const roundWrap = el('div', 'pao-de-queijo__round-wrap');
-    const roundLabel = el('div', 'pao-de-queijo__round-label-text', 'ROUND');
+    const roundHeading = el('div', 'pao-de-queijo__round-heading');
+    roundHeading.append(el('span', 'pao-de-queijo__round-label-text', 'ROUND'));
     const round = el('span', 'pao-de-queijo__round-label');
+    roundHeading.append(round);
     const timebar = el('div', 'pao-de-queijo__timebar');
     const timeFill = el('div', 'pao-de-queijo__timebar-fill');
     timebar.append(timeFill);
-    roundWrap.append(roundLabel, round, timebar);
-    status.append(subline, roundWrap);
+    roundWrap.append(roundHeading, timebar);
 
     const hud = el('div', 'pao-de-queijo__hud');
     const streak = el('div', 'pao-de-queijo__stat');
@@ -347,10 +475,34 @@ export function createPaoDeQueijo(
     const toast = el('div', 'pao-de-queijo__toast');
     toast.hidden = true;
 
-    root.append(status, hud, board, toast);
+    stage.append(subline, roundWrap, hud, board, toast);
+    field.append(stage);
+    root.append(field);
     Object.assign(refs, { subline, round, timeFill, streakValue, multValue, board, toast });
 
     container.replaceChildren(root);
+
+    const applyFit = (): void => {
+      const scale = paoDeQueijoStageScale(field.clientWidth, field.clientHeight);
+      stage.style.transform = `translate(-50%, -50%) scale(${scale})`;
+    };
+    applyFit();
+    // jsdom (unit tests) has no `ResizeObserver`; a one-shot `applyFit()`
+    // above is enough there (every size reads 0, same as the initial fit).
+    if (typeof ResizeObserver !== 'undefined') {
+      resizeObserver = new ResizeObserver(applyFit);
+      resizeObserver.observe(field);
+    } else {
+      window.addEventListener('resize', applyFit);
+      stopResizeFallback = () => window.removeEventListener('resize', applyFit);
+    }
+  }
+
+  function stopFit(): void {
+    resizeObserver?.disconnect();
+    resizeObserver = undefined;
+    stopResizeFallback?.();
+    stopResizeFallback = undefined;
   }
 
   function doneSummary(): MinigameDoneSummary {
@@ -397,6 +549,7 @@ export function createPaoDeQueijo(
 
     end() {
       stopTicking();
+      stopFit();
       finished = true;
       return { score: engine.view.score, stats: engine.stats() };
     },
