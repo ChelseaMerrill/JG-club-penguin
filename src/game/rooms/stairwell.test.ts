@@ -183,32 +183,20 @@ describe('Stairwell doors (S4-D4)', () => {
     }
   });
 
-  it("stands Dom, Jason and each floor's guest on `design/Stairwell.dc.html`'s own shadow point (#182)", () => {
+  it("stands only Dom and Jason on each floor, on `design/Stairwell.dc.html`'s own shadow points (#182)", () => {
     // Each floor's shadow ellipse `(cx, cy)`, traced from the design: Dom and
-    // Jason are identical on every floor, the guest differs per floor
-    // (#182's audit; Anthony's own tile needed a -10,0 offset to match --
-    // every other guest's tile+offset already did).
+    // Jason are identical on every floor. The design's one guest per floor
+    // was removed by the owner (2026-10-13).
     const dom = { x: 640, y: 522 };
     const jason = { x: 620, y: 590 };
-    const guests = [
-      { x: 790, y: 635 },
-      { x: 790, y: 625 },
-      { x: 770, y: 625 },
-      { x: 810, y: 625 },
-      { x: 780, y: 630 },
-      { x: 770, y: 615 },
-    ];
     floors.forEach((room, floor) => {
-      const domSlot = room.npcSlots.find((slot) => slot.npcId === `dom-stairwell-${floor}`)!;
-      const jasonSlot = room.npcSlots.find((slot) => slot.npcId === `jason-stairwell-${floor}`)!;
-      const guestSlot = room.npcSlots.find(
-        (slot) => slot.npcId !== domSlot.npcId && slot.npcId !== jasonSlot.npcId,
-      )!;
-      expect(npcSlotPoint(domSlot, room.grid.origin), `floor ${floor} Dom`).toEqual(dom);
-      expect(npcSlotPoint(jasonSlot, room.grid.origin), `floor ${floor} Jason`).toEqual(jason);
-      expect(npcSlotPoint(guestSlot, room.grid.origin), `floor ${floor} guest`).toEqual(
-        guests[floor],
-      );
+      expect(room.npcSlots.map((slot) => slot.npcId)).toEqual([
+        `dom-stairwell-${floor}`,
+        `jason-stairwell-${floor}`,
+      ]);
+      const [domSlot, jasonSlot] = room.npcSlots;
+      expect(npcSlotPoint(domSlot!, room.grid.origin), `floor ${floor} Dom`).toEqual(dom);
+      expect(npcSlotPoint(jasonSlot!, room.grid.origin), `floor ${floor} Jason`).toEqual(jason);
     });
   });
 
