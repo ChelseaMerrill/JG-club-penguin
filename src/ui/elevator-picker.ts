@@ -28,7 +28,6 @@ export interface ElevatorPicker {
   pick(door: RoomDoor, currentFloor: FloorId): Promise<FloorChoice | null>;
   /** Closes it, resolving `null` (sign-out, a Room change). A no-op when closed. */
   cancel(): void;
-  isOpen(): boolean;
   destroy(): void;
 }
 
@@ -113,6 +112,8 @@ export function createElevatorPicker(root: HTMLElement, deps: ElevatorPickerDeps
       dialog.setAttribute('role', 'dialog');
       dialog.setAttribute('aria-modal', 'true');
       dialog.setAttribute('aria-labelledby', TITLE_ID);
+      // A click on its text keeps focus inside, so the Tab trap still holds.
+      dialog.tabIndex = -1;
 
       const header = el('div', 'elevator-picker__header');
       const title = el('h2', 'elevator-picker__title', ELEVATOR_PICKER_COPY.heading);
@@ -131,7 +132,12 @@ export function createElevatorPicker(root: HTMLElement, deps: ElevatorPickerDeps
       let firstUnlocked: HTMLButtonElement | null = null;
       for (const choice of choices) {
         const locked = choice.targetRoomId === null;
-        const chip = el('button', 'elevator-picker__chip', `${choice.floor} / ${choice.label}`);
+        const text = `${choice.floor} / ${choice.label}`;
+        const chip = el(
+          'button',
+          'elevator-picker__chip',
+          locked ? `${text} · ${ELEVATOR_PICKER_COPY.underConstruction}` : text,
+        );
         chip.type = 'button';
         chip.dataset.floor = choice.floor;
         if (locked) {
@@ -170,7 +176,6 @@ export function createElevatorPicker(root: HTMLElement, deps: ElevatorPickerDeps
   return {
     pick,
     cancel,
-    isOpen: () => settle !== null,
     destroy: cancel,
   };
 }

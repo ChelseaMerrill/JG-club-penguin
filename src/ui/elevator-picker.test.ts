@@ -91,9 +91,27 @@ describe('createElevatorPicker', () => {
     expect(lobby.disabled).toBe(false);
   });
 
-  it('focuses the first unlocked floor', () => {
+  it('focuses the first unlocked floor, not just the first chip', () => {
     void picker.pick(DOOR, '5');
     expect(document.activeElement).toBe(chips()[0]);
+    picker.cancel();
+    const lockedRoof: FloorChoice = { ...ROOF, targetRoomId: null };
+    void picker.pick({ ...DOOR, floorChoices: [lockedRoof, TOWN, LOBBY_FLOOR_CHOICE] }, 'L');
+    expect(chipTexts()).toEqual([
+      'R / ROOF DECK · THE MARKET · UNDER CONSTRUCTION',
+      '5 / TOWN CENTER',
+    ]);
+    expect(document.activeElement).toBe(chips()[1]);
+  });
+
+  it('keeps focus inside when its text is clicked, so Tab stays trapped', () => {
+    void picker.pick(DOOR, '5');
+    const el = dialog()!;
+    // Focusable but not a Tab stop: a click on its text focuses it, not <body>,
+    // and the browser's next Tab goes to its first button.
+    expect(el.tabIndex).toBe(-1);
+    el.focus();
+    expect(document.activeElement).toBe(el);
   });
 
   it('resolves the chosen unlocked floor and closes', async () => {

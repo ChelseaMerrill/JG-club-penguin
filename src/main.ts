@@ -327,6 +327,8 @@ const sceneReady = whenSceneReady(game).then((scene) => {
     transitionScreen: elevatorScreen,
     fade: doorFade,
     // #170 D9: an Elevator door asks which floor first, from the floor it's on.
+    // A picked floor's change comes after the pick, so it's re-tagged as a door's.
+    withDoorSource: (change) => stairClimb.withSource('door', change),
     pickFloor: (door) => {
       const roomId = roomNavigator?.currentRoomId();
       const floor = roomId ? ROOM_FLOORS[roomId] : null;
