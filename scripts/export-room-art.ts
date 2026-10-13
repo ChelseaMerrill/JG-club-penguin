@@ -1275,7 +1275,7 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
       kind: 'selector',
       selectors: ['a[href="Minigame Pao de Queijo Memory.dc.html"]'],
       comment:
-        'Sander Nonaka\'s nameplate, pulsing highlight glow and "MATCH THE TREATS" minigame-trigger bubble, drawn together in this second, separate group at his same point (his figure itself is the `title-group` rule above).',
+        "Sander Nonaka's nameplate, pulsing highlight glow and \"MATCH THE TREATS\" minigame-trigger bubble, drawn together in this second, separate group at his same point (his figure itself is the `title-group` rule above). The glow/bubble are drawn live instead (owner feedback 2026-10-13): `src/game/rooms/definitions/latam-cafe.ts`'s own `minigameMarkers`, re-anchored to his actual in-game spot; his nameplate is the game's own generic NPC nameplate, not sourced from this hidden element.",
     },
     {
       kind: 'selector',
@@ -1289,9 +1289,8 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
   // Rooms'), and its "← MAP / 18 · LATAM DISCO HALL" breadcrumb sits above
   // the Stage element in normal document flow (measured: breadcrumb bottom
   // edge at viewport y=56, Stage top at y=70), so it's already outside the
-  // captured screenshot with no hide rule needed. The DJ booth's "SPIN IT ·
-  // CARNAVAL PARADE" sign is static, non-NPC design furniture and stays; its
-  // own bottom door-pill bar is hidden (below), like the Café's.
+  // captured screenshot with no hide rule needed. Its own bottom door-pill
+  // bar is hidden (below), like the Café's.
   'latam-disco-hall': [
     {
       kind: 'selector',
@@ -1304,6 +1303,12 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
       selectors: ['div[style*="bottom: 22px"]'],
       comment:
         "The design's own bottom door-pill bar (MAP / CAFE LOUNGE / FUTEBOL FIELD), the same HTML overlay <div> the Café's own rule above hides, for the same reason (owner request, 2026-10-09).",
+    },
+    {
+      kind: 'selector',
+      selectors: ['a[href="Minigame Carnaval Parade.dc.html"]'],
+      comment:
+        "The DJ booth's own \"SPIN IT · CARNAVAL PARADE\" sign, its pulsing glow and the `disco-turntable` hotspot's own invisible hit rect, all one group (owner feedback 2026-10-13: the sign was baked into the exported art oversized against the booth). Drawn live instead, smaller and anchored to one of the booth's turntables (`src/game/rooms/definitions/latam-disco-hall.ts`'s own `minigameMarkers`); the `disco-turntable` hotspot itself is unaffected, defined separately in that same file, not sourced from this hidden element.",
     },
   ],
   // `design/Latam Futebol Field.dc.html` draws no in-canvas HUD banner or
@@ -1327,15 +1332,14 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
   // The Penalty Kick minigame's bouncing ball (`a[href="Minigame Penalty
   // Kick.dc.html"]`, with its pulsing glow ring and "KICK IT · PENALTY
   // SHOOTOUT" callout) and its own ground shadow
-  // (`ellipse[cx="855"][cy="562"]`) are left un-hidden too (owner request,
-  // 2026-10-09: the ball was missing from the exported art). `freezeSmil
-  // Animations` resets both the bounce (`translate` 0/-34/0) and the shadow's
-  // pulsing `rx` to their 0% rest frame before the screenshot, so the ball
-  // bakes in sitting on the pitch at (855,546) rather than mid-bounce --
-  // exactly the Disco Hall's own precedent for keeping its "SPIN IT ·
-  // CARNAVAL PARADE" sign baked into the art instead of hidden. The minigame
-  // itself is not built yet (see `src/game/rooms/definitions/
-  // latam-futebol-field.ts`'s own comment, and tickets #218/#219/#220).
+  // (`ellipse[cx="855"][cy="562"]`) are now hidden too (owner feedback
+  // 2026-10-13, superseding the 2026-10-09 call to leave them baked in
+  // static): both are drawn live and animated instead
+  // (`src/game/rooms/definitions/latam-futebol-field.ts`'s own
+  // `minigameMarkers`), the bounce, the glow pulse and the shadow's own
+  // synced squash all sampled from the design's verbatim SMIL
+  // (`src/game/rooms/minigame-markers.ts`). The `penalty-kick-ball` hotspot
+  // itself is unaffected, defined separately in that same file.
   'latam-futebol-field': [
     {
       kind: 'selector',
@@ -1348,6 +1352,18 @@ const LIVE_ELEMENT_RULES: Record<RoomId, HideRule[]> = {
       selectors: ['div[style*="bottom: 22px"]'],
       comment:
         "The design's own bottom door-pill bar (MAP / CAFE LOUNGE / DISCO HALL), the same HTML overlay <div> the Café's own rule hides, for the same reason (owner request, 2026-10-09).",
+    },
+    {
+      kind: 'selector',
+      selectors: ['a[href="Minigame Penalty Kick.dc.html"]'],
+      comment:
+        'The Penalty Kick ball `<g>` (a white circle, a black pentagon and two rotating "valve" dots), its pulsing `#00BDFF` glow ring, its own invisible hit circle and the "KICK IT · PENALTY SHOOTOUT" callout, all one group.',
+    },
+    {
+      kind: 'selector',
+      selectors: ['ellipse[cx="855"][cy="562"]'],
+      comment:
+        'The ball\'s own ground shadow, squashing in sync with its bounce (`<animate attributeName="rx">`) -- a separate element from the ball `<g>` above, sitting just before `#latam-people` in the design\'s own markup.',
     },
   ],
 };

@@ -161,6 +161,90 @@ export interface RoomWallText {
 }
 
 /**
+ * The pulsing glow behind a `RoomMinigameMarker`, traced from the design's
+ * own `<ellipse ... opacity="0"><animate attributeName="opacity"
+ * values="0;PEAK;0" dur="PERIODs" repeatCount="indefinite"/></ellipse>`:
+ * `dx`/`dy` are Stage px from the marker's own `anchor` (0/0 when the design
+ * draws it centred there), `rx`/`ry` its radii, and `peakOpacity`/`periodMs`
+ * its `values`' middle stop and `dur`. `minigame-markers.ts` samples this as
+ * a 0 -> peak -> 0 triangle wave, SMIL's own default linear interpolation for
+ * an `<animate>` with neither `keyTimes` nor `calcMode`.
+ */
+export interface RoomMinigameMarkerGlow {
+  color: HexColor;
+  dx: number;
+  dy: number;
+  rx: number;
+  ry: number;
+  periodMs: number;
+  peakOpacity: number;
+}
+
+/**
+ * A `RoomMinigameMarker`'s floating label pill, traced from the design's own
+ * bouncing call-out group (a rounded rect, a small pointer triangle and its
+ * `<text>`): `dx`/`dy` are the pill's own resting centre, Stage px from the
+ * marker's `anchor`. Every design call-out this prototype ports bobs with the
+ * exact same `animateTransform` (`values="0 0;0 -6;0 0" dur="1.2s"
+ * repeatCount="indefinite"`), so the bob itself is one shared animation
+ * (`minigame-markers.ts`'s `sampleMarkerCalloutBob`), not per-marker data.
+ */
+export interface RoomMinigameMarkerCallout {
+  text: string;
+  /** The pill's own fill; its text is always the design's own near-black. */
+  color: HexColor;
+  width: number;
+  height: number;
+  dx: number;
+  dy: number;
+}
+
+/**
+ * The LATAM Futebol Field's bouncing Penalty Kick ball (owner feedback
+ * 2026-10-13): the design's own ball `<g>` (a white circle, a black pentagon
+ * and two rotating "valve" dots) bounces `animateTransform type="translate"`
+ * `0 0;0 -BOUNCE_HEIGHTpx;0 0` over `bouncePeriodMs`, eased by the design's
+ * own spline (approximated here with one `cubic-bezier`, see
+ * `minigame-markers.ts`); its ground shadow squashes in sync (`rx` only,
+ * `shadow.rx` at rest narrowing to `shadow.squashedRx` at the bounce's peak).
+ */
+export interface RoomMinigameMarkerBall {
+  radius: number;
+  bounceHeight: number;
+  bouncePeriodMs: number;
+  shadow: { dx: number; dy: number; rx: number; ry: number; squashedRx: number };
+}
+
+/**
+ * A design-sourced animated call-out marking a Room's minigame trigger (owner
+ * feedback 2026-10-13: the LATAM Café's hidden "MATCH THE TREATS" bubble, the
+ * Disco Hall's oversized baked-in "SPIN IT · CARNAVAL PARADE" sign, and the
+ * Futebol Field's missing bouncing ball). `room-minigame-markers.ts` draws
+ * it: every marker gets a pulsing `glow`; `callout` and `ball` are each
+ * optional, since the Café/Disco markers are glow+callout and the Futebol
+ * marker is glow+ball (no callout pill of its own, its "KICK IT · PENALTY
+ * SHOOTOUT" line is itself a `callout`, so both may be set together).
+ *
+ * `depth` sorts it like any other Phaser object at this Room's `RoomScene`:
+ * by convention, above the background/floor and below NPCs/Penguins (e.g.
+ * `HOTSPOT_DEPTH`/a tile's own `depthForTile`, neither of which a Room
+ * definition imports -- this field is plain data, a hand-computed number with
+ * a comment, the same convention every other hard-coded Stage-pixel field in
+ * these files already uses). A Room may still author a higher `depth` when
+ * its own NPC would otherwise cover the marker (see the LATAM Café's own
+ * comment): this is a per-Room, reviewable call, not something the renderer
+ * decides.
+ */
+export interface RoomMinigameMarker {
+  id: string;
+  anchor: StagePoint;
+  depth: number;
+  glow: RoomMinigameMarkerGlow;
+  callout?: RoomMinigameMarkerCallout;
+  ball?: RoomMinigameMarkerBall;
+}
+
+/**
  * A Room is data: everything `RoomScene` needs to render and validate one
  * Room, and everything #14/#15/#16/#28 need to place Penguins, NPCs and
  * furniture in it.
@@ -196,4 +280,6 @@ export interface RoomDefinition {
    * `.dc.html`, so nothing derives it generically from the grid.
    */
   animatedFloorTiles?: readonly DiscoFloorTile[];
+  /** Animated design call-outs marking this Room's minigame trigger(s) (owner feedback 2026-10-13); see `RoomMinigameMarker`. */
+  minigameMarkers?: readonly RoomMinigameMarker[];
 }

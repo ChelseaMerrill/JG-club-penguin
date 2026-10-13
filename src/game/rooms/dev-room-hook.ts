@@ -12,6 +12,7 @@ import type { RegisteredPlayer } from '../movement/registered-player';
 import type { PenguinAnim } from '../penguin';
 import type { RemotePenguinDebugInfo } from './room-penguin-view';
 import type { NpcMotionDebugInfo } from '../npcs/room-npc-motions';
+import type { MinigameMarkerDebugPose } from './room-minigame-markers';
 
 /** How many chickens Ashley has thrown since the Room opened, at whom last, and whether one is in the air. */
 export interface ChickenTossDebugInfo {
@@ -211,6 +212,8 @@ export interface RoomDebugInfo {
   chickenToss?: ChickenTossDebugInfo | null;
   /** Each dance-floor tile's current fill colour, in design document order, while this Room has one (the LATAM Disco Hall); else `null`. */
   discoFloor?: readonly HexColor[] | null;
+  /** Each `minigameMarkers` entry's last-sampled pose, by id (owner feedback 2026-10-13); `null` for a Room with none. */
+  minigameMarkers?: Record<string, MinigameMarkerDebugPose> | null;
 }
 
 declare global {

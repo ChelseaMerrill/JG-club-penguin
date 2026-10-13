@@ -131,6 +131,24 @@ function checkWallTextInStage(room: RoomDefinition, errors: RoomValidationError[
   }
 }
 
+/** A `minigameMarkers` entry's own `anchor` must sit within the Stage, and its id must be unique within the Room. */
+function checkMinigameMarkersInStage(room: RoomDefinition, errors: RoomValidationError[]): void {
+  const seenIds = new Set<string>();
+  for (const marker of room.minigameMarkers ?? []) {
+    if (seenIds.has(marker.id)) {
+      errors.push({ roomId: room.id, message: `duplicate minigame marker id "${marker.id}"` });
+    }
+    seenIds.add(marker.id);
+
+    if (!isInStage(marker.anchor)) {
+      errors.push({
+        roomId: room.id,
+        message: `minigame marker "${marker.id}" anchor { x: ${marker.anchor.x}, y: ${marker.anchor.y} } is outside the ${GAME_WIDTH}x${GAME_HEIGHT} Stage`,
+      });
+    }
+  }
+}
+
 /**
  * Checks the invariants #13's acceptance criteria name: unique ids; a
  * walkable spawn tile; a `walkable` mask shaped exactly `grid.rows` x
@@ -154,6 +172,7 @@ export function validateRoomDefinitions(rooms: readonly RoomDefinition[]): RoomV
     checkSlotsInBounds(room, errors);
     checkHotspotsInStage(room, errors);
     checkWallTextInStage(room, errors);
+    checkMinigameMarkersInStage(room, errors);
 
     if (!isWalkable(room, room.spawnTile)) {
       errors.push({

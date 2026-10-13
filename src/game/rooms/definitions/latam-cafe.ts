@@ -115,9 +115,54 @@ export const latamCafe: RoomDefinition = {
     // (cx 1095, cy 372.5, inside tile `(6,0)`) links to `Minigame Pao de
     // Queijo Memory.dc.html`, triggered by clicking Sander there -- clear of
     // both the front lip's blocked `(7,1)` and the crates' tile `(8,0)`.
-    // The minigame isn't built yet (#218), so he opens no dialog for now
-    // (`npcs.ts`); wire his minigame dialog here when Pão de Queijo Memory
-    // lands.
+    // His dialog (`PAO_DE_QUEIJO_DIALOG`, `npcs.ts`) opens on a direct click
+    // (#218); `hotspots`/`minigameMarkers` below re-dispatch the same
+    // `npc:arrived` for a click on his own floating bubble instead (owner
+    // feedback 2026-10-13).
     { npcId: 'sander-nonaka', tile: { col: 8, row: 1 }, offset: { x: 0, y: 0 } },
+  ],
+  // Sander's own "MATCH THE TREATS" bubble, re-dispatched to his dialog the
+  // same way the Disco Hall's `disco-turntable` and the Futebol Field's
+  // `penalty-kick-ball` hotspots already reuse an NPC's own `npc:arrived`
+  // (`main.ts`). The rect is generous around `minigameMarkers`' own
+  // `sander-treats-bubble` anchor (1150,500 -- Sander's own `npcSlotPoint`,
+  // tile (8,1) centre) and its glow/callout, the same oversized-click-area
+  // convention the Igloo's `trophy-case` and the Roof Deck's
+  // `igloo-gear-stall` hotspots use.
+  hotspots: [
+    {
+      id: 'sander-treats-bubble',
+      label: 'Match the Treats',
+      rect: { x: 1060, y: 295, width: 180, height: 120 },
+    },
+  ],
+  // Owner feedback 2026-10-13: the design's own pulsing glow and bouncing
+  // "MATCH THE TREATS" bubble (traced from `a[href="Minigame Pao de Queijo
+  // Memory.dc.html"]`, hidden from the exported art by
+  // `scripts/export-room-art.ts`'s own `latam-cafe` rule) is drawn live
+  // instead of lost. Re-anchored to Sander's own in-game point (1150,500,
+  // his `npcSlotPoint`) rather than the design's raw (1095,402.5): the owner
+  // moved him off the counter (this file's own `npcSlots` comment above),
+  // so the design's own coordinates no longer sit over him. `depth` is
+  // `depthForTile({col:8,row:1}) + 1` (9009): one more than Sander's own
+  // depth (9008), so his bubble floats in front of him rather than being
+  // covered by his own figure -- the one Room where the generic "below
+  // NPCs" default (`room-definition.ts`'s own `RoomMinigameMarker` comment)
+  // would hide the marker behind its own NPC.
+  minigameMarkers: [
+    {
+      id: 'sander-treats-bubble',
+      anchor: { x: 1150, y: 500 },
+      depth: 9009,
+      glow: { color: '#FFD23F', dx: 0, dy: -30, rx: 80, ry: 70, periodMs: 1400, peakOpacity: 0.22 },
+      callout: {
+        text: 'MATCH THE TREATS',
+        color: '#FFD23F',
+        width: 170,
+        height: 38,
+        dx: 0,
+        dy: -151,
+      },
+    },
   ],
 };

@@ -50,6 +50,7 @@ import {
 import { GAME_HEIGHT, GAME_WIDTH } from '../stage-size';
 import { planBackgroundDraw } from './background';
 import { RoomDiscoFloor } from './room-disco-floor';
+import { RoomMinigameMarkers } from './room-minigame-markers';
 import {
   countActiveTextureListeners,
   exposeRoomDebug,
@@ -379,6 +380,8 @@ export class RoomScene extends Scene {
   private tankFish: RoomTankFish | null = null;
   /** The Room's animated dance floor (the LATAM Disco Hall), when it has one. Rebuilt by every `create()`. */
   private discoFloor: RoomDiscoFloor | null = null;
+  /** The Room's minigame-trigger call-outs (owner feedback 2026-10-13), when it has any. Rebuilt by every `create()`. */
+  private minigameMarkers: RoomMinigameMarkers | null = null;
   private npcClickPause: NpcClickPause | null = null;
   /** The `onArrive` of the latest NPC click (#113), to tell whether that walk is still pending. */
   private npcArrival: (() => void) | null = null;
@@ -535,6 +538,8 @@ export class RoomScene extends Scene {
     this.tankFish = null;
     this.discoFloor?.destroy();
     this.discoFloor = null;
+    this.minigameMarkers?.destroy();
+    this.minigameMarkers = null;
     this.npcClickPause = null;
     this.npcArrival = null;
     this.guard?.sprite.destroy();
@@ -576,6 +581,7 @@ export class RoomScene extends Scene {
     this.chickenToss = null;
     this.tankFish = null;
     this.discoFloor = null;
+    this.minigameMarkers = null;
     this.npcClickPause = null;
     this.npcArrival = null;
     this.unsubscribeNpcDialog = [];
@@ -791,6 +797,7 @@ export class RoomScene extends Scene {
     ];
     this.drawNpcs(room);
     this.drawForegrounds(room);
+    this.drawMinigameMarkers(room);
     this.drawTankFish(room);
     this.drawPlants(room);
     this.spawnLocalPenguin(room);
@@ -843,6 +850,7 @@ export class RoomScene extends Scene {
     this.chickenToss?.update(delta);
     this.tankFish?.update(delta);
     this.discoFloor?.update(delta);
+    this.minigameMarkers?.update(delta);
     const npcArrival = this.npcArrival;
     this.npcClickPause?.settle({
       arrivalPending:
@@ -912,6 +920,7 @@ export class RoomScene extends Scene {
         : null,
       chickenToss: this.chickenToss?.debug() ?? null,
       discoFloor: this.discoFloor?.debug() ?? null,
+      minigameMarkers: this.minigameMarkers?.debug() ?? null,
     });
   }
 
@@ -1988,6 +1997,14 @@ export class RoomScene extends Scene {
     };
     if (this.textures.exists(PLANT_TEXTURE_KEY)) show();
     else this.textures.once(Textures.Events.ADD_KEY + PLANT_TEXTURE_KEY, show);
+  }
+
+  /** Draws a Room's `minigameMarkers` (owner feedback 2026-10-13), when it has any. */
+  private drawMinigameMarkers(room: RoomDefinition): void {
+    if (!room.minigameMarkers?.length) return;
+    this.minigameMarkers = new RoomMinigameMarkers(this, room.minigameMarkers, {
+      reducedMotion: prefersReducedMotion(),
+    });
   }
 
   private drawTankFish(room: RoomDefinition): void {
