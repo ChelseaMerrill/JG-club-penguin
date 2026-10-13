@@ -120,7 +120,16 @@ function penaltyKickSceneSvg(): string {
     )
     .join('');
   return (
-    '<svg class="penalty-kick__scene" viewBox="0 200 1600 700" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">' +
+    // Owner feedback 2026-10-13: "the top is cut off" -- `viewBox="0 200 1600
+    // 700" preserveAspectRatio="...slice"` scaled the scene up to fill
+    // `.penalty-kick__field` exactly, cropping its top (and, depending on the
+    // field's own aspect ratio, its sides) to do it. The full
+    // 1600x900 scene, letterboxed to fit instead (`meet`, never cropping),
+    // shows the whole stadium; `.penalty-kick__toast`'s own `top: 40%` (a
+    // percentage of the *container*, not the SVG) still lands inside the net
+    // area either way, so it's left as-is (Carnaval Parade's own crop is
+    // untouched -- the owner didn't flag it).
+    '<svg class="penalty-kick__scene" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid meet" aria-hidden="true" focusable="false">' +
     '<defs>' +
     '<linearGradient id="pk-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0A0C0F"></stop><stop offset="1" stop-color="#0F3441"></stop></linearGradient>' +
     '<pattern id="pk-net" width="22" height="22" patternUnits="userSpaceOnUse"><path d="M0 0H22M0 0V22" stroke="#F4F4F4" stroke-width="1.2" opacity=".4" fill="none"></path></pattern>' +
