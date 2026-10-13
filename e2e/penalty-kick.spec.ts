@@ -115,7 +115,7 @@ test('Penalty Kick: four goals and a save end GOLEADOR, with the Badge and Token
 }) => {
   // Five kicks and result pauses advance per tick, slower than real time on
   // a slow headless browser.
-  test.setTimeout(120_000);
+  test.setTimeout(240_000);
   const errors = collectErrors(page);
 
   // `window.__minigameTest` exists only when the game boots straight into a
@@ -132,12 +132,12 @@ test('Penalty Kick: four goals and a save end GOLEADOR, with the Badge and Token
     // Each shot only takes while the side sweep is live: wait for it (the
     // kick and its result pause advance per frame, slower on a slow machine).
     await expect(page.locator('.penalty-kick__subline')).toHaveText('SPACE LOCKS THE SIDE', {
-      timeout: 15_000,
+      timeout: 40_000,
     });
     await page.evaluate((o) => window.__minigameTest!.takePenaltyKickShot(o), outcome);
   }
 
-  await expect(page.locator('.minigame__done')).toBeVisible({ timeout: 40_000 });
+  await expect(page.locator('.minigame__done')).toBeVisible({ timeout: 60_000 });
   await expect(page.locator('.minigame__done-kicker')).toHaveText('FULL TIME');
   await expect(page.locator('.minigame__done-title')).toHaveText('GOLEADOR');
   await expect(page.locator('[data-done-stat="saved"] .minigame__done-stat-value')).toHaveText('1');

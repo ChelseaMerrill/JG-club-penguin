@@ -90,6 +90,16 @@ export const LEADERBOARD_SCORE_CEILINGS: Readonly<Record<MinigameId, number | nu
   // engine constant this file could cite) -- so, like Coffee Rush, Snow Cone
   // Stand and Beystadium, this excludes nothing rather than guess a number.
   'carnaval-parade': null,
+  // Pão de Queijo Memory's `best_score` is the round's own (bound-checked)
+  // score (`MINIGAME_RULES['pao-de-queijo'].rawBest`). `record_round`'s own
+  // `invalid_stats` check (`minigame-rules.ts`'s `paoDeQueijoStatsValid`)
+  // already bounds a stored score against `matches`/`roundsCleared` at the
+  // moment it's recorded, and `20261012030000_pao_de_queijo.sql`'s
+  // `leaderboard()` leaves its own ceiling `case` untouched (adding only the
+  // id to its known-ids list, the same choice Penalty Kick's and Carnaval
+  // Parade's own migrations made) -- so, like those two, this excludes
+  // nothing rather than guess a number.
+  'pao-de-queijo': null,
 };
 
 /**

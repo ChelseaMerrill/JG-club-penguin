@@ -112,9 +112,12 @@ describe('createNpcDialog', () => {
 
   it("opens no dialog for a dialog.kind === 'none' NPC (the LATAM JGers, owner request, 2026-10-09)", () => {
     const { root } = setup();
-    expect(NPCS['sander-nonaka'].dialog).toEqual({ kind: 'none' });
+    // Sander Nonaka hosts Pão de Queijo Memory now (#218), a `kind:
+    // 'minigame'` dialog -- Vinicius Martins is still one of the LATAM
+    // Café's own `'none'` castmates.
+    expect(NPCS['vinicius-martins'].dialog).toEqual({ kind: 'none' });
 
-    gameEvents.emit('npc:arrived', { npcId: 'sander-nonaka' });
+    gameEvents.emit('npc:arrived', { npcId: 'vinicius-martins' });
 
     expect(panel(root).hidden).toBe(true);
     expect(overlays!.current()).toBeNull();

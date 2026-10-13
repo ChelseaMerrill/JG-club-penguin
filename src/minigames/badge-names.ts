@@ -30,6 +30,7 @@ const BADGE_NAMES: Record<BadgeId, string> = {
   'phish-fry': 'Phish Fry',
   goleador: 'Goleador',
   passista: 'Passista',
+  'mestre-do-pao-de-queijo': 'Mestre do Pão de Queijo',
 };
 
 /**

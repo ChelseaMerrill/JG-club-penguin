@@ -654,6 +654,14 @@ export function describeProgressStoreContract(
         stats: { feathers: 200, stars: 0, barriersHit: 0, bestStreak: 10 },
         cap: 120,
       },
+      // #218: bound = 24 * 300 + 3 * 180 = 7740, comfortably above the 5000
+      // asserted, itself far above the 300 cap.
+      {
+        minigameId: 'pao-de-queijo',
+        score: 5000,
+        stats: { roundsCleared: 3, matches: 24, bestStreak: 24 },
+        cap: 300,
+      },
     ];
     it.each(overCapCases)(
       '$minigameId: an over-cap round pays exactly the cap ($cap)',
@@ -712,6 +720,13 @@ export function describeProgressStoreContract(
         score: 2000,
         stats: { feathers: 200, stars: 0, barriersHit: 0, bestStreak: 10 },
         cap: 120,
+      },
+      {
+        minigameId: 'pao-de-queijo',
+        durationSeconds: 165,
+        score: 5000,
+        stats: { roundsCleared: 3, matches: 24, bestStreak: 24 },
+        cap: 300,
       },
     ];
     it.each(durationCases)(
