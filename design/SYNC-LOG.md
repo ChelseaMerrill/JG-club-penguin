@@ -2,6 +2,14 @@
 
 Newest first. Written by design_resync.py apply.
 
+## 2026-10-12 · plan 5f371350bc50
+
+From pao-snap by Chelsea Merrill (partial pull; binaries not re-verified).
+
+Pão de Queijo Memory page, from the owner's download
+
+- added: `Minigame Pao de Queijo Memory.dc.html`
+
 ## 2026-10-09 · plan 3a67a4d134ee
 
 From latam-snap by Chelsea Merrill (partial pull; binaries not re-verified).

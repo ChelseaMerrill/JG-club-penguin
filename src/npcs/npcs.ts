@@ -223,10 +223,10 @@ export interface NpcRemoteCardDialog {
 /**
  * An NPC with no dialog at all (owner request, 2026-10-09): walking up to or
  * clicking it opens nothing, exactly like `remote-card` (`npc-dialog.ts`
- * skips both the same way). Used for 17 of the 19 LATAM JGers
- * (`design/Characters LATAM.dc.html`; Hector Grecco (#219) and Chrystian
- * Rissoli (#220) are the two exceptions, each hosting a Minigame instead):
- * that sheet gives each of their cards no quote whatsoever (just a name and
+ * skips both the same way). Used for 16 of the 19 LATAM JGers
+ * (`design/Characters LATAM.dc.html`; Sander Nonaka (#218), Hector Grecco
+ * (#219) and Chrystian Rissoli (#220) are the three exceptions, each hosting
+ * a Minigame instead): that sheet gives each of their cards no quote whatsoever (just a name and
  * a location line), unlike the Remote Lounge's own sheet, which gives every
  * person a real one-line quote -- there is no real line to show, so these
  * carry no invented placeholder instead of fabricating one. A
@@ -522,11 +522,29 @@ const CARNAVAL_PARADE_DIALOG: NpcMinigameDialog = {
   subtitle: 'LATAM DISCO HALL · CARNAVAL PARADE',
 };
 
+/**
+ * Sander Nonaka's Pão de Queijo Memory trigger dialog (#218), verbatim from
+ * `design/Minigame Pao de Queijo Memory.dc.html`'s trigger phase: the design
+ * draws a generic "A Confeiteira" card; Sander Nonaka, a real LATAM Café
+ * JGer, hosts instead (owner decision, 2026-10-09), so his own name/figure
+ * replace that title, and the result screen's "A Confeiteira:" lines become
+ * "Sander:" (`pao-de-queijo.ts`'s `doneSummary`).
+ */
+const PAO_DE_QUEIJO_DIALOG: NpcMinigameDialog = {
+  kind: 'minigame',
+  minigameId: 'pao-de-queijo',
+  actionLabel: "LET'S EAT",
+  declineLabel: 'JUST WATCHING',
+  triggerLine:
+    'Bem-vindo! Match every treat before the cafezinho goes cold. Clear all three rounds and the Mestre do Pão de Queijo badge is yours.',
+  subtitle: 'LATAM CAFÉ · PÃO DE QUEIJO MEMORY',
+};
+
 const IGLOO_GEAR_STALL_DIALOG: NpcStallDialog = { kind: 'stall', stallId: 'igloo-gear' };
 
 const LINE_DIALOG: NpcLineDialog = { kind: 'line' };
 
-/** 17 of the 19 LATAM JGers' shared dialog (owner request, 2026-10-09): see `NpcNoDialog`. */
+/** 16 of the 19 LATAM JGers' shared dialog (owner request, 2026-10-09): see `NpcNoDialog`. */
 const NO_DIALOG: NpcNoDialog = { kind: 'none' };
 
 /** A single static line, for the NPCs whose Room design shows no `say` cycling animation at all. */
@@ -1918,11 +1936,14 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     figure: { card: 'joaoVitorAmorim' },
   },
   // At the register. The design's own "MATCH THE TREATS" bubble over him
-  // links to `Minigame Pao de Queijo Memory.dc.html`, triggered by clicking
-  // him at the register -- that minigame isn't built yet (ticket #218), so he
-  // carries no dialog for now, like his six LATAM Café castmates; wire his
-  // `dialog` to the minigame trigger (see `BUG_SQUASH_DIALOG` etc. above for
-  // the shape) when #218 lands.
+  // links to `Minigame Pao de Queijo Memory.dc.html` -- #218: Sander hosts it
+  // (owner decision, 2026-10-09; see `PAO_DE_QUEIJO_DIALOG` above), so he's
+  // no longer one of the 19 LATAM JGers with no dialog at all. His own
+  // `dialogLines` entry exists only so `dialogLinePool` never throws on this
+  // appearance (every dialog kind but `'none'` needs at least one); it is
+  // never actually shown, since a `kind: 'minigame'` dialog always displays
+  // its own `triggerLine` instead (see `NpcDefinitionBase.dialogLines`'s own
+  // comment) -- the same exception Chrystian Rissoli's own entry takes.
   'sander-nonaka': {
     id: 'sander-nonaka',
     name: 'Sander Nonaka',
@@ -1931,8 +1952,11 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     kind: 'human',
     tagName: 'Sander Nonaka',
     idleLines: [],
+    dialogLines: [
+      'Bem-vindo! Match every treat before the cafezinho goes cold. Clear all three rounds and the Mestre do Pão de Queijo badge is yours.',
+    ],
     still: true,
-    dialog: NO_DIALOG,
+    dialog: PAO_DE_QUEIJO_DIALOG,
     scale: 0.72,
     figure: { card: 'sanderNonaka' },
   },

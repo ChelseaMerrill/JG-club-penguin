@@ -76,7 +76,7 @@ test('opens from the Igloo hotspot showing the current Badge count, and Escape c
 
   await expect(page.locator('.trophy-case')).toBeVisible();
   await expect(page.locator('[data-tab="badges"]')).toHaveAttribute('aria-pressed', 'true');
-  await expect(page.locator('.trophy-case__subtitle')).toHaveText('YOUR IGLOO · BADGES · 0 / 17');
+  await expect(page.locator('.trophy-case__subtitle')).toHaveText('YOUR IGLOO · BADGES · 0 / 18');
 
   const exterminator = page.locator('[data-badge-id="exterminator"]');
   await expect(exterminator).not.toHaveClass(/trophy-case__badge--earned/);
@@ -139,7 +139,7 @@ test('earning Exterminator in Bug Squash shows it unlocked in the Trophy Case', 
   await clickStagePoint(page, hotspotCenter);
 
   await expect(page.locator('.trophy-case')).toBeVisible();
-  await expect(page.locator('.trophy-case__subtitle')).toHaveText('YOUR IGLOO · BADGES · 1 / 17');
+  await expect(page.locator('.trophy-case__subtitle')).toHaveText('YOUR IGLOO · BADGES · 1 / 18');
   const exterminator = page.locator('[data-badge-id="exterminator"]');
   await expect(exterminator).toHaveClass(/trophy-case__badge--earned/);
   await expect(exterminator.locator('.trophy-case__badge-icon')).toHaveText('✓');
@@ -150,7 +150,7 @@ test('earning Exterminator in Bug Squash shows it unlocked in the Trophy Case', 
   expect(errors).toEqual([]);
 });
 
-test('pages all 17 Badges over two pages by arrow, dot and keyboard, with COMING SOON tags on page 2', async ({
+test('pages all 18 Badges over two pages by arrow, dot and keyboard, with COMING SOON tags on page 2', async ({
   page,
 }) => {
   const errors = collectErrors(page);
@@ -169,7 +169,7 @@ test('pages all 17 Badges over two pages by arrow, dot and keyboard, with COMING
 
   await clickStagePoint(page, hotspotCenter);
   await expect(page.locator('.trophy-case')).toBeVisible();
-  await expect(page.locator('.trophy-case__subtitle')).toHaveText('YOUR IGLOO · BADGES · 1 / 17');
+  await expect(page.locator('.trophy-case__subtitle')).toHaveText('YOUR IGLOO · BADGES · 1 / 18');
 
   const tiles = page.locator('.trophy-case__badge');
   const prev = page.locator('[aria-label="Previous page"]');
@@ -186,11 +186,11 @@ test('pages all 17 Badges over two pages by arrow, dot and keyboard, with COMING
   await page.evaluate(() => document.fonts.ready);
   await page.screenshot({ path: 'test-results/trophy-case-pages/page-1.png' });
 
-  // Page 2 by the arrow: Goleador (#220) and Passista (#219), the 13th and
-  // 14th earnable Badges, then the three coming-soon ones, each tagged
-  // (Snowmageddon is earnable, #154).
+  // Page 2 by the arrow: Goleador (#220), Passista (#219) and Mestre do Pão
+  // de Queijo (#218), the 13th, 14th and 15th earnable Badges, then the
+  // three coming-soon ones, each tagged (Snowmageddon is earnable, #154).
   await next.click();
-  await expect(tiles).toHaveCount(5);
+  await expect(tiles).toHaveCount(6);
   await expect(page.locator('[aria-label="Page 2"]')).toHaveAttribute('aria-current', 'page');
   await expect(next).toBeDisabled();
   await expect(page.locator('.trophy-case__badge--coming-soon')).toHaveCount(3);
@@ -205,7 +205,7 @@ test('pages all 17 Badges over two pages by arrow, dot and keyboard, with COMING
   await page.keyboard.press('ArrowLeft');
   await expect(tiles).toHaveCount(12);
   await page.keyboard.press('ArrowRight');
-  await expect(tiles).toHaveCount(5);
+  await expect(tiles).toHaveCount(6);
   await dots.first().click();
   await expect(tiles).toHaveCount(12);
 

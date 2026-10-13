@@ -1,0 +1,227 @@
+/* Pão de Queijo Memory: the play screen ported from `design/Minigame Pao de
+   Queijo Memory.dc.html` into the shell's generic play area
+   (`.minigame__play-area`, `minigame-shell.ts`). The board's grid uses
+   `--pao-de-queijo-cols`/`--pao-de-queijo-rows` (set per round by
+   `pao-de-queijo.ts`) rather than the design's own fixed 130x140 Stage-px
+   cells -- the play area isn't a fixed 1600x900 box, the same reason
+   `carnaval-parade.css`'s track uses percentages. Uses the JG design tokens
+   (`--jg-*`, `--font-*`) from `src/style.css`. */
+
+@keyframes pao-de-queijo-popin {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -50%) translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) translateY(0);
+  }
+}
+
+.pao-de-queijo {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  color: var(--fg-primary);
+}
+
+.pao-de-queijo__status {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: center;
+}
+
+.pao-de-queijo__subline {
+  font-family: var(--font-display);
+  font-size: 12px;
+  letter-spacing: 0.22em;
+  color: var(--fg-primary);
+}
+
+.pao-de-queijo__round-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.pao-de-queijo__round-label-text {
+  font-family: var(--font-display);
+  font-size: 12px;
+  letter-spacing: 0.18em;
+  color: var(--fg-muted);
+}
+
+.pao-de-queijo__round-label {
+  font-family: var(--font-display);
+  font-size: 13px;
+  letter-spacing: 0.1em;
+  color: var(--jg-primary);
+}
+
+.pao-de-queijo__timebar {
+  width: 220px;
+  height: 10px;
+  background: var(--jg-dark);
+  border: 2px solid var(--jg-secondary);
+}
+
+.pao-de-queijo__timebar-fill {
+  height: 100%;
+  width: 100%;
+  background: #ffd23f;
+  transition: width 0.2s linear;
+}
+
+.pao-de-queijo__timebar-fill--low {
+  background: #e4572e;
+}
+
+.pao-de-queijo__hud {
+  display: flex;
+  justify-content: center;
+  gap: 32px;
+}
+
+.pao-de-queijo__stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.pao-de-queijo__hud-label {
+  font-family: var(--font-display);
+  font-size: 11px;
+  letter-spacing: 0.2em;
+  color: var(--fg-muted);
+}
+
+.pao-de-queijo__stat-value {
+  font-family: var(--font-game-display);
+  font-size: 24px;
+  line-height: 1;
+  color: var(--fg-primary);
+}
+
+.pao-de-queijo__stat-value--mult {
+  color: #ffd23f;
+}
+
+.pao-de-queijo__board {
+  --pao-de-queijo-cols: 4;
+  --pao-de-queijo-rows: 3;
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(var(--pao-de-queijo-cols), 1fr);
+  grid-template-rows: repeat(var(--pao-de-queijo-rows), 1fr);
+  gap: 10px;
+  place-items: stretch;
+}
+
+.pao-de-queijo__card {
+  position: relative;
+  min-height: 0;
+  perspective: 700px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+}
+
+.pao-de-queijo__card:disabled {
+  cursor: default;
+}
+
+.pao-de-queijo__card-inner {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+  transition: transform 0.35s;
+}
+
+.pao-de-queijo__card--flipped .pao-de-queijo__card-inner {
+  transform: rotateY(180deg);
+}
+
+.pao-de-queijo__card-face {
+  position: absolute;
+  inset: 0;
+  backface-visibility: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+}
+
+.pao-de-queijo__card-face--back {
+  background: var(--jg-secondary);
+  border: 3px solid var(--jg-primary);
+  box-shadow: 0 6px 0 #06303d;
+}
+
+.pao-de-queijo__card-mark {
+  width: 36px;
+  height: 40px;
+  clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+  background: var(--jg-primary);
+  display: grid;
+  place-items: center;
+  font-family: var(--font-display);
+  font-size: 14px;
+  color: var(--jg-dark);
+}
+
+.pao-de-queijo__card-face--front {
+  background: var(--jg-light);
+  border: 3px solid var(--jg-primary);
+  box-shadow: 0 6px 0 #06303d;
+  transform: rotateY(180deg);
+}
+
+.pao-de-queijo__card--matched .pao-de-queijo__card-face--front {
+  background: #cff3ff;
+}
+
+.pao-de-queijo__card-icon {
+  width: 56%;
+  height: 56%;
+}
+
+.pao-de-queijo__card-label {
+  font-family: var(--font-display);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--jg-dark);
+  text-align: center;
+  padding: 0 4px;
+}
+
+.pao-de-queijo__toast {
+  position: absolute;
+  left: 50%;
+  top: 46%;
+  transform: translate(-50%, -50%);
+  padding: 10px 26px;
+  background: #ffd23f;
+  clip-path: polygon(
+    14px 0,
+    calc(100% - 14px) 0,
+    100% 50%,
+    calc(100% - 14px) 100%,
+    14px 100%,
+    0 50%
+  );
+  font-family: var(--font-display);
+  font-size: 28px;
+  letter-spacing: 0.06em;
+  color: var(--jg-dark);
+  animation: pao-de-queijo-popin 0.2s ease-out;
+  pointer-events: none;
+}
