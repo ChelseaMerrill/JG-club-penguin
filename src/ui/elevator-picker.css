@@ -1,0 +1,108 @@
+/* Elevator floor picker (#170 D9): a modal dialog over the 1600x900 #ui layer,
+   so every size here is Stage pixels. z-index 25 sits above the HUD overlays
+   (20) and below the Elevator ride screen (30). No fixed heights: wrapped
+   chip text must never clip (#227). */
+
+.elevator-picker {
+  position: absolute;
+  inset: 0;
+  z-index: 25;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(10, 12, 15, 0.7);
+  pointer-events: auto;
+  color: var(--jg-light);
+  font-family: var(--font-body);
+}
+
+.elevator-picker__dialog {
+  box-sizing: border-box;
+  width: 460px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px 20px 20px;
+  background: rgba(22, 23, 25, 0.96);
+  border: 2px solid var(--jg-secondary);
+}
+
+.elevator-picker__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.elevator-picker__title {
+  margin: 0;
+  font: 400 16px/1.3 var(--font-display);
+  letter-spacing: 0.12em;
+  color: var(--jg-primary);
+}
+
+.elevator-picker__close {
+  flex: none;
+  min-width: 48px;
+  min-height: 48px;
+  margin: -8px -8px 0 0;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: var(--jg-light);
+  font: 700 28px/1 var(--font-body);
+  cursor: pointer;
+}
+
+.elevator-picker__sub {
+  margin: 0;
+  font: 700 13px/1.35 var(--font-body);
+  letter-spacing: 0.1em;
+  color: #b3b6c9;
+}
+
+.elevator-picker__chips {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.elevator-picker__chip {
+  box-sizing: border-box;
+  min-height: 48px;
+  padding: 10px 14px;
+  text-align: left;
+  white-space: normal;
+  background: #0a0c0f;
+  border: 2px solid var(--jg-secondary);
+  color: var(--jg-light);
+  font: 700 15px/1.3 var(--font-body);
+  letter-spacing: 0.06em;
+  cursor: pointer;
+}
+
+.elevator-picker__chip:hover {
+  border-color: var(--jg-primary);
+}
+
+.elevator-picker__chip--locked,
+.elevator-picker__chip--locked:hover {
+  border-style: dashed;
+  border-color: #3a3d42;
+  color: #7c8087;
+  cursor: not-allowed;
+}
+
+.elevator-picker__close:focus-visible,
+.elevator-picker__chip:focus-visible {
+  outline: 3px solid var(--jg-primary);
+  outline-offset: 2px;
+}
+
+.elevator-picker__status {
+  margin: 0;
+  min-height: 1.35em;
+  font: 700 13px/1.35 var(--font-body);
+  letter-spacing: 0.1em;
+  color: var(--jg-primary);
+}

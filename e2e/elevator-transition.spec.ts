@@ -134,6 +134,11 @@ test('Elevator shows crossing Town Center -> Roof Deck via the door, hides once 
 
   const clickPoint = doorCenter(elevatorDoor);
   await clickStagePoint(page, clickPoint);
+  // #170 D9: the door asks which floor first.
+  await page
+    .getByRole('dialog', { name: 'ELEVATOR · PICK A FLOOR' })
+    .getByRole('button', { name: /^R \// })
+    .click({ timeout: WALK_TIMEOUT });
   await expect(page.locator('.elevator-screen')).toBeVisible({ timeout: WALK_TIMEOUT });
 
   // A door click while the overlay is up (it swallows clicks, D6) must not

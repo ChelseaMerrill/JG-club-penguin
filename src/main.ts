@@ -112,6 +112,7 @@ import { createElevatorScreen } from './ui/elevator-screen';
 import { createDoorFade } from './ui/door-fade';
 import { createDoorHover } from './ui/door-hover';
 import { createDoorFocus, type DoorFocus } from './ui/door-focus';
+import { createElevatorPicker, type ElevatorPicker } from './ui/elevator-picker';
 import type { ElevatorTestHandle } from './ui/elevator-test-handle';
 import { createMarket, MARKET_OVERLAY_ID } from './ui/market';
 import { createIglooEditor, type IglooEditor } from './ui/igloo-editor';
@@ -186,6 +187,8 @@ const doorFade = createDoorFade(uiLayer);
 const doorHover = createDoorHover(uiLayer);
 /** #170 D6: the doors' keyboard layer, mounted after the HUD below. */
 let doorFocus: DoorFocus | null = null;
+/** The Elevator floor picker (#170 D9): built once `hud` exists (below); `pickFloor` reads it lazily. */
+let elevatorPicker: ElevatorPicker | null = null;
 
 // Test-only (#163): drives the real Elevator screen with no Room change.
 if (HOOKS_ENABLED) {
@@ -323,6 +326,14 @@ const sceneReady = whenSceneReady(game).then((scene) => {
     hasPlayer: () => Boolean(game.registry.get('player')),
     transitionScreen: elevatorScreen,
     fade: doorFade,
+    // #170 D9: an Elevator door asks which floor first, from the floor it's on.
+    // A picked floor's change comes after the pick, so it's re-tagged as a door's.
+    withDoorSource: (change) => stairClimb.withSource('door', change),
+    pickFloor: (door) => {
+      const roomId = roomNavigator?.currentRoomId();
+      const floor = roomId ? ROOM_FLOORS[roomId] : null;
+      return elevatorPicker && floor ? elevatorPicker.pick(door, floor) : Promise.resolve(null);
+    },
   });
 
   // Test-only: `window.__roomDebug.changeRoom`/`roomEventLog` (#15 D6),
@@ -579,6 +590,8 @@ function endSession(): RoomChannel | null {
   signInGeneration += 1;
   const channel = roomChannel;
   roomNavigator?.leaveForSignOut();
+  // #170 RT170-11: a picker open at sign-out closes (resolving `null`).
+  elevatorPicker?.cancel();
   roomChannel = null;
   channelPlayerId = null;
   setSessionActive(false);
@@ -894,8 +907,11 @@ const focusLayer = createDoorFocus(uiLayer, {
     elevatorScreen.isShowing(),
 });
 doorFocus = focusLayer;
+elevatorPicker = createElevatorPicker(uiLayer, { overlays: hud.overlays });
 gameEvents.on('room:enter', ({ roomId }) => focusLayer.render(getRoomDefinition(roomId).doors));
 gameEvents.on('room:leave', () => {
+  // #170 RT170-11: a Room change closes an open picker (resolving `null`).
+  elevatorPicker?.cancel();
   doorHover.hide();
   focusLayer.refresh();
 });

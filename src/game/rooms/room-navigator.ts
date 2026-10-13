@@ -115,6 +115,12 @@ export interface RoomNavigatorDeps {
    * it, such a door uses its own `targetRoomId`.
    */
   pickFloor?: (door: RoomDoor) => Promise<FloorChoice | null>;
+  /**
+   * Wraps the Room change a picked floor makes, which runs after the pick and
+   * so outside the door's synchronous source tag (#51 slice 4, RT2-7). `main.ts`
+   * tags it as a door change. Without it, the change runs untagged.
+   */
+  withDoorSource?: <T>(change: () => T) => T;
 }
 
 export interface RoomNavigator {
@@ -160,7 +166,7 @@ function resolveEntryTile(roomId: RoomId, entryTile: Tile | undefined): Tile {
 }
 
 export function createRoomNavigator(deps: RoomNavigatorDeps): RoomNavigator {
-  const { scene, events, hasPlayer, transitionScreen, fade, pickFloor } = deps;
+  const { scene, events, hasPlayer, transitionScreen, fade, pickFloor, withDoorSource } = deps;
   let current: RoomId | null = null;
   /**
    * Set by `enterSpawnRoom`, cleared by `leaveForSignOut` (#15 review round
@@ -322,7 +328,9 @@ export function createRoomNavigator(deps: RoomNavigatorDeps): RoomNavigator {
     const choice = await pickFloor?.(door);
     if (!choice?.targetRoomId) return;
     if (current !== from || !canUse(door)) return;
-    await changeRoom(choice.targetRoomId, choice.entryTile, options);
+    const { targetRoomId, entryTile } = choice;
+    const change = () => changeRoom(targetRoomId, entryTile, options);
+    await (withDoorSource ? withDoorSource(change) : change());
   }
 
   // #170 D5: a door reached by a click or Enter fades.

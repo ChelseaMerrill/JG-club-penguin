@@ -695,7 +695,10 @@ describe('createRoomNavigator', () => {
   describe('#170 door behaviour', () => {
     /** One ordered log of every scene, fade, Elevator and event call, as strings. */
     function setupLogged(
-      options: { pickFloor?: (door: RoomDoor) => Promise<FloorChoice | null> } = {},
+      options: {
+        pickFloor?: (door: RoomDoor) => Promise<FloorChoice | null>;
+        withDoorSource?: <T>(change: () => T) => T;
+      } = {},
     ) {
       const log: string[] = [];
       const events = createEmitter<RoomEventMap>();
@@ -730,6 +733,7 @@ describe('createRoomNavigator', () => {
         transitionScreen,
         fade,
         pickFloor: options.pickFloor,
+        withDoorSource: options.withDoorSource,
       });
       return { log, events, scene, fade, navigator };
     }
@@ -971,6 +975,27 @@ describe('createRoomNavigator', () => {
         scene.fireCreate();
         await flush();
         expect(log.at(-1)).toBe('enter:roof-deck');
+      });
+
+      it("tags the picked floor's change as a door's, though it runs after the pick", async () => {
+        const pick = deferredPick();
+        let log: string[] = [];
+        const withDoorSource = <T>(change: () => T): T => {
+          log.push('tag:start');
+          const result = change();
+          log.push('tag:end');
+          return result;
+        };
+        const setup = setupLogged({ pickFloor: pick.pickFloor, withDoorSource });
+        log = setup.log;
+        await boot(setup.scene, setup.navigator);
+        log.length = 0;
+
+        setup.scene.triggerDoorReached(PICKER_DOOR);
+        pick.choose(ROOF_CHOICE);
+        await flush();
+        expect(log.slice(0, 3)).toEqual(['tag:start', 'leave:town-center', 'fade:out']);
+        expect(log).toContain('tag:end');
       });
 
       it('a cancelled pick (null) or a locked choice changes nothing', async () => {

@@ -1,6 +1,7 @@
 import type { HexColor } from '../../../contracts';
 import type { RoomDefinition, RoomHotspot, RoomWallText } from '../room-definition';
 import { createStandardRoomGrid } from '../grid';
+import { LOBBY_FLOOR_CHOICE } from './elevator-choices';
 import { ROOF_DECK_ELEVATOR_APPROACH } from './roof-deck';
 import { STAIRWELL_JG_HQ_SILL } from './stairwell';
 
@@ -241,11 +242,20 @@ export const townCenter: RoomDefinition = {
       label: 'ELEVATOR · ROOF DECK',
       hotspot: { x: 385, y: 282, ...ELEVATOR_HOTSPOT_SIZE },
       wall: 'left',
-      // #170 PR C makes this door ask for a floor first (D9); until then it
-      // goes straight to the Roof Deck, landing by its ELEVATOR pill: that
-      // pill's approach tile.
+      // #170 D9: the door asks for a floor first. Its own target is the
+      // unlocked choice (R: the Roof Deck, landing by its ELEVATOR pill, that
+      // pill's approach tile); L is locked until the Lobby is built (#169).
       targetRoomId: 'roof-deck',
       entryTile: ROOF_DECK_ELEVATOR_APPROACH,
+      floorChoices: [
+        {
+          floor: 'R',
+          label: 'ROOF DECK · THE MARKET',
+          targetRoomId: 'roof-deck',
+          entryTile: ROOF_DECK_ELEVATOR_APPROACH,
+        },
+        LOBBY_FLOOR_CHOICE,
+      ],
       // Beside the elevator, between its approach (0,6) and the sills (0,3)
       // and (0,7).
       guardTile: { col: 0, row: 5 },
