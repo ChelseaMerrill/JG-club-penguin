@@ -945,6 +945,9 @@ describe('NPCS', () => {
       // #220: Chrystian Rissoli hosts Penalty Kick -- a `kind: 'minigame'`
       // dialog, like the talkers above -- its own test covers it below.
       'chrystian-rissoli',
+      // #218: Sander Nonaka hosts Pão de Queijo Memory -- same reason,
+      // its own test covers it below.
+      'sander-nonaka',
     ];
     const latamNpcIds: NpcId[] = [];
     for (const npc of Object.values(NPCS)) {
@@ -954,10 +957,10 @@ describe('NPCS', () => {
         expect(npc.dialog).toEqual({ kind: 'remote-card' });
         continue;
       }
-      // 17 of the 19 LATAM JGers carry no dialog at all (owner request,
-      // 2026-10-09): their character sheet gives no quote. Hector Grecco
-      // (#219) and Chrystian Rissoli (#220, both excluded above) are the
-      // two exceptions.
+      // 16 of the 19 LATAM JGers carry no dialog at all (owner request,
+      // 2026-10-09): their character sheet gives no quote. Sander Nonaka
+      // (#218), Hector Grecco (#219) and Chrystian Rissoli (#220, all
+      // excluded above) are the three exceptions.
       if (
         npc.roomId === 'latam-cafe' ||
         npc.roomId === 'latam-disco-hall' ||
@@ -969,9 +972,24 @@ describe('NPCS', () => {
       }
       expect(npc.dialog).toMatchObject({ kind: 'line' });
     }
-    // 17, not 19: Hector Grecco (#219) and Chrystian Rissoli (#220) now host
-    // Minigames instead.
-    expect(latamNpcIds).toHaveLength(17);
+    // 16, not 19: Sander Nonaka (#218), Hector Grecco (#219) and Chrystian
+    // Rissoli (#220) now host Minigames instead.
+    expect(latamNpcIds).toHaveLength(16);
+  });
+
+  it('includes Sander Nonaka in the LATAM Café with a Pão de Queijo Memory trigger dialog', () => {
+    const sander = NPCS['sander-nonaka'];
+    expect(sander.name).toBe('Sander Nonaka');
+    expect(sander.roomId).toBe('latam-cafe');
+    expect(sander.dialog).toEqual({
+      kind: 'minigame',
+      minigameId: 'pao-de-queijo',
+      actionLabel: "LET'S EAT",
+      declineLabel: 'JUST WATCHING',
+      triggerLine:
+        'Bem-vindo! Match every treat before the cafezinho goes cold. Clear all three rounds and the Mestre do Pão de Queijo badge is yours.',
+      subtitle: 'LATAM CAFÉ · PÃO DE QUEIJO MEMORY',
+    });
   });
 
   it('includes Chrystian Rissoli in the LATAM Futebol Field with a Penalty Kick trigger dialog', () => {

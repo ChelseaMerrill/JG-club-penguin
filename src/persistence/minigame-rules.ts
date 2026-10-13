@@ -101,6 +101,43 @@ function carnavalParadeStatsValid(stats: Readonly<Record<string, number>>, score
   return stat(stats, 'barriersHit') <= 3 && score <= bound;
 }
 
+/** Pão de Queijo Memory's three rounds' own `cols * rows / 2` pairs, summed
+ *  (6 + 8 + 10): the most pairs a whole game could ever match. */
+export const PAO_DE_QUEIJO_TOTAL_PAIRS = 24;
+/** A loose but safe per-cleared-round time-bonus cap (`3 * 60`, the design's
+ *  own longest round timer): round 1's own bonus can reach exactly this;
+ *  rounds 2-3's shorter timers can't, so this never under-bounds. */
+export const PAO_DE_QUEIJO_MAX_TIME_BONUS_PER_ROUND = 180;
+
+/**
+ * Pão de Queijo Memory's `record_round` branch (#218): the server never
+ * trusts the client's `score` outright (the streak multiplier depends on
+ * match *order*, which the round's own aggregate stats can't reconstruct,
+ * the same reason Carnaval Parade's own branch bounds its score instead of
+ * recomputing it) -- so this rejects `roundsCleared` over 3, `matches` over
+ * `PAO_DE_QUEIJO_TOTAL_PAIRS` (24, more pairs than any round could ever
+ * contain), a `bestStreak` over `matches` (a streak can't outrun the matches
+ * that built it), and a `score` over the most those stats could honestly
+ * score: every match worth at most 300 (the x3 streak cap) plus
+ * `PAO_DE_QUEIJO_MAX_TIME_BONUS_PER_ROUND` per cleared round
+ * (`matches * 300 + roundsCleared * 180`). This bound is deliberately loose
+ * (it never ties the bonus to each round's own, shorter timer), so it never
+ * rejects a legitimate round; the true ceiling (every match at the real
+ * streak-escalation rate the engine produces, plus each round's own exact
+ * timer) is 6,795 for a flawless full clear, comfortably under this
+ * function's own 7,740 at `roundsCleared = 3, matches = 24`.
+ */
+function paoDeQueijoStatsValid(stats: Readonly<Record<string, number>>, score: number): boolean {
+  const roundsCleared = stat(stats, 'roundsCleared');
+  const matches = stat(stats, 'matches');
+  const bestStreak = stat(stats, 'bestStreak');
+  if (roundsCleared > 3) return false;
+  if (matches > PAO_DE_QUEIJO_TOTAL_PAIRS) return false;
+  if (bestStreak > matches) return false;
+  const bound = matches * 300 + roundsCleared * PAO_DE_QUEIJO_MAX_TIME_BONUS_PER_ROUND;
+  return score <= bound;
+}
+
 interface MinigameRuleBase {
   id: MinigameId;
   /** The round's maximum Token payout. */
@@ -235,6 +272,34 @@ export const MINIGAME_RULES = {
     badgeKind: 'threshold',
     badgeThreshold: 400,
     validStats: carnavalParadeStatsValid,
+    rawPayout: (score) => Math.floor(score / 10),
+    rawBest: (score) => score,
+  },
+  // #218: a round less than 10 s after the previous one (#27 RT3) is
+  // round_too_soon; otherwise the payout is at most
+  // `floor(300 * min(1, secondsSincePreviousRound / 165))` -- 165 is the
+  // design's own three round timers summed (60 + 55 + 50), so an honest
+  // Player replaying back to back is always paid in full.
+  'pao-de-queijo': {
+    id: 'pao-de-queijo',
+    cap: 300,
+    durationSeconds: 165,
+    badgeId: 'mestre-do-pao-de-queijo',
+    // A 'match-wins' Badge, reused at `badgeMatchWins: 1` rather than a new
+    // rule kind: the best (and so the leaderboard) is the round's own score
+    // (D4 below), which can't itself gate the Badge at a fixed threshold --
+    // a slow, careful full clear can score lower than an unlucky partial one
+    // (see the quest-definitions.ts note this same tension forced). Treating
+    // "cleared all 3 rounds" as this Minigame's only kind of "win" (one win
+    // is enough) reuses Beystadium's exact mechanism instead of inventing a
+    // fourth `MinigameRule` variant.
+    badgeKind: 'match-wins',
+    badgeMatchWins: 1,
+    isMatchWin: (stats) => stat(stats, 'roundsCleared') >= 3,
+    validStats: paoDeQueijoStatsValid,
+    // D4: the best is the round's own (bound-checked) score, for the
+    // leaderboard -- not `roundsCleared`, which the Badge above already
+    // tracks on its own.
     rawPayout: (score) => Math.floor(score / 10),
     rawBest: (score) => score,
   },

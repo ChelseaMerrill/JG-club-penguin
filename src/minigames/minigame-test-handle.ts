@@ -41,6 +41,11 @@ export interface MinigameTestHandle {
    *  all 3 lives were lost. A no-op when Carnaval Parade isn't the loaded
    *  Minigame. */
   finishCarnavalParadeNow(): void;
+  /** Matches every remaining pair in Pão de Queijo Memory's current round at
+   *  once (issue #218): e2e calls this once per round to clear the whole
+   *  game without playing out 24 real flips. A no-op when Pão de Queijo
+   *  Memory isn't the loaded Minigame. */
+  matchAllPaoDeQueijoPairs(): void;
   /** Launches another registered Minigame in the same page once the
    *  current shell has closed (#46: finishing two different Minigames in one
    *  page for the Quest e2e). The `finish*` methods above then drive the
