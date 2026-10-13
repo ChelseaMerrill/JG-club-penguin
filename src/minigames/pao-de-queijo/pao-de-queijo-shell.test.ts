@@ -105,7 +105,9 @@ describe('Pão de Queijo Memory through the real minigame shell and in-memory st
     click(layer, '.minigame__button--start');
 
     expect((layer.querySelector('.minigame__play') as HTMLElement).hidden).toBe(false);
-    expect(layer.querySelector('.minigame__title')?.textContent).toBe('PÃO DE QUEIJO MEMORY');
+    expect(layer.querySelector('.minigame__title')?.getAttribute('aria-label')).toBe(
+      'PÃO DE QUEIJO MEMORY',
+    );
     expect(layer.querySelectorAll('.pao-de-queijo__card')).toHaveLength(12);
   });
 
@@ -146,7 +148,9 @@ describe('Pão de Queijo Memory through the real minigame shell and in-memory st
     await settle();
 
     expect(layer.querySelector('.minigame__done-kicker')?.textContent).toBe('TIME RAN OUT');
-    expect(layer.querySelector('.minigame__done-title')?.textContent).toBe('QUASE LÁ');
+    expect(layer.querySelector('.minigame__done-title')?.getAttribute('aria-label')).toBe(
+      'QUASE LÁ',
+    );
     expect(doneValue(layer, 'cleared')).toBe('2 / 3');
     expect((layer.querySelector('.minigame__done-badge') as HTMLElement).hidden).toBe(true);
     expect(layer.querySelector('.minigame__done-quote')?.textContent).toBe(

@@ -141,7 +141,11 @@ test('Pão de Queijo Memory: START deals round 1, clearing all 3 rounds shows DE
   await page.locator('.minigame__button--start').click();
 
   await expect(page.locator('.minigame__play')).toBeVisible();
-  await expect(page.locator('.minigame__title')).toHaveText('PÃO DE QUEIJO MEMORY');
+  // The Ã is drawn as a CSS mark over a plain A, so the real title is its label.
+  await expect(page.locator('.minigame__title')).toHaveAttribute(
+    'aria-label',
+    'PÃO DE QUEIJO MEMORY',
+  );
   const cards = page.locator('.pao-de-queijo__card');
   await expect(cards).toHaveCount(12);
 
