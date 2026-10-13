@@ -441,6 +441,147 @@ describe('validateRoomDefinitions', () => {
 
     expect(validateRoomDefinitions(rooms)).toEqual([]);
   });
+
+  describe('#170 D1 door fields', () => {
+    const HOTSPOT = { x: 0, y: 0, width: 10, height: 10 };
+    const toPit = {
+      label: 'DEV PIT',
+      hotspot: HOTSPOT,
+      targetRoomId: 'dev-pit' as const,
+      entryTile: { col: 1, row: 1 },
+    };
+
+    it('accepts a twin: a pill repeating a door with the same target and entry tile', () => {
+      const rooms = [
+        room({ id: 'town-center', doors: [toPit, { ...toPit, kind: 'pill' }] }),
+        room({ id: 'dev-pit' }),
+      ];
+      expect(validateRoomDefinitions(rooms)).toEqual([]);
+    });
+
+    it('flags a repeated label with a different target or entry tile', () => {
+      const rooms = [
+        room({
+          id: 'town-center',
+          doors: [
+            toPit,
+            { ...toPit, entryTile: { col: 0, row: 1 } },
+            { ...toPit, targetRoomId: null },
+          ],
+        }),
+        room({ id: 'dev-pit' }),
+      ];
+      const messages = validateRoomDefinitions(rooms).map((error) => error.message);
+      expect(messages).toEqual([
+        'door "DEV PIT" repeats a label with a different target or entry tile (a twin must match its door)',
+        'door "DEV PIT" repeats a label with a different target or entry tile (a twin must match its door)',
+      ]);
+    });
+
+    it('checks floorChoices like doors: a registered target with a walkable entry tile, or locked', () => {
+      const rooms = [
+        room({
+          id: 'town-center',
+          doors: [
+            {
+              ...toPit,
+              label: 'ELEVATOR',
+              floorChoices: [
+                {
+                  floor: '5',
+                  label: 'DEV PIT',
+                  targetRoomId: 'dev-pit',
+                  entryTile: { col: 1, row: 1 },
+                },
+                {
+                  floor: 'R',
+                  label: 'ROOF',
+                  targetRoomId: 'roof-deck',
+                  entryTile: { col: 0, row: 0 },
+                },
+                {
+                  floor: '5',
+                  label: 'BAD',
+                  targetRoomId: 'dev-pit',
+                  entryTile: { col: 5, row: 5 },
+                },
+                { floor: 'L', label: 'LOBBY', targetRoomId: null, entryTile: { col: 0, row: 0 } },
+              ],
+            },
+          ],
+        }),
+        room({ id: 'dev-pit' }),
+      ];
+      expect(validateRoomDefinitions(rooms).map((error) => error.message)).toEqual([
+        'door "ELEVATOR" floor R targets undefined room "roof-deck"',
+        'door "ELEVATOR" floor 5 entryTile { col: 5, row: 5 } is not walkable in target room "dev-pit"',
+      ]);
+    });
+
+    it("flags a pill whose rect leaves the Stage, but not a door's", () => {
+      const off = { x: 1580, y: 880, width: 40, height: 40 };
+      const rooms = [
+        room({
+          id: 'town-center',
+          doors: [
+            { ...toPit, label: 'PILL', kind: 'pill', hotspot: off },
+            { ...toPit, label: 'DOOR', hotspot: off },
+          ],
+        }),
+        room({ id: 'dev-pit' }),
+      ];
+      expect(validateRoomDefinitions(rooms).map((error) => error.message)).toEqual([
+        'pill "PILL" rect { x: 1580, y: 880, width: 40, height: 40 } is outside the 1600x900 Stage',
+      ]);
+    });
+
+    it('flags a guardTile off the grid or not walkable', () => {
+      const rooms = [
+        room({
+          id: 'town-center',
+          walkable: [
+            [true, false],
+            [true, true],
+          ],
+          doors: [
+            { ...toPit, label: 'A', guardTile: { col: 0, row: 1 } },
+            { ...toPit, label: 'B', guardTile: { col: 1, row: 0 } },
+            { ...toPit, label: 'C', guardTile: { col: 4, row: 0 } },
+          ],
+        }),
+        room({ id: 'dev-pit' }),
+      ];
+      expect(validateRoomDefinitions(rooms).map((error) => error.message)).toEqual([
+        'door "B" guardTile { col: 1, row: 0 } is not a walkable tile in the grid',
+        'door "C" guardTile { col: 4, row: 0 } is not a walkable tile in the grid',
+      ]);
+    });
+  });
+});
+
+// #170 plan step 6 (PR A): the existing doors carry the fields door
+// behaviour reads, with no change to where any of them goes.
+describe('#170 door kinds and walls on the registered Rooms', () => {
+  it("gives every in-scene door() frame a wall (70x165, and Town Center's 90x175 Elevator)", () => {
+    for (const definition of ROOM_DEFINITIONS) {
+      for (const door of definition.doors) {
+        const frame =
+          (door.hotspot.width === 70 && door.hotspot.height === 165) ||
+          (door.hotspot.width === 90 && door.hotspot.height === 175);
+        if (frame) expect(door.wall, `${definition.id} ${door.label}`).toMatch(/^(left|right)$/);
+        if (frame) expect(door.kind ?? 'door', `${definition.id} ${door.label}`).toBe('door');
+      }
+    }
+  });
+
+  it('tags every Stairwell exit pill (40 px tall) kind pill, twins included, and nothing else', () => {
+    for (const definition of ROOM_DEFINITIONS.filter((r) => r.id.startsWith('stairwell-'))) {
+      for (const door of definition.doors) {
+        const pill = door.hotspot.height === 40;
+        expect(door.kind === 'pill', `${definition.id} ${door.label}`).toBe(pill);
+      }
+    }
+  });
 });
 
 // #16 fix 3: the verification-map assertions the execution plan named but

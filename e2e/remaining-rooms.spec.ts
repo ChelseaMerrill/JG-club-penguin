@@ -393,7 +393,7 @@ test('The Stairwell: Map tile 12 opens floor 0 from Town Center, by the Elevator
   expect(errors).toEqual([]);
 });
 
-test("The Stairwell: floor 0's LOBBY door is coming soon, clicked or by holding ↓ (UD-7)", async ({
+test("The Stairwell: floor 0's LOBBY door is UNDER CONSTRUCTION, clicked or by holding ↓ (UD-7, #170 D4)", async ({
   page,
 }) => {
   test.setTimeout(90_000);
@@ -410,19 +410,21 @@ test("The Stairwell: floor 0's LOBBY door is coming soon, clicked or by holding 
     y: lobby.hotspot.y + lobby.hotspot.height / 2,
   });
   await expect
-    .poll(async () => (await debugInfo(page))?.comingSoonHint, {
+    .poll(async () => (await debugInfo(page))?.lockedHint, {
       timeout: WALK_TIMEOUT,
       intervals: [50],
     })
     .toBe('LOBBY');
-  await page.screenshot({ path: 'test-results/room-stairwell-0/lobby-coming-soon.png' });
+  // #170 D4: a locked door never walks the Penguin.
+  expect((await debugInfo(page))?.localPenguin?.tile).toEqual(stairwell0.spawnTile);
+  await page.screenshot({ path: 'test-results/room-stairwell-0/lobby-under-construction.png' });
   await expect
-    .poll(async () => (await debugInfo(page))?.comingSoonHint, { timeout: 15_000 })
+    .poll(async () => (await debugInfo(page))?.lockedHint, { timeout: 15_000 })
     .toBeNull();
 
   await page.keyboard.down('ArrowDown');
   await expect
-    .poll(async () => (await debugInfo(page))?.comingSoonHint, {
+    .poll(async () => (await debugInfo(page))?.lockedHint, {
       timeout: WALK_TIMEOUT,
       intervals: [50],
     })
@@ -435,8 +437,8 @@ test("The Stairwell: floor 0's LOBBY door is coming soon, clicked or by holding 
 
 // Every Stairwell door, pill or frame, clicked from the floor's spawn tile
 // (not from the approach tile a pill-to-pill climb lands on): the Penguin
-// walks there and changes Room, or (floor 0's LOBBY door and pill) shows the
-// coming-soon hint. Each floor is re-entered by `changeRoom`, which lands on
+// walks there and changes Room, or (floor 0's LOBBY door and pill) shows
+// UNDER CONSTRUCTION with no walk (#170 D4). Each floor is re-entered by `changeRoom`, which lands on
 // its spawn tile; a move between two Stairwell floors, or from Town Center or
 // the Roof Deck onto floor 5, never shows the Elevator, so after the first
 // visit there is nothing to wait out.
@@ -466,7 +468,7 @@ test('The Stairwell: every door and pill works when clicked from the spawn tile'
       });
       if (through.targetRoomId === null) {
         await expect
-          .poll(async () => (await debugInfo(page))?.comingSoonHint, {
+          .poll(async () => (await debugInfo(page))?.lockedHint, {
             timeout: WALK_TIMEOUT,
             intervals: [50],
             message: name,

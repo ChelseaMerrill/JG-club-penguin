@@ -173,7 +173,7 @@ describe('createStairKeys (#51 slice 4, S4-D10)', () => {
     expect(labels(h.used)).toEqual(['FLOOR 5']);
   });
 
-  it("uses floor 0's LOBBY door on ArrowDown: its coming-soon hint once per press, never on a held chain (UD-7, RT2-5)", () => {
+  it("uses floor 0's LOBBY door on ArrowDown: its UNDER CONSTRUCTION hint once per press, never on a held chain (UD-7, RT2-5)", () => {
     const h = setup('stairwell-1');
     h.keys.keydown(key('ArrowDown'));
     vi.advanceTimersByTime(STAIR_HOLD_MS);

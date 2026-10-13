@@ -2,10 +2,13 @@ import './style.css';
 import { loadEnv } from './env';
 import { startGame, whenSceneReady } from './game/main';
 import {
+  DOOR_HOVER_END_EVENT,
+  DOOR_HOVER_EVENT,
   FURNITURE_SLOT_CLICK_EVENT,
   LOCAL_PENGUIN_ARRIVED_EVENT,
   LOCAL_PENGUIN_MOVE_EVENT,
   SNOWBALL_THROW_EVENT,
+  type DoorHoverEvent,
   type FurnitureSlotClickEvent,
   type LocalPenguinArrivedEvent,
   type LocalPenguinMoveEvent,
@@ -106,6 +109,9 @@ import { createMapScreen } from './ui/map-screen';
 import { createRemoteLounge } from './ui/remote-lounge/remote-lounge';
 import { createLatamNav } from './ui/latam-nav/latam-nav';
 import { createElevatorScreen } from './ui/elevator-screen';
+import { createDoorFade } from './ui/door-fade';
+import { createDoorHover } from './ui/door-hover';
+import { createDoorFocus, type DoorFocus } from './ui/door-focus';
 import type { ElevatorTestHandle } from './ui/elevator-test-handle';
 import { createMarket, MARKET_OVERLAY_ID } from './ui/market';
 import { createIglooEditor, type IglooEditor } from './ui/igloo-editor';
@@ -167,7 +173,19 @@ const elevatorScreen = createElevatorScreen(uiLayer, {
   resolveFloor: (roomId) => ROOM_FLOORS[roomId],
   // #163: the Player's own Look rides in the car.
   resolveLook: () => (game.registry.get('player') as Player | undefined)?.look ?? null,
+  // #170 D6: the doors' keyboard layer stays inert under the Elevator.
+  onHide: () => doorFocus?.refresh(),
 });
+
+/**
+ * #170 D5: the fade a door, pill, Enter or picker Room change plays
+ * (`roomNavigator` drives it). Up, it swallows every Stage click.
+ */
+const doorFade = createDoorFade(uiLayer);
+/** #170 D3: the "CLICK TO ENTER · X" pill, drawn from `RoomScene`'s hover events. */
+const doorHover = createDoorHover(uiLayer);
+/** #170 D6: the doors' keyboard layer, mounted after the HUD below. */
+let doorFocus: DoorFocus | null = null;
 
 // Test-only (#163): drives the real Elevator screen with no Room change.
 if (HOOKS_ENABLED) {
@@ -297,11 +315,14 @@ const sceneReady = whenSceneReady(game).then((scene) => {
       // #51 slice 4 (RT2-7): a door's Room change is tagged as one.
       onDoorReached: (handler) =>
         scene.onDoorReached((door) => stairClimb.withSource('door', () => handler(door))),
-      showComingSoonHint: (door) => scene.showComingSoonHint(door),
+      showLockedHint: (door) => scene.showLockedHint(door),
+      // #170 D7 (#51 n3): Anthony guards every use of a door.
+      redirectGuardedDoor: (door) => scene.redirectGuardedDoor(door),
     },
     events: gameEvents,
     hasPlayer: () => Boolean(game.registry.get('player')),
     transitionScreen: elevatorScreen,
+    fade: doorFade,
   });
 
   // Test-only: `window.__roomDebug.changeRoom`/`roomEventLog` (#15 D6),
@@ -320,6 +341,11 @@ const sceneReady = whenSceneReady(game).then((scene) => {
         void roomNavigator?.changeRoom(roomId);
       },
       roomEventLog,
+      fade: () => ({
+        state: doorFade.state(),
+        opacity: doorFade.opacity(),
+        blocking: doorFade.isBlocking(),
+      }),
     });
   }
 
@@ -335,6 +361,9 @@ const sceneReady = whenSceneReady(game).then((scene) => {
   scene.events.on(LOCAL_PENGUIN_ARRIVED_EVENT, (event: LocalPenguinArrivedEvent) => {
     roomChannel?.setTile(event.tile, event.facing);
   });
+  // #170 D3: the door hover pill follows the scene's hovered (or focused) door.
+  scene.events.on(DOOR_HOVER_EVENT, (event: DoorHoverEvent) => doorHover.show(event));
+  scene.events.on(DOOR_HOVER_END_EVENT, () => doorHover.hide());
   // #53: a click while aiming. A 0-ammo click resolves `false` and does
   // nothing at all (no throw, no move: the scene already suppressed it).
   scene.events.on(SNOWBALL_THROW_EVENT, ({ target }: SnowballThrowRequestEvent) => {
@@ -816,6 +845,9 @@ exposeSnowballDebug(() => ({
 createMapScreen(uiLayer, {
   overlays: hud.overlays,
   changeRoom: (roomId) => {
+    // #170 RT170-10: mid-transition (a door's fade included) the Map does
+    // nothing at all, so it never records a bypass for a change it drops.
+    if (roomNavigator?.isTransitioning()) return;
     // #146: leaving by the Map may be a bypass of Anthony; the server decides.
     const leaving = roomNavigator?.currentRoomId();
     if (leaving) void phishing.mapUsed(leaving);
@@ -845,6 +877,33 @@ createLatamNav(uiLayer, {
   },
   initialRoomId: resolveRoomIdFromLocation(window.location),
 });
+
+// #170 D6: Tab and Enter on doors. Mounted after the HUD, so the HUD keeps
+// its own Tab order; inert while an overlay is open, the Elevator shows, a
+// transition is in flight or no Room is entered. Every event that can change
+// that refreshes it: overlays opening and closing, Room changes, and the
+// Elevator hiding (`onHide`, above).
+const focusLayer = createDoorFocus(uiLayer, {
+  activate: (door) => roomScene?.activateDoor(door),
+  focusChanged: (door) => roomScene?.focusDoor(door),
+  isBlocked: () =>
+    !roomNavigator ||
+    roomNavigator.currentRoomId() === null ||
+    roomNavigator.isTransitioning() ||
+    hud.overlays.current() !== null ||
+    elevatorScreen.isShowing(),
+});
+doorFocus = focusLayer;
+gameEvents.on('room:enter', ({ roomId }) => focusLayer.render(getRoomDefinition(roomId).doors));
+gameEvents.on('room:leave', () => {
+  doorHover.hide();
+  focusLayer.refresh();
+});
+hud.overlays.onOpen(() => {
+  doorHover.hide();
+  focusLayer.refresh();
+});
+hud.overlays.onClose(() => focusLayer.refresh());
 
 // #77 D7: registers with the same shared `OverlayManager` MENU uses, so
 // opening one closes the other and Escape closes whichever is open.

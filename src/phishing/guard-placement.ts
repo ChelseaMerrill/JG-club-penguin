@@ -55,10 +55,10 @@ export function isGuardedDoor(guard: RoomGuard | null, door: RoomDoor): boolean 
 }
 
 /**
- * The Tile Anthony stands on: the guarded door's approach tile (the tile a
- * Penguin walks to in order to use it), or, when he isn't at a door, the
- * walkable tile nearest `playerTile` that is clear of the Room's NPCs.
- * `null` for a door `room` doesn't have.
+ * The Tile Anthony stands on: the guarded door's own `guardTile` (#170 D14),
+ * else its approach tile (the tile a Penguin walks to in order to use it),
+ * or, when he isn't at a door, the walkable tile nearest `playerTile` that
+ * is clear of the Room's NPCs. `null` for a door `room` doesn't have.
  */
 export function guardTile(
   room: RoomDefinition,
@@ -67,7 +67,8 @@ export function guardTile(
 ): Tile | null {
   if (guard.doorLabel !== null) {
     const door = room.doors.find((candidate) => candidate.label === guard.doorLabel);
-    return door ? doorApproachTile(room.walkable, door, room.grid.origin) : null;
+    if (!door) return null;
+    return door.guardTile ?? doorApproachTile(room.walkable, door, room.grid.origin);
   }
   // Clear of the Room's own NPCs where there's room (not on or next to one,
   // so he and his click zone don't overlap theirs), else just not on one.
@@ -140,8 +141,12 @@ export const GUARD_PACE_PERIOD_S = 10;
  * The `translate()`s are `tileToScreen` deltas (Stage pixels) from his post,
  * the same units every NPC's `path` uses (`motions/types.ts`).
  */
-export function guardPaceMotion(room: RoomDefinition, tile: Tile): NpcMotionSpec | undefined {
-  const occupied = npcOccupiedTiles(room);
+export function guardPaceMotion(
+  room: RoomDefinition,
+  tile: Tile,
+  avoid: readonly Tile[] = [],
+): NpcMotionSpec | undefined {
+  const occupied = [...npcOccupiedTiles(room), ...avoid];
   const free = (dc: number, dr: number): boolean => {
     const col = tile.col + dc;
     const row = tile.row + dr;
@@ -177,6 +182,62 @@ export function guardPaceMotion(room: RoomDefinition, tile: Tile): NpcMotionSpec
       animation: 'idle 3s ease-in-out infinite',
     },
   };
+}
+
+/** Anthony's click zone relative to his feet (`npcLayout(...).hitArea`), in Stage pixels. */
+export interface GuardHitZone {
+  centerX: number;
+  centerY: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * The tiles Anthony's pacing must never step onto in `room` (#170 D14, I6),
+ * on top of the NPC tiles `guardPaceMotion` always avoids: every exit's
+ * approach tile, every landing tile (each `entryTile` and `floorChoices`
+ * entry in `rooms` that targets `room`, plus its spawn), and (RT170-22, I7)
+ * every tile where his click zone `hitZone`, checked before doors, would
+ * cover part of an exit other than `ownLabel`'s.
+ */
+export function guardPaceAvoidTiles(
+  room: RoomDefinition,
+  rooms: readonly RoomDefinition[],
+  ownLabel: string | null,
+  hitZone?: GuardHitZone,
+): Tile[] {
+  const tiles: Tile[] = [room.spawnTile];
+  for (const door of room.doors) {
+    tiles.push(doorApproachTile(room.walkable, door, room.grid.origin));
+  }
+  for (const other of rooms) {
+    for (const door of other.doors) {
+      if (door.targetRoomId === room.id) tiles.push(door.entryTile);
+      for (const choice of door.floorChoices ?? []) {
+        if (choice.targetRoomId === room.id) tiles.push(choice.entryTile);
+      }
+    }
+  }
+  if (hitZone) {
+    const others = room.doors.filter((door) => door.label !== ownLabel);
+    room.walkable.forEach((cells, row) =>
+      cells.forEach((walkable, col) => {
+        if (!walkable) return;
+        const feet = tileToScreen({ col, row }, room.grid.origin);
+        const left = feet.x + hitZone.centerX - hitZone.width / 2;
+        const top = feet.y + hitZone.centerY - hitZone.height / 2;
+        const covers = others.some(
+          ({ hotspot }) =>
+            left < hotspot.x + hotspot.width &&
+            left + hitZone.width > hotspot.x &&
+            top < hotspot.y + hotspot.height &&
+            top + hitZone.height > hotspot.y,
+        );
+        if (covers) tiles.push({ col, row });
+      }),
+    );
+  }
+  return tiles;
 }
 
 /** Whether two Tiles touch (the same tile or one of its eight neighbours). */

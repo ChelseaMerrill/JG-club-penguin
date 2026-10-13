@@ -75,7 +75,16 @@ import {
   TILE_HEIGHT,
   TILE_WIDTH,
 } from './iso';
-import { getRoomDefinition, hasRoomDefinition } from './registry';
+import { getRoomDefinition, hasRoomDefinition, ROOM_DEFINITIONS } from './registry';
+import {
+  doorFocusPoint,
+  doorGlowPolygon,
+  doorHoverText,
+  isInSceneDoor,
+  isLockedDoor,
+  LOCKED_HINT_TEXT,
+  type DoorPoint,
+} from './door-ui';
 import type {
   RoomDefinition,
   RoomDoor,
@@ -95,6 +104,7 @@ import { arcPoint, clampTileToGrid, type ScreenPoint } from '../../snowball/snow
 import type { IglooSlot, ShopItem } from '../../persistence/progress-store';
 import {
   createBumpTracker,
+  guardPaceAvoidTiles,
   guardPaceMotion,
   guardTile,
   isGuardedDoor,
@@ -124,10 +134,21 @@ export const LOCAL_PENGUIN_ARRIVED_EVENT = 'local-penguin:arrived';
 /**
  * Scene-local event (#14 D5, not a contract event): fired on arrival at a
  * door's approach tile. #15 calls `changeRoom(door.targetRoomId)` from it.
- * A disabled door (`targetRoomId: null`) still fires this; #15 owns the
- * "coming soon" handling for that case.
+ * A locked door (`targetRoomId: null`) is never walked to (#170 D4), so it
+ * never fires this: its click shows UNDER CONSTRUCTION straight away.
  */
 export const DOOR_REACHED_EVENT = 'door:reached';
+
+/**
+ * Scene-local event (#170 D3, not a contract event): the door the pointer
+ * is over (never through an NPC, never a pill), or the exit keyboard focus
+ * is on, with where its hover pill goes in Stage pixels and its text. Fired
+ * again on every pointer move over it, so the pill follows the pointer.
+ * `main.ts` draws the DOM pill (`src/ui/door-hover.ts`) from it.
+ */
+export const DOOR_HOVER_EVENT = 'door:hover';
+/** Scene-local event (#170 D3): no door is hovered or focused any more. */
+export const DOOR_HOVER_END_EVENT = 'door:hover-end';
 
 /**
  * Scene-local event (#53, not a contract event): a left-click while aiming
@@ -165,6 +186,15 @@ export interface LocalPenguinArrivedEvent {
 
 export interface DoorReachedEvent {
   door: RoomDoor;
+}
+
+export interface DoorHoverEvent {
+  door: RoomDoor;
+  /** Where the pill points, in Stage pixels: the pointer, or a focused exit's hotspot top. */
+  point: DoorPoint;
+  /** "CLICK TO ENTER · X", "X · UNDER CONSTRUCTION", or "UNDER CONSTRUCTION" once a locked one is used. */
+  text: string;
+  locked: boolean;
 }
 
 // Room-surface colours from `design/design_handoff_club_jenguin/README.md`'s
@@ -216,15 +246,21 @@ const HOTSPOT_LABEL_FONT_SIZE = '14px';
 const LABEL_FONT_FAMILY = 'sans-serif';
 const LABEL_TEXT_COLOR = '#F4F4F4';
 const DOOR_LABEL_FONT_SIZE = '14px';
-// #15 D3/A4: a disabled door's (`targetRoomId: null`) "COMING SOON" hint, in
-// the Stage's own display font (`--font-game-display`, `style.css`).
+// #170 D4 (was #15 D3/A4's "COMING SOON"): a locked door's
+// (`targetRoomId: null`) UNDER CONSTRUCTION hint, in the Stage's own display
+// font (`--font-game-display`, `style.css`).
 const DOOR_HINT_FONT_FAMILY = "'Bumbastika', sans-serif";
 const DOOR_HINT_FONT_SIZE = '22px';
 const DOOR_HINT_STROKE_COLOR = '#0a0b0d';
 const DOOR_HINT_STROKE_THICKNESS = 4;
-const DOOR_HINT_TEXT = 'COMING SOON';
-/** How long the "coming soon" hint stays up (#15 D3). */
+/** How long the UNDER CONSTRUCTION hint stays up (#15 D3, #170 D4). */
 export const DOOR_HINT_DURATION_MS = 2000;
+// #170 D3: the design's hover glow (`rgba(0,189,255,.32)`) over a door on a
+// back wall. A locked door looks like any other (owner decision H1,
+// 2026-10-12): only its hover pill and its UNDER CONSTRUCTION hint say so.
+const DOOR_GLOW_COLOR = 0x00bdff;
+const DOOR_GLOW_ALPHA = 0.32;
+const DOOR_GLOW_DEPTH = 0.5;
 
 // Snowball mode (#53), after `design/Club JenGuin HUD Menus.dc.html`'s
 // HUD-SNOWBALL screen: cyan reticle ellipse + ticks on the aimed Tile, a
@@ -413,8 +449,20 @@ export class RoomScene extends Scene {
   private debugPenguins: Penguin[] = [];
   /** Persists across restarts (never reset in `init()`); see `restartCount` on `RoomDebugInfo`. */
   private restartCount = 0;
-  /** The "coming soon" hint currently shown for a disabled door (#15 D3), or `null`. Not reset in `init()`: `cleanup()` (SHUTDOWN) always clears it first. */
-  private comingSoonHint: {
+  /** #170 D3: the door under the pointer (never a pill, never through an NPC), or `null`. */
+  private hoveredDoor: RoomDoor | null = null;
+  /** #170 D3: where the pointer is over `hoveredDoor`, in Stage pixels. */
+  private hoverPoint: DoorPoint | null = null;
+  /** #170 D6: the exit whose focus button has keyboard focus, or `null`. */
+  private focusedDoor: RoomDoor | null = null;
+  /** #170 D4: the locked door last used while hovered or focused: its pill then reads UNDER CONSTRUCTION. */
+  private lockedPressedDoor: RoomDoor | null = null;
+  /** #170 D3: the hover glow, redrawn for the hovered or focused door. Rebuilt by every `create()`. */
+  private doorGlow: GameObjects.Graphics | null = null;
+  /** #170 D7: whether the arrival now being handled already bumped Anthony (opened his dialog). */
+  private arrivalBumpedGuard = false;
+  /** The UNDER CONSTRUCTION hint currently shown for a locked door (#170 D4), or `null`. Not reset in `init()`: `cleanup()` (SHUTDOWN) always clears it first. */
+  private lockedHint: {
     door: RoomDoor;
     text: GameObjects.Text;
     timer: Time.TimerEvent;
@@ -463,10 +511,21 @@ export class RoomScene extends Scene {
     this.onPointerDown(pointer, currentlyOver);
   };
 
-  /** Moves the Snowball reticle with the pointer while aiming (#53). */
-  private readonly handlePointerMove = (pointer: Input.Pointer): void => {
-    if (!this.aiming) return;
-    this.aimAt(pointer);
+  /** Moves the Snowball reticle with the pointer while aiming (#53); otherwise tracks the hovered door (#170 D3). */
+  private readonly handlePointerMove = (
+    pointer: Input.Pointer,
+    currentlyOver: GameObjects.GameObject[] = [],
+  ): void => {
+    if (this.aiming) {
+      this.aimAt(pointer);
+      return;
+    }
+    this.updatePointerHover(pointer, currentlyOver);
+  };
+
+  /** The pointer left the canvas (#170 D3): nothing is hovered any more. */
+  private readonly handleGameOut = (): void => {
+    this.setHoveredDoor(null);
   };
 
   /** Right-click cancels the aim rather than opening the browser menu, only while aiming (#53 D6). */
@@ -501,6 +560,7 @@ export class RoomScene extends Scene {
   private readonly cleanup = (): void => {
     this.input.off('pointerdown', this.handlePointerDown);
     this.input.off('pointermove', this.handlePointerMove);
+    this.input.off('gameout', this.handleGameOut);
     this.game.canvas?.removeEventListener('contextmenu', this.handleContextMenu);
     this.resetSnowballState();
     this.registry.events.off(Data.Events.SET_DATA, this.handleRegistrySetData);
@@ -539,7 +599,14 @@ export class RoomScene extends Scene {
     this.npcArrival = null;
     this.guard?.sprite.destroy();
     this.guard = null;
-    this.clearComingSoonHint();
+    this.clearLockedHint();
+    // #170 D3: the hover pill goes with the Room.
+    const hovering = this.hoveredDoor !== null || this.focusedDoor !== null;
+    this.hoveredDoor = null;
+    this.focusedDoor = null;
+    this.lockedPressedDoor = null;
+    this.doorGlow = null;
+    if (hovering) this.events.emit(DOOR_HOVER_END_EVENT);
   };
 
   constructor() {
@@ -580,6 +647,11 @@ export class RoomScene extends Scene {
     this.npcArrival = null;
     this.unsubscribeNpcDialog = [];
     this.guard = null;
+    this.hoveredDoor = null;
+    this.focusedDoor = null;
+    this.lockedPressedDoor = null;
+    this.doorGlow = null;
+    this.arrivalBumpedGuard = false;
     this.resetSnowballState();
   }
 
@@ -602,10 +674,11 @@ export class RoomScene extends Scene {
   }
 
   /**
-   * Registers `handler` for every door the local Penguin reaches, enabled or
-   * disabled alike (#15 D3). Call once: `this.events` (and any listener
-   * already attached to it) survives every `scene.restart()`, so calling
-   * this again on a later Room change would only stack a duplicate.
+   * Registers `handler` for every door the local Penguin reaches (#15 D3; a
+   * locked door is never walked to, #170 D4). Call once: `this.events` (and
+   * any listener already attached to it) survives every `scene.restart()`,
+   * so calling this again on a later Room change would only stack a
+   * duplicate.
    */
   onDoorReached(handler: (door: RoomDoor) => void): void {
     this.events.on(DOOR_REACHED_EVENT, ({ door }: DoorReachedEvent) => handler(door));
@@ -667,16 +740,22 @@ export class RoomScene extends Scene {
   }
 
   /**
-   * Shows the "COMING SOON" hint for a disabled door (#15 D3/A4) near its
-   * hotspot for `DOOR_HINT_DURATION_MS`, replacing any hint already shown
-   * rather than stacking two.
+   * Shows the UNDER CONSTRUCTION hint for a locked door or pill (#170 D4,
+   * was #15 D3/A4's "COMING SOON") at its hotspot for
+   * `DOOR_HINT_DURATION_MS`, replacing any hint already shown rather than
+   * stacking two. A hover pill showing for that door flips to UNDER
+   * CONSTRUCTION too, as door-nav.js's does.
    */
-  showComingSoonHint(door: RoomDoor): void {
-    this.clearComingSoonHint();
+  showLockedHint(door: RoomDoor): void {
+    this.clearLockedHint();
+    if (this.highlightedDoor() === door) {
+      this.lockedPressedDoor = door;
+      this.emitHover();
+    }
     const centerX = door.hotspot.x + door.hotspot.width / 2;
     const centerY = door.hotspot.y + door.hotspot.height / 2;
     const text = this.add
-      .text(centerX, centerY, DOOR_HINT_TEXT, {
+      .text(centerX, centerY, LOCKED_HINT_TEXT, {
         fontFamily: DOOR_HINT_FONT_FAMILY,
         fontSize: DOOR_HINT_FONT_SIZE,
         color: LABEL_TEXT_COLOR,
@@ -687,16 +766,113 @@ export class RoomScene extends Scene {
       .setDepth(DOOR_HINT_DEPTH);
     const timer = this.time.delayedCall(DOOR_HINT_DURATION_MS, () => {
       text.destroy();
-      this.comingSoonHint = null;
+      this.lockedHint = null;
     });
-    this.comingSoonHint = { door, text, timer };
+    this.lockedHint = { door, text, timer };
   }
 
-  private clearComingSoonHint(): void {
-    if (!this.comingSoonHint) return;
-    this.comingSoonHint.timer.remove();
-    this.comingSoonHint.text.destroy();
-    this.comingSoonHint = null;
+  private clearLockedHint(): void {
+    if (!this.lockedHint) return;
+    this.lockedHint.timer.remove();
+    this.lockedHint.text.destroy();
+    this.lockedHint = null;
+  }
+
+  /**
+   * Uses `door` as a click on it does (#170 D6: Enter or Space on its focus
+   * button): Anthony first, then a locked door's hint, else the walk there.
+   * A no-op for a door this Room doesn't have, while aiming, or while the
+   * Stage takes no input.
+   */
+  activateDoor(door: RoomDoor): void {
+    const room = this.room;
+    if (!room || !this.live || this.aiming || !stageAcceptsInput(this.registry)) return;
+    if (!room.doors.includes(door)) return;
+    this.handleDoorClick(door, room);
+  }
+
+  /**
+   * #170 D6: keyboard focus moved onto `door`'s focus button (or off every
+   * one, with `null`): shows its hover pill at its hotspot, and its glow.
+   */
+  focusDoor(door: RoomDoor | null): void {
+    if (door && !this.room?.doors.includes(door)) door = null;
+    if (door === this.focusedDoor) return;
+    this.focusedDoor = door;
+    this.lockedPressedDoor = null;
+    this.emitHover();
+  }
+
+  /**
+   * #170 D7 (#51 n3), for `RoomNavigator.useDoor`: if Anthony is guarding
+   * `door` for this Player, opens his dialog (`npc:arrived`) instead and
+   * returns `true`, unless this same arrival already bumped him, which
+   * opened it (no second `npc:arrived`). `false` otherwise.
+   */
+  redirectGuardedDoor(door: RoomDoor): boolean {
+    const guard = this.guard;
+    if (!guard || !isGuardedDoor(guard.spec, door)) return false;
+    if (!this.arrivalBumpedGuard) {
+      this.npcArrivedLog.push(guard.spec.npcId);
+      gameEvents.emit('npc:arrived', { npcId: guard.spec.npcId });
+    }
+    return true;
+  }
+
+  /** The door whose pill and glow show: the pointer's, else keyboard focus's. */
+  private highlightedDoor(): RoomDoor | null {
+    return this.hoveredDoor ?? this.focusedDoor;
+  }
+
+  /** #170 D3: the door under the pointer, never through an NPC's click zone, never a pill. */
+  private updatePointerHover(
+    pointer: Input.Pointer,
+    currentlyOver: GameObjects.GameObject[],
+  ): void {
+    let door: RoomDoor | null = null;
+    if (this.room && stageAcceptsInput(this.registry)) {
+      const overNpc = this.npcHitAreas.some((hit) => currentlyOver.includes(hit.object));
+      const hit = overNpc
+        ? undefined
+        : this.doorHitAreas.find((area) => currentlyOver.includes(area.object));
+      if (hit && isInSceneDoor(hit.data)) door = hit.data;
+    }
+    this.setHoveredDoor(door, { x: pointer.x, y: pointer.y });
+  }
+
+  private setHoveredDoor(door: RoomDoor | null, point?: DoorPoint): void {
+    const changed = door !== this.hoveredDoor;
+    this.hoveredDoor = door;
+    this.hoverPoint = door ? (point ?? null) : null;
+    if (changed) this.lockedPressedDoor = null;
+    if (changed || door) this.emitHover();
+  }
+
+  /** Emits the hover pill for the highlighted door, or its end; redraws the glow. */
+  private emitHover(): void {
+    const door = this.highlightedDoor();
+    this.drawDoorGlow(door);
+    if (!door) {
+      this.events.emit(DOOR_HOVER_END_EVENT);
+      return;
+    }
+    const point =
+      door === this.hoveredDoor && this.hoverPoint ? this.hoverPoint : doorFocusPoint(door.hotspot);
+    const locked = isLockedDoor(door);
+    const text = this.lockedPressedDoor === door ? LOCKED_HINT_TEXT : doorHoverText(door);
+    const event: DoorHoverEvent = { door, point, text, locked };
+    this.events.emit(DOOR_HOVER_EVENT, event);
+  }
+
+  /** #170 D3: the glow over a highlighted door on a back wall (`wall`); none for any other. */
+  private drawDoorGlow(door: RoomDoor | null): void {
+    const glow = this.doorGlow;
+    if (!glow) return;
+    glow.clear();
+    const polygon = door ? doorGlowPolygon(door) : null;
+    if (!polygon) return;
+    glow.fillStyle(DOOR_GLOW_COLOR, DOOR_GLOW_ALPHA);
+    glow.fillPoints(polygon, true);
   }
 
   /** The Room currently shown (or being restarted into). */
@@ -779,6 +955,7 @@ export class RoomScene extends Scene {
     this.drawBackground(room);
     this.drawDiscoFloor(room);
     this.drawDoors(room);
+    this.doorGlow = this.add.graphics().setDepth(DOOR_GLOW_DEPTH);
     this.drawHotspots(room);
     this.drawProps(room);
     this.renderFurniture(room);
@@ -797,6 +974,7 @@ export class RoomScene extends Scene {
 
     this.input.on('pointerdown', this.handlePointerDown);
     this.input.on('pointermove', this.handlePointerMove);
+    this.input.on('gameout', this.handleGameOut);
     this.game.canvas?.addEventListener('contextmenu', this.handleContextMenu);
     this.reticleGraphics = this.add.graphics().setDepth(SNOWBALL_DEPTH).setVisible(false);
     this.reticleHint = this.add
@@ -888,7 +1066,8 @@ export class RoomScene extends Scene {
       npcArrivedLog: this.npcArrivedLog,
       doorReachedLog: this.doorReachedLog,
       localPenguinMoveLog: this.localPenguinMoveLog,
-      comingSoonHint: this.comingSoonHint?.door.label ?? null,
+      lockedHint: this.lockedHint?.door.label ?? null,
+      hoveredDoor: this.highlightedDoor()?.label ?? null,
       localPenguinArrivedLog: this.localPenguinArrivedLog,
       restartRoom: () => this.scene.restart(),
       restartCount: this.restartCount,
@@ -1017,6 +1196,8 @@ export class RoomScene extends Scene {
     if (on) {
       this.pendingArrival = null;
       if (this.queuedMove) this.queuedMove.onArrive = undefined;
+      // #170 D3: while aiming the pointer throws, so no door is hovered.
+      this.setHoveredDoor(null);
     }
     if (!on) this.cancelAim();
   }
@@ -1310,6 +1491,12 @@ export class RoomScene extends Scene {
       this.handleNpcClick(this.guard.slot, room);
       return;
     }
+    // #170 D4 (RT170-9): a locked door or pill shows UNDER CONSTRUCTION, and
+    // the Penguin doesn't walk.
+    if (isLockedDoor(door)) {
+      this.showLockedHint(door);
+      return;
+    }
     const target = doorApproachTile(room.walkable, door, room.grid.origin);
     this.startMoveTo(target, () => {
       this.doorReachedLog.push(door.label);
@@ -1395,13 +1582,14 @@ export class RoomScene extends Scene {
         const moveEvent: LocalPenguinMoveEvent = { target: tile };
         this.events.emit(LOCAL_PENGUIN_MOVE_EVENT, moveEvent);
         this.emitArrived(tile, facing);
-        this.checkGuardBump(tile, onArrive);
+        this.arrivalBumpedGuard = this.checkGuardBump(tile, onArrive);
       }
       // Already standing on an NPC's interaction tile or a door's approach
       // tile: that still counts as arriving, so clicking an NPC you're next
       // to opens its dialog (#36) and clicking the door you're at uses it
       // (#15). An unreachable target that merely resolves to here doesn't.
       if (onArrive && tilesEqual(target, controller.state.tile)) onArrive();
+      this.arrivalBumpedGuard = false;
       return;
     }
 
@@ -1455,8 +1643,10 @@ export class RoomScene extends Scene {
       this.emitArrived(controller.state.tile, controller.state.facing);
       const arrive = this.pendingArrival;
       this.pendingArrival = null;
-      this.checkGuardBump(controller.state.tile, arrive);
+      // #170 D7: a door arrival that just bumped Anthony mustn't open him twice.
+      this.arrivalBumpedGuard = this.checkGuardBump(controller.state.tile, arrive);
       arrive?.();
+      this.arrivalBumpedGuard = false;
       return;
     }
 
@@ -1873,13 +2063,20 @@ export class RoomScene extends Scene {
     const point = tileToScreen(tile, room.grid.origin);
     const depth = depthForTile(tile);
     const ownSlot = room.npcSlots.some((roomSlot) => roomSlot.npcId === spec.npcId);
+    const { hitArea } = npcLayout(npc);
+    // #170 D14 (I6, RT170-22 I7): his pacing never steps onto an exit's
+    // approach tile, a landing tile, or where his click zone would cover
+    // another exit.
     const motion =
       spec.doorLabel !== null && !ownSlot && this.npcMotions
-        ? guardPaceMotion(room, tile)
+        ? guardPaceMotion(
+            room,
+            tile,
+            guardPaceAvoidTiles(room, ROOM_DEFINITIONS, spec.doorLabel, hitArea),
+          )
         : undefined;
     const sprite = createNpcSprite(this, point.x, point.y, npc, depth, { motion });
     sprite.container.setName(NPC_CONTAINER_NAME);
-    const { hitArea } = npcLayout(npc);
     const zone = this.add
       .zone(point.x + hitArea.centerX, point.y + hitArea.centerY, hitArea.width, hitArea.height)
       .setDepth(depth)
@@ -1941,14 +2138,15 @@ export class RoomScene extends Scene {
    * train a locked-out Player. A click on an NPC already announces its own
    * arrival, so that walk doesn't bump him as well.
    */
-  private checkGuardBump(tile: Tile, arrive: (() => void) | null | undefined): void {
+  private checkGuardBump(tile: Tile, arrive: (() => void) | null | undefined): boolean {
     const guard = this.guard;
-    if (!guard) return;
+    if (!guard) return false;
     const bumped = this.guardBumps.arrived(isNextTo(tile, guard.slot.tile));
-    if (!bumped || (arrive && arrive === this.npcArrival)) return;
-    if (!guard.spec.blocking && guard.spec.doorLabel !== null) return;
+    if (!bumped || (arrive && arrive === this.npcArrival)) return false;
+    if (!guard.spec.blocking && guard.spec.doorLabel !== null) return false;
     this.npcArrivedLog.push(guard.spec.npcId);
     gameEvents.emit('npc:arrived', { npcId: guard.spec.npcId });
+    return true;
   }
 
   /**

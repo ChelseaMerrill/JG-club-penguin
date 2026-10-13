@@ -70,6 +70,7 @@ export const theIcebox: RoomDefinition = {
     {
       label: 'TOWN CENTER',
       hotspot: { x: 705, y: 132.5, ...DOOR_HOTSPOT_SIZE },
+      wall: 'left',
       targetRoomId: 'town-center',
       // The tile just inside Town Center's own "THE ICEBOX" door: project
       // that door's own hotspot bottom-centre (the door sill, not its
@@ -81,6 +82,7 @@ export const theIcebox: RoomDefinition = {
     {
       label: 'DEV PIT',
       hotspot: { x: 1290, y: 365, ...DOOR_HOTSPOT_SIZE },
+      wall: 'right',
       targetRoomId: 'dev-pit',
       // The tile just inside Dev Pit's own "THE ICEBOX" door: project that
       // door's own hotspot bottom-centre (the door sill, not its centre)

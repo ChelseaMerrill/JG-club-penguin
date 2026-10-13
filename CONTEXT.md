@@ -29,6 +29,12 @@ The full multi-room office environment, modeled from the real JG office blueprin
 **Room**
 One explorable, self-contained area of the World, drawn as an isometric scene that fills the Stage. Players move between Rooms through doors or the Map. Multiplayer Presence is scoped per-Room (who else is in *this* Room), not global. The prototype Rooms are Town Center (where every Session starts), Dev Pit, The Melt, Roof Deck and the Player's Igloo. #51 adds The Icebox, the Hallway, Team Rooms 1-4, the Bathroom, The Mullet and the Stairwell. The Stairwell is six Rooms, one per **Stairwell floor**: floor 0, the lobby level, up to floor 5, the JG HQ floor.
 
+**Door**
+The way from one Room into another: a door drawn in the Room, or an exit pill at the bottom of the Stage. Hovering a door shows CLICK TO ENTER · <Room>. Clicking walks the Penguin there; the screen fades (250 ms) and the Penguin arrives at the matching door. Tab and Enter reach and use doors (#170).
+
+**Locked door**
+A door to a Room not built yet: no way in. It looks like any other door; only its grey hover pill (<Room> · UNDER CONSTRUCTION) says so. Clicking it, or Enter on it, shows UNDER CONSTRUCTION and the Penguin doesn't walk. The Stairwell's floor 0 LOBBY door is one until the Lobby is built (#170).
+
 **Igloo**
 The Player's own home Room. Only its owner is ever in it, so each Player's Igloo is a separate Room with its own Room channel. It holds the Player's Furniture and Trophy Case, and is reached from the HUD. Visiting other Players' Igloos is out of scope.
 
@@ -134,7 +140,7 @@ A named game from the designs that is out of scope for the prototype. The term i
 - **Quests are part of the vocabulary; they are stretch for the prototype.** Supersedes the earlier "No Quest/Task system in v1" decision (2026-09-24). "Task" stays out of the vocabulary.
 - **Presence is scoped per-Room, not global.** A Player only sees/hears other Penguins in their current Room.
 - **Every Session starts in Town Center**, after sign-in, a reload or a reconnect that starts a new Session.
-- **Click-to-move with pathfinding; no keyboard movement, except on the Stairwell's floors, where holding ↑/↓ climbs or descends one flight.** Clicking a Tile, an NPC or a door walks the Penguin there. The stair keys never fire while a text field has focus or an overlay is open (amended by #51, HD-2).
+- **Click-to-move with pathfinding; no keyboard movement, except on the Stairwell's floors, where holding ↑/↓ climbs or descends one flight.** Clicking a Tile, an NPC or a door walks the Penguin there. The stair keys never fire while a text field has focus or an overlay is open (amended by #51, HD-2). Tab and Enter on doors are keyboard access, not movement (#170).
 - **Isometric Rooms on a 1600x900 Stage, letterboxed, desktop only.** Small or touch-only screens see a "desktop only" notice instead of the game. Supersedes "2D top-down" and Tiled tilemaps.
 - **Chat and Presence are live only and never persisted.**
 - **The Penguin's name is not the Player's Google name.** The database stores no copy of the Player's Google identity beyond what Supabase Auth already holds.

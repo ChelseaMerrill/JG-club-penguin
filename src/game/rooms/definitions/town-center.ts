@@ -206,6 +206,7 @@ export const townCenter: RoomDefinition = {
     {
       label: 'THE ICEBOX',
       hotspot: { x: 860, y: 150, ...DOOR_HOTSPOT_SIZE },
+      wall: 'right',
       targetRoomId: 'the-icebox',
       // The tile just inside the Icebox's own "TOWN CENTER" door: project
       // that door's own hotspot bottom-centre (the door sill, not its
@@ -216,6 +217,7 @@ export const townCenter: RoomDefinition = {
     {
       label: 'DEV PIT',
       hotspot: { x: 1270, y: 355, ...DOOR_HOTSPOT_SIZE },
+      wall: 'right',
       targetRoomId: 'dev-pit',
       // The tile just inside Dev Pit's own "TOWN CENTER" door (#16 fix 4):
       // the nearest walkable tile to that door's hotspot centre in Dev Pit's
@@ -226,6 +228,7 @@ export const townCenter: RoomDefinition = {
     {
       label: 'STAIRWELL',
       hotspot: { x: 610, y: 180, ...DOOR_HOTSPOT_SIZE },
+      wall: 'left',
       // #51 slice 4: the Stairwell opens on floor 5, the JG HQ floor (UD-2),
       // on the sill inside its JG HQ door, which leads back here.
       targetRoomId: 'stairwell-5',
@@ -234,6 +237,7 @@ export const townCenter: RoomDefinition = {
     {
       label: 'ELEVATOR · ROOF DECK',
       hotspot: { x: 385, y: 282, ...ELEVATOR_HOTSPOT_SIZE },
+      wall: 'left',
       targetRoomId: 'roof-deck',
       // Roof Deck has no door/elevator of its own drawn in the design (only
       // a HUD exit pill), so this lands on Roof Deck's own spawn tile (#16

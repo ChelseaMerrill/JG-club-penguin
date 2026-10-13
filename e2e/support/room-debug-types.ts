@@ -72,7 +72,16 @@ export interface RoomDebugInfo {
   setRegisteredPlayer?: (player: RegisteredPlayer) => void;
   setLocalPenguinVisible?: (visible: boolean) => void;
   spawnDebugPenguin?: (tile: Tile, look: PenguinLook) => void;
-  comingSoonHint?: string | null;
+  /** #170 D4: the locked door's label while its UNDER CONSTRUCTION hint shows; `null` otherwise. */
+  lockedHint?: string | null;
+  /** #170 D3/D6: the hovered door's (or focused exit's) label while its hover pill shows; `null` otherwise. */
+  hoveredDoor?: string | null;
+  /** #170 D5: the door fade layer. */
+  fade?: {
+    state: 'hidden' | 'fading-out' | 'opaque' | 'fading-in';
+    opacity: number;
+    blocking: boolean;
+  };
   changeRoom?: (roomId: RoomId) => void;
   roomEventLog?: RoomDebugEventLogEntry[];
   /** The Igloo's current Furniture layout (#41): item id per slot id, `null` when empty; `undefined` for a Room with no `furnitureSlots`. */

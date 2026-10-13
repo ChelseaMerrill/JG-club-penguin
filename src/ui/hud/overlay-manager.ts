@@ -20,6 +20,13 @@ export interface OverlayManager {
    * whenever any HUD overlay opens. Returns an unsubscribe function.
    */
   onOpen(listener: (id: string) => void): () => void;
+  /**
+   * Fires after the open overlay closes, however it closes (`close`,
+   * Escape, or another overlay opening over it), with its id. Used by #170's
+   * door-focus layer to wake once no overlay is open. Returns an
+   * unsubscribe function.
+   */
+  onClose(listener: (id: string) => void): () => void;
   /** Removes the `window` `keydown` listener this manager installed. */
   destroy(): void;
 }
@@ -27,12 +34,14 @@ export interface OverlayManager {
 export function createOverlayManager(): OverlayManager {
   let openOverlay: { id: string; onClose: () => void } | null = null;
   const openListeners = new Set<(id: string) => void>();
+  const closeListeners = new Set<(id: string) => void>();
 
   function closeCurrent(): void {
     if (!openOverlay) return;
-    const { onClose } = openOverlay;
+    const { id, onClose } = openOverlay;
     openOverlay = null;
     onClose();
+    for (const listener of Array.from(closeListeners)) listener(id);
   }
 
   function handleKeydown(event: KeyboardEvent): void {
@@ -58,6 +67,12 @@ export function createOverlayManager(): OverlayManager {
       openListeners.add(listener);
       return () => {
         openListeners.delete(listener);
+      };
+    },
+    onClose(listener) {
+      closeListeners.add(listener);
+      return () => {
+        closeListeners.delete(listener);
       };
     },
     destroy() {

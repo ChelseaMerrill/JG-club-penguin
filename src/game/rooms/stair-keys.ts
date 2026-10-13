@@ -74,8 +74,8 @@ const DIRECTIONS: Readonly<Record<string, 'up' | 'down'>> = {
  * - keeping it held climbs (or descends) on to the next floor once that floor
  *   has loaded and `STAIR_CHAIN_MIN_MS` has passed since the last move;
  * - the exits that aren't a flight (floor 5's Roof Deck, floor 0's LOBBY
- *   door) need a fresh press and never continue a hold, so the coming-soon
- *   hint shows once per press;
+ *   door) need a fresh press and never continue a hold, so the UNDER
+ *   CONSTRUCTION hint (#170 D4) shows once per press;
  * - nothing happens off the Stairwell, while a text field has focus, while a
  *   HUD overlay is open or while a transition is in flight; only a key it
  *   handles is `preventDefault`ed, so arrow keys scroll and edit as usual

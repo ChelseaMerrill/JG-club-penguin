@@ -133,6 +133,7 @@ function doorsFor(floor: number): FloorDoors {
     up = {
       label: `FLOOR ${floor + 1}`,
       hotspot: upPill(floor),
+      kind: 'pill',
       targetRoomId: stairwellRoomId(floor + 1),
       entryTile,
     };
@@ -157,24 +158,27 @@ function doorsFor(floor: number): FloorDoors {
     const jgHq: RoomDoor = {
       label: 'JG HQ',
       hotspot: LANDING_DOOR,
+      wall: 'left',
       targetRoomId: 'town-center',
       entryTile: TOWN_CENTER_STAIRWELL_SILL,
     };
-    doors.push(jgHq, { ...jgHq, hotspot: JG_HQ_PILL });
+    doors.push(jgHq, { ...jgHq, hotspot: JG_HQ_PILL, kind: 'pill' });
   }
   if (floor > 0) {
     down = {
       label: floor === 1 ? 'LOBBY' : `FLOOR ${floor - 1}`,
       hotspot: downPill(floor),
+      kind: 'pill',
       targetRoomId: stairwellRoomId(floor - 1),
       entryTile: UP_PILL_APPROACH,
     };
   } else {
-    // The Lobby (#169) isn't built yet, so this shows the coming-soon hint,
+    // The Lobby (#169) isn't built yet, so this shows UNDER CONSTRUCTION (#170 D4),
     // as holding ↓ here does (UD-7). #169 sets its target.
     down = {
       label: 'LOBBY',
       hotspot: LANDING_DOOR,
+      wall: 'left',
       targetRoomId: null,
       entryTile: { col: 0, row: 0 },
     };
@@ -182,7 +186,7 @@ function doorsFor(floor: number): FloorDoors {
   doors.push(down);
   // Floor 0's "↙ LOBBY" pill shares the landing door's exit; ↓ still uses
   // the door alone, so one press shows one hint.
-  if (floor === 0) doors.push({ ...down, hotspot: LOBBY_PILL });
+  if (floor === 0) doors.push({ ...down, hotspot: LOBBY_PILL, kind: 'pill' });
   return { doors, up, down };
 }
 

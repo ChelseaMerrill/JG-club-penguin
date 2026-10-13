@@ -74,6 +74,7 @@ export const officeHallway: RoomDefinition = {
     {
       label: 'TOWN CENTER',
       hotspot: { x: 680, y: 224, ...DOOR_HOTSPOT_SIZE },
+      wall: 'left',
       targetRoomId: 'town-center',
       // Town Center has no door of its own into the Hallway, so this lands
       // on Town Center's own spawn tile, as the Igloo's TOWN CENTER door does
@@ -83,6 +84,7 @@ export const officeHallway: RoomDefinition = {
     {
       label: 'TEAM ROOM 1',
       hotspot: { x: 830, y: 214, ...DOOR_HOTSPOT_SIZE },
+      wall: 'right',
       targetRoomId: 'team-room-1',
       // The tile just inside Team Room 1's own HALLWAY door: that door's
       // hotspot bottom-centre (the sill) projected into Team Room 1's own
@@ -92,6 +94,7 @@ export const officeHallway: RoomDefinition = {
     {
       label: 'TEAM ROOM 2',
       hotspot: { x: 925, y: 261.5, ...DOOR_HOTSPOT_SIZE },
+      wall: 'right',
       targetRoomId: 'team-room-2',
       // Team Room 2's own HALLWAY door sill, as above.
       entryTile: { col: 5, row: 0 },
@@ -99,6 +102,7 @@ export const officeHallway: RoomDefinition = {
     {
       label: 'TEAM ROOM 3',
       hotspot: { x: 1020, y: 309, ...DOOR_HOTSPOT_SIZE },
+      wall: 'right',
       targetRoomId: 'team-room-3',
       // Team Room 3's own HALLWAY door sill, as above.
       entryTile: { col: 5, row: 0 },
@@ -106,6 +110,7 @@ export const officeHallway: RoomDefinition = {
     {
       label: 'TEAM ROOM 4',
       hotspot: { x: 1115, y: 356.5, ...DOOR_HOTSPOT_SIZE },
+      wall: 'right',
       targetRoomId: 'team-room-4',
       // Team Room 4's own HALLWAY door sill, as above.
       entryTile: { col: 5, row: 0 },
@@ -113,12 +118,14 @@ export const officeHallway: RoomDefinition = {
     {
       label: 'TEAM ROOM 5',
       hotspot: { x: 1210, y: 404, ...DOOR_HOTSPOT_SIZE },
+      wall: 'right',
       targetRoomId: null,
       entryTile: { col: 0, row: 0 },
     },
     {
       label: 'TEAM ROOM 6',
       hotspot: { x: 1305, y: 451.5, ...DOOR_HOTSPOT_SIZE },
+      wall: 'right',
       targetRoomId: null,
       entryTile: { col: 0, row: 0 },
     },
