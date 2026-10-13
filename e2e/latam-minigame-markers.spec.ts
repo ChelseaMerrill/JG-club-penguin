@@ -120,9 +120,13 @@ test('LATAM Café: the HUD title draws É the same size as its other letters (sp
   page,
 }) => {
   const errors = collectErrors(page);
-  await page.goto('/?asPlayer');
+  // `&hud` (`latam-nav.spec.ts`'s own convention): forces the HUD visible
+  // immediately, rather than waiting on the real sign-in flow's own
+  // Penguin-Creator-ready gate, which plain `?asPlayer` never reaches.
+  await page.goto('/?asPlayer&hud');
   await waitForBoot(page);
   await changeRoom(page, 'latam-cafe');
+  await expect(page.locator('.hud')).toBeVisible();
 
   const title = page.locator('.hud__title');
   await expect(title).toBeVisible();
