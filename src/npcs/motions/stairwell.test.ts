@@ -15,18 +15,10 @@ const STAIRWELL_IDS: NpcId[] = [0, 1, 2, 3, 4, 5].flatMap((floor) => [
   `dom-stairwell-${floor}` as NpcId,
   `jason-stairwell-${floor}` as NpcId,
 ]);
-const GUEST_IDS: NpcId[] = [
-  'anthony-stairwell-0',
-  'casey-stairwell-1',
-  'sydney-stairwell-2',
-  'tony-stairwell-3',
-  'jory-stairwell-4',
-  'ashley-stairwell-5',
-];
 
 describe("The Stairwell's NPC motions (#182)", () => {
-  it('registers a motion for all 18 Stairwell placements, on their own floor, and no other', () => {
-    const expected = [...STAIRWELL_IDS, ...GUEST_IDS].sort();
+  it('registers a motion for all 12 Stairwell placements, on their own floor, and no other', () => {
+    const expected = [...STAIRWELL_IDS].sort();
     expect((Object.keys(STAIRWELL_MOTIONS) as NpcId[]).sort()).toEqual(expected);
     for (const id of Object.keys(STAIRWELL_MOTIONS) as NpcId[]) {
       expect(NPCS[id].roomId, id).toMatch(/^stairwell-\d$/);
@@ -61,17 +53,5 @@ describe("The Stairwell's NPC motions (#182)", () => {
     const point = transformPoint(sampleCssAnimation(compiled, 7_000), { x: 0, y: 0 });
     expect(point.x).toBeCloseTo(170);
     expect(point.y).toBeCloseTo(-65);
-  });
-
-  it("holds a guest's mingle at (-10,-50) through its 45%-70% stop, and idle at its 50% stop", () => {
-    const motion = STAIRWELL_MOTIONS['anthony-stairwell-0']!;
-    const path = compileCssAnimation(motion.path!);
-    const pathPoint = transformPoint(sampleCssAnimation(path, 9_000), { x: 0, y: 0 });
-    expect(pathPoint.x).toBeCloseTo(-10);
-    expect(pathPoint.y).toBeCloseTo(-50);
-    const figure = compileCssAnimation(motion.figure!);
-    const figurePoint = transformPoint(sampleCssAnimation(figure, 1_500), { x: 0, y: 0 });
-    expect(figurePoint.x).toBeCloseTo(0);
-    expect(figurePoint.y).toBeCloseTo(-3);
   });
 });

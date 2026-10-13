@@ -3,11 +3,11 @@ import type { NpcMotionSpec } from './types';
 
 /**
  * The Stairwell's NPC motions (#182, carried over from #51 slice 4/#149):
- * `design/Stairwell.dc.html`'s `<style>` block defines `domRun`, `jasonPace`
- * and `mingle` once and reuses them verbatim on every one of its six Stages
+ * `design/Stairwell.dc.html`'s `<style>` block defines `domRun` and
+ * `jasonPace` once and reuses them verbatim on every one of its six Stages
  * (same duration, easing and keyframe stops on every floor), so one spec per
- * role covers all 18 placements -- `stairwell.ts`'s own `npcSlotsFor` already
- * stands every floor's Dom/Jason/guest on the tile that reproduces the
+ * role covers all 12 placements -- `stairwell.ts`'s own `npcSlotsFor` already
+ * stands every floor's Dom/Jason on the tile that reproduces the
  * design's rest point (checked against each floor's own shadow ellipse).
  *
  * Left out:
@@ -23,11 +23,10 @@ import type { NpcMotionSpec } from './types';
  *   through the wrap instead of fading, a known, accepted engine limit (not
  *   new to this ticket).
  *
- * `idle` (the guests' figure-level sway while mingling) and `hop2` (Dom's
- * running hop) both sit on a `<g>` *inside* the figure's own scaled
+ * `hop2` (Dom's running hop) sits on a `<g>` *inside* the figure's own scaled
  * `<svg width="74.4" viewBox="0 0 120 130">`, the same nesting as every
  * other Room's `figure`-channel keyframe (e.g. Dev Pit's own `idle`), so
- * both are ported verbatim with no scale conversion: every Stairwell figure
+ * it is ported verbatim with no scale conversion: every Stairwell figure
  * draws at the Human default (0.62), matching the design's own `width`.
  */
 
@@ -67,36 +66,6 @@ const JASON_MOTION: NpcMotionSpec = {
   },
 };
 
-/**
- * Each floor's guest mingling (`mingle`), verbatim Stage px: every guest's
- * own tile + offset already reproduces the design's own rest ellipse exactly
- * (checked per floor against `design/Stairwell.dc.html`'s shadow), so 0%
- * needs no baseline subtraction here either. `idle` is the same figure sway
- * every other still guest plays while standing, kept alongside the roam as
- * the design's own markup nests it the same way.
- */
-const GUEST_MOTION: NpcMotionSpec = {
-  path: {
-    keyframes:
-      '@keyframes mingle { 0%,25% { transform: translate(0,0);} 45%,70% { transform: translate(-10px, -50px);} 90%,100% { transform: translate(0,0);} }',
-    animation: 'mingle 18s ease-in-out infinite',
-  },
-  figure: {
-    keyframes:
-      '@keyframes idle { 0%,100% { transform: translateY(0);} 50% { transform: translateY(-3px);} }',
-    animation: 'idle 3s ease-in-out infinite',
-  },
-};
-
-const STAIRWELL_GUEST_IDS: readonly NpcId[] = [
-  'anthony-stairwell-0',
-  'casey-stairwell-1',
-  'sydney-stairwell-2',
-  'tony-stairwell-3',
-  'jory-stairwell-4',
-  'ashley-stairwell-5',
-];
-
 export const STAIRWELL_MOTIONS: Partial<Record<NpcId, NpcMotionSpec>> = {
   'dom-stairwell-0': DOM_MOTION,
   'dom-stairwell-1': DOM_MOTION,
@@ -110,5 +79,4 @@ export const STAIRWELL_MOTIONS: Partial<Record<NpcId, NpcMotionSpec>> = {
   'jason-stairwell-3': JASON_MOTION,
   'jason-stairwell-4': JASON_MOTION,
   'jason-stairwell-5': JASON_MOTION,
-  ...Object.fromEntries(STAIRWELL_GUEST_IDS.map((id) => [id, GUEST_MOTION])),
 };

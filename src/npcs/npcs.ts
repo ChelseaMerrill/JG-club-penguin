@@ -135,9 +135,10 @@ export type NpcId =
   | 'gustavo-barska'
   // The Remote Lounge's JGers (`remote-lounge-npcs.ts`).
   | RemoteLoungeNpcId
-  // #51 slice 4: the Stairwell's 18 NPCs, by the same rule with each floor's
-  // RoomId as the suffix (S4-D8): Dom and Jason on every floor, plus one
-  // guest per floor. Every one of them is a repeat appearance.
+  // #51 slice 4: the Stairwell's 12 NPCs, by the same rule with each floor's
+  // RoomId as the suffix (S4-D8): Dom and Jason on every floor (the design's
+  // one guest per floor was removed by the owner, 2026-10-13). Every one of
+  // them is a repeat appearance.
   | 'dom-stairwell-0'
   | 'dom-stairwell-1'
   | 'dom-stairwell-2'
@@ -149,13 +150,7 @@ export type NpcId =
   | 'jason-stairwell-2'
   | 'jason-stairwell-3'
   | 'jason-stairwell-4'
-  | 'jason-stairwell-5'
-  | 'anthony-stairwell-0'
-  | 'casey-stairwell-1'
-  | 'sydney-stairwell-2'
-  | 'tony-stairwell-3'
-  | 'jory-stairwell-4'
-  | 'ashley-stairwell-5';
+  | 'jason-stairwell-5';
 
 /**
  * A minigame-launching NPC's trigger dialog (#36 D4; round-1 review item 4
@@ -822,11 +817,7 @@ const BRANDON_FIGURE: HumanFigureSpec = {
   prop: 'hobbyhorse',
 };
 
-/**
- * Tony Mercadante's figure (`humans.js`'s `mercadante`: `slick` hair and a
- * `henley` collar), shared by the Mullet's `tony` and the Stairwell's
- * `tony-stairwell-3` (#51 slice 4).
- */
+/** Tony Mercadante's figure (`humans.js`'s `mercadante`: `slick` hair and a `henley` collar). */
 const TONY_FIGURE: HumanFigureSpec = {
   style: 'slick',
   hair: 'dark',
@@ -928,12 +919,11 @@ interface StairwellLine {
 /**
  * One Stairwell floor's NPC (#51 slice 4, S4-D8): its two `say` bubbles from
  * that floor's Stage of `design/Stairwell.dc.html`, verbatim, on the
- * design's own cycle (Dom 9 s, Jason 14 s, the guest 18 s, each with its two
- * delays). The same two lines are its dialog lines, so each pool has two and
+ * design's own cycle (Dom 9 s, Jason 14 s, each with its two delays). The same two lines are its dialog lines, so each pool has two and
  * needs no BA copy. Its figure is its person's shared constant; the design
  * draws every Stairwell figure at 0.62 (`width="74.4"`), the Human default,
  * so none sets `scale` (HD-5). The design's motions (Dom's run up the
- * stairs, Jason's pacing, the guests' mingling) are ported in
+ * stairs, Jason's pacing) are ported in
  * `motions/stairwell.ts` (#182); that file's own header explains the two
  * pieces left out (Dom's direction flip, his run's opacity fade). The
  * climb panel's own "Jason pop-in" flourish (`scripts/export-room-art.ts`'s
@@ -972,9 +962,10 @@ function stairwellDom(floor: number, first: string, second: string): HumanNpcDef
       { text: first, delayS: -1 },
       { text: second, delayS: -5 },
     ],
-    // humans.js's spec, laptop and all: the Stairwell's design doesn't put
-    // him in Team Room 1's and the Mullet's running kit.
-    figure: DOM_FIGURE,
+    // His running kit, as Team Room 1 and the Mullet dress him (owner
+    // request, 2026-10-13), though the Stairwell's design still draws
+    // humans.js's laptop look.
+    figure: DOM_RUNNER_FIGURE,
   });
 }
 
@@ -1000,14 +991,6 @@ function stairwellJason(floor: number, first: string, second: string): HumanNpcD
     bubbleOffsetY: 3,
     figure: JASON_FIGURE,
   });
-}
-
-/** The 18 s cycle every Stairwell guest's two bubbles share, at -4 s and -13 s. */
-function guestLines(first: string, second: string): readonly [StairwellLine, StairwellLine] {
-  return [
-    { text: first, delayS: -4 },
-    { text: second, delayS: -13 },
-  ];
 }
 
 /** How the Mullet's design draws Jon and Brandon (#149): at 0.58, with dark nameplates. */
@@ -2439,8 +2422,8 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     figure: DOM_RUNNER_FIGURE,
   },
   // #51 slice 4: the Stairwell's NPCs (`stairwellNpc` above). Names and
-  // titles from design/Characters.dc.html (Dom, Ashley and Casey are on its
-  // TITLE TBD list); tags and lines verbatim from each floor's Stage.
+  // titles from design/Characters.dc.html (Dom is on its TITLE TBD list);
+  // tags and lines verbatim from each floor's Stage.
   // The Stairwell is an approved exception to the "each person appears in one
   // Room only" rule (owner decision via @milliehime, 2026-10-02): its designed
   // cast stays as-is, including people whose home Room no longer lists them.
@@ -2475,76 +2458,11 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     'Floor 4. Breathing hard already?',
     'The elevator misses you.',
   ),
-  'jason-stairwell-5': {
-    ...stairwellJason(5, 'Oh, you made it? Took a while.', 'Dom beat you by four minutes.'),
-    // The grid stands floor 5's guest, Ashley, a tile nearer him than the
-    // other floors' guests, where his bubbles would meet hers (the design
-    // already has them touching). Floated up until they clear (#113).
-    bubbleOffsetY: -10,
-  },
-  'anthony-stairwell-0': stairwellNpc({
-    id: 'anthony-stairwell-0',
-    name: 'Anthony Conway',
-    title: 'Director of IT',
-    roomId: 'stairwell-0',
-    tagName: 'Anthony',
-    periodS: 18,
-    lines: guestLines('Nobody phishes on the stairs.', 'Verify the floor number.'),
-    figure: ANTHONY_FIGURE,
-  }),
-  'casey-stairwell-1': stairwellNpc({
-    id: 'casey-stairwell-1',
-    name: 'Casey Snow',
-    title: null,
-    roomId: 'stairwell-1',
-    tagName: 'Casey',
-    periodS: 18,
-    lines: guestLines('Headphones on. Legs on.', 'Beat drops on floor 3.'),
-    figure: CASEY_FIGURE,
-  }),
-  'sydney-stairwell-2': stairwellNpc({
-    id: 'sydney-stairwell-2',
-    name: 'Sydney Murauskas',
-    title: 'Technical Recruiter',
-    roomId: 'stairwell-2',
-    tagName: 'Sydney',
-    periodS: 18,
-    lines: guestLines('Stairs build character.', 'Looking strong!'),
-    figure: SYDNEY_FIGURE,
-  }),
-  'tony-stairwell-3': stairwellNpc({
-    id: 'tony-stairwell-3',
-    name: 'Tony Mercadante',
-    title: 'Project Manager',
-    roomId: 'stairwell-3',
-    tagName: 'Tony',
-    periodS: 18,
-    lines: guestLines('Pool table is on 5. Motivation.', 'Two more. Easy.'),
-    figure: TONY_FIGURE,
-  }),
-  'jory-stairwell-4': stairwellNpc({
-    id: 'jory-stairwell-4',
-    name: 'Jory Hutchins',
-    title: 'Director of Career Development',
-    roomId: 'stairwell-4',
-    tagName: 'Jory',
-    periodS: 18,
-    lines: guestLines('Outwit. Outplay. Outclimb.', 'The tribe says: keep going.'),
-    figure: JORY_FIGURE,
-  }),
-  'ashley-stairwell-5': stairwellNpc({
-    id: 'ashley-stairwell-5',
-    name: 'Ashley Schuliger',
-    title: null,
-    roomId: 'stairwell-5',
-    tagName: 'Ashley',
-    periodS: 18,
-    lines: guestLines('Made it! Chicken did too.', 'Stretch. Then coffee.'),
-    // Shifted right until her bubbles clear Jason's nameplate (see his
-    // entry above; #113).
-    bubbleOffsetX: 20,
-    figure: ASHLEY_FIGURE,
-  }),
+  'jason-stairwell-5': stairwellJason(
+    5,
+    'Oh, you made it? Took a while.',
+    'Dom beat you by four minutes.',
+  ),
   // Jessie: the design draws her as a Penguin in the Bathroom, but only
   // Players appear as Penguins in the World (owner decision 2026-09-25; see
   // PR #133) -- dropped here and from the Bathroom's own npcSlots. Spelled

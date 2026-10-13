@@ -190,29 +190,29 @@ function doorsFor(floor: number): FloorDoors {
 const KEY_EXITS = new Map<RoomId, { up: RoomDoor; down: RoomDoor }>();
 
 /**
- * Each floor's three NPCs (S4-D8), on the tile under each figure's ground
+ * Each floor's two NPCs (S4-D8), on the tile under each figure's ground
  * shadow as the design draws it at rest, with an `offset` to its exact spot:
- * Dom at his run's first visible point (640, 522), at the foot of the stairs;
- * Jason at (620, 590); and the floor's guest by the floor's centre. "You" is
- * the local Player, never a slot.
+ * Dom at his run's first visible point (640, 522), at the foot of the stairs,
+ * and Jason at (620, 590). "You" is the local Player, never a slot. The
+ * design also stands one guest per floor by the floor's centre (Anthony,
+ * Casey, Sydney, Tony, Jory, Ashley); the owner removed them on 2026-10-13,
+ * leaving only Dom and Jason on the stairs.
  */
-function npcSlotsFor(floor: number, guest: RoomNpcSlot): RoomNpcSlot[] {
+function npcSlotsFor(floor: number): RoomNpcSlot[] {
   return [
     { npcId: `dom-stairwell-${floor}`, tile: { col: 1, row: 4 }, offset: { x: -10, y: 12 } },
     { npcId: `jason-stairwell-${floor}`, tile: { col: 2, row: 6 }, offset: { x: 20, y: 5 } },
-    guest,
   ];
 }
 
 interface StairwellFloorSpec {
   floor: number;
   subtitle: string;
-  guest: RoomNpcSlot;
 }
 
-function stairwellFloor({ floor, subtitle, guest }: StairwellFloorSpec): RoomDefinition {
+function stairwellFloor({ floor, subtitle }: StairwellFloorSpec): RoomDefinition {
   const id = stairwellRoomId(floor);
-  const npcSlots = npcSlotsFor(floor, guest);
+  const npcSlots = npcSlotsFor(floor);
   const { doors, up, down } = doorsFor(floor);
   KEY_EXITS.set(id, { up, down });
   return {
@@ -242,35 +242,26 @@ function stairwellFloor({ floor, subtitle, guest }: StairwellFloorSpec): RoomDef
 export const stairwell0 = stairwellFloor({
   floor: 0,
   subtitle: 'LOBBY · STREET LEVEL',
-  // #182: the design's own guest shadow sits 10px left of this tile's centre
-  // (790,635 vs this tile's (800,635)), the one guest of the six whose rest
-  // point needed an offset at all -- every other floor's guest already
-  // matched its design shadow exactly.
-  guest: { npcId: 'anthony-stairwell-0', tile: { col: 5, row: 5 }, offset: { x: -10, y: 0 } },
 });
 
 export const stairwell1 = stairwellFloor({
   floor: 1,
   subtitle: 'STAIRWELL · FLOOR 1',
-  guest: { npcId: 'casey-stairwell-1', tile: { col: 5, row: 5 }, offset: { x: -10, y: -10 } },
 });
 
 export const stairwell2 = stairwellFloor({
   floor: 2,
   subtitle: 'STAIRWELL · FLOOR 2',
-  guest: { npcId: 'sydney-stairwell-2', tile: { col: 5, row: 5 }, offset: { x: -30, y: -10 } },
 });
 
 export const stairwell3 = stairwellFloor({
   floor: 3,
   subtitle: 'STAIRWELL · FLOOR 3',
-  guest: { npcId: 'tony-stairwell-3', tile: { col: 5, row: 5 }, offset: { x: 10, y: -10 } },
 });
 
 export const stairwell4 = stairwellFloor({
   floor: 4,
   subtitle: 'STAIRWELL · FLOOR 4',
-  guest: { npcId: 'jory-stairwell-4', tile: { col: 5, row: 5 }, offset: { x: -20, y: -5 } },
 });
 
 // The banner's subtitle minus "RAIL SLIDING ENCOURAGED", which names the
@@ -279,7 +270,6 @@ export const stairwell4 = stairwellFloor({
 export const stairwell5 = stairwellFloor({
   floor: 5,
   subtitle: 'STAIRWELL B · 5 OF 5 · TOP FLOOR · JG HQ',
-  guest: { npcId: 'ashley-stairwell-5', tile: { col: 4, row: 5 }, offset: { x: 20, y: 5 } },
 });
 
 /** Every Stairwell floor, floor 0 first. */
