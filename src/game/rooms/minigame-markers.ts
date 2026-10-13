@@ -126,7 +126,7 @@ export interface MarkerBallPose {
   dy: number;
   /** The shadow's own horizontal scale (1 at rest, narrower at the bounce's peak). */
   shadowScaleX: number;
-  /** The valve dots' own rotation, degrees. */
+  /** The ball's pattern rotation, degrees (the design's valve-dot spin). */
   valveRotationDeg: number;
 }
 
@@ -150,4 +150,50 @@ export function sampleMarkerBall(
     shadowScaleX: shadow.a,
     valveRotationDeg: (Math.atan2(valves.b, valves.a) * 180) / Math.PI,
   };
+}
+
+export interface SoccerBallPattern {
+  /** The black centre pentagon. */
+  centre: { x: number; y: number }[];
+  /** The five black patches around the rim, each already clipped to the ball's edge. */
+  rimPatches: { x: number; y: number }[][];
+  /** The five seams joining each centre-pentagon corner to its rim patch. */
+  seams: { from: { x: number; y: number }; to: { x: number; y: number } }[];
+}
+
+/**
+ * A classic black-and-white soccer ball's pattern for a ball of `radius`,
+ * centred on (0,0) (owner request, 2026-10-13: the design's own ball, one
+ * pentagon and two valve dots, "just looks like a white ball with 3 dots").
+ * A centre pentagon, a seam from each of its corners out to a rim patch, and
+ * five rim pentagons, each clipped to the ball's edge by pulling any corner
+ * that falls outside the ball back onto it.
+ */
+export function soccerBallPattern(radius: number): SoccerBallPattern {
+  const pentagon = (cx: number, cy: number, size: number, turn: number) =>
+    [0, 1, 2, 3, 4].map((i) => {
+      const angle = turn + (i * 2 * Math.PI) / 5;
+      return { x: cx + size * Math.cos(angle), y: cy + size * Math.sin(angle) };
+    });
+  const toEdge = (point: { x: number; y: number }) => {
+    const distance = Math.hypot(point.x, point.y);
+    return distance <= radius
+      ? point
+      : { x: (point.x / distance) * radius, y: (point.y / distance) * radius };
+  };
+  const up = -Math.PI / 2;
+  const centre = pentagon(0, 0, radius * 0.36, up);
+  const rimPatches: SoccerBallPattern['rimPatches'] = [];
+  const seams: SoccerBallPattern['seams'] = [];
+  for (let i = 0; i < 5; i += 1) {
+    const angle = up + (i * 2 * Math.PI) / 5;
+    const cx = radius * 0.98 * Math.cos(angle);
+    const cy = radius * 0.98 * Math.sin(angle);
+    // Each rim patch points back at the centre, so a flat side faces outward.
+    const patch = pentagon(cx, cy, radius * 0.34, angle + Math.PI).map(toEdge);
+    rimPatches.push(patch);
+    // Its first corner is the one pointing at the centre pentagon.
+    seams.push({ from: centre[i]!, to: patch[0]! });
+  }
+  return { centre, rimPatches, seams };
 }

@@ -1,12 +1,17 @@
 import type { GameObjects, Scene } from 'phaser';
 import type { HexColor } from '../../contracts';
-import { sampleMarkerBall, sampleMarkerCalloutBob, sampleMarkerGlow } from './minigame-markers';
+import {
+  sampleMarkerBall,
+  sampleMarkerCalloutBob,
+  sampleMarkerGlow,
+  soccerBallPattern,
+} from './minigame-markers';
 import type { RoomMinigameMarker } from './room-definition';
 
 /** The design's own near-black callout-pill text colour and bubble stroke (every call-out this prototype ports uses both verbatim). */
 const CALLOUT_TEXT_COLOUR = '#161719';
 const CALLOUT_STROKE_COLOUR = 0x0c4b5f;
-/** The design's own ball fill/outline and pentagon colour (`Latam Futebol Field.dc.html`'s ball `<g>`). */
+/** The design's own ball fill/outline colours (`Latam Futebol Field.dc.html`'s ball `<g>`), also the patches' colour. */
 const BALL_FILL_COLOUR = 0xf4f4f4;
 const BALL_OUTLINE_COLOUR = 0x161719;
 const BALL_SHADOW_COLOUR = 0x000000;
@@ -137,47 +142,27 @@ export class RoomMinigameMarkers {
       const { radius } = spec.ball;
       const body = scene.add.graphics();
       body.fillStyle(BALL_FILL_COLOUR, 1);
-      body.lineStyle(3, BALL_OUTLINE_COLOUR, 1);
       body.fillCircle(0, 0, radius);
-      body.strokeCircle(0, 0, radius);
-      // The design's own pentagon, traced from its `<polygon points="855,539
-      // 862,544 859,552 851,552 848,544">` relative to the ball's own centre
-      // (855,546): `(0,-7) (7,-2) (4,6) (-4,6) (-7,-2)`, scaled to this
-      // marker's own radius (the design's ball is r=22).
-      const pentagonScale = radius / 22;
-      const pentagon = [
-        0 * pentagonScale,
-        -7 * pentagonScale,
-        7 * pentagonScale,
-        -2 * pentagonScale,
-        4 * pentagonScale,
-        6 * pentagonScale,
-        -4 * pentagonScale,
-        6 * pentagonScale,
-        -7 * pentagonScale,
-        -2 * pentagonScale,
-      ];
-      body.fillStyle(BALL_OUTLINE_COLOUR, 1);
-      body.fillPoints(
-        [0, 1, 2, 3, 4].map((i) => ({ x: pentagon[i * 2], y: pentagon[i * 2 + 1] })),
-        true,
-      );
 
-      const valveDotRadius = 2.5 * pentagonScale;
-      const valveOffset = 11 * pentagonScale;
-      const valves = scene.add.container(0, 0, [
-        scene.add
-          .graphics()
-          .fillStyle(BALL_OUTLINE_COLOUR, 1)
-          .fillCircle(valveOffset, 0, valveDotRadius),
-        scene.add
-          .graphics()
-          .fillStyle(BALL_OUTLINE_COLOUR, 1)
-          .fillCircle(-valveOffset, 0, valveDotRadius),
-      ]);
+      // A classic soccer ball's patches and seams (owner request,
+      // 2026-10-13), in their own container so they spin with the design's
+      // valve-dot rotation while the white body and outline stay put.
+      const { centre, rimPatches, seams } = soccerBallPattern(radius);
+      const patches = scene.add.graphics();
+      patches.lineStyle(Math.max(1, radius / 14), BALL_OUTLINE_COLOUR, 1);
+      for (const seam of seams) patches.lineBetween(seam.from.x, seam.from.y, seam.to.x, seam.to.y);
+      patches.fillStyle(BALL_OUTLINE_COLOUR, 1);
+      patches.fillPoints(centre, true);
+      for (const patch of rimPatches) patches.fillPoints(patch, true);
+      const valves = scene.add.container(0, 0, [patches]);
+
+      // The outline last, over the rim patches' clipped edges.
+      const outline = scene.add.graphics();
+      outline.lineStyle(3, BALL_OUTLINE_COLOUR, 1);
+      outline.strokeCircle(0, 0, radius);
 
       const bodyContainer = scene.add
-        .container(spec.anchor.x, spec.anchor.y, [body, valves])
+        .container(spec.anchor.x, spec.anchor.y, [body, valves, outline])
         .setDepth(spec.depth);
 
       const shadow = scene.add.graphics().setDepth(spec.depth - 0.001);
