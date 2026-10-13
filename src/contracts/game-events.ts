@@ -11,7 +11,8 @@ export type MinigameId =
   | 'snow-cone-stand'
   | 'beystadium'
   | 'penalty-kick'
-  | 'carnaval-parade';
+  | 'carnaval-parade'
+  | 'pao-de-queijo';
 
 /**
  * Every Badge seeded in `public.badges` (#138's migration; mirrored by
@@ -36,7 +37,8 @@ export type BadgeId =
   | 'stair-master'
   | 'phish-fry'
   | 'goleador'
-  | 'passista';
+  | 'passista'
+  | 'mestre-do-pao-de-queijo';
 
 /**
  * Per-minigame stats keys. Producer: #37. Consumers: #27 (SQL keys), #32,
@@ -150,6 +152,21 @@ export interface MinigameStatsMap {
     feathers: number;
     stars: number;
     barriersHit: number;
+    bestStreak: number;
+  };
+  /** One Pão de Queijo Memory game (#218): `roundsCleared` is rounds
+   *  finished (0-3, the personal-best and leaderboard measure stays the
+   *  round's own `score`, not this); `matches` is pairs matched over the
+   *  whole game (at most 24, every round's pairs summed); `bestStreak` is
+   *  the longest unbroken run of matches (a miss resets it, a cleared round
+   *  doesn't). Producer: `pao-de-queijo-engine.ts`. Consumer:
+   *  `record_round`'s `'pao-de-queijo'` branch
+   *  (`20261012030000_pao_de_queijo.sql`), which pays and validates from
+   *  these, and whose Badge (Mestre do Pão de Queijo) is earned exactly when
+   *  `roundsCleared` reaches 3. */
+  'pao-de-queijo': {
+    roundsCleared: number;
+    matches: number;
     bestStreak: number;
   };
 }

@@ -240,6 +240,27 @@ export const QUEST_DEFINITIONS: readonly QuestDefinition[] = [
     'TALK TO HECTOR',
     'Score 400 in one parade',
   ),
+  // #218: `badgeGoal()`'s own `'match-wins'` branch (the Badge's rule kind,
+  // reused from Beystadium's exact mechanism -- see `minigame-rules.ts`'s
+  // own comment on `pao-de-queijo`) gives `goalKind: 'match-wins', goal: 1`
+  // here: "cleared all 3 rounds" is this Minigame's only kind of win, so one
+  // is enough. `evaluateQuest` (`quest-engine.ts`) still finishes this Quest
+  // the moment the Badge itself is earned regardless (every Minigame Quest's
+  // `done` is `progress >= goal || badges.includes(badgeId)`) -- the
+  // `'match-wins'` goal only has to agree, which it does by construction.
+  // This Quest's own `matchWins` count never actually appears in
+  // `quest_progress()` (its `coalesce` is hardcoded to `'beystadium'`,
+  // 20261006000000_quest_registry.sql), so its progress bar reads 0 until
+  // the Badge pops it straight to done -- a real but cosmetic-only gap,
+  // accepted rather than redefining `quest_progress()` for a count this
+  // Quest's own `done` doesn't actually need (per #218's own decision).
+  minigameQuest(
+    'pao-de-queijo',
+    'PÃO DE QUEIJO MEMORY · 3 ROUNDS',
+    'latam-cafe',
+    'TALK TO SANDER',
+    'Clear all 3 rounds',
+  ),
   // #141: Nicole's coffee run, steps in the ticket's order. The server's
   // `quest_steps__nicole_coffee` (20261006020000_quest_nicole_coffee.sql C4)
   // reports them; a cup that goes cold resets steps 3-5 until Tom hands over

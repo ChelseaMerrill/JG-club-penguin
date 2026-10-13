@@ -7,6 +7,7 @@ import type { CoffeeRushTestHooks } from './coffee-rush/coffee-rush';
 import type { LaunchedMinigame, MinigameLauncher } from './minigame-launcher';
 import type { MinigameTestHandle } from './minigame-test-handle';
 import type { PancakeFlipTestHooks } from './pancake-flip/pancake-flip';
+import type { PaoDeQueijoTestHooks } from './pao-de-queijo/pao-de-queijo';
 import type { PenaltyKickTestHooks } from './penalty-kick/penalty-kick';
 import type { SnowConeStandTestHooks } from './snow-cone-stand/snow-cone-stand';
 import type { StubMinigameTestHooks } from './stub-minigame';
@@ -48,6 +49,12 @@ function hasPenaltyKickHooks(value: unknown): value is PenaltyKickTestHooks {
 function hasCarnavalParadeHooks(value: unknown): value is CarnavalParadeTestHooks {
   return (
     !!value && typeof (value as Partial<CarnavalParadeTestHooks>).debugFinishNow === 'function'
+  );
+}
+
+function hasPaoDeQueijoHooks(value: unknown): value is PaoDeQueijoTestHooks {
+  return (
+    !!value && typeof (value as Partial<PaoDeQueijoTestHooks>).debugMatchAllPairs === 'function'
   );
 }
 
@@ -125,6 +132,10 @@ export function initDevMinigameHook(hud: Hud, launcher: MinigameLauncher): boole
     finishCarnavalParadeNow() {
       // Gated on the loaded id for the same reason as `finishPancakeFlipNow`.
       if (currentId === 'carnaval-parade' && hasCarnavalParadeHooks(hooks)) hooks.debugFinishNow();
+    },
+    matchAllPaoDeQueijoPairs() {
+      // Gated on the loaded id for the same reason as `finishPancakeFlipNow`.
+      if (currentId === 'pao-de-queijo' && hasPaoDeQueijoHooks(hooks)) hooks.debugMatchAllPairs();
     },
     launch(minigameId) {
       if (!isMinigameId(minigameId)) return;

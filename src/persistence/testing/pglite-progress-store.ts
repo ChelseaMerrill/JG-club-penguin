@@ -66,6 +66,7 @@ export const MIGRATIONS = [
   ['quest-snowmageddon', '20261012000000_quest_snowmageddon.sql'],
   ['penalty-kick', '20261012010000_penalty_kick.sql'],
   ['carnaval-parade', '20261012020000_carnaval_parade.sql'],
+  ['pao-de-queijo', '20261012030000_pao_de_queijo.sql'],
   ['door-network-guard-posts', '20261013000000_door_network_guard_posts.sql'],
 ] as const;
 

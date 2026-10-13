@@ -245,7 +245,11 @@ function stairwellFloor({ floor, subtitle, guest }: StairwellFloorSpec): RoomDef
 export const stairwell0 = stairwellFloor({
   floor: 0,
   subtitle: 'LOBBY · STREET LEVEL',
-  guest: { npcId: 'anthony-stairwell-0', tile: { col: 5, row: 5 } },
+  // #182: the design's own guest shadow sits 10px left of this tile's centre
+  // (790,635 vs this tile's (800,635)), the one guest of the six whose rest
+  // point needed an offset at all -- every other floor's guest already
+  // matched its design shadow exactly.
+  guest: { npcId: 'anthony-stairwell-0', tile: { col: 5, row: 5 }, offset: { x: -10, y: 0 } },
 });
 
 export const stairwell1 = stairwellFloor({
