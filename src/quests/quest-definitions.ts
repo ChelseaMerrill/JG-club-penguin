@@ -212,6 +212,34 @@ export const QUEST_DEFINITIONS: readonly QuestDefinition[] = [
     'TALK TO MICHAEL',
     'Win 3 Beystadium matches',
   ),
+  // #220: the design's own "QUEST · PENALTY KICK · 0 / 5 GOALS" trigger-card
+  // line, styled the way Beystadium's title is -- not built with
+  // `minigameQuest()`'s `badgeGoal()` helper (every other Minigame Quest's
+  // threshold matches its Badge's own threshold) because this one
+  // deliberately doesn't: Goleador is 4 of 5 scored (the Badge catalog's "4
+  // OF 5"), but the design's own Quest line reads "0 / 5" -- a clean sheet,
+  // all five shots scored -- so this Quest's goal is 5, not Goleador's 4.
+  {
+    kind: 'minigame',
+    id: 'penalty-kick',
+    minigameId: 'penalty-kick',
+    title: 'PENALTY KICK · 5 GOALS',
+    location: `${roomTitle('latam-futebol-field')} · TALK TO CHRYSTIAN`,
+    goalKind: 'best',
+    goal: 5,
+    hint: 'Score 5 goals in one round',
+    roomId: 'latam-futebol-field',
+    hintLocation: roomTitle('latam-futebol-field'),
+  },
+  // #219: the design's own trigger-screen quest counter, "QUEST · CARNAVAL
+  // PARADE · 0 / 400 PTS"; Hector gives it, from the LATAM Disco Hall.
+  minigameQuest(
+    'carnaval-parade',
+    'CARNAVAL PARADE · SCORE 400 PTS',
+    'latam-disco-hall',
+    'TALK TO HECTOR',
+    'Score 400 in one parade',
+  ),
   // #141: Nicole's coffee run, steps in the ticket's order. The server's
   // `quest_steps__nicole_coffee` (20261006020000_quest_nicole_coffee.sql C4)
   // reports them; a cup that goes cold resets steps 3-5 until Tom hands over
@@ -320,6 +348,51 @@ export const QUEST_DEFINITIONS: readonly QuestDefinition[] = [
         label: 'Report back to Paul',
         hint: 'Report back to Paul',
         roomId: 'the-icebox',
+      },
+    ],
+  },
+  // #154: "Snowmageddon: hit 5 penguins today". No giver, active from the
+  // start, like the #46 quests. The server's
+  // `quest_steps__snowmageddon` (20261012000000_quest_snowmageddon.sql S5)
+  // reports today's (Eastern) distinct-target hit count as five steps; the
+  // thrower's client reports each hit through `recordSnowballHit`
+  // (`src/snowball/snowball-controller.ts`).
+  {
+    kind: 'steps',
+    id: 'snowmageddon',
+    title: 'Snowmageddon: hit 5 penguins today',
+    location: 'ANYWHERE · SNOWBALL',
+    rewardTokens: 75,
+    steps: [
+      {
+        id: 'hit-1',
+        label: 'Hit 1 different Player today',
+        hint: 'Hit a different Player with a snowball',
+        roomId: null,
+      },
+      {
+        id: 'hit-2',
+        label: 'Hit 2 different Players today',
+        hint: 'Hit another different Player with a snowball',
+        roomId: null,
+      },
+      {
+        id: 'hit-3',
+        label: 'Hit 3 different Players today',
+        hint: 'Hit another different Player with a snowball',
+        roomId: null,
+      },
+      {
+        id: 'hit-4',
+        label: 'Hit 4 different Players today',
+        hint: 'Hit another different Player with a snowball',
+        roomId: null,
+      },
+      {
+        id: 'hit-5',
+        label: 'Hit 5 different Players today',
+        hint: 'Hit another different Player with a snowball',
+        roomId: null,
       },
     ],
   },

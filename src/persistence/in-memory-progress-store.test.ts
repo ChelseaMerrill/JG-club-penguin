@@ -403,6 +403,113 @@ describe('createInMemoryProgressStore pair-flaky-test Quest (#140)', () => {
   });
 });
 
+describe('createInMemoryProgressStore Snowmageddon Quest (#154)', () => {
+  it('seeds the snowmageddon Quest with its 75-Token reward', () => {
+    expect(IN_MEMORY_STEPS_QUESTS.get('snowmageddon')?.rewardTokens).toBe(75);
+  });
+
+  it('counts distinct targets today, rising hit-1 through hit-5', async () => {
+    const store = createInMemoryProgressStore({ completedLook: DEFAULT_LOOK });
+
+    for (let i = 1; i <= 5; i += 1) {
+      const result = await store.recordSnowballHit(`target-${i}`, `throw-${i}`);
+      expect(result).toEqual({ counted: true, today: i });
+    }
+
+    expect((await store.questProgress()).questSteps['snowmageddon']).toEqual({
+      'hit-1': true,
+      'hit-2': true,
+      'hit-3': true,
+      'hit-4': true,
+      'hit-5': true,
+    });
+  });
+
+  it('a repeat target (fresh throwId) and a reused throwId (different target) both add nothing', async () => {
+    const store = createInMemoryProgressStore({ completedLook: DEFAULT_LOOK });
+    await store.recordSnowballHit('target-1', 'throw-1');
+
+    const repeatTarget = await store.recordSnowballHit('target-1', 'throw-1-again');
+    expect(repeatTarget).toEqual({ counted: false, today: 1 });
+
+    const reusedThrowId = await store.recordSnowballHit('target-2', 'throw-1');
+    expect(reusedThrowId).toEqual({ counted: false, today: 1 });
+  });
+
+  it('resets the distinct-target count at 00:00 America/New_York, by its injected clock', async () => {
+    // 23:59:50 EDT on 2026-09-27.
+    let currentMs = Date.parse('2026-09-28T03:59:50.000Z');
+    const store = createInMemoryProgressStore({
+      completedLook: DEFAULT_LOOK,
+      now: () => currentMs,
+    });
+
+    await store.recordSnowballHit('target-1', 'throw-1');
+    await store.recordSnowballHit('target-2', 'throw-2');
+    await store.recordSnowballHit('target-3', 'throw-3');
+    const beforeMidnight = await store.recordSnowballHit('target-4', 'throw-4');
+    expect(beforeMidnight).toEqual({ counted: true, today: 4 });
+
+    currentMs += 20_000; // past 00:00 Eastern
+    const afterMidnight = await store.recordSnowballHit('target-5', 'throw-5');
+    // A new Eastern day: only today's own (one) hit counts, so the Quest
+    // doesn't complete from the earlier day's four plus one more.
+    expect(afterMidnight).toEqual({ counted: true, today: 1 });
+    expect((await store.questProgress()).questSteps['snowmageddon']).toEqual({
+      'hit-1': true,
+      'hit-2': false,
+      'hit-3': false,
+      'hit-4': false,
+      'hit-5': false,
+    });
+    await expect(store.completeQuest('snowmageddon')).rejects.toMatchObject({
+      code: 'quest_incomplete',
+    });
+  });
+
+  it('pays 75 Tokens and the Badge once all five steps are met, and nothing again after', async () => {
+    const store = createInMemoryProgressStore({ completedLook: DEFAULT_LOOK });
+    for (let i = 1; i <= 5; i += 1) {
+      await store.recordSnowballHit(`target-${i}`, `throw-${i}`);
+    }
+
+    const before = (await store.loadAll()).tokens;
+    const first = await store.completeQuest('snowmageddon');
+    const second = await store.completeQuest('snowmageddon');
+    const after = await store.loadAll();
+
+    expect(first).toMatchObject({
+      tokensAwarded: 75,
+      alreadyCompleted: false,
+      // #154 S6/D3: the Badge is awarded by a side channel, not this call's
+      // own badgesEarned (the registry's R5) -- the next Session Badge check
+      // announces it.
+      badgesEarned: [],
+    });
+    expect(second).toMatchObject({ tokensAwarded: 0, alreadyCompleted: true, badgesEarned: [] });
+    expect(after.tokens).toBe(before + 125); // 75 Quest + the Badge's +50
+    expect(after.badges).toContain('snowmageddon');
+  });
+
+  it('records no further hits once the Quest is complete, and steps stay true forever', async () => {
+    const store = createInMemoryProgressStore({ completedLook: DEFAULT_LOOK });
+    for (let i = 1; i <= 5; i += 1) {
+      await store.recordSnowballHit(`target-${i}`, `throw-${i}`);
+    }
+    await store.completeQuest('snowmageddon');
+
+    const afterComplete = await store.recordSnowballHit('target-6', 'throw-6');
+    expect(afterComplete.counted).toBe(false);
+    expect((await store.questProgress()).questSteps['snowmageddon']).toEqual({
+      'hit-1': true,
+      'hit-2': true,
+      'hit-3': true,
+      'hit-4': true,
+      'hit-5': true,
+    });
+  });
+});
+
 describe('createInMemoryProgressStore Stairs Challenge clock (#51 slice 4)', () => {
   it('resets the daily tally at 00:00 America/New_York, by its injected clock', async () => {
     // 23:59:50 EDT on 2026-09-27.

@@ -256,6 +256,17 @@ function wrapStore(
         badges: unionBadges(previous.badges, result.badgesEarned),
       });
     }
+    // #154: the Snowmageddon Badge is awarded by a server-side trigger on the
+    // completion row, not by this call's own badgesEarned (the registry's
+    // R5, #138 D3's "a Quest-triggered Badge" precedent -- Interior Penguin's
+    // igloo_slots trigger, right below in `setSlot`). Force a Session Badge
+    // check immediately on the first real completion, rather than waiting out
+    // the periodic one, so the Badge's own +50 popup shows up straight away.
+    // A failed check never fails the Quest; a repeat completion (already
+    // announced) checks nothing again.
+    if (questId === 'snowmageddon' && !result.alreadyCompleted) {
+      await checkBadges().catch(() => undefined);
+    }
     return result;
   }
 
@@ -349,6 +360,9 @@ function wrapStore(
       reportToPaul: () => store.reportToPaul(),
       logStairFlight,
       getStairClimb: () => store.getStairClimb(),
+      // #154: changes nothing the snapshot holds either (the Badge, if any,
+      // comes through `completeQuest` above, not this call).
+      recordSnowballHit: (targetId, throwId) => store.recordSnowballHit(targetId, throwId),
     },
     loadInitial: loadAll,
   };
@@ -482,5 +496,6 @@ export function createActiveProgressStore(
     reportToPaul: async () => current().reportToPaul(),
     logStairFlight: async (floor) => current().logStairFlight(floor),
     getStairClimb: async () => current().getStairClimb(),
+    recordSnowballHit: async (targetId, throwId) => current().recordSnowballHit(targetId, throwId),
   };
 }

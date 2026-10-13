@@ -45,6 +45,19 @@ const WORLD_MS = 1100;
  */
 export const RIO_LOCATION = { lon: -43.173, lat: -22.907 };
 
+/**
+ * The LATAM pin's static marker shapes -- the purple disc, the white face,
+ * the beak and the leg lines -- as inline SVG markup, without the globe's
+ * pulse ring or "LATAM" label. Reused by the Remote Lounge's LATAM roster
+ * row and card (`remote-lounge.ts`, owner request, 2026-10-12) for a small
+ * version of the same mark.
+ */
+export const LATAM_PIN_SHAPES =
+  '<circle r="12" fill="#C9A8FF" stroke="#161719" stroke-width="3"/>' +
+  '<circle r="8" fill="#F4F4F4" stroke="#161719" stroke-width="1.5"/>' +
+  '<polygon points="0,-4 3.8,-1.2 2.4,3.2 -2.4,3.2 -3.8,-1.2" fill="#161719"/>' +
+  '<path d="M0 -4 V-8 M3.8 -1.2 L7.5 -2.5 M2.4 3.2 L4.6 6.4 M-2.4 3.2 L-4.6 6.4 M-3.8 -1.2 L-7.5 -2.5" stroke="#161719" stroke-width="1.2"/>';
+
 export interface GlobePin {
   name: string;
   lon: number;
@@ -62,6 +75,10 @@ export interface Globe {
   setMap(map: GlobeMap): void;
   /** Tweens to `pins[index]`'s city, zoomed in, and stops the spin. */
   flyTo(index: number): void;
+  /** Tweens to an arbitrary point (the LATAM roster card's Rio, owner
+   *  request, 2026-10-12), zoomed in like `flyTo`, without selecting any
+   *  JGer pin. */
+  flyToLocation(lon: number, lat: number): void;
   /** Tweens back out to the whole globe, then resumes the spin. */
   world(): void;
   destroy(): void;
@@ -93,7 +110,10 @@ function easeCubicInOut(t: number): number {
 }
 
 /** Great-circle miles between two points, as the design's card shows them. */
-export function milesBetween(a: GlobePin, b: { lon: number; lat: number }): number {
+export function milesBetween(
+  a: { lon: number; lat: number },
+  b: { lon: number; lat: number },
+): number {
   return Math.round(geoDistance([a.lon, a.lat], [b.lon, b.lat]) * EARTH_RADIUS_MILES);
 }
 
@@ -189,22 +209,7 @@ export function createGlobe(
     { attributeName: 'opacity', values: '1;.25;1', dur: '1s', repeatCount: 'indefinite' },
     latamPinBody,
   );
-  el('circle', { r: 12, fill: '#C9A8FF', stroke: '#161719', 'stroke-width': 3 }, latamPinBody);
-  el('circle', { r: 8, fill: '#F4F4F4', stroke: '#161719', 'stroke-width': 1.5 }, latamPinBody);
-  el(
-    'polygon',
-    { points: '0,-4 3.8,-1.2 2.4,3.2 -2.4,3.2 -3.8,-1.2', fill: '#161719' },
-    latamPinBody,
-  );
-  el(
-    'path',
-    {
-      d: 'M0 -4 V-8 M3.8 -1.2 L7.5 -2.5 M2.4 3.2 L4.6 6.4 M-2.4 3.2 L-4.6 6.4 M-3.8 -1.2 L-7.5 -2.5',
-      stroke: '#161719',
-      'stroke-width': 1.2,
-    },
-    latamPinBody,
-  );
+  latamPinBody.insertAdjacentHTML('beforeend', LATAM_PIN_SHAPES);
   el('circle', { r: 26, fill: 'transparent' }, latamMarker);
   const latamLabel = el('g', {}, latamPin);
   el(
@@ -422,6 +427,13 @@ export function createGlobe(
       selected = index;
       spinning = false;
       tweenTo(pin.lon, pin.lat, FLY_ZOOM, FLY_MS);
+      draw();
+    },
+    flyToLocation(lon, lat) {
+      clearTimeout(resumeTimer);
+      selected = -1;
+      spinning = false;
+      tweenTo(lon, lat, FLY_ZOOM, FLY_MS);
       draw();
     },
     world() {

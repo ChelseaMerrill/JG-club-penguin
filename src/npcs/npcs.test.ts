@@ -54,7 +54,10 @@ describe('NPCS', () => {
     // Jon and Sydney left Town Center (owner request, 2026-10-02); the Mullet
     // and Team Room 3 have their own. Steven left the Dev Pit too; the
     // Characters sheet puts him in the Remote Lounge, which isn't built yet.
-    // Millie, Jason and Darrin left the Icebox (owner request, 2026-10-02).
+    // Millie, Jason and Darrin left the Icebox (owner request, 2026-10-02),
+    // and Jethro did too (owner request, 2026-10-12): his Team Room 1
+    // appearance stays, and his Icebox definition keeps the bubbles it
+    // shares with that appearance.
     const NO_LONGER_PLACED: NpcId[] = [
       'dom',
       'anthony',
@@ -66,6 +69,7 @@ describe('NPCS', () => {
       'millie-icebox',
       'jason',
       'darrin-icebox',
+      'jethro',
       // Millie and Brandon left the Market (owner request, 2026-10-02).
       'millie',
       'brandon',
@@ -904,6 +908,21 @@ describe('NPCS', () => {
     });
   });
 
+  it("includes Hector Grecco in the LATAM Disco Hall with a Carnaval Parade dialog and the trigger design's own quote/subtitle (#219)", () => {
+    const hector = NPCS['hector-grecco'];
+    expect(hector.name).toBe('Hector Grecco');
+    expect(hector.roomId).toBe('latam-disco-hall');
+    expect(hector.dialog).toEqual({
+      kind: 'minigame',
+      minigameId: 'carnaval-parade',
+      actionLabel: 'JOIN THE PARADE',
+      declineLabel: 'JUST WATCHING',
+      triggerLine:
+        'Vem pro desfile! Grab the feathers, dodge the barriers and keep the beat going. Score 400 and you earn the Passista badge.',
+      subtitle: 'LATAM DISCO HALL · CARNAVAL PARADE',
+    });
+  });
+
   it('includes Casey in Roof Deck with an Igloo Gear stall dialog', () => {
     const casey = NPCS.casey;
     expect(casey.name).toBe('Casey Snow');
@@ -921,6 +940,11 @@ describe('NPCS', () => {
       'tom',
       'michael',
       'anthony',
+      // #219: Hector hosts Carnaval Parade, so he's checked by his own test above.
+      'hector-grecco',
+      // #220: Chrystian Rissoli hosts Penalty Kick -- a `kind: 'minigame'`
+      // dialog, like the talkers above -- its own test covers it below.
+      'chrystian-rissoli',
     ];
     const latamNpcIds: NpcId[] = [];
     for (const npc of Object.values(NPCS)) {
@@ -930,8 +954,10 @@ describe('NPCS', () => {
         expect(npc.dialog).toEqual({ kind: 'remote-card' });
         continue;
       }
-      // The 19 LATAM JGers carry no dialog at all (owner request, 2026-10-09):
-      // their character sheet gives no quote.
+      // 17 of the 19 LATAM JGers carry no dialog at all (owner request,
+      // 2026-10-09): their character sheet gives no quote. Hector Grecco
+      // (#219) and Chrystian Rissoli (#220, both excluded above) are the
+      // two exceptions.
       if (
         npc.roomId === 'latam-cafe' ||
         npc.roomId === 'latam-disco-hall' ||
@@ -943,7 +969,24 @@ describe('NPCS', () => {
       }
       expect(npc.dialog).toMatchObject({ kind: 'line' });
     }
-    expect(latamNpcIds).toHaveLength(19);
+    // 17, not 19: Hector Grecco (#219) and Chrystian Rissoli (#220) now host
+    // Minigames instead.
+    expect(latamNpcIds).toHaveLength(17);
+  });
+
+  it('includes Chrystian Rissoli in the LATAM Futebol Field with a Penalty Kick trigger dialog', () => {
+    const chrystian = NPCS['chrystian-rissoli'];
+    expect(chrystian.name).toBe('Chrystian Rissoli');
+    expect(chrystian.roomId).toBe('latam-futebol-field');
+    expect(chrystian.dialog).toEqual({
+      kind: 'minigame',
+      minigameId: 'penalty-kick',
+      actionLabel: 'TAKE THE SHOT',
+      declineLabel: 'JUST WATCHING',
+      triggerLine:
+        'Cinco pênaltis. Pick a corner and mean it. Score four and the Goleador badge is yours.',
+      subtitle: 'LATAM FUTEBOL FIELD · PENALTY KICK',
+    });
   });
 
   it('gives a human NPC a figure spec and a penguin-kind NPC a fixed look', () => {

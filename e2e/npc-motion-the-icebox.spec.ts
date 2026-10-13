@@ -17,10 +17,10 @@ const LONG_WALK_TIMEOUT = 15_000;
 const PROOF_ROOT = 'test-results/npc-motion-the-icebox';
 /** The centre of `RoomScene`'s click zone for a Human NPC, relative to its feet. */
 const HIT_ZONE_OFFSET_Y = npcLayout({ kind: 'human' }).hitArea.centerY;
-/** Nicole and Jethro roam a loop around their slot point; Millie, Jason and
- *  Darrin left the Icebox (owner request, 2026-10-02, Track D). Linda Martin
- *  (owner request, 2026-10-09) walks a lap. */
-const MOVING_NPCS = ['nicole', 'jethro', 'linda-martin'];
+/** Nicole roams a loop around her slot point. Millie, Jason and Darrin left
+ *  the Icebox (owner request, 2026-10-02, Track D) and Jethro did too
+ *  (2026-10-12). Linda Martin (owner request, 2026-10-09) walks a lap. */
+const MOVING_NPCS = ['nicole', 'linda-martin'];
 /** New from the Characters sheet: they sit at the conference table. */
 const SEATED_NPCS = ['dan-bedian', 'paul-carnival', 'greg-westover'];
 /**
@@ -84,7 +84,7 @@ async function bootTheIcebox(page: Page): Promise<string[]> {
   return errors;
 }
 
-test('Nicole and Jethro roam their loops; the three at the table stay seated', async ({ page }) => {
+test('Nicole roams her loop; the three at the table stay seated', async ({ page }) => {
   test.slow();
   const dir = proofDir('npcs-move');
   const errors = await bootTheIcebox(page);

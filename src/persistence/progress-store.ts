@@ -237,6 +237,19 @@ export interface StairClimbProgress {
 }
 
 /**
+ * The result of `record_snowball_hit` (#154,
+ * 20261012000000_quest_snowmageddon.sql S4). `counted` is `false` for every
+ * rejection (a self-hit, an unknown or unnamed target, a repeat target
+ * already counted today, a reused throw id, or the Quest already complete) --
+ * none of them raise. `today` is the caller's own distinct-target count for
+ * today (Eastern), unchanged by a rejected call.
+ */
+export interface SnowballHitResult {
+  counted: boolean;
+  today: number;
+}
+
+/**
  * The main Quest's reward, paid once by `complete_quest` (#46;
  * `public.quests`' 'main' row since 20261006000000_quest_registry.sql).
  */
@@ -622,4 +635,16 @@ export interface ProgressStore {
 
   /** The Player's climb (#51 slice 4, SC13). Read-only: a failure never emits `ui:toast`. */
   getStairClimb(): Promise<StairClimbProgress>;
+
+  /**
+   * Reports a landed snowball hit for the Snowmageddon Quest (#154): the
+   * thrower's client calls this right after a local hit resolves
+   * (`src/snowball/snowball-controller.ts`). Never rejects for a business
+   * rule -- a self-hit, an unknown or unnamed target, a repeat target already
+   * counted today, a reused `throwId`, or the Quest already complete -- each
+   * just resolves `counted: false`. A failed call (network, auth) rejects as
+   * every other write does, but the caller (the Snowball controller) must
+   * never let that affect the snowball itself.
+   */
+  recordSnowballHit(targetId: string, throwId: string): Promise<SnowballHitResult>;
 }

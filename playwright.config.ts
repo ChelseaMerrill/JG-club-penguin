@@ -12,6 +12,7 @@ const SHARED_TEST_USER_SPECS = [
   '**/penguin-load-retry.spec.ts',
   '**/own-penguin-sign-in.spec.ts',
   '**/quest-pair-two-browsers.spec.ts',
+  '**/quest-snowmageddon-two-browsers.spec.ts',
 ];
 
 export default defineConfig({

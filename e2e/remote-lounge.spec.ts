@@ -47,7 +47,13 @@ test('Remote Lounge: the globe spins with its land, and the roster lists all 17 
   const errors = await bootLounge(page);
 
   await expect(page.locator('.remote-lounge')).toBeVisible();
+  // The LATAM roster card (owner request, 2026-10-12) is a sibling of the
+  // JGer rows, not one of them, so the JGer-only count holds unchanged.
   await expect(page.locator('.remote-lounge__roster-item')).toHaveCount(17);
+  await expect(page.locator('.remote-lounge__roster-latam')).toHaveCount(1);
+  await expect(page.locator('.remote-lounge__roster > :first-child')).toHaveClass(
+    /remote-lounge__roster-latam/,
+  );
   // The land arrives once the world map has loaded.
   await expect
     .poll(() => page.locator('.globe path[fill="#d3ebf3"]').getAttribute('d'), {
@@ -166,6 +172,52 @@ test('Remote Lounge: the LATAM pin opens the LATAM Café (owner request, 2026-10
   await page.screenshot({ path: 'test-results/remote-lounge/latam-pin.png' });
   await latamPin.click({ force: true });
 
+  await expect
+    .poll(async () => (await debugInfo(page))?.roomId, { timeout: BOOT_TIMEOUT })
+    .toBe('latam-cafe');
+  await expect(page.locator('.remote-lounge')).toBeHidden();
+
+  expect(errors).toEqual([]);
+});
+
+test('Remote Lounge: the LATAM roster card flies to Rio and VISIT LATAM opens the LATAM Café', async ({
+  page,
+}) => {
+  // A Room change needs a Session: the dev fake Player's, as BACK TO HQ's own test uses.
+  const errors = collectErrors(page);
+  await page.goto('/?asPlayer');
+  await expect
+    .poll(async () => (await debugInfo(page))?.roomId, { timeout: BOOT_TIMEOUT })
+    .toBe('town-center');
+  await page.evaluate(() => window.__roomDebug?.changeRoom?.('remote-lounge'));
+  await expect
+    .poll(async () => (await debugInfo(page))?.roomId, { timeout: BOOT_TIMEOUT })
+    .toBe('remote-lounge');
+
+  // The LATAM row tops the roster, above every JGer.
+  await expect(page.locator('.remote-lounge__roster > :first-child')).toHaveClass(
+    /remote-lounge__roster-latam/,
+  );
+
+  const latamRow = page.locator('.remote-lounge__roster-latam');
+  await latamRow.click();
+
+  const card = page.locator('.remote-lounge__card');
+  await expect(card).toBeVisible();
+  await expect(card).toHaveClass(/remote-lounge__card--latam/);
+  await expect(card.locator('.remote-lounge__card-name')).toHaveText('LATAM');
+  await expect(card).toContainText('Rio de Janeiro, Brazil');
+  await expect(card).toContainText(/\d+ mi/);
+  await expect(card).toContainText(
+    '19 JGers across the Café, the Disco Hall and the Futebol Field.',
+  );
+  await expect(latamRow).toHaveAttribute('aria-pressed', 'true');
+  // Zoomed in, flying to Rio brings the globe's own LATAM pin into view too.
+  await expect(page.locator('.globe__latam-pin')).toBeVisible({ timeout: 3000 });
+  await page.waitForTimeout(1600);
+  await page.screenshot({ path: 'test-results/remote-lounge/latam-card.png' });
+
+  await card.getByRole('button', { name: 'VISIT LATAM' }).click();
   await expect
     .poll(async () => (await debugInfo(page))?.roomId, { timeout: BOOT_TIMEOUT })
     .toBe('latam-cafe');

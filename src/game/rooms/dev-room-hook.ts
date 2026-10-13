@@ -221,6 +221,8 @@ export interface RoomDebugInfo {
   guard?: GuardDebugInfo | null;
   /** Ashley's chicken toss, while this Room has one (the Dev Pit, motion allowed); else `null`. */
   chickenToss?: ChickenTossDebugInfo | null;
+  /** Each dance-floor tile's current fill colour, in design document order, while this Room has one (the LATAM Disco Hall); else `null`. */
+  discoFloor?: readonly HexColor[] | null;
 }
 
 declare global {

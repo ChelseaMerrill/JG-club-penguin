@@ -136,3 +136,96 @@ describe('createRemoteLounge', () => {
     expect(goToRoom).toHaveBeenCalledWith('latam-cafe');
   });
 });
+
+describe('the LATAM roster card (owner request, 2026-10-12)', () => {
+  it('tops the roster, above every JGer, without changing the JGer rows', () => {
+    const { root } = setup();
+    const latamRow = root.querySelector<HTMLButtonElement>('.remote-lounge__roster-latam')!;
+    expect(latamRow).not.toBeNull();
+    expect(root.querySelector('.remote-lounge__roster')!.firstElementChild).toBe(latamRow);
+    expect(latamRow.querySelector('.remote-lounge__roster-name')!.textContent).toBe('LATAM');
+    expect(latamRow.querySelector('.remote-lounge__roster-city')!.textContent).toBe(
+      'Rio de Janeiro, Brazil',
+    );
+
+    // A sibling class, not a JGer row: the JGer-only count and order hold.
+    const jgerRows = [...root.querySelectorAll<HTMLButtonElement>('.remote-lounge__roster-item')];
+    expect(jgerRows).toHaveLength(REMOTE_JGERS.length);
+    expect(
+      jgerRows.map((row) => row.querySelector('.remote-lounge__roster-name')!.textContent),
+    ).toEqual(REMOTE_JGERS.map((p) => p.name));
+  });
+
+  it('opens a purple, index-less LATAM card with the distance from HQ and the Café line', () => {
+    const { q, root, overlays } = setup();
+    root.querySelector<HTMLButtonElement>('.remote-lounge__roster-latam')!.click();
+
+    const card = q('.remote-lounge__card');
+    expect(card.hidden).toBe(false);
+    expect(card.classList.contains('remote-lounge__card--latam')).toBe(true);
+    expect(q('.remote-lounge__card-name').textContent).toBe('LATAM');
+    expect(card.textContent).toContain('Rio de Janeiro, Brazil');
+    expect(card.textContent).toMatch(/\d+ mi/);
+    expect(q('.remote-lounge__card-line').textContent).toBe(
+      '19 JGers across the Café, the Disco Hall and the Futebol Field.',
+    );
+    expect(q('.remote-lounge__card-index').hidden).toBe(true);
+    expect(q('.remote-lounge__card-title').hidden).toBe(true);
+    expect(
+      root
+        .querySelector<HTMLButtonElement>('.remote-lounge__roster-latam')!
+        .getAttribute('aria-pressed'),
+    ).toBe('true');
+    expect(overlays.current()).toBe(REMOTE_CARD_OVERLAY_ID);
+  });
+
+  it('has no Prev/Next, just VISIT LATAM and GLOBE', () => {
+    const { q, root } = setup();
+    root.querySelector<HTMLButtonElement>('.remote-lounge__roster-latam')!.click();
+
+    expect(q('[aria-label="Previous"]')).toBeNull();
+    expect(q('[aria-label="Next"]')).toBeNull();
+    const buttons = [...root.querySelectorAll<HTMLButtonElement>('.remote-lounge__hex--globe')];
+    expect(buttons.map((b) => b.textContent)).toEqual(['VISIT LATAM', 'GLOBE']);
+  });
+
+  it('VISIT LATAM goes to the LATAM Café', () => {
+    const { root, goToRoom } = setup();
+    root.querySelector<HTMLButtonElement>('.remote-lounge__roster-latam')!.click();
+
+    [...root.querySelectorAll<HTMLButtonElement>('.remote-lounge__hex--globe')]
+      .find((b) => b.textContent === 'VISIT LATAM')!
+      .click();
+    expect(goToRoom).toHaveBeenCalledWith('latam-cafe');
+  });
+
+  it('Escape closes the LATAM card, same as a person card', () => {
+    const { q, root } = setup();
+    root.querySelector<HTMLButtonElement>('.remote-lounge__roster-latam')!.click();
+    expect(q('.remote-lounge__card').hidden).toBe(false);
+
+    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+
+    expect(q('.remote-lounge__card').hidden).toBe(true);
+    expect(root.querySelector('.remote-lounge__roster-latam')!.getAttribute('aria-pressed')).toBe(
+      'false',
+    );
+  });
+
+  it("selecting a JGer row after LATAM un-presses LATAM's row, and vice versa", () => {
+    const { root } = setup();
+    const latamRow = root.querySelector<HTMLButtonElement>('.remote-lounge__roster-latam')!;
+    const firstJger = root.querySelector<HTMLButtonElement>('.remote-lounge__roster-item')!;
+
+    latamRow.click();
+    expect(latamRow.getAttribute('aria-pressed')).toBe('true');
+
+    firstJger.click();
+    expect(latamRow.getAttribute('aria-pressed')).toBe('false');
+    expect(firstJger.getAttribute('aria-pressed')).toBe('true');
+
+    latamRow.click();
+    expect(firstJger.getAttribute('aria-pressed')).toBe('false');
+    expect(latamRow.getAttribute('aria-pressed')).toBe('true');
+  });
+});

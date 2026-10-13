@@ -646,6 +646,14 @@ export function describeProgressStoreContract(
       },
       { minigameId: 'coffee-rush', score: 0, stats: { large: 30 }, cap: 400 },
       { minigameId: 'snow-cone-stand', score: 0, stats: { rushCone25: 100 }, cap: 600 },
+      // #219: bound = (10 * 200 + 25 * 0) * 4 = 8000, comfortably above the
+      // 2000 asserted, itself far above the 120 cap.
+      {
+        minigameId: 'carnaval-parade',
+        score: 2000,
+        stats: { feathers: 200, stars: 0, barriersHit: 0, bestStreak: 10 },
+        cap: 120,
+      },
     ];
     it.each(overCapCases)(
       '$minigameId: an over-cap round pays exactly the cap ($cap)',
@@ -691,6 +699,20 @@ export function describeProgressStoreContract(
         cap: 600,
       },
       { minigameId: 'beystadium', durationSeconds: 45, score: 7, stats: WON_MATCH, cap: 60 },
+      {
+        minigameId: 'penalty-kick',
+        durationSeconds: 30,
+        score: 5,
+        stats: { goals: 0, golazos: 5, saved: 0, wide: 0, over: 0 },
+        cap: 250,
+      },
+      {
+        minigameId: 'carnaval-parade',
+        durationSeconds: 45,
+        score: 2000,
+        stats: { feathers: 200, stars: 0, barriersHit: 0, bestStreak: 10 },
+        cap: 120,
+      },
     ];
     it.each(durationCases)(
       '$minigameId: a second round 9 s later is round_too_soon, 10 s later is accepted',
@@ -784,6 +806,27 @@ export function describeProgressStoreContract(
         // of every cone weight; 195 is the largest reachable value below it.
         belowThreshold: { score: 0, stats: { cone5: 39 } },
         atThreshold: { score: 0, stats: { cone5: 40 } },
+      },
+      {
+        minigameId: 'penalty-kick',
+        badgeId: 'goleador',
+        durationSeconds: 30,
+        belowThreshold: { score: 3, stats: { goals: 3, golazos: 0, saved: 1, wide: 1, over: 0 } },
+        atThreshold: { score: 4, stats: { goals: 4, golazos: 0, saved: 1, wide: 0, over: 0 } },
+      },
+      {
+        minigameId: 'carnaval-parade',
+        badgeId: 'passista',
+        durationSeconds: 45,
+        // bound = (10 * 40) * 4 = 1600, comfortably above either score.
+        belowThreshold: {
+          score: 399,
+          stats: { feathers: 40, stars: 0, barriersHit: 0, bestStreak: 10 },
+        },
+        atThreshold: {
+          score: 400,
+          stats: { feathers: 40, stars: 0, barriersHit: 0, bestStreak: 10 },
+        },
       },
     ];
     it.each(badgeThresholdCases)(
