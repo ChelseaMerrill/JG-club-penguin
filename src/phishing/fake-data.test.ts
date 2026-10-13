@@ -23,7 +23,7 @@ const GUARD_POST_INSERT =
 
 /**
  * The latest migration that seeds `public.phishing_guard_posts` (#170's
- * `20261012000000_door_network_guard_posts.sql`, replacing #146's seed),
+ * `20261013000000_door_network_guard_posts.sql`, replacing #146's seed),
  * checking each seeding migration has exactly one anchored insert.
  */
 function latestGuardPostMigration(): { file: string; sql: string } {
@@ -92,7 +92,7 @@ function guardableDoors(): string[] {
 
 describe('guard posts', () => {
   it("are seeded by #170's migration, the latest that seeds them", () => {
-    expect(latestGuardPostMigration().file).toBe('20261012000000_door_network_guard_posts.sql');
+    expect(latestGuardPostMigration().file).toBe('20261013000000_door_network_guard_posts.sql');
   });
 
   it('match the migration seed, in position order', () => {

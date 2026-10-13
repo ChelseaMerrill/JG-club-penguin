@@ -1,5 +1,5 @@
 -- Door network guard posts proof, in 51_stair_climb_proof.sql's style.
--- Covers 20261012000000_door_network_guard_posts.sql's decisions DN1-DN10.
+-- Covers 20261013000000_door_network_guard_posts.sql's decisions DN1-DN10.
 --
 -- What this proves: public.phishing_guard_posts holds exactly DN5's 16 posts,
 -- compared row by row by position, with positions contiguous from 0 (DN5);

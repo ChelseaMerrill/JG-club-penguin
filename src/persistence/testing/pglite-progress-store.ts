@@ -34,6 +34,7 @@ import {
   type ProgressStore,
   type PurchaseResult,
   type RoundResult,
+  type SnowballHitResult,
   type StairClimbProgress,
   type StairFlightResult,
 } from '../progress-store';
@@ -62,7 +63,10 @@ export const MIGRATIONS = [
   ['quest-pair-flaky-test', '20261009000000_quest_pair_flaky_test.sql'],
   ['quest-pitch-hack', '20261009010000_quest_pitch_hack.sql'],
   ['stair-climb', '20261011000000_stair_climb.sql'],
-  ['door-network-guard-posts', '20261012000000_door_network_guard_posts.sql'],
+  ['quest-snowmageddon', '20261012000000_quest_snowmageddon.sql'],
+  ['penalty-kick', '20261012010000_penalty_kick.sql'],
+  ['carnaval-parade', '20261012020000_carnaval_parade.sql'],
+  ['door-network-guard-posts', '20261013000000_door_network_guard_posts.sql'],
 ] as const;
 
 export type MigrationName = (typeof MIGRATIONS)[number][0];
@@ -477,6 +481,17 @@ function createSqlProgressStore(db: PGliteInterface, playerId: string): Progress
     });
   }
 
+  // #154: the Snowmageddon Quest's hit-reporting RPC, as the Supabase store calls it.
+  async function recordSnowballHit(targetId: string, throwId: string): Promise<SnowballHitResult> {
+    return runAsPlayer(async (tx) => {
+      const res = await tx.query<{ result: SnowballHitResult }>(
+        'select public.record_snowball_hit($1, $2) as result',
+        [targetId, throwId],
+      );
+      return res.rows[0].result;
+    });
+  }
+
   return {
     loadAll,
     saveLook,
@@ -504,6 +519,7 @@ function createSqlProgressStore(db: PGliteInterface, playerId: string): Progress
     submitPitch,
     logStairFlight,
     getStairClimb,
+    recordSnowballHit,
   };
 }
 

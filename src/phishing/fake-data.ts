@@ -4,7 +4,7 @@ import type { GuardPost } from './phishing-client';
  * Test and dev-hook data for the in-memory `PhishingClient` fake only: a
  * copy of what the migrations seed: the questions from
  * `20260928020000_phishing_quiz.sql`, the guard posts from #170's
- * `20261012000000_door_network_guard_posts.sql`. The real client
+ * `20261013000000_door_network_guard_posts.sql`. The real client
  * never imports this file (the server holds the questions, their answers
  * and the post list, P3/P8), so a production build never contains it.
  * `fake-data.test.ts` fails if either list drifts from the migration.
@@ -22,7 +22,7 @@ export interface FakePhishingQuestion {
 
 /**
  * `public.phishing_guard_posts`, in position order: #170's DN5 seed
- * (`20261012000000_door_network_guard_posts.sql`), 16 posts, with no two
+ * (`20261013000000_door_network_guard_posts.sql`), 16 posts, with no two
  * neighbouring windows in one Room or on the two sides of one doorway,
  * including the wrap.
  */

@@ -54,6 +54,16 @@ function snowConeRaw(stats: Readonly<Record<string, number>>): number {
   );
 }
 
+/**
+ * Penalty Kick's `record_round` branch's extra stats check: `goals` and
+ * `golazos` are each already checked non-negative integers by the shared
+ * rule, so the only extra rule is that a round can't claim more scores than
+ * it had shots: `goals + golazos <= 5` (five penalties, solo).
+ */
+function penaltyKickStatsValid(stats: Readonly<Record<string, number>>): boolean {
+  return stat(stats, 'goals') + stat(stats, 'golazos') <= 5;
+}
+
 /** Beystadium pays this for a match win (design: `tokens = youWins >= 2 ? 60 : 15`). */
 export const BEYSTADIUM_WIN_TOKENS = 60;
 /** Beystadium pays this for a match loss. */
@@ -79,6 +89,18 @@ function beystadiumStatsValid(stats: Readonly<Record<string, number>>): boolean 
   );
 }
 
+/**
+ * Carnaval Parade's `record_round` branch (#219): the server never trusts
+ * the client's `score` outright, so it rejects one that's higher than what
+ * `feathers`/`stars` could possibly have scored at the max x4 multiplier
+ * (`(10 * feathers + 25 * stars) * 4`), and rejects `barriersHit` over 3 (the
+ * round's own 3 lives mean a 4th barrier hit can't happen honestly).
+ */
+function carnavalParadeStatsValid(stats: Readonly<Record<string, number>>, score: number): boolean {
+  const bound = (10 * stat(stats, 'feathers') + 25 * stat(stats, 'stars')) * 4;
+  return stat(stats, 'barriersHit') <= 3 && score <= bound;
+}
+
 interface MinigameRuleBase {
   id: MinigameId;
   /** The round's maximum Token payout. */
@@ -88,9 +110,10 @@ interface MinigameRuleBase {
   badgeId: BadgeId;
   rawPayout(score: number, stats: Readonly<Record<string, number>>): number;
   rawBest(score: number, stats: Readonly<Record<string, number>>): number;
-  /** Extra per-Minigame stats checks; `false` rejects the round as
+  /** Extra per-Minigame stats checks, given the round's own `stats` and its
+   *  (already range/integer-checked) `score`; `false` rejects the round as
    *  `invalid_stats`. Omitted when the shared checks are enough. */
-  validStats?(stats: Readonly<Record<string, number>>): boolean;
+  validStats?(stats: Readonly<Record<string, number>>, score: number): boolean;
 }
 
 /** A Badge earned by one round's `rawBest` reaching `badgeThreshold`. */
@@ -185,6 +208,35 @@ export const MINIGAME_RULES = {
     rawPayout: (_score, stats) =>
       stat(stats, 'won') === 1 ? BEYSTADIUM_WIN_TOKENS : BEYSTADIUM_LOSS_TOKENS,
     rawBest: (_score, stats) => stat(stats, 'strikes'),
+  },
+  // Five penalties take roughly 15-25 s once the sweep speed-up is in play;
+  // 30 s is a generous anti-farm window (see the migration's header for the
+  // full reasoning), well short of the 5*50=250 cap's own `cap` value.
+  'penalty-kick': {
+    id: 'penalty-kick',
+    cap: 250,
+    durationSeconds: 30,
+    badgeId: 'goleador',
+    badgeKind: 'threshold',
+    badgeThreshold: 4,
+    validStats: penaltyKickStatsValid,
+    rawPayout: (_score, stats) => 30 * stat(stats, 'goals') + 50 * stat(stats, 'golazos'),
+    rawBest: (_score, stats) => stat(stats, 'goals') + stat(stats, 'golazos'),
+  },
+  // #219: the server never recomputes the payout from stats the way every
+  // other Minigame here does -- the multiplier depends on pickup *order*,
+  // which the aggregate stats can't reconstruct -- so `rawPayout`/`rawBest`
+  // both read the client's own (bound-checked) `score` directly.
+  'carnaval-parade': {
+    id: 'carnaval-parade',
+    cap: 120,
+    durationSeconds: 45,
+    badgeId: 'passista',
+    badgeKind: 'threshold',
+    badgeThreshold: 400,
+    validStats: carnavalParadeStatsValid,
+    rawPayout: (score) => Math.floor(score / 10),
+    rawBest: (score) => score,
   },
 } satisfies Record<MinigameId, MinigameRule>;
 

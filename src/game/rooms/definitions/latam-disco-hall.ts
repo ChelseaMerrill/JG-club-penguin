@@ -1,5 +1,6 @@
 import type { RoomDefinition } from '../room-definition';
 import { createStandardRoomGrid } from '../grid';
+import { LATAM_DISCO_HALL_FLOOR_TILES } from './latam-disco-hall-floor';
 
 /**
  * Traced from `design/Latam Disco Hall.dc.html` ("18 · LATAM DISCO HALL"):
@@ -84,5 +85,26 @@ export const latamDiscoHall: RoomDefinition = {
     { npcId: 'fernando-possebon', tile: { col: 3, row: 6 }, offset: { x: -10, y: 0 } },
     { npcId: 'fernando-garagnani', tile: { col: 8, row: 4 }, offset: { x: 10, y: 0 } },
     { npcId: 'ricardo-cordeiro', tile: { col: 7, row: 6 }, offset: { x: 5, y: -7.5 } },
+  ],
+  // The dance floor's own flashing tile colours (the design's `<animate>`
+  // SMIL loops `RoomScene`'s exported PNG froze at one frame): generated,
+  // never hand-edited (`scripts/latam-disco-floor.ts`).
+  animatedFloorTiles: LATAM_DISCO_HALL_FLOOR_TILES,
+  // #219: the DJ turntable, Carnaval Parade's trigger (the design's own
+  // "TRIGGERED BY CLICKING THE DJ TURNTABLE IN THE DISCO HALL"). Traced from
+  // `design/Latam Disco Hall.dc.html`'s `a[href="Minigame Carnaval
+  // Parade.dc.html"]` element: its own invisible hit zone, `<rect x="1140"
+  // y="425" width="200" height="100" fill="transparent"/>`, sits under the
+  // "SPIN IT · CARNAVAL PARADE" floating sign and glow pulse (both decorative,
+  // baked into the exported PNG), over the turntables themselves. Clicking
+  // Hector Grecco opens the same trigger (his own NPC dialog,
+  // `CARNAVAL_PARADE_DIALOG` in `npcs.ts`); this hotspot re-dispatches to the
+  // same `npc:arrived` Hector's dialog already listens for (`main.ts`).
+  hotspots: [
+    {
+      id: 'disco-turntable',
+      label: 'DJ Turntable',
+      rect: { x: 1140, y: 425, width: 200, height: 100 },
+    },
   ],
 };

@@ -15,7 +15,7 @@ export const BADGE_CATALOG: readonly (BadgeDefinition & { id: BadgeId })[] = [
     name: 'Snowmageddon',
     howToEarn: '5 SNOWBALL HITS / DAY',
     sortOrder: 2,
-    available: false,
+    available: true,
   },
   {
     id: 'ship-it',
@@ -108,6 +108,28 @@ export const BADGE_CATALOG: readonly (BadgeDefinition & { id: BadgeId })[] = [
     sortOrder: 15,
     available: true,
   },
+  // #220: unlike every Badge above (all 15 seeded, available or not, by
+  // #138's original migration), Goleador didn't exist yet: it is inserted
+  // fresh, already available, by `20261012010000_penalty_kick.sql` -- so it
+  // has no entry in that original seed and isn't a `BADGE_AVAILABILITY_
+  // OVERRIDES` flip (`badge-catalog.test.ts` covers both cases).
+  {
+    id: 'goleador',
+    name: 'Goleador',
+    howToEarn: 'SCORE 4 OF 5 PENALTIES',
+    sortOrder: 16,
+    available: true,
+  },
+  // #219: 20261012020000_carnaval_parade.sql (rebased on #220's migration,
+  // see its header) also inserts this row fresh with `available` already
+  // true, so it too needs no `BADGE_AVAILABILITY_OVERRIDES` entry.
+  {
+    id: 'passista',
+    name: 'Passista',
+    howToEarn: 'SCORE 400 IN THE PARADE',
+    sortOrder: 17,
+    available: true,
+  },
 ];
 
 /**
@@ -124,6 +146,8 @@ export const BADGE_AVAILABILITY_OVERRIDES: ReadonlySet<BadgeId> = new Set<BadgeI
   'phish-fry',
   // #51 slice 4: 20261011000000_stair_climb.sql turns Stair Master on.
   'stair-master',
+  // #154: 20261012000000_quest_snowmageddon.sql turns Snowmageddon on.
+  'snowmageddon',
 ]);
 
 /** The catalog row for `badgeId`, if there is one. */

@@ -51,4 +51,13 @@ export interface QuestsTestHandle {
    * an earlier run).
    */
   pairFlakyTestSteps(): Promise<Record<string, boolean>>;
+  /**
+   * #154: reports a snowball hit on `targetId` for the Snowmageddon Quest,
+   * without driving the real Snowball mode or Presence, then refreshes
+   * Quests. Returns the server's own `{ counted, today }`.
+   */
+  recordSnowballHit(
+    targetId: string,
+    throwId: string,
+  ): Promise<{ counted: boolean; today: number }>;
 }

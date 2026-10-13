@@ -211,6 +211,47 @@ describe('createNpcDialog', () => {
     expect(panel(root).hidden).toBe(true);
   });
 
+  it("Chrystian's buttons: TAKE THE SHOT launches penalty-kick; JUST WATCHING just closes (#220)", () => {
+    const { root, launchMinigame } = setup();
+    gameEvents.emit('npc:arrived', { npcId: 'chrystian-rissoli' });
+
+    expect(root.querySelector('.npc-dialog__name')?.textContent).toBe('Chrystian Rissoli');
+    expect(root.querySelector('.npc-dialog__subtitle')?.textContent).toBe(
+      'LATAM FUTEBOL FIELD · PENALTY KICK',
+    );
+    expect(lineText(root)).toBe(
+      'Cinco pênaltis. Pick a corner and mean it. Score four and the Goleador badge is yours.',
+    );
+    const buttonNamed = (label: string) =>
+      Array.from(root.querySelectorAll('button')).find(
+        (button) => button.textContent === label,
+      ) as HTMLButtonElement;
+
+    buttonNamed('JUST WATCHING').click();
+    expect(panel(root).hidden).toBe(true);
+    expect(launchMinigame).not.toHaveBeenCalled();
+
+    gameEvents.emit('npc:arrived', { npcId: 'chrystian-rissoli' });
+    buttonNamed('TAKE THE SHOT').click();
+
+    expect(launchMinigame).toHaveBeenCalledWith('penalty-kick');
+    expect(panel(root).hidden).toBe(true);
+  });
+
+  it('a hotspot:click on the ball reuses the exact same dialog as clicking Chrystian (#220)', () => {
+    const { root } = setup();
+
+    // `main.ts`'s `penalty-kick-ball` hotspot handler just re-emits
+    // `npc:arrived` for Chrystian; this proves that produces an identical
+    // open, not a simulation of it.
+    gameEvents.emit('npc:arrived', { npcId: 'chrystian-rissoli' });
+
+    expect(panel(root).hidden).toBe(false);
+    expect(root.querySelector('.npc-dialog__subtitle')?.textContent).toBe(
+      'LATAM FUTEBOL FIELD · PENALTY KICK',
+    );
+  });
+
   it('Anthony, the door guard: his rule, TAKE THE QUIZ opens the quiz, WALK AROUND HIM closes (#146)', () => {
     const root = document.createElement('div');
     document.body.append(root);

@@ -96,6 +96,8 @@ export interface RoomDebugInfo {
   guard?: { npcId: string; tile: Tile; doorLabel: string | null; blocking: boolean } | null;
   /** Ashley's chicken toss in the Dev Pit, or `null` without one (other Rooms, reduced motion). */
   chickenToss?: { tosses: number; lastTargetId: string | null; flying: boolean } | null;
+  /** Each dance-floor tile's current fill colour, in design document order, or `null` for a Room with none (the LATAM Disco Hall only). */
+  discoFloor?: readonly HexColor[] | null;
 }
 
 /** One NPC's motion state (#113). */

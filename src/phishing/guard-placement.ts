@@ -15,7 +15,7 @@ import { GUARD_NPC_ID, type GuardWindow, type PhishingState } from './phishing-c
  * The Rooms Anthony guards (#146 P3 as amended by #170 Q1/D13): their
  * enabled in-scene doors are the guard posts, each with its own `guardTile`.
  * `public.phishing_guard_posts`' `room_id` check names exactly these
- * (`20261012000000_door_network_guard_posts.sql`, DN7).
+ * (`20261013000000_door_network_guard_posts.sql`, DN7).
  */
 export const GUARD_ROOM_IDS: readonly RoomId[] = [
   'town-center',
