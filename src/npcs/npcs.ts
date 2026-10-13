@@ -390,6 +390,15 @@ interface NpcDefinitionBase {
    * Tile, plus any slot `offset`).
    */
   nameplateOffset?: { x?: number; y?: number };
+  /**
+   * This NPC's own text-wrap width for its idle speech bubble (#182),
+   * overriding the shared `SPEECH_BUBBLE_MAX_TEXT_WIDTH` (`bubble-geometry.ts`)
+   * where a Room design draws one of its lines wider than that on a single
+   * line. Dev Pit's Sam: "Ship it Friday. What could go wrong." draws as one
+   * 297.6 px pill in the design (273.6 px of text); left at the shared cap it
+   * wraps to two lines instead.
+   */
+  bubbleMaxWidth?: number;
 }
 
 /** A Human NPC (`design/build/humans.js`'s figures), rendered by `render-npc-svg.ts`. */
@@ -1238,6 +1247,13 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
     // Room 4's doesn't, so it's this entry's own override.
     figure: { ...RYAN_FIGURE, marker: DEV_PIT_CYAN_MARKER },
   },
+  // #182: Sam no longer has an `npcSlot` anywhere (Ryan and Sam left the Dev
+  // Pit, owner request, 2026-09-30, Track D -- before this ticket's audit
+  // started; Team Room 4's `sam-team-room-4` is a separate, bubble-less
+  // appearance, "the design gives him music notes, not a bubble"). This
+  // entry stays, unplaced, as `dom`'s and `ryan`'s do. `bubbleMaxWidth` below
+  // is a data-correctness fix kept for whenever he's placed again, not
+  // something this audit could verify on screen.
   sam: {
     id: 'sam',
     name: 'Sam Schantz',
@@ -1252,10 +1268,15 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
       { text: 'Ship it Friday. What could go wrong.', periodS: 20, delayS: -17 },
     ],
     // Shifted right just past Steven's nameplate (#113): the grid stands
-    // him 50 px below Steven, and his wrapped "Ship it Friday..." pill (one
-    // line in the design) would otherwise cover Steven's whole nameplate.
-    // The design's own one-line pills already overlap its bottom 4 px.
+    // him 50 px below Steven, and his "Ship it Friday..." pill (one line in
+    // the design, 297.6 px: `bubbleMaxWidth` below) would otherwise cover
+    // Steven's whole nameplate. The design's own one-line pills already
+    // overlap its bottom 4 px.
     bubbleOffsetX: 72,
+    // The design draws "Ship it Friday. What could go wrong." (273.6 px of
+    // text) on one line, past the shared 250 px wrap cap (#182): widened to
+    // fit it without changing any other NPC's bubble.
+    bubbleMaxWidth: 273.6,
     dialog: LINE_DIALOG,
     // As Ryan's: the marker is Dev Pit's only.
     figure: { ...SAM_FIGURE, marker: DEV_PIT_CYAN_MARKER },

@@ -18,4 +18,10 @@ describe('estimateBubbleSize', () => {
       height: 46,
     });
   });
+
+  it("draws one line at an NPC's own wider `maxTextWidth` (#182: Dev Pit's Sam, 297.6 px in the design)", () => {
+    const size = estimateBubbleSize('Ship it Friday. What could go wrong.', 273.6);
+    expect(size.width).toBeCloseTo(297.6);
+    expect(size.height).toBe(30);
+  });
 });

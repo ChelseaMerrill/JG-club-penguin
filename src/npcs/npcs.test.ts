@@ -165,6 +165,19 @@ describe('NPCS', () => {
     expect(NPCS.sam.name).toBe('Sam Schantz');
   });
 
+  it("widens Sam's bubble so his design-drawn one-line pill doesn't wrap (#182)", () => {
+    expect(NPCS.sam.bubbleMaxWidth).toBe(273.6);
+    const line = NPCS.sam.idleLines.find((each) => each.text.startsWith('Ship it Friday'))!;
+    const size = estimateBubbleSize(line.text, NPCS.sam.bubbleMaxWidth);
+    expect(size.width).toBeCloseTo(297.6);
+    expect(size.height).toBe(30);
+    // Sam no longer has an `npcSlot` anywhere (he and Ryan left the Dev Pit,
+    // and Team Room 4's `sam-team-room-4` is a bubble-less appearance): this
+    // is a data-correctness fix for whenever he's placed again, not
+    // something visible in the game today.
+    expect(devPit.npcSlots.some((slot) => slot.npcId === 'sam')).toBe(false);
+  });
+
   it('Dev Pit and Roof Deck tag names are first names; Town Center and The Melt are full names', () => {
     expect(NPCS.ian.tagName).toBe('Ian');
     expect(NPCS.dom.tagName).toBe('Dom');
@@ -286,7 +299,7 @@ describe('NPCS', () => {
           const bottom = feet.y + npcLayout(npc).bubbleBottomY + (npc.bubbleOffsetY ?? 0);
           const centerX = feet.x + (npc.bubbleOffsetX ?? 0);
           return npc.idleLines.map((line) => {
-            const size = estimateBubbleSize(line.text);
+            const size = estimateBubbleSize(line.text, npc.bubbleMaxWidth);
             return {
               npcId: npc.id,
               line,

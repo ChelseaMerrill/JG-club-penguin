@@ -28,12 +28,21 @@ const EXTRA_LINE_HEIGHT = 16;
  */
 const ESTIMATED_CHAR_WIDTH = 7.6;
 
-/** A line's estimated pill size, for layout checks that can't measure real text. */
-export function estimateBubbleSize(text: string): { width: number; height: number } {
+/**
+ * A line's estimated pill size, for layout checks that can't measure real
+ * text. `maxTextWidth` defaults to the shared `SPEECH_BUBBLE_MAX_TEXT_WIDTH`;
+ * pass an NPC's own `bubbleMaxWidth` (#182) for the rare line a Room design
+ * draws wider than that on one line (Dev Pit's Sam: "Ship it Friday. What
+ * could go wrong." at 297.6 px), without widening every other NPC's wrap.
+ */
+export function estimateBubbleSize(
+  text: string,
+  maxTextWidth: number = SPEECH_BUBBLE_MAX_TEXT_WIDTH,
+): { width: number; height: number } {
   const textWidth = text.length * ESTIMATED_CHAR_WIDTH;
-  const lines = Math.max(1, Math.ceil(textWidth / SPEECH_BUBBLE_MAX_TEXT_WIDTH));
+  const lines = Math.max(1, Math.ceil(textWidth / maxTextWidth));
   return {
-    width: Math.min(textWidth, SPEECH_BUBBLE_MAX_TEXT_WIDTH) + SPEECH_BUBBLE_PADDING_X * 2,
+    width: Math.min(textWidth, maxTextWidth) + SPEECH_BUBBLE_PADDING_X * 2,
     height: ONE_LINE_BUBBLE_HEIGHT + (lines - 1) * EXTRA_LINE_HEIGHT,
   };
 }
