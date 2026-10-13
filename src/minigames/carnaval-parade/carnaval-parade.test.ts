@@ -126,6 +126,55 @@ describe('createCarnavalParade: the Minigame the shell drives', () => {
     expect((ctx.stats.at(-1) as { feathers: number }).feathers).toBeGreaterThanOrEqual(1);
   });
 
+  describe('the ported art', () => {
+    it('renders the avenue scene with the player figure and an empty items layer', () => {
+      const { game, container, ctx } = setup();
+      game.start(container, ctx);
+
+      const scene = container.querySelector('.carnaval-parade__scene');
+      expect(scene).not.toBeNull();
+      const player = scene!.querySelector('.carnaval-parade__player');
+      expect(player).not.toBeNull();
+      // The player's own shadow, verbatim from the design.
+      expect(player!.innerHTML).toContain('rx="46" ry="11"');
+      expect(scene!.querySelector('.carnaval-parade__items')?.children.length).toBe(0);
+    });
+
+    it('spawns a feather pickup drawn with the design’s own FEATHER path', () => {
+      // jitter=0, lane=0, r=0.6: a single feather in lane 0.
+      let i = 0;
+      const script = [0, 0, 0.6];
+      const engine = createCarnavalParadeEngine({ rng: () => script[i++ % script.length] });
+      const { game, container, ctx } = setup(engine);
+      game.start(container, ctx);
+
+      // A few ticks past the first spawn roll, before the item reaches the
+      // Penguin's lane (so it's still in `view.items`, not yet collided).
+      vi.advanceTimersByTime(50 * TICK_MS);
+
+      const items = container.querySelectorAll('.carnaval-parade__item--feather');
+      expect(items.length).toBeGreaterThanOrEqual(1);
+      const path = items[0].querySelector('path');
+      expect(path?.getAttribute('d')).toBe('M0 -30 C20 -18 20 14 0 30 C-20 14 -20 -18 0 -30 Z');
+    });
+
+    it('spawns a barrier pickup drawn with the design’s own BAR path', () => {
+      // jitter=0, lane=0, r=0.1 (< .22): a barrier.
+      let i = 0;
+      const script = [0, 0, 0.1, 0.9];
+      const engine = createCarnavalParadeEngine({ rng: () => script[i++ % script.length] });
+      const { game, container, ctx } = setup(engine);
+      game.start(container, ctx);
+
+      vi.advanceTimersByTime(50 * TICK_MS);
+
+      const items = container.querySelectorAll('.carnaval-parade__item--barrier');
+      expect(items.length).toBeGreaterThanOrEqual(1);
+      const path = items[0].querySelector('path');
+      expect(path?.getAttribute('d')).toContain('M34.0 0.0');
+    });
+  });
+
   it('pause() stops ticking and resume() restarts it', () => {
     const engine = createCarnavalParadeEngine();
     const { game, container, ctx } = setup(engine);
