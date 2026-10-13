@@ -9,7 +9,6 @@ import { HUMAN_NPC_SCALE } from '../../game/npcs/npc-layout';
 import { theIcebox } from '../../game/rooms/definitions/the-icebox';
 import { npcSlotPoint, screenToTile } from '../../game/rooms/iso';
 import type { NpcId } from '../npcs';
-import { JETHRO_CAMERA_PROPS } from './team-room-1';
 import { THE_ICEBOX_MOTIONS } from './the-icebox';
 
 const ORIGIN = { x: 800, y: 250 };
@@ -23,7 +22,6 @@ describe('The Icebox NPC motions (#113)', () => {
     expect((Object.keys(THE_ICEBOX_MOTIONS) as NpcId[]).sort()).toEqual([
       'dan-bedian',
       'greg-westover',
-      'jethro',
       'linda-martin',
       'nicole',
       'paul-carnival',
@@ -41,39 +39,6 @@ describe('The Icebox NPC motions (#113)', () => {
     for (const spec of Object.values(THE_ICEBOX_MOTIONS)) {
       expect(() => createNpcMotion(spec, REST, ORIGIN, { reducedMotion: false })).not.toThrow();
     }
-  });
-
-  it("samples Jethro's jetRoam path at its 65% stop, 16.9s into the 26s loop", () => {
-    const compiled = compileCssAnimation(THE_ICEBOX_MOTIONS.jethro!.path!);
-    const point = transformPoint(sampleCssAnimation(compiled, 16_900), { x: 0, y: 0 });
-    // The design's translate(20px, 100px), less its 0% frame (-20px, 65px).
-    expect(point.x).toBeCloseTo(40);
-    expect(point.y).toBeCloseTo(35);
-    expect(transformPoint(sampleCssAnimation(compiled, 0), { x: 0, y: 0 })).toEqual({ x: 0, y: 0 });
-  });
-
-  it("keeps Jethro's whole walk on the Icebox floor, at the design's own points", () => {
-    const slot = theIcebox.npcSlots.find((candidate) => candidate.npcId === 'jethro')!;
-    const start = npcSlotPoint(slot, theIcebox.grid.origin);
-    // The design's 0% point: shadow (590, 525) + translate(-20px, 65px).
-    expect(start).toEqual({ x: 570, y: 590 });
-    const compiled = compileCssAnimation(THE_ICEBOX_MOTIONS.jethro!.path!);
-    for (let ms = 0; ms < 26_000; ms += 250) {
-      const offset = transformPoint(sampleCssAnimation(compiled, ms), { x: 0, y: 0 });
-      const tile = screenToTile(
-        { x: start.x + offset.x, y: start.y + offset.y },
-        theIcebox.grid.origin,
-      );
-      expect(tile.col, `col at ${ms} ms`).toBeGreaterThanOrEqual(0);
-      expect(tile.row, `row at ${ms} ms`).toBeGreaterThanOrEqual(0);
-      expect(tile.col, `col at ${ms} ms`).toBeLessThan(theIcebox.grid.columns);
-      expect(tile.row, `row at ${ms} ms`).toBeLessThan(theIcebox.grid.rows);
-    }
-  });
-
-  it('takes photos as he walks, with the same camera raise as Team Room 1', () => {
-    expect(THE_ICEBOX_MOTIONS.jethro!.props).toBe(JETHRO_CAMERA_PROPS);
-    expect(THE_ICEBOX_MOTIONS.jethro!.replaceFigureRestPose).toBe(true);
   });
 
   it('walks Linda Martin a lap, on her own card bob, never seated (owner request, 2026-10-09)', () => {
@@ -104,7 +69,7 @@ describe('The Icebox NPC motions (#113)', () => {
     // from outside, so it moves 3 Stage px; a `figure` track runs inside the
     // 0.62 scaled wrapper instead. The three new at the table bob as their
     // cards do instead.
-    for (const spec of [THE_ICEBOX_MOTIONS.nicole, THE_ICEBOX_MOTIONS.jethro]) {
+    for (const spec of [THE_ICEBOX_MOTIONS.nicole]) {
       const compiled = compileCssAnimation(spec!.figure!);
       const point = transformPoint(sampleCssAnimation(compiled, 550), { x: 0, y: 0 });
       expect(point.x).toBeCloseTo(0);

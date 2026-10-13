@@ -639,7 +639,15 @@ function wireSnowballController(
   view: SnowballView,
   playerId: string,
 ): SnowballController {
-  const snowball = createSnowballController({ channel, view, playerId });
+  const snowball = createSnowballController({
+    channel,
+    view,
+    playerId,
+    // #154: reports a landed local hit for the Snowmageddon Quest, then
+    // refreshes Quests; a failed report never affects the snowball itself
+    // (the controller's own catch).
+    recordHit: (targetId, throwId) => questAwareStore.recordSnowballHit(targetId, throwId),
+  });
   snowballController = snowball;
   const ammo = snowball.ammo();
   hud.setSnowballAmmo(ammo.count, ammo.capacity);
@@ -1089,6 +1097,9 @@ const questAwareStore: ProgressStore = {
   markCiBoardChecked: () => refreshQuestsAfter(progressStore.markCiBoardChecked()),
   markPaired: () => refreshQuestsAfter(progressStore.markPaired()),
   reportToPaul: () => refreshQuestsAfter(progressStore.reportToPaul()),
+  // #154: the Snowmageddon Quest's hit reports.
+  recordSnowballHit: (targetId, throwId) =>
+    refreshQuestsAfter(progressStore.recordSnowballHit(targetId, throwId)),
 };
 
 // #143: Casey's "Got any work for me?" starts the Igloo Badge Quest by
@@ -1152,6 +1163,25 @@ gameEvents.on('hotspot:click', ({ hotspotId }) => {
   if (hotspotId !== 'ci-board') return;
   gameEvents.emit('ui:toast', { message: 'Half the builds are red. Typical.' });
   void questAwareStore.markCiBoardChecked();
+});
+
+// The LATAM Futebol Field's ball (#220, `penalty-kick-ball`): clicking it
+// opens the exact same Penalty Kick intro card clicking Chrystian Rissoli
+// does, by reusing the real `npc:arrived` event `createNpcDialog` (below)
+// already listens for -- one dialog implementation, two ways to reach it,
+// rather than a second copy of the trigger card's markup.
+gameEvents.on('hotspot:click', ({ hotspotId }) => {
+  if (hotspotId !== 'penalty-kick-ball') return;
+  gameEvents.emit('npc:arrived', { npcId: 'chrystian-rissoli' });
+});
+
+// #219: the LATAM Disco Hall's DJ turntable opens Carnaval Parade's trigger,
+// the same NPC dialog panel clicking Hector Grecco himself does (both are
+// `npc-dialog.ts`'s own `npc:arrived` handler, which it also uses for an
+// ordinary walk-up-and-click NPC).
+gameEvents.on('hotspot:click', ({ hotspotId }) => {
+  if (hotspotId !== 'disco-turntable') return;
+  gameEvents.emit('npc:arrived', { npcId: 'hector-grecco' });
 });
 
 /**
@@ -1408,6 +1438,9 @@ if (e2eHooksEnabled) {
     },
     async pairFlakyTestSteps() {
       return (await progressStore.questProgress()).questSteps['pair-flaky-test'] ?? {};
+    },
+    async recordSnowballHit(targetId, throwId) {
+      return questAwareStore.recordSnowballHit(targetId, throwId);
     },
   };
 }

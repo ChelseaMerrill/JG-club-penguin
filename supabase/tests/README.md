@@ -574,7 +574,7 @@ or a client role may execute an award function, before anything changes.
 
 ## #170 Door network guard posts (gate H2)
 
-`170_guard_posts_proof.sql` proves `20261012000000_door_network_guard_posts.sql`
+`170_guard_posts_proof.sql` proves `20261013000000_door_network_guard_posts.sql`
 (decisions DN1-DN10 in its header), in `51_stair_climb_proof.sql`'s style. As
 postgres it checks that `public.phishing_guard_posts` holds exactly DN5's 16
 posts, compared row by row by position, with positions contiguous from 0; that
@@ -611,7 +611,7 @@ named room check are missing.
       abort can't fire. It starts on a 10-minute UTC boundary, comes round
       once every 160 minutes and lasts 10; rerun the query to see when.
    2. Paste the whole of
-      `supabase/migrations/20261012000000_door_network_guard_posts.sql` into
+      `supabase/migrations/20261013000000_door_network_guard_posts.sql` into
       the SQL editor and run it. It is one implicit transaction (no
       `begin`/`commit`), waits at most 5 s for its table lock, and on any
       error changes nothing. On `guard_window_in_use`, wait for the next slot
@@ -653,3 +653,52 @@ named room check are missing.
 4. Rollback (DN9): re-paste #146's guard-post block (its `delete` and 8-row
    `insert`), only together with a pre-#170 client. The relaxed check can
    stay.
+
+## Snowmageddon Quest (reviewer gate; #154)
+
+`quest_snowmageddon_proof.sql` proves `20261012000000_quest_snowmageddon.sql`
+(decisions S1-S10 in its header) against the same #9 H1 fixture Player. As
+postgres it checks the `('snowmageddon', 75)` registry row, its
+`quest_steps__snowmageddon(uuid)` function, and that the Snowmageddon Badge is
+`available`. As the fixture signed in: `record_snowball_hit` adds nothing for
+a self-hit, an unknown target id, a target with no named Penguin, a repeat
+target already counted today or a reused throw id (none of them raise); a
+valid hit on a real, named target counts once, and `quest_steps__snowmageddon`
+reports `hit-1` through `hit-5` as today's distinct-target count rises.
+`complete_quest('snowmageddon')` refuses (`quest_incomplete`) under 5 today.
+Time is controlled by backdating every recorded hit to "yesterday", as
+postgres, relative to the database's own `now()` -- the only clock the server
+reads, the same technique the pitch/coffee/stair proofs use -- so: the
+backdated hits no longer count today; one more hit on top of four backdated
+ones still leaves the Quest incomplete; five distinct targets in one Eastern
+day then completes it, paying 75 Tokens through `complete_quest` and the
+Badge's +50 through the `player_quest_completions` trigger (not
+`complete_quest`'s own `badgesEarned`, which stays `[]`, per the registry's
+R5); a second `complete_quest` call returns `alreadyCompleted`; no further hit
+is recorded once complete; and `quest_steps__snowmageddon` then reads every
+step true forever, regardless of the day. A second Player (D) hitting the
+fixture never changes the fixture's own thrown-hit count. As anon,
+`record_snowball_hit` and `quest_steps__snowmageddon` are denied (`42501`);
+`quest_steps__snowmageddon` is denied to the fixture too (internal only, like
+every other steps function). It also checks `security definer`/
+`search_path = ''`/one overload each, and the grants (`record_snowball_hit`
+authenticated-only; `snowball_day`, `quest_steps__snowmageddon` and the Badge
+trigger function closed to both client roles).
+
+**Apply it before the client that lists this Quest or calls
+`record_snowball_hit` merges or deploys**, after `20261011000000_stair_climb.sql`
+and `20260927000000_badges.sql` (its first statement stops with
+`badge_award_missing` or `snowmageddon_badge_missing` if either is out of
+order).
+
+1. Local: covered automatically by `sql-quest-snowmageddon.test.ts`'s PGlite
+   run in `npm test`, including a rerun.
+2. Real Postgres/Supabase: apply `20261012000000_quest_snowmageddon.sql` in
+   the SQL editor, then open `quest_snowmageddon_proof.sql`, replace every
+   occurrence of `00000000-0000-0000-0000-00000000f1f0` with the real fixture
+   Player's id, and run it. Expect every row's `pass` column to read `true`,
+   including the final `ALL` row. It changes nothing (everything, including
+   every throwaway target Player, Player D and the fixture's own Snowmageddon
+   Badge, is rolled back) and prints only booleans, counts and Token amounts.
+   Then rerun `quest_registry_proof.sql` and `138_badges_proof.sql`: both
+   still pass.

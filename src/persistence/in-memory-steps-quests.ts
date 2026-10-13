@@ -13,6 +13,11 @@ import {
   PITCH_HACK_REWARD,
   type PitchRunRecord,
 } from './pitch-run-rules';
+import {
+  snowmageddonQuestSteps,
+  SNOWMAGEDDON_QUEST_ID,
+  SNOWMAGEDDON_REWARD,
+} from './snowmageddon-rules';
 
 /**
  * The in-memory fake's mirror of `public.quests` plus the
@@ -52,6 +57,13 @@ export interface InMemoryQuestState {
    *  reached 3 (`squash-flakes`). Sticky once true, mirroring the server's
    *  `exists (...)` check over every recorded round. */
   bugSquashFlakyHitsMet: boolean;
+  /** #154: today's (the fake's clock, Eastern) distinct-target snowball hit
+   *  count, 0 before `snowmageddonCompleted`. */
+  snowballHitsToday: number;
+  /** #154: whether the Snowmageddon Quest has already been paid
+   *  (`player_quest_completions`), forcing every step true regardless of
+   *  `snowballHitsToday`. */
+  snowmageddonCompleted: boolean;
   /** The fake's clock (the server's `now()`), for time-limited steps. */
   nowMs: number;
 }
@@ -132,4 +144,11 @@ registerInMemoryStepsQuest('pair-flaky-test', {
     'squash-flakes': state.bugSquashFlakyHitsMet,
     'report-to-paul': state.paulReported,
   }),
+});
+
+// #154 "Snowmageddon: hit 5 penguins today": `public.quest_steps__snowmageddon`
+// (20261012000000_quest_snowmageddon.sql S5), sticky once completed.
+registerInMemoryStepsQuest(SNOWMAGEDDON_QUEST_ID, {
+  rewardTokens: SNOWMAGEDDON_REWARD,
+  steps: (state) => snowmageddonQuestSteps(state.snowballHitsToday, state.snowmageddonCompleted),
 });

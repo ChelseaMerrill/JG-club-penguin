@@ -245,6 +245,7 @@ function createController(
     setTimeout: typeof setTimeout;
     clearTimeout: typeof clearTimeout;
     generateThrowId: () => string;
+    recordHit: (targetId: string, throwId: string) => Promise<unknown>;
   }> = {},
 ): SnowballController {
   return createSnowballController({
@@ -550,6 +551,98 @@ describe('createSnowballController: hit detection (D3) and O3', () => {
 
     expect(fakeView.calls.remotePoint).toEqual(['other']);
     expect(fakeView.calls.remotePoint).not.toContain(LOCAL_ID);
+  });
+});
+
+describe('createSnowballController: recordHit (#154)', () => {
+  it("calls recordHit with the hit target and the throw's own throwId once a hit resolves", async () => {
+    const fakeChannel = createFakeChannel();
+    const fakeView = createFakeView();
+    fakeView.shownIds.push('other');
+    fakeView.remotePoints.set('other', { x: 100, y: 5 });
+    const timer = createManualTimer();
+    const recordHit = vi.fn().mockResolvedValue(undefined);
+    const controller = createController(fakeChannel, fakeView, {
+      setTimeout: timer.setTimeout,
+      clearTimeout: timer.clearTimeout,
+      generateThrowId: () => 'throw-1',
+      recordHit,
+    });
+
+    await controller.throwAt({ col: 1, row: 0 });
+    timer.fireDelay(SNOWBALL_FLIGHT_MS);
+    await Promise.resolve();
+
+    expect(recordHit).toHaveBeenCalledTimes(1);
+    expect(recordHit).toHaveBeenCalledWith('other', 'throw-1');
+  });
+
+  it('never calls recordHit when no hit landed (a splat only)', async () => {
+    const fakeChannel = createFakeChannel();
+    const fakeView = createFakeView();
+    const timer = createManualTimer();
+    const recordHit = vi.fn().mockResolvedValue(undefined);
+    const controller = createController(fakeChannel, fakeView, {
+      setTimeout: timer.setTimeout,
+      clearTimeout: timer.clearTimeout,
+      recordHit,
+    });
+
+    await controller.throwAt({ col: 1, row: 0 });
+    timer.fireDelay(SNOWBALL_FLIGHT_MS);
+    await Promise.resolve();
+
+    expect(recordHit).not.toHaveBeenCalled();
+  });
+
+  it('a recordHit rejection never affects the snowball itself: the hat and splat still apply, and nothing throws', async () => {
+    const fakeChannel = createFakeChannel();
+    const fakeView = createFakeView();
+    fakeView.shownIds.push('other');
+    fakeView.remotePoints.set('other', { x: 100, y: 5 });
+    const timer = createManualTimer();
+    const recordHit = vi.fn().mockRejectedValue(new Error('network down'));
+    const debugSpy = vi.spyOn(console, 'debug').mockImplementation(() => undefined);
+    const controller = createController(fakeChannel, fakeView, {
+      setTimeout: timer.setTimeout,
+      clearTimeout: timer.clearTimeout,
+      generateThrowId: () => 'throw-1',
+      recordHit,
+    });
+
+    await controller.throwAt({ col: 1, row: 0 });
+    timer.fireDelay(SNOWBALL_FLIGHT_MS);
+    // Flushes the rejected recordHit promise's own microtask queue (its
+    // `.catch()`), so the rejection is observed as handled, not unhandled.
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(recordHit).toHaveBeenCalledWith('other', 'throw-1');
+    expect(fakeChannel.hitSends).toEqual([{ throwId: 'throw-1', targetId: 'other' }]);
+    expect(fakeView.calls.setRemoteSnowHat).toEqual([{ playerId: 'other', on: true }]);
+    expect(controller.snowHats().get('other')).toBeDefined();
+    expect(debugSpy).toHaveBeenCalled();
+
+    debugSpy.mockRestore();
+  });
+
+  it('defaults to a no-op when recordHit is omitted', async () => {
+    const fakeChannel = createFakeChannel();
+    const fakeView = createFakeView();
+    fakeView.shownIds.push('other');
+    fakeView.remotePoints.set('other', { x: 100, y: 5 });
+    const timer = createManualTimer();
+    const controller = createController(fakeChannel, fakeView, {
+      setTimeout: timer.setTimeout,
+      clearTimeout: timer.clearTimeout,
+      generateThrowId: () => 'throw-1',
+    });
+
+    await controller.throwAt({ col: 1, row: 0 });
+    expect(() => timer.fireDelay(SNOWBALL_FLIGHT_MS)).not.toThrow();
+    await Promise.resolve();
+
+    expect(fakeChannel.hitSends).toEqual([{ throwId: 'throw-1', targetId: 'other' }]);
   });
 });
 

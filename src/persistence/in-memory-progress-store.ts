@@ -10,6 +10,7 @@ import {
   stairDay,
   stairFlightPay,
 } from './stair-climb-rules';
+import { SNOWMAGEDDON_BADGE_ID, SNOWMAGEDDON_QUEST_ID } from './snowmageddon-rules';
 import {
   BADGE_BONUS,
   IGLOO_GEAR_CATALOG,
@@ -44,6 +45,7 @@ import {
   type ProgressStore,
   type PurchaseResult,
   type RoundResult,
+  type SnowballHitResult,
   type StairClimbProgress,
   type StairFlightResult,
 } from './progress-store';
@@ -112,6 +114,12 @@ interface PlayerState {
   bugSquashFlakyHitsMet: boolean;
   /** #51 slice 4: the `player_stair_climbs` row, `null` before the first climb. */
   stairClimb: StairClimbState | null;
+  /** #154: the fake's mirror of `public.snowball_hits`, keyed by Eastern day
+   *  (`stairDay`) to the distinct target ids hit that day. */
+  snowballHitsByDay: Map<string, Set<string>>;
+  /** #154: every throwId already used, globally (mirrors the server's unique
+   *  constraint on `throw_id` alone). */
+  usedSnowballThrowIds: Set<string>;
 }
 
 /** #51 slice 4: the fake's mirror of one `player_stair_climbs` row. */
@@ -208,6 +216,8 @@ export function createInMemoryProgressStoreWithControls(
     paulReported: false,
     bugSquashFlakyHitsMet: false,
     stairClimb: null,
+    snowballHitsByDay: new Map(),
+    usedSnowballThrowIds: new Set(),
   };
 
   async function loadAll(): Promise<ProgressSnapshot> {
@@ -294,7 +304,7 @@ export function createInMemoryProgressStoreWithControls(
       throw new ProgressStoreError('unknown_minigame');
     }
     const numericStats = statsRecord as Record<string, number>;
-    if (rule.validStats && !rule.validStats(numericStats)) {
+    if (rule.validStats && !rule.validStats(numericStats, score)) {
       throw new ProgressStoreError('invalid_stats');
     }
 
@@ -513,6 +523,8 @@ export function createInMemoryProgressStoreWithControls(
       paired: state.paired,
       paulReported: state.paulReported,
       bugSquashFlakyHitsMet: state.bugSquashFlakyHitsMet,
+      snowballHitsToday: state.snowballHitsByDay.get(stairDay(new Date(now())))?.size ?? 0,
+      snowmageddonCompleted: state.completedQuests.has(SNOWMAGEDDON_QUEST_ID),
       nowMs: now(),
     };
   }
@@ -587,6 +599,13 @@ export function createInMemoryProgressStoreWithControls(
     state.completedQuests.add(questId);
     // #138: Ship It, for the main Quest only.
     const badgesEarned: BadgeId[] = questId === 'main' && awardBadge('ship-it') ? ['ship-it'] : [];
+    // #154: Snowmageddon's Badge mirrors the server's own trigger on
+    // player_quest_completions (S6) -- awarded here, but never added to this
+    // call's own badgesEarned (the registry's R5): the next Session Badge
+    // check announces it, exactly as the real server's does.
+    if (questId === SNOWMAGEDDON_QUEST_ID) {
+      awardBadge(SNOWMAGEDDON_BADGE_ID);
+    }
     emitter?.emit('tokens:changed', { balance: state.tokens });
     for (const badgeId of badgesEarned) {
       emitter?.emit('badge:earned', { badgeId });
@@ -724,6 +743,24 @@ export function createInMemoryProgressStoreWithControls(
     };
   }
 
+  // #154: mirrors `record_snowball_hit` (S4). The fake has no roster of other
+  // Players, so (unlike the server) it can't check the target is real and
+  // named -- a dev/e2e caller is trusted to pass a sensible id, the same way
+  // this fake trusts its own single Player's other inputs.
+  async function recordSnowballHit(targetId: string, throwId: string): Promise<SnowballHitResult> {
+    const today = stairDay(new Date(now()));
+    const todaySet = state.snowballHitsByDay.get(today) ?? new Set<string>();
+    const alreadyCompleted = state.completedQuests.has(SNOWMAGEDDON_QUEST_ID);
+    const eligible =
+      !alreadyCompleted && !state.usedSnowballThrowIds.has(throwId) && !todaySet.has(targetId);
+    if (eligible) {
+      todaySet.add(targetId);
+      state.snowballHitsByDay.set(today, todaySet);
+      state.usedSnowballThrowIds.add(throwId);
+    }
+    return { counted: eligible, today: todaySet.size };
+  }
+
   return {
     store: {
       loadAll,
@@ -752,6 +789,7 @@ export function createInMemoryProgressStoreWithControls(
       submitPitch,
       logStairFlight,
       getStairClimb,
+      recordSnowballHit,
     },
     grantTokens(tokens: number): void {
       state.tokens += tokens;

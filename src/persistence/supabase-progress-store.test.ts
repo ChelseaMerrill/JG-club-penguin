@@ -1267,4 +1267,50 @@ describe('createSupabaseProgressStore', () => {
       await expect(store.submitPitch(0, 0, 0)).rejects.toMatchObject({ code: 'invalid_response' });
     });
   });
+
+  describe('Snowmageddon Quest (#154)', () => {
+    it('recordSnowballHit calls record_snowball_hit with target_id/throw_id and returns the result', async () => {
+      const { client, calls } = makeFakeClient({
+        recordSnowballHit: { data: { counted: true, today: 3 }, error: null },
+      });
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID });
+
+      await expect(store.recordSnowballHit('target-1', 'throw-1')).resolves.toEqual({
+        counted: true,
+        today: 3,
+      });
+      expect(calls).toContainEqual([
+        'rpc.record_snowball_hit',
+        { target_id: 'target-1', throw_id: 'throw-1' },
+      ]);
+    });
+
+    it('a failed call rejects but never toasts (not wrapped in guarded(), like logStairFlight)', async () => {
+      const { client } = makeFakeClient({
+        recordSnowballHit: { data: null, error: { message: 'no_player' } },
+      });
+      const toasts: string[] = [];
+      const emitter = createEmitter<GameEventMap>();
+      emitter.on('ui:toast', ({ message }) => toasts.push(message));
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID, emitter });
+
+      await expect(store.recordSnowballHit('target-1', 'throw-1')).rejects.toMatchObject({
+        code: 'no_player',
+      });
+      expect(toasts).toEqual([]);
+    });
+
+    it.each([
+      ['no data', null],
+      ['a missing counted flag', { today: 1 }],
+      ['a non-number today', { counted: true, today: '1' }],
+    ])('rejects a malformed reply (%s) with invalid_response', async (_label, data) => {
+      const { client } = makeFakeClient({ recordSnowballHit: { data, error: null } });
+      const store = createSupabaseProgressStore({ client, playerId: PLAYER_ID });
+
+      await expect(store.recordSnowballHit('target-1', 'throw-1')).rejects.toMatchObject({
+        code: 'invalid_response',
+      });
+    });
+  });
 });

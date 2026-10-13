@@ -1,5 +1,4 @@
 import type { NpcId } from '../npcs';
-import { JETHRO_CAMERA_PROPS } from './team-room-1';
 import type { NpcMotionSpec } from './types';
 
 /**
@@ -53,17 +52,6 @@ export const THE_ICEBOX_MOTIONS: Partial<Record<NpcId, NpcMotionSpec>> = {
   // stop is the design's own minus that start (owner request, 2026-10-01,
   // Track D), so the loop traces the design's own path from his slot's
   // `offset` point (see `the-icebox.ts`); stops and timing are verbatim.
-  // He also takes photos as he walks, with Team Room 1's camera raise.
-  jethro: {
-    path: {
-      keyframes:
-        '@keyframes jetRoam { 0% { transform: translate(0px, 0px); } 10% { transform: translate(0px, 0px); } 30% { transform: translate(-100px, -30px); } 45% { transform: translate(-100px, -30px); } 65% { transform: translate(40px, 35px); } 80% { transform: translate(40px, 35px); } 100% { transform: translate(0px, 0px); } }',
-      animation: 'jetRoam 26s ease-in-out infinite',
-    },
-    figure: ICEBOX_IDLE_BOB,
-    replaceFigureRestPose: true,
-    props: JETHRO_CAMERA_PROPS,
-  },
   // Millie, Jason and Darrin left the Icebox (owner request, 2026-10-02,
   // Track D), and their roams with them.
   //
@@ -94,7 +82,7 @@ export const THE_ICEBOX_MOTIONS: Partial<Record<NpcId, NpcMotionSpec>> = {
   },
   // Linda Martin (owner request, 2026-10-09): walks a lap of the open
   // floor near the front of the Room, clear of the conference table (cols
-  // 3-8), Nicole's (1,7) and Jethro's (4,9) roams -- from her (9,8) slot,
+  // 3-8) and Nicole's (1,7) roam -- from her (9,8) slot,
   // north to (9,7), east two tiles to (11,7), south to (11,8) and west two
   // tiles home, each leg a `tileToScreen` delta (100/50 tiles, the Mullet's
   // `adamLap`/`bryanLap` precedent), paused briefly at each corner, on her
