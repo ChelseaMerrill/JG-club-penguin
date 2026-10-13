@@ -102,6 +102,36 @@ describe('aiming and shooting', () => {
   });
 });
 
+describe('the ported art', () => {
+  it('renders the stadium scene with the goal, keeper and ball groups', () => {
+    const { container, ctx, game } = setup();
+    game.start(container, ctx);
+
+    const scene = container.querySelector('.penalty-kick__scene');
+    expect(scene).not.toBeNull();
+    expect(scene!.querySelector('.penalty-kick__keeper')).not.toBeNull();
+    expect(scene!.querySelector('.penalty-kick__ball')).not.toBeNull();
+    // The design's own net background + pattern, verbatim.
+    expect(scene!.innerHTML).toContain('url(#pk-net)');
+  });
+
+  it('moves the keeper to its dive zone once a shot resolves', () => {
+    const { container, ctx, game, q } = setup();
+    game.start(container, ctx);
+    const keeper = q('.penalty-kick__keeper');
+    const restTransform = keeper.getAttribute('transform');
+
+    game.debugForceShot('save');
+    vi.advanceTimersByTime(TICK_MS);
+
+    // Mid-flight the keeper has already started easing off its rest pose
+    // (translate(800 470) rotate(0)) toward one of the design's own `KZ`
+    // dive points.
+    expect(keeper.getAttribute('transform')).not.toBe(restTransform);
+    expect(keeper.getAttribute('transform')).not.toBe('translate(800.0 470.0) rotate(0.0)');
+  });
+});
+
 describe('a forced shot', () => {
   it('shows the toast and the Coach-style line (prefixed with the host’s name) once the kick lands', () => {
     const { container, ctx, game, text, q } = setup();
