@@ -2,8 +2,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { MinigameStatsMap } from '../../contracts';
 import type { MinigameContext } from '../minigame';
-import { createPaoDeQueijoEngine, TICK_MS } from './pao-de-queijo-engine';
-import { createPaoDeQueijo } from './pao-de-queijo';
+import { createPaoDeQueijoEngine, ROUNDS, TICK_MS } from './pao-de-queijo-engine';
+import { createPaoDeQueijo, paoDeQueijoCardLayout, paoDeQueijoStageScale } from './pao-de-queijo';
 
 /** `pao-de-queijo.ts`'s own seam: the `Minigame` interface plus the DOM it
  *  renders into the shell's play area. Drives a real engine (the default or
@@ -170,6 +170,99 @@ describe('createPaoDeQueijo: the Minigame the shell drives', () => {
     game.end();
 
     expect(() => game.debugMatchAllPairs()).not.toThrow();
+  });
+});
+
+describe('paoDeQueijoCardLayout: the design’s own card-grid centring formula', () => {
+  // Hand-worked from the design's `renderVals()` (`W=130,H=140,G=14`,
+  // `x0=800-tw/2`, `y0=500-th/2+30`), independently of the implementation.
+  it('round 1 (4x3): centres a 562x448 grid at x0=519, y0=306', () => {
+    expect(paoDeQueijoCardLayout(0, ROUNDS[0])).toEqual({ x: 519, y: 306 });
+    expect(paoDeQueijoCardLayout(1, ROUNDS[0])).toEqual({ x: 663, y: 306 }); // col 1, row 0.
+    expect(paoDeQueijoCardLayout(4, ROUNDS[0])).toEqual({ x: 519, y: 460 }); // col 0, row 1.
+  });
+
+  it('round 2 (4x4): the same 562-wide grid, now 602 tall, centres at x0=519, y0=229', () => {
+    expect(paoDeQueijoCardLayout(0, ROUNDS[1])).toEqual({ x: 519, y: 229 });
+  });
+
+  it('round 3 (5x4): a wider 706x602 grid centres at x0=447, y0=229', () => {
+    expect(paoDeQueijoCardLayout(0, ROUNDS[2])).toEqual({ x: 447, y: 229 });
+    expect(paoDeQueijoCardLayout(2, ROUNDS[2])).toEqual({ x: 735, y: 229 }); // col 2, row 0.
+    expect(paoDeQueijoCardLayout(7, ROUNDS[2])).toEqual({ x: 735, y: 383 }); // col 2, row 1.
+  });
+});
+
+describe('paoDeQueijoStageScale: the contain-fit scale for the 1600x900 stage', () => {
+  it('is the smaller of the two axis ratios (a letterboxed field)', () => {
+    expect(paoDeQueijoStageScale(1600, 900)).toBe(1); // exact fit.
+    expect(paoDeQueijoStageScale(800, 450)).toBe(0.5); // uniform half scale.
+    expect(paoDeQueijoStageScale(3200, 900)).toBe(1); // wider field: height-bound.
+    expect(paoDeQueijoStageScale(1600, 1800)).toBe(1); // taller field: width-bound.
+  });
+
+  it('is 0 for a not-yet-laid-out field (jsdom, or a 0-size box) rather than Infinity/NaN', () => {
+    expect(paoDeQueijoStageScale(0, 0)).toBe(0);
+    expect(paoDeQueijoStageScale(0, 500)).toBe(0);
+  });
+});
+
+describe('createPaoDeQueijo: the rendered board positions cards at the design’s own layout', () => {
+  it('positions round 1’s cards at paoDeQueijoCardLayout’s own coordinates, and repositions on round 2', () => {
+    const { game, container, ctx } = setup();
+    game.start(container, ctx);
+
+    const cardsRound1 = container.querySelectorAll<HTMLButtonElement>('.pao-de-queijo__card');
+    const expectedFirst = paoDeQueijoCardLayout(0, ROUNDS[0]);
+    expect(cardsRound1[0].style.left).toBe(`${expectedFirst.x}px`);
+    expect(cardsRound1[0].style.top).toBe(`${expectedFirst.y}px`);
+    const expectedLast = paoDeQueijoCardLayout(cardsRound1.length - 1, ROUNDS[0]);
+    expect(cardsRound1[cardsRound1.length - 1].style.left).toBe(`${expectedLast.x}px`);
+    expect(cardsRound1[cardsRound1.length - 1].style.top).toBe(`${expectedLast.y}px`);
+
+    game.debugMatchAllPairs();
+    vi.advanceTimersByTime(1500); // the between-round pause.
+
+    const cardsRound2 = container.querySelectorAll<HTMLButtonElement>('.pao-de-queijo__card');
+    const expectedRound2First = paoDeQueijoCardLayout(0, ROUNDS[1]);
+    expect(cardsRound2[0].style.left).toBe(`${expectedRound2First.x}px`);
+    expect(cardsRound2[0].style.top).toBe(`${expectedRound2First.y}px`);
+  });
+
+  it('every card has both a back face (the JG mark) and a front face (icon + label)', () => {
+    const { game, container, ctx } = setup();
+    game.start(container, ctx);
+
+    const card = container.querySelector<HTMLButtonElement>('.pao-de-queijo__card')!;
+    const back = card.querySelector('.pao-de-queijo__card-face--back')!;
+    const front = card.querySelector('.pao-de-queijo__card-face--front')!;
+    expect(back.querySelector('.pao-de-queijo__card-mark')?.textContent).toBe('JG');
+    expect(front.querySelector('.pao-de-queijo__card-icon')).not.toBeNull();
+    expect(front.querySelector('.pao-de-queijo__card-label')?.textContent).toMatch(/\S/);
+  });
+
+  it('a matched pair carries --matched (the design’s own matched front-face styling hook) and stays disabled', () => {
+    const engine = createPaoDeQueijoEngine();
+    const { game, container, ctx } = setup(engine);
+    game.start(container, ctx);
+    vi.advanceTimersByTime(2200); // round 1's own preview.
+
+    const cards = container.querySelectorAll<HTMLButtonElement>('.pao-de-queijo__card');
+    const key = engine.view.cards[0].key;
+    const partnerIndex = engine.view.cards.findIndex((c, i) => i !== 0 && c.key === key);
+    cards[0].click();
+    cards[partnerIndex].click();
+    vi.advanceTimersByTime(450); // the match reveal delay.
+
+    expect(cards[0].classList.contains('pao-de-queijo__card--matched')).toBe(true);
+    expect(cards[0].querySelector('.pao-de-queijo__card-face--front')).not.toBeNull();
+    expect(cards[0].disabled).toBe(true);
+
+    // An unselected, still face-down card never picks up --matched or
+    // --flipped on its own.
+    const untouched = [...cards].find((_c, i) => i !== 0 && i !== partnerIndex)!;
+    expect(untouched.classList.contains('pao-de-queijo__card--matched')).toBe(false);
+    expect(untouched.classList.contains('pao-de-queijo__card--flipped')).toBe(false);
   });
 });
 

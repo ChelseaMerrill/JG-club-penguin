@@ -1,40 +1,89 @@
 /* Pão de Queijo Memory: the play screen ported from `design/Minigame Pao de
    Queijo Memory.dc.html` into the shell's generic play area
-   (`.minigame__play-area`, `minigame-shell.ts`). The board's grid uses
-   `--pao-de-queijo-cols`/`--pao-de-queijo-rows` (set per round by
-   `pao-de-queijo.ts`) rather than the design's own fixed 130x140 Stage-px
-   cells -- the play area isn't a fixed 1600x900 box, the same reason
-   `carnaval-parade.css`'s track uses percentages. Uses the JG design tokens
+   (`.minigame__play-area`, `minigame-shell.ts`). The background
+   (`paoDeQueijoSceneSvg()` in `pao-de-queijo.ts`) is one inline SVG in the
+   design's own 1600x900 coordinate space, fit to `.pao-de-queijo__field` by
+   its own `preserveAspectRatio="xMidYMid meet"`. The HUD and the board are a
+   separate, plain-HTML `.pao-de-queijo__stage` -- also authored at 1600x900
+   -- fit identically via a JS-computed `transform: scale()`
+   (`paoDeQueijoStageScale`), not nested inside the SVG's own
+   `<foreignObject>`: the board's interactive, 3D-flipping cards stay plain,
+   accessible HTML the whole way down instead, the same reasoning
+   `pao-de-queijo.ts`'s own doc comment gives. Uses the JG design tokens
    (`--jg-*`, `--font-*`) from `src/style.css`. */
 
 @keyframes pao-de-queijo-popin {
   from {
     opacity: 0;
-    transform: translate(-50%, -50%) translateY(10px);
+    transform: translateX(-50%) translateY(10px);
   }
   to {
     opacity: 1;
-    transform: translate(-50%, -50%) translateY(0);
+    transform: translateX(-50%) translateY(0);
+  }
+}
+
+@keyframes pao-de-queijo-bulb-blink {
+  0%,
+  100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 1;
   }
 }
 
 .pao-de-queijo {
+  position: relative;
   width: 100%;
   height: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+}
+
+.pao-de-queijo__field {
+  position: absolute;
+  inset: 0;
+}
+
+.pao-de-queijo__scene {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+
+.pao-de-queijo__bulb {
+  animation: pao-de-queijo-bulb-blink 2s ease-in-out infinite;
+  animation-delay: calc(var(--pq-bulb-i, 0) * -0.18s);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pao-de-queijo__bulb {
+    animation: none;
+    opacity: 0.85;
+  }
+}
+
+/* Authored at the design's own 1600x900 pixel coordinates; `.pao-de-queijo__
+   field`'s own box is irrelevant to this element's layout size, only to the
+   `transform: scale()` `pao-de-queijo.ts`'s `paoDeQueijoStageScale` computes
+   and applies inline. `left/top: 50%` plus the inline `translate(-50%,-50%)`
+   centres it regardless of that scale (the translate's own percentages
+   resolve against this element's unscaled 1600x900 box, so they stay correct
+   at any scale). */
+.pao-de-queijo__stage {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 1600px;
+  height: 900px;
   color: var(--fg-primary);
 }
 
-.pao-de-queijo__status {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  align-items: center;
-}
-
 .pao-de-queijo__subline {
+  position: absolute;
+  left: 36px;
+  top: 100px;
   font-family: var(--font-display);
   font-size: 12px;
   letter-spacing: 0.22em;
@@ -42,28 +91,33 @@
 }
 
 .pao-de-queijo__round-wrap {
+  position: absolute;
+  left: 50%;
+  top: 70px;
+  transform: translateX(-50%);
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
 }
 
-.pao-de-queijo__round-label-text {
-  font-family: var(--font-display);
-  font-size: 12px;
-  letter-spacing: 0.18em;
-  color: var(--fg-muted);
+.pao-de-queijo__round-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
 }
 
+.pao-de-queijo__round-label-text,
 .pao-de-queijo__round-label {
   font-family: var(--font-display);
-  font-size: 13px;
-  letter-spacing: 0.1em;
-  color: var(--jg-primary);
+  font-size: 14px;
+  letter-spacing: 0.18em;
+  color: var(--fg-primary);
 }
 
 .pao-de-queijo__timebar {
-  width: 220px;
-  height: 10px;
+  width: 340px;
+  height: 12px;
   background: var(--jg-dark);
   border: 2px solid var(--jg-secondary);
 }
@@ -80,15 +134,18 @@
 }
 
 .pao-de-queijo__hud {
+  position: absolute;
+  right: 230px;
+  top: 62px;
   display: flex;
-  justify-content: center;
-  gap: 32px;
+  gap: 30px;
+  align-items: flex-end;
 }
 
 .pao-de-queijo__stat {
   display: flex;
   flex-direction: column;
-  align-items: center;
+  align-items: flex-end;
   gap: 2px;
 }
 
@@ -96,12 +153,12 @@
   font-family: var(--font-display);
   font-size: 11px;
   letter-spacing: 0.2em;
-  color: var(--fg-muted);
+  color: var(--jg-inactive);
 }
 
 .pao-de-queijo__stat-value {
   font-family: var(--font-game-display);
-  font-size: 24px;
+  font-size: 30px;
   line-height: 1;
   color: var(--fg-primary);
 }
@@ -111,20 +168,14 @@
 }
 
 .pao-de-queijo__board {
-  --pao-de-queijo-cols: 4;
-  --pao-de-queijo-rows: 3;
-  flex: 1;
-  min-height: 0;
-  display: grid;
-  grid-template-columns: repeat(var(--pao-de-queijo-cols), 1fr);
-  grid-template-rows: repeat(var(--pao-de-queijo-rows), 1fr);
-  gap: 10px;
-  place-items: stretch;
+  position: absolute;
+  inset: 0;
 }
 
 .pao-de-queijo__card {
-  position: relative;
-  min-height: 0;
+  position: absolute;
+  width: 130px;
+  height: 140px;
   perspective: 700px;
   background: none;
   border: none;
@@ -149,6 +200,12 @@
   transform: rotateY(180deg);
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .pao-de-queijo__card-inner {
+    transition: none;
+  }
+}
+
 .pao-de-queijo__card-face {
   position: absolute;
   inset: 0;
@@ -167,37 +224,38 @@
 }
 
 .pao-de-queijo__card-mark {
-  width: 36px;
-  height: 40px;
+  width: 62px;
+  height: 70px;
   clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
   background: var(--jg-primary);
   display: grid;
   place-items: center;
   font-family: var(--font-display);
-  font-size: 14px;
+  font-size: 22px;
   color: var(--jg-dark);
 }
 
 .pao-de-queijo__card-face--front {
   background: var(--jg-light);
-  border: 3px solid var(--jg-primary);
+  border: 3px solid var(--jg-secondary);
   box-shadow: 0 6px 0 #06303d;
   transform: rotateY(180deg);
 }
 
 .pao-de-queijo__card--matched .pao-de-queijo__card-face--front {
   background: #cff3ff;
+  border-color: var(--jg-primary);
 }
 
 .pao-de-queijo__card-icon {
-  width: 56%;
-  height: 56%;
+  width: 96px;
+  height: 96px;
 }
 
 .pao-de-queijo__card-label {
   font-family: var(--font-display);
-  font-size: 10px;
-  letter-spacing: 0.08em;
+  font-size: 12px;
+  letter-spacing: 0.1em;
   color: var(--jg-dark);
   text-align: center;
   padding: 0 4px;
@@ -206,22 +264,28 @@
 .pao-de-queijo__toast {
   position: absolute;
   left: 50%;
-  top: 46%;
-  transform: translate(-50%, -50%);
-  padding: 10px 26px;
+  top: 430px;
+  transform: translateX(-50%);
+  padding: 12px 34px;
   background: #ffd23f;
   clip-path: polygon(
-    14px 0,
-    calc(100% - 14px) 0,
+    18px 0,
+    calc(100% - 18px) 0,
     100% 50%,
-    calc(100% - 14px) 100%,
-    14px 100%,
+    calc(100% - 18px) 100%,
+    18px 100%,
     0 50%
   );
   font-family: var(--font-display);
-  font-size: 28px;
+  font-size: 44px;
   letter-spacing: 0.06em;
   color: var(--jg-dark);
   animation: pao-de-queijo-popin 0.2s ease-out;
   pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pao-de-queijo__toast {
+    animation: none;
+  }
 }
