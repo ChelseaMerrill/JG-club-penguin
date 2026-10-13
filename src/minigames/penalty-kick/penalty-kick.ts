@@ -6,8 +6,10 @@ import {
   scored,
   SHOTS_PER_ROUND,
   TICK_MS,
+  type KeeperZone,
   type PenaltyKickEngine,
   type PenaltyKickStats,
+  type PenaltyKickView,
   type PenaltyOutcome,
 } from './penalty-kick-engine';
 import './penalty-kick.css';
@@ -49,8 +51,6 @@ const DOT_LETTER: Record<PenaltyOutcome, string> = {
   over: 'X',
 };
 
-const ZONE_LABEL = ['LEFT', 'CENTRE', 'RIGHT'] as const;
-
 function el<K extends keyof HTMLElementTagNameMap>(
   tag: K,
   className: string,
@@ -62,6 +62,121 @@ function el<K extends keyof HTMLElementTagNameMap>(
   return node;
 }
 
+// The keeper's three dive targets (x, y, rotation), verbatim from the
+// design's own `KZ` array -- the left/centre/right thirds of the goal.
+const KZ: ReadonlyArray<readonly [number, number, number]> = [
+  [570, 430, -70],
+  [800, 395, 0],
+  [1030, 430, 70],
+];
+
+/** The ball's flight target, verbatim from the design's `renderVals`: the
+ *  locked aim point, bent wide/over the bar for a miss, or pulled to the
+ *  keeper's own dive point for a save. Cosmetic derivation only (the
+ *  engine's `view.outcome`/`view.keeperZone` already decided the shot); kept
+ *  out of the engine the same way `carnaval-parade.ts`'s item positioning is. */
+function targetPoint(view: PenaltyKickView): { tx: number; ty: number } {
+  let tx = 450 + view.aimX * 700;
+  let ty = 520 - view.aimY * 270;
+  if (view.outcome === 'wide') tx = view.aimX < 0.5 ? 395 : 1205;
+  if (view.outcome === 'over') ty = 190;
+  if (view.outcome === 'save' && view.keeperZone !== -1) {
+    const k = KZ[view.keeperZone];
+    tx = k[0] + (view.keeperZone - 1) * -30;
+    ty = k[1] - 20;
+  }
+  return { tx, ty };
+}
+
+/** The stadium backdrop, goal/net, keeper and ball, ported from `design/
+ *  Minigame Penalty Kick.dc.html`'s static SVG verbatim apart from one
+ *  deliberate simplification: the crowd's ~370 individually-placed circles
+ *  become one repeating `<pattern>` tile sampling the same row colours/
+ *  opacities. The ad boards, floodlights, pitch stripes and penalty-area
+ *  lines are copied exactly; the keeper and ball groups are the design's own
+ *  markup, left for `render()` to move with their own `transform`. */
+function penaltyKickSceneSvg(): string {
+  const adBoards: ReadonlyArray<{ x: number; fill: string; text: string; textFill: string }> = [
+    { x: 20, fill: '#0C4B5F', text: 'JG', textFill: '#F4F4F4' },
+    { x: 218, fill: '#161719', text: 'LATAM', textFill: '#F4F4F4' },
+    { x: 416, fill: '#00BDFF', text: 'CLUB JENGUIN', textFill: '#161719' },
+    { x: 614, fill: '#161719', text: 'JG', textFill: '#F4F4F4' },
+    { x: 812, fill: '#0C4B5F', text: 'JG', textFill: '#F4F4F4' },
+    { x: 1010, fill: '#161719', text: 'LATAM', textFill: '#F4F4F4' },
+    { x: 1208, fill: '#00BDFF', text: 'CLUB JENGUIN', textFill: '#161719' },
+    { x: 1406, fill: '#161719', text: 'JG', textFill: '#F4F4F4' },
+  ];
+  const ads = adBoards
+    .map(
+      ({ x, fill, text, textFill }) =>
+        `<rect x="${x}" y="332" width="186" height="64" fill="${fill}" stroke="#00BDFF" stroke-width="2"></rect>` +
+        `<text x="${x + 93}" y="376" text-anchor="middle" font-family="Anton,sans-serif" font-size="30" letter-spacing="3" fill="${textFill}">${text}</text>`,
+    )
+    .join('');
+  const pitchStripes = [560, 603, 646, 689, 732, 775, 818, 861]
+    .map(
+      (y, i) =>
+        `<rect x="0" y="${y}" width="1600" height="43" fill="${i % 2 === 0 ? '#287046' : '#2f7d4f'}"></rect>`,
+    )
+    .join('');
+  return (
+    '<svg class="penalty-kick__scene" viewBox="0 0 1600 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true" focusable="false">' +
+    '<defs>' +
+    '<linearGradient id="pk-sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0A0C0F"></stop><stop offset="1" stop-color="#0F3441"></stop></linearGradient>' +
+    '<pattern id="pk-net" width="22" height="22" patternUnits="userSpaceOnUse"><path d="M0 0H22M0 0V22" stroke="#F4F4F4" stroke-width="1.2" opacity=".4" fill="none"></path></pattern>' +
+    '<radialGradient id="pk-fl"><stop offset="0" stop-color="#F4F4F4" stop-opacity=".45"></stop><stop offset="1" stop-color="#F4F4F4" stop-opacity="0"></stop></radialGradient>' +
+    '<pattern id="pk-crowd" width="27" height="130" patternUnits="userSpaceOnUse">' +
+    '<circle cx="0" cy="0" r="8" fill="#FFD23F" opacity=".55"></circle><circle cx="13.5" cy="13" r="8" fill="#3DDC84" opacity=".67"></circle>' +
+    '<circle cx="0" cy="26" r="8" fill="#00BDFF" opacity=".67"></circle><circle cx="13.5" cy="39" r="8" fill="#F4F4F4" opacity=".79"></circle>' +
+    '<circle cx="0" cy="52" r="8" fill="#E4572E" opacity=".79"></circle><circle cx="13.5" cy="65" r="8" fill="#FF3DA5" opacity=".55"></circle>' +
+    '<circle cx="0" cy="78" r="8" fill="#3DDC84" opacity=".55"></circle><circle cx="13.5" cy="91" r="8" fill="#FFD23F" opacity=".67"></circle>' +
+    '<circle cx="0" cy="104" r="8" fill="#F4F4F4" opacity=".67"></circle><circle cx="13.5" cy="117" r="8" fill="#00BDFF" opacity=".79"></circle>' +
+    '</pattern>' +
+    '</defs>' +
+    '<rect width="1600" height="900" fill="url(#pk-sky)"></rect>' +
+    '<rect x="0" y="90" width="1600" height="240" fill="#15191c"></rect>' +
+    '<rect x="0" y="90" width="1600" height="240" fill="url(#pk-crowd)"></rect>' +
+    '<rect x="0" y="310" width="1600" height="250" fill="#1b1f22"></rect>' +
+    ads +
+    '<ellipse cx="200" cy="130" rx="180" ry="90" fill="url(#pk-fl)"></ellipse>' +
+    '<ellipse cx="1400" cy="130" rx="180" ry="90" fill="url(#pk-fl)"></ellipse>' +
+    '<rect x="0" y="540" width="1600" height="22" fill="#0C4B5F"></rect>' +
+    pitchStripes +
+    '<polygon points="330,900 520,640 1080,640 1270,900" fill="none" stroke="#F4F4F4" stroke-width="4" opacity=".7"></polygon>' +
+    '<polygon points="560,640 640,740 960,740 1040,640" fill="none" stroke="#F4F4F4" stroke-width="3" opacity=".6"></polygon>' +
+    '<ellipse cx="800" cy="770" rx="14" ry="5" fill="#F4F4F4" opacity=".8"></ellipse>' +
+    '<rect x="450" y="250" width="700" height="270" fill="#0A0C0F" opacity=".55"></rect>' +
+    '<rect x="450" y="250" width="700" height="270" fill="url(#pk-net)"></rect>' +
+    '<g class="penalty-kick__keeper">' +
+    '<ellipse cx="0" cy="92" rx="40" ry="9" fill="#000" opacity=".35"></ellipse>' +
+    '<rect x="-24" y="46" width="18" height="46" rx="6" fill="#161719" stroke="#0C4B5F" stroke-width="3"></rect>' +
+    '<rect x="6" y="46" width="18" height="46" rx="6" fill="#161719" stroke="#0C4B5F" stroke-width="3"></rect>' +
+    '<rect x="-32" y="-34" width="64" height="86" rx="16" fill="#FFD23F" stroke="#0C4B5F" stroke-width="3.5"></rect>' +
+    '<text x="0" y="22" text-anchor="middle" font-family="Anton,sans-serif" font-size="26" fill="#161719">1</text>' +
+    '<path d="M-30 -26 L-62 -66 M30 -26 L62 -66" stroke="#0C4B5F" stroke-width="22" stroke-linecap="round"></path>' +
+    '<path d="M-30 -26 L-62 -66 M30 -26 L62 -66" stroke="#FFD23F" stroke-width="15" stroke-linecap="round"></path>' +
+    '<circle cx="-66" cy="-72" r="12" fill="#00BDFF" stroke="#0C4B5F" stroke-width="3"></circle>' +
+    '<circle cx="66" cy="-72" r="12" fill="#00BDFF" stroke="#0C4B5F" stroke-width="3"></circle>' +
+    '<circle cx="0" cy="-58" r="24" fill="#F6DCC6" stroke="#0C4B5F" stroke-width="3.5"></circle>' +
+    '<path d="M-24 -62 C-26 -86 -8 -88 4 -86 C20 -86 28 -76 24 -62 C16 -68 4 -72 -6 -68 C-12 -66 -18 -64 -24 -62 Z" fill="#2b2118" stroke="#0C4B5F" stroke-width="3"></path>' +
+    '<circle cx="-8" cy="-56" r="3" fill="#161719"></circle>' +
+    '<circle cx="8" cy="-56" r="3" fill="#161719"></circle>' +
+    '<path d="M-7 -46 Q0 -41 7 -46" fill="none" stroke="#0C4B5F" stroke-width="2.5" stroke-linecap="round"></path>' +
+    '</g>' +
+    '<path d="M450 520 V250 H1150 V520" fill="none" stroke="#F4F4F4" stroke-width="12" stroke-linejoin="round" stroke-linecap="round"></path>' +
+    '<line class="penalty-kick__aim-line penalty-kick__aim-line--x" x1="800" y1="250" x2="800" y2="520" stroke="#00BDFF" stroke-width="5"></line>' +
+    '<line class="penalty-kick__aim-line penalty-kick__aim-line--y" x1="450" y1="385" x2="1150" y2="385" stroke="#00BDFF" stroke-width="5"></line>' +
+    '<circle class="penalty-kick__aim-dot" cx="800" cy="385" r="18" fill="none" stroke="#F4F4F4" stroke-width="4"></circle>' +
+    '<ellipse class="penalty-kick__ball-shadow" cx="800" cy="775" rx="24" ry="8" fill="#000" opacity=".35"></ellipse>' +
+    '<g class="penalty-kick__ball">' +
+    '<circle r="22" fill="#F4F4F4" stroke="#161719" stroke-width="3"></circle>' +
+    '<polygon points="0,-12 11,-4 7,10 -7,10 -11,-4" fill="#161719"></polygon>' +
+    '<path d="M0 -12 V-22 M11 -4 L21 -8 M7 10 L14 19 M-7 10 L-14 19 M-11 -4 L-21 -8" stroke="#161719" stroke-width="2.5"></path>' +
+    '</g>' +
+    '</svg>'
+  );
+}
+
 /**
  * Penalty Kick: five solo penalties against a keeper, the pure
  * `penalty-kick-engine.ts` under a thin DOM layer ported from `design/
@@ -71,6 +186,13 @@ function el<K extends keyof HTMLElementTagNameMap>(
  * `context.finish()` once the 5th shot resolves), PAUSE/P, QUIT and
  * `recordRound`; its done screen shows this game's FULL TIME headings via
  * `doneSummary()`.
+ *
+ * The stadium, goal/net, keeper and ball are one inline SVG
+ * (`penaltyKickSceneSvg()`) in the design's own 1600x900 coordinate space;
+ * `render()` moves the keeper/ball/aim-line elements with the same formulas
+ * the design's own `renderVals()` uses (`targetPoint`, the easing on
+ * `view.kickProgress`), reading only the engine's public `view` -- the
+ * engine itself is untouched.
  *
  * Not ported: the design's trigger screen (the host's challenge, the "HOW TO
  * PLAY" cards) -- those are Chrystian Rissoli's NPC dialog and the shell's
@@ -91,6 +213,7 @@ export function createPenaltyKick(
   let finished = false;
 
   const refs: Record<string, HTMLElement> = {};
+  const svgRefs: Record<string, SVGElement> = {};
   const dotEls: HTMLElement[] = [];
 
   function report(): void {
@@ -125,28 +248,56 @@ export function createPenaltyKick(
   function render(): void {
     const view = engine.view;
     const aiming = view.stage === 'aim-x' || view.stage === 'aim-y';
-
-    refs.aimX.style.left = `${(view.aimX * 100).toFixed(2)}%`;
-    refs.aimX.style.visibility = aiming || view.stage !== 'done' ? 'visible' : 'hidden';
-    refs.aimY.style.bottom = `${(view.aimY * 100).toFixed(2)}%`;
-    refs.aimX.classList.toggle('penalty-kick__aim-line--active', view.stage === 'aim-x');
-    refs.aimY.classList.toggle('penalty-kick__aim-line--active', view.stage === 'aim-y');
-
     const diving = view.stage === 'kick' || view.stage === 'result';
-    refs.keeper.classList.toggle('penalty-kick__keeper--diving', diving);
-    for (let zone = 0; zone < 3; zone++) {
-      refs.keeper.classList.toggle(
-        `penalty-kick__keeper--zone-${zone}`,
-        diving && view.keeperZone === zone,
-      );
-    }
-    refs.keeper.dataset.zone = diving && view.keeperZone !== -1 ? ZONE_LABEL[view.keeperZone] : '';
+    const p = view.kickProgress;
+    const ease = 1 - Math.pow(1 - p, 2);
 
-    refs.ball.classList.toggle(
-      'penalty-kick__ball--kicked',
-      view.stage === 'kick' || view.stage === 'result',
+    // The two sweeping aim lines and their intersection dot, verbatim from
+    // the design's own `vx`/`hy`/`vOp`/`hOp`.
+    const vx = 450 + view.aimX * 700;
+    const hy = 520 - view.aimY * 270;
+    svgRefs.aimLineX.setAttribute('x1', vx.toFixed(1));
+    svgRefs.aimLineX.setAttribute('x2', vx.toFixed(1));
+    svgRefs.aimLineX.setAttribute('opacity', aiming ? '1' : '0');
+    svgRefs.aimLineY.setAttribute('y1', hy.toFixed(1));
+    svgRefs.aimLineY.setAttribute('y2', hy.toFixed(1));
+    svgRefs.aimLineY.setAttribute('opacity', view.stage === 'aim-y' ? '1' : '0');
+    svgRefs.aimDot.setAttribute('cx', vx.toFixed(1));
+    svgRefs.aimDot.setAttribute('cy', hy.toFixed(1));
+    svgRefs.aimDot.setAttribute('opacity', view.stage === 'aim-y' ? '1' : '0');
+
+    // The keeper's dive to its `KZ` zone, verbatim from the design's own
+    // `kx`/`ky`/`kr`.
+    let kx = 800;
+    let ky = 470;
+    let kr = 0;
+    if (diving && view.keeperZone !== -1) {
+      const zone: KeeperZone = view.keeperZone;
+      const k = KZ[zone];
+      kx = 800 + (k[0] - 800) * ease;
+      ky = 470 + (k[1] - 470) * ease + (zone === 1 ? 0 : -Math.sin(p * Math.PI) * 30);
+      kr = k[2] * ease;
+    }
+    svgRefs.keeper.setAttribute(
+      'transform',
+      `translate(${kx.toFixed(1)} ${ky.toFixed(1)}) rotate(${kr.toFixed(1)})`,
     );
-    refs.ball.style.setProperty('--kick-progress', String(view.kickProgress));
+
+    // The ball's flight and its shrinking shadow, verbatim from the design's
+    // own `bx`/`by`/`bsc`/`shx`/`shy`/`shr`.
+    const { tx, ty } = targetPoint(view);
+    const launched = diving;
+    const bx = launched ? 800 + (tx - 800) * p : 800;
+    const by = launched ? 770 + (ty - 770) * p - Math.sin(p * Math.PI) * 70 : 770;
+    const bsc = launched ? 1 - 0.5 * p : 1;
+    svgRefs.ball.setAttribute(
+      'transform',
+      `translate(${bx.toFixed(1)} ${by.toFixed(1)}) scale(${bsc.toFixed(3)})`,
+    );
+    const shy = launched ? 770 + (ty - 770) * p : 775;
+    svgRefs.ballShadow.setAttribute('cx', bx.toFixed(1));
+    svgRefs.ballShadow.setAttribute('cy', shy.toFixed(1));
+    svgRefs.ballShadow.setAttribute('rx', (24 * bsc).toFixed(1));
 
     refs.subline.textContent =
       view.stage === 'aim-x'
@@ -205,16 +356,18 @@ export function createPenaltyKick(
     }
 
     const field = el('div', 'penalty-kick__field');
-    const goal = el('div', 'penalty-kick__goal');
-    const aimX = el('div', 'penalty-kick__aim-line penalty-kick__aim-line--x');
-    const aimY = el('div', 'penalty-kick__aim-line penalty-kick__aim-line--y');
-    const keeper = el('div', 'penalty-kick__keeper');
-    const ball = el('div', 'penalty-kick__ball');
-    goal.append(aimX, aimY, keeper, ball);
-    field.append(goal);
+    field.innerHTML = penaltyKickSceneSvg();
     const toast = el('div', 'penalty-kick__toast');
     toast.hidden = true;
     field.append(toast);
+    Object.assign(svgRefs, {
+      aimLineX: field.querySelector('.penalty-kick__aim-line--x')!,
+      aimLineY: field.querySelector('.penalty-kick__aim-line--y')!,
+      aimDot: field.querySelector('.penalty-kick__aim-dot')!,
+      keeper: field.querySelector('.penalty-kick__keeper')!,
+      ball: field.querySelector('.penalty-kick__ball')!,
+      ballShadow: field.querySelector('.penalty-kick__ball-shadow')!,
+    });
 
     const counters = el('div', 'penalty-kick__counters');
     const goalsCounter = el('div', 'penalty-kick__counter');
@@ -243,10 +396,6 @@ export function createPenaltyKick(
     container.replaceChildren(root);
 
     Object.assign(refs, {
-      aimX,
-      aimY,
-      keeper,
-      ball,
       toast,
       subline,
       coach,
