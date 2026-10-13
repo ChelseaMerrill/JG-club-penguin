@@ -1,18 +1,13 @@
 /* Carnaval Parade: the three-lane play screen ported from `design/Minigame
    Carnaval Parade.dc.html` into the shell's generic play area
-   (`.minigame__play-area`, `minigame-shell.ts`). The track's own content
-   (lanes, items, the Penguin) is positioned with percentages of the play
-   area's own box, not Stage pixels -- the play area isn't a fixed 1600x900
-   box (`.minigame__play` leaves room for the shell's header/footer), the
-   same reason `beystadium.css`'s tops use percentages. Uses the JG design
-   tokens (`--jg-*`, `--font-*`) from `src/style.css`; the barrier's grey has
-   no named token, the same exception `beystadium.css`'s stadium greys take. */
-
-@keyframes carnaval-parade-road {
-  to {
-    background-position: -48px 0;
-  }
-}
+   (`.minigame__play-area`, `minigame-shell.ts`). The avenue backdrop, the
+   lane markings, the pickups/barriers and the player's own figure are one
+   inline SVG (`carnavalSceneSvg()` in `carnaval-parade.ts`) in the design's
+   own 1600x900 coordinate space; `.carnaval-parade__track` only has to size
+   and clip it. The HUD and the toast stay plain HTML, positioned as
+   percentages of the track's own box (unaffected by how the SVG itself
+   scales inside it). Uses the JG design tokens (`--jg-*`, `--font-*`) from
+   `src/style.css`. */
 
 @keyframes carnaval-parade-toast-pop {
   from {
@@ -44,113 +39,12 @@
   border: 2px solid var(--jg-secondary);
 }
 
-.carnaval-parade__lane {
-  position: absolute;
-  left: 0;
-  right: 0;
-  height: calc(100% / 3);
-  border-bottom: 1px dashed rgba(244, 244, 244, 0.12);
-}
-
-.carnaval-parade__lane--0 {
-  top: 0;
-}
-
-.carnaval-parade__lane--1 {
-  top: calc(100% / 3);
-}
-
-.carnaval-parade__lane--2 {
-  top: calc(200% / 3);
-  border-bottom: none;
-}
-
-/* Purely decorative scroll cueing the parade's forward motion; frozen under
-   reduced motion (below) since the items' own movement is the real gameplay. */
-.carnaval-parade__road {
+.carnaval-parade__scene {
   position: absolute;
   inset: 0;
-  background-image: repeating-linear-gradient(
-    90deg,
-    rgba(0, 189, 255, 0.16) 0px,
-    rgba(0, 189, 255, 0.16) 24px,
-    transparent 24px,
-    transparent 48px
-  );
-  animation: carnaval-parade-road 0.9s linear infinite;
-  pointer-events: none;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .carnaval-parade__road {
-    animation: none;
-  }
-}
-
-.carnaval-parade__player {
-  position: absolute;
-  left: 20%;
-  width: 36px;
-  height: 36px;
-  transform: translate(-50%, -50%);
-  border-radius: 50%;
-  background: var(--jg-primary);
-  border: 3px solid var(--jg-secondary);
-  box-shadow: 0 0 0 4px rgba(0, 189, 255, 0.25);
-}
-
-.carnaval-parade__item {
-  position: absolute;
-  width: 28px;
-  height: 28px;
-  transform: translate(-50%, -50%);
-  border-radius: 6px;
-}
-
-.carnaval-parade__item--feather {
-  background: var(--jg-primary);
-  border-radius: 50% 50% 50% 0;
-}
-
-.carnaval-parade__item--star {
-  background: #ffd23f;
-  clip-path: polygon(
-    50% 0%,
-    61% 35%,
-    98% 35%,
-    68% 57%,
-    79% 91%,
-    50% 70%,
-    21% 91%,
-    32% 57%,
-    2% 35%,
-    39% 35%
-  );
-}
-
-.carnaval-parade__item--barrier {
-  background: #8a8f96;
-  border: 2px solid var(--jg-secondary);
-  clip-path: polygon(
-    50% 0%,
-    61% 20%,
-    82% 9%,
-    78% 32%,
-    100% 38%,
-    82% 52%,
-    94% 72%,
-    71% 68%,
-    68% 91%,
-    50% 76%,
-    32% 91%,
-    29% 68%,
-    6% 72%,
-    18% 52%,
-    0% 38%,
-    22% 32%,
-    18% 9%,
-    39% 20%
-  );
+  width: 100%;
+  height: 100%;
+  display: block;
 }
 
 .carnaval-parade__toast {
@@ -174,6 +68,12 @@
 .carnaval-parade__toast--hit {
   background: #e4572e;
   color: var(--fg-primary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .carnaval-parade__toast {
+    animation: none;
+  }
 }
 
 .carnaval-parade__hud {

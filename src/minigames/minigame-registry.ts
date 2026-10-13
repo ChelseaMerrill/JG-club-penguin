@@ -4,6 +4,7 @@ import { createCarnavalParade } from './carnaval-parade/carnaval-parade';
 import { createCoffeeRush } from './coffee-rush/coffee-rush';
 import type { MinigameRegistry } from './minigame';
 import { createPancakeFlip } from './pancake-flip/pancake-flip';
+import { createPaoDeQueijo } from './pao-de-queijo/pao-de-queijo';
 import { createPenaltyKick } from './penalty-kick/penalty-kick';
 import { createSnowConeStand } from './snow-cone-stand/snow-cone-stand';
 
@@ -12,10 +13,12 @@ import { createSnowConeStand } from './snow-cone-stand/snow-cone-stand';
  * Every `MinigameId` has its real game: `bug-squash` (#38), `pancake-flip`
  * (#39), `snow-cone-stand` (#49), `coffee-rush` (#50), `beystadium` (#121),
  * `penalty-kick` (#220, launched by Chrystian Rissoli's NPC dialog and the
- * LATAM Futebol Field's ball hotspot) and `carnaval-parade` (#219, launched
+ * LATAM Futebol Field's ball hotspot), `carnaval-parade` (#219, launched
  * by Hector Grecco's own NPC dialog and the LATAM Disco Hall's
- * `disco-turntable` Room hotspot, `main.ts`). Beystadium has no NPC launching
- * it yet: #51 (Team Room 4 and Michael) wires Michael's LET IT RIP button to
+ * `disco-turntable` Room hotspot, `main.ts`) and `pao-de-queijo` (#218,
+ * launched by Sander Nonaka's own NPC dialog at the register in the LATAM
+ * Café). Beystadium has no NPC launching it yet: #51 (Team Room 4 and
+ * Michael) wires Michael's LET IT RIP button to
  * `minigameLauncher.launch('beystadium')`.
  */
 export function createDefaultMinigameRegistry(): MinigameRegistry {
@@ -27,5 +30,6 @@ export function createDefaultMinigameRegistry(): MinigameRegistry {
     beystadium: () => createBeystadium(),
     'penalty-kick': () => createPenaltyKick(),
     'carnaval-parade': () => createCarnavalParade(),
+    'pao-de-queijo': () => createPaoDeQueijo(),
   };
 }

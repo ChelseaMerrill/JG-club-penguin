@@ -165,6 +165,19 @@ describe('NPCS', () => {
     expect(NPCS.sam.name).toBe('Sam Schantz');
   });
 
+  it("widens Sam's bubble so his design-drawn one-line pill doesn't wrap (#182)", () => {
+    expect(NPCS.sam.bubbleMaxWidth).toBe(273.6);
+    const line = NPCS.sam.idleLines.find((each) => each.text.startsWith('Ship it Friday'))!;
+    const size = estimateBubbleSize(line.text, NPCS.sam.bubbleMaxWidth);
+    expect(size.width).toBeCloseTo(297.6);
+    expect(size.height).toBe(30);
+    // Sam no longer has an `npcSlot` anywhere (he and Ryan left the Dev Pit,
+    // and Team Room 4's `sam-team-room-4` is a bubble-less appearance): this
+    // is a data-correctness fix for whenever he's placed again, not
+    // something visible in the game today.
+    expect(devPit.npcSlots.some((slot) => slot.npcId === 'sam')).toBe(false);
+  });
+
   it('Dev Pit and Roof Deck tag names are first names; Town Center and The Melt are full names', () => {
     expect(NPCS.ian.tagName).toBe('Ian');
     expect(NPCS.dom.tagName).toBe('Dom');
@@ -286,7 +299,7 @@ describe('NPCS', () => {
           const bottom = feet.y + npcLayout(npc).bubbleBottomY + (npc.bubbleOffsetY ?? 0);
           const centerX = feet.x + (npc.bubbleOffsetX ?? 0);
           return npc.idleLines.map((line) => {
-            const size = estimateBubbleSize(line.text);
+            const size = estimateBubbleSize(line.text, npc.bubbleMaxWidth);
             return {
               npcId: npc.id,
               line,
@@ -323,12 +336,14 @@ describe('NPCS', () => {
       // The Mullet's two design-drawn overlaps (Dom over Nicole, Jory over
       // Brandon) went when Dom, Nicole and Jory left (owner request,
       // 2026-10-02); Dev Pit's Steven-over-Ryan went when Ryan left
-      // (2026-09-30). The Stairwell's floor-2 and floor-4 guests' overlaps are
-      // kept as designed (#51 slice 4): design/Stairwell.dc.html draws
-      // Sydney's "Stairs build character." at x 670.6 and Jory's two bubbles
-      // at x 669.2 and 665.4, each over the right end of Jason's nameplate
-      // (x 564-676, y 487.4-507.4).
+      // (2026-09-30). The Stairwell's floor-0, floor-2 and floor-4 guests'
+      // overlaps are kept as designed (#51 slice 4, confirmed again by #182's
+      // audit): design/Stairwell.dc.html draws Anthony's "Nobody phishes on
+      // the stairs." at x 667.8-912.2, Sydney's "Stairs build character." at
+      // x 670.6 and Jory's two bubbles at x 669.2 and 665.4, each over the
+      // right end of Jason's nameplate (x 564-676, y 487.4-507.4).
       const drawnByTheDesign: string[] = [
+        `stairwell-0: anthony-stairwell-0 "Nobody phishes on the stairs." x jason-stairwell-0's nameplate "Jason Jahnel"`,
         `stairwell-2: sydney-stairwell-2 "Stairs build character." x jason-stairwell-2's nameplate "Jason Jahnel"`,
         `stairwell-4: jory-stairwell-4 "Outwit. Outplay. Outclimb." x jason-stairwell-4's nameplate "Jason Jahnel"`,
         `stairwell-4: jory-stairwell-4 "The tribe says: keep going." x jason-stairwell-4's nameplate "Jason Jahnel"`,
@@ -945,6 +960,9 @@ describe('NPCS', () => {
       // #220: Chrystian Rissoli hosts Penalty Kick -- a `kind: 'minigame'`
       // dialog, like the talkers above -- its own test covers it below.
       'chrystian-rissoli',
+      // #218: Sander Nonaka hosts Pão de Queijo Memory -- same reason,
+      // its own test covers it below.
+      'sander-nonaka',
     ];
     const latamNpcIds: NpcId[] = [];
     for (const npc of Object.values(NPCS)) {
@@ -954,10 +972,10 @@ describe('NPCS', () => {
         expect(npc.dialog).toEqual({ kind: 'remote-card' });
         continue;
       }
-      // 17 of the 19 LATAM JGers carry no dialog at all (owner request,
-      // 2026-10-09): their character sheet gives no quote. Hector Grecco
-      // (#219) and Chrystian Rissoli (#220, both excluded above) are the
-      // two exceptions.
+      // 16 of the 19 LATAM JGers carry no dialog at all (owner request,
+      // 2026-10-09): their character sheet gives no quote. Sander Nonaka
+      // (#218), Hector Grecco (#219) and Chrystian Rissoli (#220, all
+      // excluded above) are the three exceptions.
       if (
         npc.roomId === 'latam-cafe' ||
         npc.roomId === 'latam-disco-hall' ||
@@ -969,9 +987,24 @@ describe('NPCS', () => {
       }
       expect(npc.dialog).toMatchObject({ kind: 'line' });
     }
-    // 17, not 19: Hector Grecco (#219) and Chrystian Rissoli (#220) now host
-    // Minigames instead.
-    expect(latamNpcIds).toHaveLength(17);
+    // 16, not 19: Sander Nonaka (#218), Hector Grecco (#219) and Chrystian
+    // Rissoli (#220) now host Minigames instead.
+    expect(latamNpcIds).toHaveLength(16);
+  });
+
+  it('includes Sander Nonaka in the LATAM Café with a Pão de Queijo Memory trigger dialog', () => {
+    const sander = NPCS['sander-nonaka'];
+    expect(sander.name).toBe('Sander Nonaka');
+    expect(sander.roomId).toBe('latam-cafe');
+    expect(sander.dialog).toEqual({
+      kind: 'minigame',
+      minigameId: 'pao-de-queijo',
+      actionLabel: "LET'S EAT",
+      declineLabel: 'JUST WATCHING',
+      triggerLine:
+        'Bem-vindo! Match every treat before the cafezinho goes cold. Clear all three rounds and the Mestre do Pão de Queijo badge is yours.',
+      subtitle: 'LATAM CAFÉ · PÃO DE QUEIJO MEMORY',
+    });
   });
 
   it('includes Chrystian Rissoli in the LATAM Futebol Field with a Penalty Kick trigger dialog', () => {

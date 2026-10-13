@@ -4,7 +4,7 @@ import { findPath } from '../movement/pathfinding';
 import { doorApproachTile, npcInteractionTile } from '../movement/targets';
 import { STAIRWELL_DEFINITIONS, stairwellExit } from './definitions/stairwell';
 import { townCenter } from './definitions/town-center';
-import { screenToTile } from './iso';
+import { npcSlotPoint, screenToTile } from './iso';
 import { getRoomDefinition } from './registry';
 import type { RoomDefinition, RoomDoor } from './room-definition';
 import {
@@ -184,6 +184,35 @@ describe('Stairwell doors (S4-D4)', () => {
         }
       }
     }
+  });
+
+  it("stands Dom, Jason and each floor's guest on `design/Stairwell.dc.html`'s own shadow point (#182)", () => {
+    // Each floor's shadow ellipse `(cx, cy)`, traced from the design: Dom and
+    // Jason are identical on every floor, the guest differs per floor
+    // (#182's audit; Anthony's own tile needed a -10,0 offset to match --
+    // every other guest's tile+offset already did).
+    const dom = { x: 640, y: 522 };
+    const jason = { x: 620, y: 590 };
+    const guests = [
+      { x: 790, y: 635 },
+      { x: 790, y: 625 },
+      { x: 770, y: 625 },
+      { x: 810, y: 625 },
+      { x: 780, y: 630 },
+      { x: 770, y: 615 },
+    ];
+    floors.forEach((room, floor) => {
+      const domSlot = room.npcSlots.find((slot) => slot.npcId === `dom-stairwell-${floor}`)!;
+      const jasonSlot = room.npcSlots.find((slot) => slot.npcId === `jason-stairwell-${floor}`)!;
+      const guestSlot = room.npcSlots.find(
+        (slot) => slot.npcId !== domSlot.npcId && slot.npcId !== jasonSlot.npcId,
+      )!;
+      expect(npcSlotPoint(domSlot, room.grid.origin), `floor ${floor} Dom`).toEqual(dom);
+      expect(npcSlotPoint(jasonSlot, room.grid.origin), `floor ${floor} Jason`).toEqual(jason);
+      expect(npcSlotPoint(guestSlot, room.grid.origin), `floor ${floor} guest`).toEqual(
+        guests[floor],
+      );
+    });
   });
 
   it("keeps floor 0's LOBBY door disabled until #169 builds the Lobby", () => {

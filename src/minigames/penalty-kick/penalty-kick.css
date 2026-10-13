@@ -1,10 +1,11 @@
-/* Penalty Kick: the goal, the two sweeping aim lines, the keeper and ball,
-   the shot dots and the Coach-style footer line, ported from `design/
-   Minigame Penalty Kick.dc.html` into the shell's generic play area
-   (`.minigame__play-area`, `minigame-shell.ts`). Uses the JG design tokens
-   (`--jg-*`, `--font-*`) from `src/style.css`; all sizes are percentages of
-   the play area, which is itself a fixed-size region of the 1600x900 `#ui`
-   Stage. */
+/* Penalty Kick: the stadium, goal/net, keeper, ball and the two sweeping aim
+   lines, ported from `design/Minigame Penalty Kick.dc.html` into the shell's
+   generic play area (`.minigame__play-area`, `minigame-shell.ts`). All of
+   that is one inline SVG (`penaltyKickSceneSvg()` in `penalty-kick.ts`) in
+   the design's own 1600x900 coordinate space; `.penalty-kick__field` only
+   has to size and clip it. The shot dots, counters, toast and the
+   Coach-style footer line stay plain HTML, using the JG design tokens
+   (`--jg-*`, `--font-*`) from `src/style.css`. */
 
 @keyframes penalty-kick-popin {
   from {
@@ -99,81 +100,15 @@
   position: relative;
   flex: 1;
   min-height: 0;
+  overflow: hidden;
 }
 
-.penalty-kick__goal {
-  position: relative;
-  width: 70%;
+.penalty-kick__scene {
+  position: absolute;
+  inset: 0;
+  width: 100%;
   height: 100%;
-  margin: 0 auto;
-  border: 10px solid #f4f4f4;
-  border-bottom: none;
-  background: rgba(10, 12, 15, 0.55);
-}
-
-.penalty-kick__aim-line {
-  position: absolute;
-  background: var(--jg-primary);
-  opacity: 0.6;
-}
-
-.penalty-kick__aim-line--active {
-  opacity: 1;
-}
-
-.penalty-kick__aim-line--x {
-  top: 0;
-  bottom: 0;
-  width: 4px;
-  transform: translateX(-50%);
-}
-
-.penalty-kick__aim-line--y {
-  left: 0;
-  right: 0;
-  height: 4px;
-  transform: translateY(50%);
-}
-
-.penalty-kick__keeper {
-  position: absolute;
-  top: 10%;
-  left: 50%;
-  width: 48px;
-  height: 64px;
-  transform: translate(-50%, 0);
-  background: #ffd23f;
-  border: 3px solid var(--jg-secondary);
-  border-radius: 10px;
-  transition: left 0.25s ease-out;
-}
-
-.penalty-kick__keeper--diving.penalty-kick__keeper--zone-0 {
-  left: 20%;
-}
-
-.penalty-kick__keeper--diving.penalty-kick__keeper--zone-1 {
-  left: 50%;
-}
-
-.penalty-kick__keeper--diving.penalty-kick__keeper--zone-2 {
-  left: 80%;
-}
-
-.penalty-kick__ball {
-  position: absolute;
-  bottom: 6%;
-  left: 50%;
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  background: #f4f4f4;
-  border: 3px solid #161719;
-  transform: translate(-50%, 0);
-}
-
-.penalty-kick__ball--kicked {
-  transition: none;
+  display: block;
 }
 
 .penalty-kick__toast {
@@ -188,6 +123,12 @@
   letter-spacing: 0.06em;
   color: #161719;
   animation: penalty-kick-popin 0.2s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .penalty-kick__toast {
+    animation: none;
+  }
 }
 
 .penalty-kick__footer {

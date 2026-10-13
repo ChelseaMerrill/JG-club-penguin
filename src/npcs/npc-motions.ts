@@ -6,6 +6,7 @@ import { LATAM_FUTEBOL_FIELD_MOTIONS } from './motions/latam-futebol-field';
 import { OFFICE_HALLWAY_MOTIONS } from './motions/office-hallway';
 import { REMOTE_LOUNGE_MOTIONS } from './motions/remote-lounge';
 import { ROOF_DECK_MOTIONS } from './motions/roof-deck';
+import { STAIRWELL_MOTIONS } from './motions/stairwell';
 import { TEAM_ROOM_1_MOTIONS } from './motions/team-room-1';
 import { TEAM_ROOM_2_MOTIONS } from './motions/team-room-2';
 import { TEAM_ROOM_3_MOTIONS } from './motions/team-room-3';
@@ -27,6 +28,7 @@ const NPC_MOTIONS: Partial<Record<NpcId, NpcMotionSpec>> = {
   ...TOWN_CENTER_MOTIONS,
   ...DEV_PIT_MOTIONS,
   ...OFFICE_HALLWAY_MOTIONS,
+  ...STAIRWELL_MOTIONS,
   ...THE_MELT_MOTIONS,
   ...ROOF_DECK_MOTIONS,
   ...THE_ICEBOX_MOTIONS,

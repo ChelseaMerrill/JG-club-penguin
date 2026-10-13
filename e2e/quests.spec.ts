@@ -111,10 +111,10 @@ test('the widget tracks the main Quest and opens the Quests panel; TRACK and BAD
   // Main, the Igloo Badge Quest (#143), Nicole's coffee (#141), Linda's
   // pitch (#142), "Pair with a JGer" (#140), Snowmageddon (#154) + one per
   // registered Minigame (Bug Squash, Pancake Flip, Snow Cone Stand, Coffee
-  // Rush, Beystadium, Penalty Kick, Carnaval Parade).
-  await expect(panel.locator('[data-quests-tab="active"]')).toHaveText('ACTIVE · 13');
+  // Rush, Beystadium, Penalty Kick, Carnaval Parade, Pão de Queijo Memory).
+  await expect(panel.locator('[data-quests-tab="active"]')).toHaveText('ACTIVE · 14');
   await expect(panel.locator('[data-quests-tab="done"]')).toHaveText('DONE · 0');
-  await expect(panel.locator('.quests__row')).toHaveCount(13);
+  await expect(panel.locator('.quests__row')).toHaveCount(14);
   const bey = panel.locator('[data-quest-id="beystadium"]');
   await expect(bey.locator('.quests__row-title')).toHaveText('LET IT RIP · WIN 3 MATCHES');
   await expect(bey.locator('.quests__row-location')).toHaveText('TEAM ROOM 4 · TALK TO MICHAEL');
@@ -345,6 +345,16 @@ test('every Quest done: the widget shows ALL QUESTS DONE with a line and opens t
       barriersHit: 0,
       bestStreak: 10,
     });
+    // #218: Pão de Queijo Memory's Quest (a 'match-wins' Badge at 1 win,
+    // `minigame-rules.ts`'s `isMatchWin`): a single round reporting
+    // `roundsCleared: 3` both earns the Badge and -- since this Quest's
+    // `done` is `progress >= goal || badges.includes(badgeId)` -- finishes
+    // it, whatever score comes along with it.
+    await t.recordRound('pao-de-queijo', 6795, {
+      roundsCleared: 3,
+      matches: 24,
+      bestStreak: 24,
+    });
   });
   // Beystadium's Quest is three match wins, and record_round's anti-farm
   // rule refuses a round less than 10 s after the previous one of the same
@@ -369,9 +379,9 @@ test('every Quest done: the widget shows ALL QUESTS DONE with a line and opens t
   await widget.click();
   const panel = page.locator('.quests');
   await expect(panel).toBeVisible();
-  await expect(panel.locator('[data-quests-tab="done"]')).toHaveText('DONE · 13');
+  await expect(panel.locator('[data-quests-tab="done"]')).toHaveText('DONE · 14');
   await expect(panel.locator('[data-quests-tab="done"]')).toHaveAttribute('aria-pressed', 'true');
-  await expect(panel.locator('.quests__row')).toHaveCount(13);
+  await expect(panel.locator('.quests__row')).toHaveCount(14);
 
   expect(errors).toEqual([]);
 });

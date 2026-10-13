@@ -2,10 +2,10 @@
   "tool": "claude-design",
   "source": "6050d967-ba2e-4edd-819f-f7dcf4ed9d61",
   "source_url": "https://claude.ai/design/p/6050d967-ba2e-4edd-819f-f7dcf4ed9d61",
-  "synced": "2026-10-09",
+  "synced": "2026-10-12",
   "synced_by": "Chelsea Merrill",
-  "snapshot": "latam-snap",
-  "plan_id": "3a67a4d134ee",
+  "snapshot": "pao-snap",
+  "plan_id": "5f371350bc50",
   "files": {
     "Canvas.dc.html": {
       "sha256": "d3a65cc8ce0e759849eaa1ca985d0fbc49bafb3212f9029731ca08d1bda42293",
@@ -86,6 +86,10 @@
     "Minigame Pancake Flip.dc.html": {
       "sha256": "a9c46fcbf7df196567b2693ab6d15aaa6044220656796454ab54126eb85b5d3e",
       "bytes": 53326
+    },
+    "Minigame Pao de Queijo Memory.dc.html": {
+      "sha256": "cff1f4052d35b8754d7bed66bec2490c25e206cebd06a766dabf8eb232558a8c",
+      "bytes": 32166
     },
     "Minigame Penalty Kick.dc.html": {
       "sha256": "9bf3aafb84119022aaa9161a862116c9aec48b9040f75e2355fbd8c39d34914a",

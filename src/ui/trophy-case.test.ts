@@ -94,6 +94,8 @@ describe('orderBadgeTiles', () => {
       'goleador',
       // #219: so is Passista, seeded fresh (not a flipped "coming soon" row).
       'passista',
+      // #218: so is Mestre do Pão de Queijo, seeded fresh at sortOrder 18.
+      'mestre-do-pao-de-queijo',
       'rail-rider',
       'hexle-parent',
       'mullet-mania',
@@ -126,10 +128,10 @@ describe('createTrophyCase', () => {
     expect(q('[data-panel="badges"]').hidden).toBe(false);
     expect(q('[data-panel="trophies"]').hidden).toBe(true);
     expect(q('[data-panel="awards"]').hidden).toBe(true);
-    expect(q('.trophy-case__subtitle').textContent).toBe('YOUR IGLOO · BADGES · 1 / 17');
+    expect(q('.trophy-case__subtitle').textContent).toBe('YOUR IGLOO · BADGES · 1 / 18');
   });
 
-  it('shows 17 Badges over two pages: 12 on page 1 and 5 on page 2', async () => {
+  it('shows 18 Badges over two pages: 12 on page 1 and 6 on page 2', async () => {
     const { q, qa, trophyCase } = setup([]);
 
     await trophyCase.open();
@@ -140,7 +142,7 @@ describe('createTrophyCase', () => {
 
     q<HTMLButtonElement>('[aria-label="Next page"]').click();
 
-    expect(qa('.trophy-case__badge')).toHaveLength(5);
+    expect(qa('.trophy-case__badge')).toHaveLength(6);
   });
 
   it.each([
@@ -215,10 +217,12 @@ describe('createTrophyCase', () => {
 
     next.click();
     // Snowmageddon (#154) is earnable and sorts onto page 1, so page 2 is
-    // Goleador (#220), Passista (#219) and the three coming-soon ones.
+    // Goleador (#220), Passista (#219), Mestre do Pão de Queijo (#218) and
+    // the three coming-soon ones.
     expect(tileIds()).toEqual([
       'goleador',
       'passista',
+      'mestre-do-pao-de-queijo',
       'rail-rider',
       'hexle-parent',
       'mullet-mania',
@@ -236,9 +240,9 @@ describe('createTrophyCase', () => {
     const firstPage = tileIds();
 
     press('ArrowRight');
-    expect(tileIds()).toHaveLength(5);
+    expect(tileIds()).toHaveLength(6);
     press('ArrowRight'); // Already on the last page.
-    expect(tileIds()).toHaveLength(5);
+    expect(tileIds()).toHaveLength(6);
     press('ArrowLeft');
     expect(tileIds()).toEqual(firstPage);
 

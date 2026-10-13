@@ -220,7 +220,10 @@ export function createNpcSprite(
       fontSize: SPEECH_BUBBLE_FONT_SIZE,
       color: SPEECH_BUBBLE_TEXT_COLOR,
       align: 'center',
-      wordWrap: { width: SPEECH_BUBBLE_MAX_TEXT_WIDTH },
+      // `npc.bubbleMaxWidth` (#182) widens one NPC's wrap for a design line
+      // that draws wider than the shared cap on a single line, without
+      // affecting anyone else's.
+      wordWrap: { width: npc.bubbleMaxWidth ?? SPEECH_BUBBLE_MAX_TEXT_WIDTH },
     }),
   );
   bubbleText.setOrigin(0.5, 0);
