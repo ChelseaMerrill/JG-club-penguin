@@ -57,6 +57,14 @@ export const igloo: RoomDefinition = {
       // judgment call reported on the #16 execution plan.
       entryTile: townCenter.spawnTile,
     },
+    {
+      // The baked "↙ TOWN CENTER" exit pill: the TOWN CENTER door's twin (#170).
+      label: 'TOWN CENTER',
+      hotspot: { x: 36, y: 748, width: 136.5, height: 40 },
+      kind: 'pill',
+      targetRoomId: 'town-center',
+      entryTile: townCenter.spawnTile,
+    },
   ],
   npcSlots: [],
   // #135: 11 slots, positions approved by milliehime at the #135 mockup

@@ -21,12 +21,12 @@ test.use({ viewport: { width: GAME_WIDTH, height: GAME_HEIGHT } });
 const BOOT_TIMEOUT = 15_000;
 const WALK_TIMEOUT = 15_000;
 const PROOF_ROOT = 'test-results/phishing-quiz';
-/** Post 0 (Town Center's THE ICEBOX door), one minute into its window. */
-const TOWN_CENTER_ICEBOX = 60_000;
-/** Post 3 (Town Center's DEV PIT door). */
-const TOWN_CENTER_DEV_PIT = 3 * 600_000 + 60_000;
-/** Post 1 (Dev Pit's THE ICEBOX door): no Anthony in Town Center. */
-const DEV_PIT_ICEBOX = 600_000 + 60_000;
+/** #170 DN5 post 1 (Town Center's KITCHEN door), one minute into its window. */
+const TOWN_CENTER_KITCHEN = 600_000 + 60_000;
+/** DN5 post 7 (Town Center's THE HALLWAY door). */
+const TOWN_CENTER_HALLWAY = 7 * 600_000 + 60_000;
+/** DN5 post 3 (Dev Pit's THE ICEBOX door): no Anthony in Town Center. */
+const DEV_PIT_ICEBOX = 3 * 600_000 + 60_000;
 const HIT_AREA = npcLayout({ kind: 'human' }).hitArea;
 const KEYS = ['A', 'B', 'C', 'D'];
 
@@ -101,11 +101,28 @@ async function changeRoom(page: Page, roomId: RoomDebugInfo['roomId']): Promise<
   await waitForElevatorHidden(page);
 }
 
-/** Clicks Anthony's click zone in `room`. */
+/**
+ * Where Anthony stands while he's still: at a door he paces beside his post
+ * (#170 D14), so this samples his position until two reads 100 ms apart
+ * agree. `null` when he doesn't pace (he then stands on his post).
+ */
+async function anthonyAtRest(page: Page): Promise<{ x: number; y: number } | null> {
+  if (!(await page.evaluate(() => window.__roomDebug?.npcs?.anthony))) return null;
+  const deadline = Date.now() + 12_000;
+  while (Date.now() < deadline) {
+    const a = await page.evaluate(() => window.__roomDebug?.npcs?.anthony);
+    await page.waitForTimeout(100);
+    const b = await page.evaluate(() => window.__roomDebug?.npcs?.anthony);
+    if (a && b && Math.abs(a.x - b.x) < 0.5 && Math.abs(a.y - b.y) < 0.5) return { x: b.x, y: b.y };
+  }
+  throw new Error('Anthony never stood still');
+}
+
+/** Clicks Anthony's click zone in `room`, where he stands still. */
 async function clickAnthony(page: Page, room: RoomDefinition): Promise<void> {
   const current = await guard(page);
   if (!current) throw new Error('no guard in this Room');
-  const feet = tileToScreen(current.tile, room.grid.origin);
+  const feet = (await anthonyAtRest(page)) ?? tileToScreen(current.tile, room.grid.origin);
   await clickStagePoint(page, { x: feet.x + HIT_AREA.centerX, y: feet.y + HIT_AREA.centerY });
 }
 
@@ -177,20 +194,20 @@ test('Anthony stands at the scheduled door, the same for two Players, and moves 
   const first = await browser.newPage();
   const second = await browser.newPage();
   const errors = [...collectErrors(first), ...collectErrors(second)];
-  await boot(first, TOWN_CENTER_ICEBOX);
-  await boot(second, TOWN_CENTER_ICEBOX);
+  await boot(first, TOWN_CENTER_KITCHEN);
+  await boot(second, TOWN_CENTER_KITCHEN);
 
   await expect
     .poll(() => guard(first))
-    .toMatchObject({ npcId: 'anthony', doorLabel: 'THE ICEBOX', blocking: true });
+    .toMatchObject({ npcId: 'anthony', doorLabel: 'KITCHEN', blocking: true });
   const a = await guard(first);
   const b = await guard(second);
   expect(b).toEqual(a);
-  await first.screenshot({ path: `${dir}/town-center-icebox.png` });
+  await first.screenshot({ path: `${dir}/town-center-kitchen.png` });
 
-  await setNow(first, TOWN_CENTER_DEV_PIT);
-  await expect.poll(() => guard(first)).toMatchObject({ doorLabel: 'DEV PIT', blocking: true });
-  await first.screenshot({ path: `${dir}/town-center-dev-pit.png` });
+  await setNow(first, TOWN_CENTER_HALLWAY);
+  await expect.poll(() => guard(first)).toMatchObject({ doorLabel: 'THE HALLWAY', blocking: true });
+  await first.screenshot({ path: `${dir}/town-center-the-hallway.png` });
 
   await setNow(first, DEV_PIT_ICEBOX);
   await expect.poll(() => guard(first)).toBeNull();
@@ -208,8 +225,8 @@ test('clicking Anthony opens the quiz; a wrong answer keeps his door shut, a cor
   test.setTimeout(120_000);
   const dir = proofDir('quiz');
   const errors = collectErrors(page);
-  await boot(page, TOWN_CENTER_ICEBOX);
-  await expect.poll(() => guard(page)).toMatchObject({ doorLabel: 'THE ICEBOX', blocking: true });
+  await boot(page, TOWN_CENTER_KITCHEN);
+  await expect.poll(() => guard(page)).toMatchObject({ doorLabel: 'KITCHEN', blocking: true });
 
   await clickAnthony(page, townCenter);
   await expect(page.locator('.npc-dialog')).toBeVisible({ timeout: WALK_TIMEOUT });
@@ -235,14 +252,14 @@ test('clicking Anthony opens the quiz; a wrong answer keeps his door shut, a cor
   await backToRoom(page);
   expect(await guard(page)).toMatchObject({ blocking: true });
 
-  const door = townCenter.doors.find((d) => d.label === 'THE ICEBOX')!;
+  const door = townCenter.doors.find((d) => d.label === 'KITCHEN')!;
   await clickStagePoint(page, {
     x: door.hotspot.x + door.hotspot.width / 2,
     y: door.hotspot.y + door.hotspot.height / 2,
   });
   await expect(page.locator('.npc-dialog')).toBeVisible({ timeout: WALK_TIMEOUT });
   expect((await debugInfo(page))?.roomId).toBe('town-center');
-  expect((await debugInfo(page))?.doorReachedLog ?? []).not.toContain('THE ICEBOX');
+  expect((await debugInfo(page))?.doorReachedLog ?? []).not.toContain('KITCHEN');
   await page.keyboard.press('Escape');
   await expect(page.locator('.npc-dialog')).toBeHidden();
 
@@ -259,10 +276,10 @@ test('clicking Anthony opens the quiz; a wrong answer keeps his door shut, a cor
   await backToRoom(page);
   await expect.poll(() => guard(page)).toMatchObject({ blocking: false });
 
-  await clickStagePoint(page, await doorPointClearOfAnthony(page, 'THE ICEBOX'));
+  await clickStagePoint(page, await doorPointClearOfAnthony(page, 'KITCHEN'));
   await expect
     .poll(async () => (await debugInfo(page))?.roomId, { timeout: WALK_TIMEOUT })
-    .toBe('the-icebox');
+    .toBe('the-melt');
   await waitForElevatorHidden(page);
 
   expect(errors).toEqual([]);
@@ -274,8 +291,8 @@ test('5 Map bypasses lock the Map and show the banner; 3 correct training answer
   test.setTimeout(120_000);
   const dir = proofDir('lockout');
   const errors = collectErrors(page);
-  await boot(page, TOWN_CENTER_ICEBOX);
-  await expect.poll(() => guard(page)).toMatchObject({ doorLabel: 'THE ICEBOX', blocking: true });
+  await boot(page, TOWN_CENTER_KITCHEN);
+  await expect.poll(() => guard(page)).toMatchObject({ doorLabel: 'KITCHEN', blocking: true });
 
   // Challenged and not passed: a wrong answer.
   await openQuestion(page, townCenter);

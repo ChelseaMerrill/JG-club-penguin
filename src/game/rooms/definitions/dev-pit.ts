@@ -35,11 +35,19 @@ const WALKABLE: readonly (readonly boolean[])[] = [
 ];
 
 /**
- * Traced from `design/Room 02 Dev Pit.dc.html`: a real door back to Town
- * Center, and THE ICEBOX disabled (not one of this prototype's five Rooms).
- * The design has no in-scene door or elevator toward the Kitchen at all
- * (confirmed: no "MELT"/"KITCHEN" text anywhere in the file), so this
- * Room defines no door to the Kitchen.
+ * Traced from `design/Room 02 Dev Pit.dc.html`. #170's door network (the
+ * 2026-09-27 resync): THE ICEBOX on the back-right wall and THE HALLWAY on the
+ * back-left wall (the frame that was TOWN CENTER: the Dev Pit is reached
+ * from the Hallway now), the baked "↙ THE HALLWAY" exit pill (the design's
+ * "↙ HALLWAY A", rewritten by `scripts/export-room-art.ts`'s TEXT_RULES, D10)
+ * as that door's twin, and the "THE MULLET ↘" pill, the Mullet's only way in
+ * from here. The design's "← HALLWAY A" sign reads "← HALLWAY" in the art.
+ *
+ * Each `entryTile` is the sill inside the matching door of the Room it leads
+ * to (#170 D8; `door-network.test.ts` re-derives every one), and each
+ * `guardTile` is where Anthony stands while he guards that door (D14;
+ * `guard-tiles.test.ts` checks I1-I7). Both doors approach (0,0), so each
+ * guard tile stands in front of its own door instead.
  */
 export const devPit: RoomDefinition = {
   id: 'dev-pit',
@@ -62,17 +70,35 @@ export const devPit: RoomDefinition = {
       // (9,0), close enough to Jason's own tile (8,0) to visually overlap
       // his sprite as the Penguin arrived.
       entryTile: { col: 10, row: 0 },
+      // In front of the door, two from the shared approach (0,0).
+      guardTile: { col: 2, row: 0 },
     },
     {
-      label: 'TOWN CENTER',
+      label: 'THE HALLWAY',
       hotspot: { x: 700, y: 135, ...DOOR_HOTSPOT_SIZE },
       wall: 'left',
-      targetRoomId: 'town-center',
-      // The tile just inside Town Center's own "DEV PIT" door (#16 fix 4):
-      // the nearest walkable tile to that door's hotspot centre in Town
-      // Center's own grid, the same rule `reachability.test.ts` uses for a
-      // door's approach tile.
-      entryTile: { col: 10, row: 0 },
+      targetRoomId: 'office-hallway',
+      // The sill inside the Hallway's DEV PIT door.
+      entryTile: { col: 11, row: 0 },
+      // In front of the door, two from the shared approach (0,0).
+      guardTile: { col: 0, row: 2 },
+    },
+    {
+      // The "↙ THE HALLWAY" exit pill: THE HALLWAY door's twin.
+      label: 'THE HALLWAY',
+      hotspot: { x: 36, y: 748, width: 135.5, height: 40 },
+      kind: 'pill',
+      targetRoomId: 'office-hallway',
+      entryTile: { col: 11, row: 0 },
+    },
+    {
+      // The "THE MULLET ↘" exit pill, with no door of its own.
+      label: 'THE MULLET',
+      hotspot: { x: 1438, y: 748, width: 126.5, height: 40 },
+      kind: 'pill',
+      targetRoomId: 'the-mullet',
+      // The sill inside the Mullet's DEV PIT door.
+      entryTile: { col: 13, row: 0 },
     },
   ],
   npcSlots: [

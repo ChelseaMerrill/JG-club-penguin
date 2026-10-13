@@ -26,26 +26,26 @@ import { DEFAULT_PHISHING_STATE, type GuardWindow } from './phishing-client';
 
 const WINDOW: GuardWindow = {
   roomId: 'town-center',
-  doorLabel: 'THE ICEBOX',
+  doorLabel: 'KITCHEN',
   windowStart: '2026-09-28T14:00:00.000Z',
   windowEnd: '2026-09-28T14:10:00.000Z',
   serverNow: '2026-09-28T14:01:00.000Z',
 };
 
-const icebox = townCenter.doors.find((door) => door.label === 'THE ICEBOX')!;
-const devPit = townCenter.doors.find((door) => door.label === 'DEV PIT')!;
+const kitchen = townCenter.doors.find((door) => door.label === 'KITCHEN')!;
+const hallway = townCenter.doors.find((door) => door.label === 'THE HALLWAY')!;
 
 describe('planGuard', () => {
   it('guards the scheduled door, shut until the Player passes this window', () => {
     expect(planGuard('town-center', WINDOW, DEFAULT_PHISHING_STATE)).toEqual({
       roomId: 'town-center',
       npcId: 'anthony',
-      doorLabel: 'THE ICEBOX',
+      doorLabel: 'KITCHEN',
       blocking: true,
     });
     expect(
       planGuard('town-center', WINDOW, { ...DEFAULT_PHISHING_STATE, passedGuardWindow: true }),
-    ).toMatchObject({ doorLabel: 'THE ICEBOX', blocking: false });
+    ).toMatchObject({ doorLabel: 'KITCHEN', blocking: false });
   });
 
   it('puts no Anthony in any other Room', () => {
@@ -63,7 +63,7 @@ describe('planGuard', () => {
     });
     // In his own Room he stays at the door, which stays shut.
     expect(planGuard('town-center', WINDOW, locked)).toMatchObject({
-      doorLabel: 'THE ICEBOX',
+      doorLabel: 'KITCHEN',
       blocking: true,
     });
   });
@@ -73,40 +73,45 @@ describe('isGuardedDoor', () => {
   const guard: RoomGuard = {
     roomId: 'town-center',
     npcId: 'anthony',
-    doorLabel: 'THE ICEBOX',
+    doorLabel: 'KITCHEN',
     blocking: true,
   };
 
   it('gates only the guarded door, and only while blocking', () => {
-    expect(isGuardedDoor(guard, icebox)).toBe(true);
-    expect(isGuardedDoor(guard, devPit)).toBe(false);
-    expect(isGuardedDoor({ ...guard, blocking: false }, icebox)).toBe(false);
-    expect(isGuardedDoor(null, icebox)).toBe(false);
+    expect(isGuardedDoor(guard, kitchen)).toBe(true);
+    expect(isGuardedDoor(guard, hallway)).toBe(false);
+    expect(isGuardedDoor({ ...guard, blocking: false }, kitchen)).toBe(false);
+    expect(isGuardedDoor(null, kitchen)).toBe(false);
   });
 });
 
 describe('guardTile', () => {
-  it("stands on the guarded door's approach tile, a walkable tile of the Room", () => {
-    const tile = guardTile(townCenter, { doorLabel: 'THE ICEBOX' }, townCenter.spawnTile)!;
+  it("stands on the guarded door's own guardTile, a walkable tile of the Room (#170 D14)", () => {
+    const tile = guardTile(townCenter, { doorLabel: 'KITCHEN' }, townCenter.spawnTile)!;
+    expect(tile).toEqual(kitchen.guardTile);
     expect(townCenter.walkable[tile.row][tile.col]).toBe(true);
-    // The Icebox door is up at the top of Town Center's floor.
+    // The KITCHEN door is up at the top of Town Center's floor.
     expect(tile.row).toBeLessThan(townCenter.spawnTile.row);
   });
 
-  it("prefers the door's own guardTile over its approach tile (#170 D14)", () => {
+  it("falls back to the door's approach tile when it has no guardTile", () => {
+    const withoutPost: RoomDefinition = {
+      ...townCenter,
+      doors: townCenter.doors.map((door) => ({ ...door, guardTile: undefined })),
+    };
+    expect(guardTile(withoutPost, { doorLabel: 'KITCHEN' }, townCenter.spawnTile)).toEqual(
+      doorApproachTile(townCenter.walkable, kitchen, townCenter.grid.origin),
+    );
+    // Other doors keep their own posts, and the locked-out "next to the
+    // Player" case is unchanged.
     const withPost: RoomDefinition = {
       ...townCenter,
       doors: townCenter.doors.map((door) =>
-        door.label === 'THE ICEBOX' ? { ...door, guardTile: { col: 2, row: 1 } } : door,
+        door.label === 'KITCHEN' ? { ...door, guardTile: undefined } : door,
       ),
     };
-    expect(guardTile(withPost, { doorLabel: 'THE ICEBOX' }, townCenter.spawnTile)).toEqual({
-      col: 2,
-      row: 1,
-    });
-    // Other doors, and the locked-out "next to the Player" case, are unchanged.
-    expect(guardTile(withPost, { doorLabel: 'DEV PIT' }, townCenter.spawnTile)).toEqual(
-      guardTile(townCenter, { doorLabel: 'DEV PIT' }, townCenter.spawnTile),
+    expect(guardTile(withPost, { doorLabel: 'THE HALLWAY' }, townCenter.spawnTile)).toEqual(
+      hallway.guardTile,
     );
     expect(guardTile(withPost, { doorLabel: null }, townCenter.spawnTile)).toEqual(
       guardTile(townCenter, { doorLabel: null }, townCenter.spawnTile),
@@ -297,7 +302,7 @@ describe('guardPaceAvoidTiles (#170 D14 I6, RT170-22 I7)', () => {
 
   it("adds every tile where his click zone would cover another label's exit, never his own", () => {
     const zone = { centerX: 0, centerY: -40, width: 48, height: 104 };
-    const own = 'THE ICEBOX';
+    const own = 'KITCHEN';
     const avoid = guardPaceAvoidTiles(townCenter, [], own, zone);
     const covers = (tile: { col: number; row: number }, label: string) => {
       const door = townCenter.doors.find((candidate) => candidate.label === label)!;

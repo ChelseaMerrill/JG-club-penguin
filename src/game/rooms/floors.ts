@@ -14,7 +14,7 @@ export const FLOOR_ORDER: readonly FloorId[] = ['L', '1', '2', '3', '4', '5', 'R
  * Which floor each Room sits on, or `null` for a Room with no floor at all
  * (#52 D2): the Igloo is the Player's own home, reached from the HUD, not a
  * room inside 108 State St, so there is never an elevator to or from it.
- * Town Center, Dev Pit and The Melt (the Kitchen) are all floor 5 -- "JG HQ
+ * Town Center, Dev Pit and the Kitchen (`the-melt`) are all floor 5 -- "JG HQ
  * IS ON 5" (the Elevator design's own tip text) -- and the Roof Deck is one
  * floor above that. A `Record` over `RoomId` (rather than a `RoomDefinition`
  * field, #52 D1) keeps this data out of `definitions/*.ts`, which #36 and

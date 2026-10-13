@@ -1,7 +1,5 @@
 import type { RoomDefinition } from '../room-definition';
 import { createGrid } from '../grid';
-import { devPit } from './dev-pit';
-import { officeHallway } from './office-hallway';
 
 // Not the standard 12x10 grid (#51 D2): `design/The Mullet.dc.html` bakes a
 // 14x11 floor, 154 tile diamonds whose first north corner is (800, 248) --
@@ -47,15 +45,15 @@ const WALKABLE: readonly (readonly boolean[])[] = [
 
 /**
  * Traced from `design/The Mullet.dc.html`, "THE MULLET (MEZZANINE)" (#51
- * slice 3). Its two doors are the design's in-scene door frames: "← HALLWAY"
- * on the back-left wall (`770,263 700,298 700,168 770,133`) and "DEV PIT →"
- * on the right wall (`1410,553 1480,588 1480,458 1410,423`). The "↙ HALLWAY"
- * and "DEV PIT ↘" pills are HUD chrome, not doors. Neither the Hallway nor
- * the Dev Pit draws a door into the Mullet, so from them it is reached by the
- * Map (#51 D5), and each of its doors lands on the target Room's own spawn
- * tile, as the Bathroom's does. The Ms. Pac-Man cabinet is a prop: the arcade
- * and its Mullet Mania badge are out of scope, so Brandon's Interaction is
- * Dialogue.
+ * slice 3). Its two doors are the design's in-scene door frames: "← HALLWAY
+ * B" on the back-left wall (`770,263 700,298 700,168 770,133`), locked until
+ * #172 builds Hallway B, and "DEV PIT →" on the right wall (`1410,553
+ * 1480,588 1480,458 1410,423`). #170: the 2026-09-27 resync turned the old
+ * HALLWAY door into HALLWAY B, so the Mullet no longer connects to the
+ * Hallway; the baked "↙ HALLWAY B" and "DEV PIT ↘" exit pills are the doors'
+ * twins, and the Dev Pit's "THE MULLET ↘" pill leads here. The Ms. Pac-Man
+ * cabinet is a prop: the arcade and its Mullet Mania badge are out of scope,
+ * so Brandon's Interaction is Dialogue.
  */
 export const theMullet: RoomDefinition = {
   id: 'the-mullet',
@@ -71,22 +69,39 @@ export const theMullet: RoomDefinition = {
   spawnTile: { col: 3, row: 8 },
   doors: [
     {
-      label: 'HALLWAY',
+      // The design's "← HALLWAY B" door: Hallway B (#172) isn't built, so
+      // it's locked (#170 D4) and shows UNDER CONSTRUCTION. #172 sets its
+      // target.
+      label: 'HALLWAY B',
       hotspot: { x: 700, y: 133, ...DOOR_HOTSPOT_SIZE },
       wall: 'left',
-      targetRoomId: 'office-hallway',
-      // The Hallway draws no door back into the Mullet, so this lands on the
-      // Hallway's own spawn tile (#51 D5; the Bathroom precedent).
-      entryTile: officeHallway.spawnTile,
+      targetRoomId: null,
+      entryTile: { col: 0, row: 0 },
     },
     {
       label: 'DEV PIT',
       hotspot: { x: 1410, y: 423, ...DOOR_HOTSPOT_SIZE },
       wall: 'right',
       targetRoomId: 'dev-pit',
-      // The Dev Pit draws no Mullet door either, so this lands on the Dev
-      // Pit's own spawn tile.
-      entryTile: devPit.spawnTile,
+      // The Dev Pit has no Mullet door, only its "THE MULLET ↘" pill, so this
+      // lands on that pill's approach tile (#170 D8).
+      entryTile: { col: 11, row: 2 },
+    },
+    {
+      // The "↙ HALLWAY B" exit pill: the locked HALLWAY B door's twin.
+      label: 'HALLWAY B',
+      hotspot: { x: 36, y: 748, width: 120.5, height: 40 },
+      kind: 'pill',
+      targetRoomId: null,
+      entryTile: { col: 0, row: 0 },
+    },
+    {
+      // The "DEV PIT ↘" exit pill: the DEV PIT door's twin.
+      label: 'DEV PIT',
+      hotspot: { x: 1465.5, y: 748, width: 98.5, height: 40 },
+      kind: 'pill',
+      targetRoomId: 'dev-pit',
+      entryTile: { col: 11, row: 2 },
     },
   ],
   npcSlots: [

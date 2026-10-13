@@ -60,13 +60,22 @@ export const teamRoom4: RoomDefinition = {
   spawnTile: { col: 3, row: 5 },
   doors: [
     {
-      label: 'HALLWAY',
+      // #170: the Room's name, THE HALLWAY; its baked sign reads "HALLWAY →".
+      label: 'THE HALLWAY',
       hotspot: { x: 1030, y: 320, ...DOOR_HOTSPOT_SIZE },
       wall: 'right',
       targetRoomId: 'office-hallway',
       // The tile just inside the Hallway's own TEAM ROOM 4 door: that door's
       // hotspot bottom-centre (the sill) projected into the Hallway's own
       // grid, then the nearest walkable tile (#16 fix 4, #51 review fix 2).
+      entryTile: { col: 7, row: 0 },
+    },
+    {
+      // The baked "HALLWAY ↓" exit pill: THE HALLWAY door's twin (#170).
+      label: 'THE HALLWAY',
+      hotspot: { x: 1461.5, y: 748, width: 102.5, height: 40 },
+      kind: 'pill',
+      targetRoomId: 'office-hallway',
       entryTile: { col: 7, row: 0 },
     },
   ],

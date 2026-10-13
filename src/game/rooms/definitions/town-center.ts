@@ -1,7 +1,7 @@
 import type { HexColor } from '../../../contracts';
 import type { RoomDefinition, RoomHotspot, RoomWallText } from '../room-definition';
 import { createStandardRoomGrid } from '../grid';
-import { roofDeck } from './roof-deck';
+import { ROOF_DECK_ELEVATOR_APPROACH } from './roof-deck';
 import { STAIRWELL_JG_HQ_SILL } from './stairwell';
 
 // The standard 12x10 grid every one of the five prototype Rooms shares
@@ -180,17 +180,20 @@ const CORE_VALUES_POSTER_HOTSPOT: RoomHotspot = {
 };
 
 /**
- * Traced from `design/Room 01 Town Center.dc.html`. Doors: DEV PIT (real,
- * `door()`-styled sign), THE ICEBOX and STAIRWELL (both disabled — neither
- * Room is in this prototype's five), and the sliding-panel elevator labelled
- * "ELEVATOR · ROOF DECK" (real; its hotspot is the two animated door panels'
- * bounding box, since it isn't drawn with the same `door()` frame as the
- * others). The design also shows a "KITCHEN ↘" HUD exit pill with no in-scene
- * door graphic to place a hotspot on, so this Room has no door to the Kitchen
- * (the Kitchen's own "← TOWN CENTER" door is one-way in this static
- * prototype; see the #16 execution plan's reported deviations). #92 D3
- * resync: this Room's only design change was a cosmetic tweak to Anthony's
- * (Roof Deck) cameo figure, so this trace is otherwise unchanged.
+ * Traced from `design/Room 01 Town Center.dc.html`. #170's door network (the
+ * 2026-09-27 resync): KITCHEN and THE HALLWAY on the back-right wall (the
+ * frames that were THE ICEBOX and DEV PIT; the Dev Pit and the Icebox are
+ * reached through the Hallway now), STAIRWELL and the sliding-panel elevator
+ * labelled "ELEVATOR · ROOF DECK" (its hotspot is the two animated door
+ * panels' bounding box, since it isn't drawn with the same `door()` frame as
+ * the others), and the baked "KITCHEN ↘" exit pill, a twin of the KITCHEN
+ * door. The design's "HALLWAY A →" sign reads "HALLWAY →" in the art
+ * (`scripts/export-room-art.ts`'s TEXT_RULES, #170 D10).
+ *
+ * Each `entryTile` is the sill inside the matching door of the Room it leads
+ * to (#170 D8; `door-network.test.ts` re-derives every one), and each
+ * `guardTile` is where Anthony stands while he guards that door (D14;
+ * `guard-tiles.test.ts` checks I1-I7).
  */
 export const townCenter: RoomDefinition = {
   id: 'town-center',
@@ -204,26 +207,24 @@ export const townCenter: RoomDefinition = {
   spawnTile: { col: 6, row: 8 },
   doors: [
     {
-      label: 'THE ICEBOX',
+      label: 'KITCHEN',
       hotspot: { x: 860, y: 150, ...DOOR_HOTSPOT_SIZE },
       wall: 'right',
-      targetRoomId: 'the-icebox',
-      // The tile just inside the Icebox's own "TOWN CENTER" door: project
-      // that door's own hotspot bottom-centre (the door sill, not its
-      // centre) into the Icebox's own grid, then the nearest walkable tile
-      // (#16 fix 4, #51 D4, #51 review fix 2).
-      entryTile: { col: 0, row: 1 },
+      targetRoomId: 'the-melt',
+      // The sill inside the Kitchen's TOWN CENTER door.
+      entryTile: { col: 0, row: 6 },
+      // Directly in front of the door, off its approach tile (2,0).
+      guardTile: { col: 2, row: 1 },
     },
     {
-      label: 'DEV PIT',
+      label: 'THE HALLWAY',
       hotspot: { x: 1270, y: 355, ...DOOR_HOTSPOT_SIZE },
       wall: 'right',
-      targetRoomId: 'dev-pit',
-      // The tile just inside Dev Pit's own "TOWN CENTER" door (#16 fix 4):
-      // the nearest walkable tile to that door's hotspot centre in Dev Pit's
-      // own grid, the same rule `reachability.test.ts` uses for a door's
-      // approach tile.
-      entryTile: { col: 0, row: 0 },
+      targetRoomId: 'office-hallway',
+      // The sill inside the Hallway's TOWN CENTER door.
+      entryTile: { col: 0, row: 2 },
+      // Below the door, off its approach tile (10,0).
+      guardTile: { col: 11, row: 1 },
     },
     {
       label: 'STAIRWELL',
@@ -233,16 +234,29 @@ export const townCenter: RoomDefinition = {
       // on the sill inside its JG HQ door, which leads back here.
       targetRoomId: 'stairwell-5',
       entryTile: STAIRWELL_JG_HQ_SILL,
+      // Beside the door, off its approach tile (0,2) and sill (0,3).
+      guardTile: { col: 1, row: 3 },
     },
     {
       label: 'ELEVATOR · ROOF DECK',
       hotspot: { x: 385, y: 282, ...ELEVATOR_HOTSPOT_SIZE },
       wall: 'left',
+      // #170 PR C makes this door ask for a floor first (D9); until then it
+      // goes straight to the Roof Deck, landing by its ELEVATOR pill: that
+      // pill's approach tile.
       targetRoomId: 'roof-deck',
-      // Roof Deck has no door/elevator of its own drawn in the design (only
-      // a HUD exit pill), so this lands on Roof Deck's own spawn tile (#16
-      // fix 4) -- a judgment call reported on the #16 execution plan.
-      entryTile: roofDeck.spawnTile,
+      entryTile: ROOF_DECK_ELEVATOR_APPROACH,
+      // Beside the elevator, between its approach (0,6) and the sills (0,3)
+      // and (0,7).
+      guardTile: { col: 0, row: 5 },
+    },
+    {
+      // The baked "KITCHEN ↘" exit pill: the KITCHEN door's twin.
+      label: 'KITCHEN',
+      hotspot: { x: 1462, y: 748, width: 102, height: 40 },
+      kind: 'pill',
+      targetRoomId: 'the-melt',
+      entryTile: { col: 0, row: 6 },
     },
   ],
   npcSlots: [

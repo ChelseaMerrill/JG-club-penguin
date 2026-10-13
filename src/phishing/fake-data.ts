@@ -2,7 +2,9 @@ import type { GuardPost } from './phishing-client';
 
 /**
  * Test and dev-hook data for the in-memory `PhishingClient` fake only: a
- * copy of what `20260928020000_phishing_quiz.sql` seeds. The real client
+ * copy of what the migrations seed: the questions from
+ * `20260928020000_phishing_quiz.sql`, the guard posts from #170's
+ * `20261013000000_door_network_guard_posts.sql`. The real client
  * never imports this file (the server holds the questions, their answers
  * and the post list, P3/P8), so a production build never contains it.
  * `fake-data.test.ts` fails if either list drifts from the migration.
@@ -18,16 +20,29 @@ export interface FakePhishingQuestion {
   explanation: string;
 }
 
-/** `public.phishing_guard_posts`, in position order. */
+/**
+ * `public.phishing_guard_posts`, in position order: #170's DN5 seed
+ * (`20261013000000_door_network_guard_posts.sql`), 16 posts, with no two
+ * neighbouring windows in one Room or on the two sides of one doorway,
+ * including the wrap.
+ */
 export const FAKE_GUARD_POSTS: readonly GuardPost[] = [
-  { roomId: 'town-center', doorLabel: 'THE ICEBOX' },
+  { roomId: 'office-hallway', doorLabel: 'TEAM ROOM 1' },
+  { roomId: 'town-center', doorLabel: 'KITCHEN' },
+  { roomId: 'office-hallway', doorLabel: 'TEAM ROOM 2' },
   { roomId: 'dev-pit', doorLabel: 'THE ICEBOX' },
-  { roomId: 'the-melt', doorLabel: 'TOWN CENTER' },
-  { roomId: 'town-center', doorLabel: 'DEV PIT' },
-  { roomId: 'dev-pit', doorLabel: 'TOWN CENTER' },
+  { roomId: 'office-hallway', doorLabel: 'DEV PIT' },
   { roomId: 'the-melt', doorLabel: 'ROOF DECK' },
-  { roomId: 'town-center', doorLabel: 'ELEVATOR · ROOF DECK' },
+  { roomId: 'office-hallway', doorLabel: 'TEAM ROOM 3' },
+  { roomId: 'town-center', doorLabel: 'THE HALLWAY' },
+  { roomId: 'office-hallway', doorLabel: 'BATHROOM' },
+  { roomId: 'dev-pit', doorLabel: 'THE HALLWAY' },
+  { roomId: 'office-hallway', doorLabel: 'TEAM ROOM 4' },
+  { roomId: 'the-melt', doorLabel: 'TOWN CENTER' },
+  { roomId: 'office-hallway', doorLabel: 'TOWN CENTER' },
+  { roomId: 'town-center', doorLabel: 'STAIRWELL' },
   { roomId: 'roof-deck', doorLabel: 'KITCHEN' },
+  { roomId: 'town-center', doorLabel: 'ELEVATOR · ROOF DECK' },
 ];
 
 /** `public.phishing_questions`, in sort order: the design's 10, unbranded. */

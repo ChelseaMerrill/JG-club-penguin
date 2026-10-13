@@ -732,23 +732,34 @@ describe('ROOM_DEFINITIONS registry', () => {
     );
 
     expect(connections).toEqual({
-      // #51 slice 4: STAIRWELL, Town Center's last disabled door, opens floor 5.
-      'town-center': ['dev-pit', 'roof-deck', 'stairwell-5', 'the-icebox'],
-      'dev-pit': ['the-icebox', 'town-center'],
-      'the-melt': ['roof-deck', 'town-center'],
-      // #100: the Roof Deck's new KITCHEN floor-arrow door, its first exit.
-      'roof-deck': ['the-melt'],
-      igloo: ['town-center'],
-      'the-icebox': ['dev-pit', 'town-center'],
-      // #51: the Hallway's TEAM ROOM 5-9 doors stay disabled (no designs).
-      'office-hallway': ['team-room-1', 'team-room-2', 'team-room-3', 'team-room-4', 'town-center'],
-      'team-room-1': ['office-hallway'],
-      'team-room-2': ['office-hallway'],
-      'team-room-3': ['office-hallway'],
-      'team-room-4': ['office-hallway'],
-      bathroom: ['office-hallway'],
-      // #51 slice 3: one-way doors out; nothing draws a door in (D5).
-      'the-mullet': ['dev-pit', 'office-hallway'],
+      // #170's door network: a pill twin (the same exit as its door) appears
+      // once per hotspot, so a target can repeat.
+      'town-center': ['office-hallway', 'roof-deck', 'stairwell-5', 'the-melt', 'the-melt'],
+      'dev-pit': ['office-hallway', 'office-hallway', 'the-icebox', 'the-mullet'],
+      'the-melt': ['roof-deck', 'roof-deck', 'town-center', 'town-center'],
+      // The KITCHEN floor arrow (#100) and the ↙ KITCHEN, ELEVATOR and STAIRS
+      // pills.
+      'roof-deck': ['stairwell-5', 'the-melt', 'the-melt', 'town-center'],
+      igloo: ['town-center', 'town-center'],
+      'the-icebox': ['dev-pit', 'dev-pit'],
+      'office-hallway': [
+        'bathroom',
+        'dev-pit',
+        'dev-pit',
+        'team-room-1',
+        'team-room-2',
+        'team-room-3',
+        'team-room-4',
+        'town-center',
+        'town-center',
+      ],
+      'team-room-1': ['office-hallway', 'office-hallway'],
+      'team-room-2': ['office-hallway', 'office-hallway'],
+      'team-room-3': ['office-hallway', 'office-hallway'],
+      'team-room-4': ['office-hallway', 'office-hallway'],
+      bathroom: ['office-hallway', 'office-hallway'],
+      // HALLWAY B (door and pill) waits for #172.
+      'the-mullet': ['dev-pit', 'dev-pit'],
       // #51 slice 4: each floor's ↑ pill and upper stair flight both climb a
       // floor, and its ↓ pill descends one. Floor 0's LOBBY door waits for
       // #169 (its "↙ LOBBY" pill too); floor 5's flight leads to the Roof
@@ -832,9 +843,11 @@ describe('ROOM_DEFINITIONS registry', () => {
     // #51: each banner minus its fabricated live figures (headcounts, the
     // training progress, the stall occupancy) and, for the Bathroom, the
     // "SNOWBALLS DISABLED" rule this build doesn't implement.
+    // #170 Q4: the banner's 'HALLWAY A · TEAM ROOMS 1–4 · BATHROOM · DEV PIT',
+    // without 'HALLWAY A' (the title is THE HALLWAY).
     expect(getRoomDefinition('office-hallway')).toMatchObject({
       title: 'THE HALLWAY',
-      subtitle: 'OFFICES 1–9 · KNOCK BEFORE YOU WADDLE',
+      subtitle: 'TEAM ROOMS 1–4 · BATHROOM · DEV PIT',
     });
     expect(getRoomDefinition('team-room-1')).toMatchObject({
       title: 'TEAM ROOM 1',

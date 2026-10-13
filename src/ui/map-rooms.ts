@@ -42,8 +42,8 @@ export const MAP_ROOMS: readonly MapRoomTile[] = [
     number: '04',
     label: '04 · THE KITCHEN',
     subtitle: 'KITCHEN (BREAK ROOM)',
-    // Q6: the design's card already reads THE KITCHEN; the underlying Room
-    // id/HUD title stay `the-melt`/"THE MELT" until #92 renames them.
+    // Q6: the design's card reads THE KITCHEN, as the HUD title has since
+    // #92; the Room id stays `the-melt` (the Presence channel name).
     roomId: 'the-melt',
   },
   {

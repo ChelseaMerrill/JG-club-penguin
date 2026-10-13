@@ -47,23 +47,23 @@ async function play(
 describe('guardWindowAt (the schedule)', () => {
   it('puts post 0 at the epoch and moves one post every 600 s, wrapping after the last', () => {
     expect(guardWindowAt(FAKE_GUARD_POSTS, 0)).toMatchObject({
-      roomId: 'town-center',
-      doorLabel: 'THE ICEBOX',
+      roomId: 'office-hallway',
+      doorLabel: 'TEAM ROOM 1',
       windowStart: '1970-01-01T00:00:00.000Z',
       windowEnd: '1970-01-01T00:10:00.000Z',
     });
-    expect(guardWindowAt(FAKE_GUARD_POSTS, 599_999)).toMatchObject({ doorLabel: 'THE ICEBOX' });
+    expect(guardWindowAt(FAKE_GUARD_POSTS, 599_999)).toMatchObject({ doorLabel: 'TEAM ROOM 1' });
     expect(guardWindowAt(FAKE_GUARD_POSTS, 600_000)).toMatchObject({
-      roomId: 'dev-pit',
-      doorLabel: 'THE ICEBOX',
-    });
-    expect(guardWindowAt(FAKE_GUARD_POSTS, 7 * 600_000)).toMatchObject({
-      roomId: 'roof-deck',
+      roomId: 'town-center',
       doorLabel: 'KITCHEN',
     });
-    expect(guardWindowAt(FAKE_GUARD_POSTS, 8 * 600_000 + 1)).toMatchObject({
+    expect(guardWindowAt(FAKE_GUARD_POSTS, 15 * 600_000)).toMatchObject({
       roomId: 'town-center',
-      doorLabel: 'THE ICEBOX',
+      doorLabel: 'ELEVATOR · ROOF DECK',
+    });
+    expect(guardWindowAt(FAKE_GUARD_POSTS, 16 * 600_000 + 1)).toMatchObject({
+      roomId: 'office-hallway',
+      doorLabel: 'TEAM ROOM 1',
     });
   });
 

@@ -82,7 +82,7 @@ export type NpcId =
   | 'brandon-mullet'
   | 'dom-mullet'
   // New on the Characters sheet (owner request, 2026-10-02, Track D), each in
-  // one Room only. `jesse-lucier`, not `jesse`: that id is The Melt's Jesse.
+  // one Room only. `jesse-lucier`, not `jesse`: that id is the Kitchen's Jesse.
   | 'jesse-lucier'
   | 'alex-kelly'
   | 'alex-nikolis'
@@ -310,7 +310,7 @@ interface NpcDefinitionBase {
   roomId: RoomId;
   /**
    * The in-Room nameplate text (#36 round-1 review item 5): Dev Pit and Roof
-   * Deck use first names ("Ian", "Kevin"); Town Center and The Melt use full
+   * Deck use first names ("Ian", "Kevin"); Town Center and the Kitchen use full
    * names ("Darrin Jahnel", "Chelsea Merrill"), per each Room design's own
    * nameplate markup.
    */
@@ -445,7 +445,7 @@ const PANCAKE_FLIP_DIALOG: NpcMinigameDialog = {
   declineLabel: 'I BURN TOAST',
   triggerLine:
     'Batter is mixed, griddle is hot, and Tom keeps eating the burnt ones. Watch the color and flip on GOLDEN. Twenty on the stack and you are in the Breakfast Club.',
-  subtitle: 'THE MELT · PANCAKE FLIP',
+  subtitle: 'THE KITCHEN · PANCAKE FLIP',
 };
 
 /** Josh's Snow Cone Stand trigger dialog (#36 round-2 review item 1a; #49's own design, verbatim from `design/Minigame Snow Cone Stand.dc.html`). */
@@ -467,7 +467,7 @@ const COFFEE_RUSH_DIALOG: NpcMinigameDialog = {
   declineLabel: 'JUST HERE FOR COFFEE',
   triggerLine:
     'Fresh pot is on and the line is out the door. You pour, I supervise. Fifteen good cups before the pot runs dry and the Barista badge is yours.',
-  subtitle: 'THE MELT · COFFEE RUSH',
+  subtitle: 'THE KITCHEN · COFFEE RUSH',
 };
 
 /**
@@ -2548,7 +2548,7 @@ export const NPCS: Record<NpcId, NpcDefinition> = {
   // Jessie: the design draws her as a Penguin in the Bathroom, but only
   // Players appear as Penguins in the World (owner decision 2026-09-25; see
   // PR #133) -- dropped here and from the Bathroom's own npcSlots. Spelled
-  // "Jessie" there, unlike The Melt's "Jesse" (see that entry's own
+  // "Jessie" there, unlike the Kitchen's "Jesse" (see that entry's own
   // comment), which remains.
   // LATAM Disco Hall's six dancers (owner request, 2026-10-09), from
   // `design/Characters LATAM.dc.html`. Unlike `design/Characters.dc.html`,

@@ -868,7 +868,7 @@ describe('NPCS', () => {
       declineLabel: 'JUST HERE FOR COFFEE',
       triggerLine:
         'Fresh pot is on and the line is out the door. You pour, I supervise. Fifteen good cups before the pot runs dry and the Barista badge is yours.',
-      subtitle: 'THE MELT · COFFEE RUSH',
+      subtitle: 'THE KITCHEN · COFFEE RUSH',
     });
   });
 
@@ -901,7 +901,7 @@ describe('NPCS', () => {
       declineLabel: 'I BURN TOAST',
       triggerLine:
         'Batter is mixed, griddle is hot, and Tom keeps eating the burnt ones. Watch the color and flip on GOLDEN. Twenty on the stack and you are in the Breakfast Club.',
-      subtitle: 'THE MELT · PANCAKE FLIP',
+      subtitle: 'THE KITCHEN · PANCAKE FLIP',
     });
   });
 

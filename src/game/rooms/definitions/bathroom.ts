@@ -1,6 +1,5 @@
 import type { RoomDefinition } from '../room-definition';
 import { createGrid } from '../grid';
-import { officeHallway } from './office-hallway';
 
 // Not the standard 12x10 grid (#51 D2): `design/Room 13 Bathroom.dc.html`
 // bakes an 8x6 tiled floor, 48 tile diamonds whose first north corner is
@@ -38,11 +37,12 @@ const WALKABLE: readonly (readonly boolean[])[] = [
 
 /**
  * Traced from `design/Room 13 Bathroom.dc.html` (#51), which titles it THE
- * THAW ROOM. Its one door, "HALLWAY →" on the back-right wall, is the
- * bounding box of the design's own door-frame polygon (`1100,535 1170,570
- * 1170,440 1100,405`). The floor arrow is unlabelled floor art, not a door.
- * No Room draws a door into the Bathroom, so it is reached by the Map (#51
- * D5).
+ * THAW ROOM. Its one door, on the back-right wall, is the bounding box of the
+ * design's own door-frame polygon (`1100,535 1170,570 1170,440 1100,405`):
+ * THE HALLWAY, whose sign reads "HALLWAY →" in the art (the design's
+ * "HALLWAY A →", rewritten by `scripts/export-room-art.ts`'s TEXT_RULES,
+ * #170 D10), with the baked exit pill as its twin. The Hallway's BATHROOM
+ * door leads here (#170).
  */
 export const bathroom: RoomDefinition = {
   id: 'bathroom',
@@ -58,14 +58,21 @@ export const bathroom: RoomDefinition = {
   spawnTile: { col: 1, row: 4 },
   doors: [
     {
-      label: 'HALLWAY',
+      label: 'THE HALLWAY',
       hotspot: { x: 1100, y: 405, ...DOOR_HOTSPOT_SIZE },
       wall: 'right',
       targetRoomId: 'office-hallway',
-      // The Hallway draws no Bathroom door of its own, so this lands on the
-      // Hallway's own spawn tile, as the Igloo's TOWN CENTER door does (#16
-      // fix 4).
-      entryTile: officeHallway.spawnTile,
+      // The sill inside the Hallway's BATHROOM door (#170 D8).
+      entryTile: { col: 9, row: 0 },
+    },
+    {
+      // The "THE HALLWAY ↘" exit pill (the design's "HALLWAY A ↘", rewritten
+      // by `scripts/export-room-art.ts`'s TEXT_RULES, D10): the door's twin.
+      label: 'THE HALLWAY',
+      hotspot: { x: 1428.5, y: 748, width: 135.5, height: 40 },
+      kind: 'pill',
+      targetRoomId: 'office-hallway',
+      entryTile: { col: 9, row: 0 },
     },
   ],
   npcSlots: [

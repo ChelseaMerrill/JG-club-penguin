@@ -1,7 +1,7 @@
 import type { RoomId, Tile } from '../../../contracts';
 import type { DoorHotspot, RoomDefinition, RoomDoor, RoomNpcSlot } from '../room-definition';
 import { createGrid } from '../grid';
-import { roofDeck } from './roof-deck';
+import { ROOF_DECK_STAIRS_APPROACH } from './roof-deck';
 
 // Not the standard 12x10 grid (#51 D2): every Stage of
 // `design/Stairwell.dc.html` bakes the same 8x8 landing, 64 tile diamonds
@@ -149,10 +149,9 @@ function doorsFor(floor: number): FloorDoors {
       label: 'ROOF DECK',
       hotspot: UPPER_FLIGHT,
       targetRoomId: 'roof-deck',
-      // The Roof Deck draws no STAIRS exit yet, so this lands on its own
-      // spawn tile until #170 adds that pill and retargets this to its sill
-      // (the #16 fix 4 precedent).
-      entryTile: roofDeck.spawnTile,
+      // #170 D8: by the Roof Deck's STAIRS pill, which leads back here: that
+      // pill's approach tile.
+      entryTile: ROOF_DECK_STAIRS_APPROACH,
     };
     doors.push(up);
     const jgHq: RoomDoor = {

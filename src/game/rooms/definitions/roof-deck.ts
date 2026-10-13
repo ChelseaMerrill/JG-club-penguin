@@ -1,3 +1,4 @@
+import type { Tile } from '../../../contracts';
 import type { RoomDefinition } from '../room-definition';
 import { createStandardRoomGrid } from '../grid';
 
@@ -38,19 +39,32 @@ const WALKABLE: readonly (readonly boolean[])[] = [
 ];
 
 /**
- * Traced from `design/Room 05 Roof Deck.dc.html`. Unlike the other four
- * Rooms, this design draws no *door()*-framed sign or elevator graphic in
- * this Room -- its HUD nav pill ("↙ ELEVATOR · STAIRS · KITCHEN") still names
- * no in-world hotspot for the elevator/stairs legs, so this Room is still
- * reachable via Town Center's and the Kitchen's elevator/stairs doors, whose
- * `entryTile` points at this Room's own `spawnTile` (#16 D3 deviation).
- * `spawnTile` isn't any NPC's own interaction tile (#16 fix 4; see
- * `reachability.test.ts`).
- *
- * #100: the 2026-09-25 design resync (PR #101) adds a real in-world hotspot
- * after all -- a blinking floor arrow + "KITCHEN" label linking to
- * `Kitchen.dc.html` -- so this Room now has exactly one door, to the Kitchen
- * (`the-melt`), the first exit this Room has ever had.
+ * The three baked exit pills side by side at the bottom left (#170 Q5), each
+ * its rect in the exported art after `scripts/export-room-art.ts
+ * --print-exit-rects`: "↙ KITCHEN", "ELEVATOR" and "STAIRS", 40 px tall at
+ * (36, 748), (146, 748) and (248, 748).
+ */
+const KITCHEN_PILL = { x: 36, y: 748, width: 102, height: 40 };
+const ELEVATOR_PILL = { x: 146, y: 748, width: 94, height: 40 };
+const STAIRS_PILL = { x: 248, y: 748, width: 77, height: 40 };
+
+/**
+ * Where a Player arrives from Town Center's elevator (#170 D8): the approach
+ * tile of this Room's ELEVATOR pill, the nearest walkable tile to its centre.
+ */
+export const ROOF_DECK_ELEVATOR_APPROACH: Tile = { col: 4, row: 9 };
+
+/** Where a Player arrives up the Stairwell's top flight: the STAIRS pill's approach tile (#170 D8). */
+export const ROOF_DECK_STAIRS_APPROACH: Tile = { col: 5, row: 8 };
+
+/**
+ * Traced from `design/Room 05 Roof Deck.dc.html`. This design draws no
+ * `door()`-framed sign or elevator graphic: its exits are the blinking floor
+ * arrow + "KITCHEN" label linking to `Kitchen.dc.html` (#100), and (#170) the
+ * three baked exit pills: "↙ KITCHEN" (the arrow's twin), "ELEVATOR" (to Town
+ * Center, where PR C's floor picker will ask first, D9) and "STAIRS" (up to
+ * the Stairwell's floor 5, UD-4). `spawnTile` isn't any NPC's own interaction
+ * tile (#16 fix 4; see `reachability.test.ts`).
  */
 export const roofDeck: RoomDefinition = {
   id: 'roof-deck',
@@ -96,13 +110,39 @@ export const roofDeck: RoomDefinition = {
       // old 605-710 x 589-646 rect's centre (657.5, 617.5) mapped to.
       hotspot: { x: 619, y: 561, width: 91, height: 85 },
       targetRoomId: 'the-melt',
-      // The Kitchen tile next to its own "ROOF DECK" door (#100, the same
-      // rule `reachability.test.ts` uses for a door's approach tile): the
-      // nearest walkable tile, in the Kitchen's own grid, to that door's
-      // hotspot centre ({ x: 1290, y: 365, width: 70, height: 165 }, `the-
-      // melt.ts`) -- which floors/BFS-walks out to { col: 10, row: 0 }, a
-      // tile just off the Kitchen's own back counter.
+      // The sill inside the Kitchen's ROOF DECK door (#170 D8): its hotspot's
+      // bottom-centre, projected into the Kitchen's grid.
       entryTile: { col: 10, row: 0 },
+      // Just right of the arrow, off its approach (5,8) and its sill (6,9),
+      // where Players from the Kitchen land (#170 D14).
+      guardTile: { col: 7, row: 9 },
+    },
+    {
+      // The "↙ KITCHEN" exit pill: the KITCHEN arrow's twin.
+      label: 'KITCHEN',
+      hotspot: KITCHEN_PILL,
+      kind: 'pill',
+      targetRoomId: 'the-melt',
+      entryTile: { col: 10, row: 0 },
+    },
+    {
+      label: 'ELEVATOR',
+      hotspot: ELEVATOR_PILL,
+      kind: 'pill',
+      // #170 PR C makes this pill ask for a floor first (Q3, D9); until then it
+      // goes straight to Town Center, landing on the sill inside its
+      // ELEVATOR · ROOF DECK door.
+      targetRoomId: 'town-center',
+      entryTile: { col: 0, row: 7 },
+    },
+    {
+      label: 'STAIRS',
+      hotspot: STAIRS_PILL,
+      kind: 'pill',
+      // Down the Stairwell's top flight (UD-4), onto the sill of floor 5's
+      // ROOF DECK flight (`STAIRWELL_ROOF_SILL`).
+      targetRoomId: 'stairwell-5',
+      entryTile: { col: 2, row: 0 },
     },
   ],
   npcSlots: [

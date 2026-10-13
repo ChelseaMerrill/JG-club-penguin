@@ -27,10 +27,16 @@ The screen where a Player creates and edits their Penguin look. It opens on firs
 The full multi-room office environment, modeled from the real JG office blueprint, spread over several floors. Composed of Rooms.
 
 **Room**
-One explorable, self-contained area of the World, drawn as an isometric scene that fills the Stage. Players move between Rooms through doors or the Map. Multiplayer Presence is scoped per-Room (who else is in *this* Room), not global. The prototype Rooms are Town Center (where every Session starts), Dev Pit, The Melt, Roof Deck and the Player's Igloo. #51 adds The Icebox, the Hallway, Team Rooms 1-4, the Bathroom, The Mullet and the Stairwell. The Stairwell is six Rooms, one per **Stairwell floor**: floor 0, the lobby level, up to floor 5, the JG HQ floor.
+One explorable, self-contained area of the World, drawn as an isometric scene that fills the Stage. Players move between Rooms through doors or the Map. Multiplayer Presence is scoped per-Room (who else is in *this* Room), not global. The prototype Rooms are Town Center (where every Session starts), Dev Pit, the Kitchen, Roof Deck and the Player's Igloo. #51 adds The Icebox, the Hallway, Team Rooms 1-4, the Bathroom, The Mullet and the Stairwell. The Stairwell is six Rooms, one per **Stairwell floor**: floor 0, the lobby level, up to floor 5, the JG HQ floor. The Room ids keep their old names where they differ (the Kitchen is `the-melt`, the Hallway `office-hallway`), since an id names the Room channel.
+
+**Door network**
+Which Room each door leads to (#170). Town Center's doors lead to the Kitchen, the Hallway, the Stairwell (floor 5) and, by the Elevator, the Roof Deck. The Hallway leads to Team Rooms 1-4, the Bathroom and the Dev Pit, and back to Town Center. The Dev Pit is reached only through the Hallway, and leads on to The Icebox and The Mullet; the Icebox is reached only from the Dev Pit. The Kitchen leads to the Roof Deck and back to Town Center, and the Roof Deck back to the Kitchen, to Town Center by the Elevator, and down the stairs to Stairwell floor 5. The Mullet's other door, to Hallway B, is a Locked door. Every Room on the network can reach every other by doors alone; the Igloo, the Remote Lounge and the LATAM Rooms are reached from the HUD or the Map instead.
+
+**Hallway**
+The corridor off Town Center (THE HALLWAY in the game; the design calls it THE CORRIDOR and once named it Hallway A). Its doors are Team Rooms 1-4, the Bathroom and the Dev Pit along one wall and Town Center on the other. "Hallway A" is not used anywhere in the game; Hallway B, off The Mullet, is a separate Room that isn't built yet.
 
 **Door**
-The way from one Room into another: a door drawn in the Room, or an exit pill at the bottom of the Stage. Hovering a door shows CLICK TO ENTER · <Room>. Clicking walks the Penguin there; the screen fades (250 ms) and the Penguin arrives at the matching door. Tab and Enter reach and use doors (#170).
+The way from one Room into another: a door drawn in the Room, or an exit pill at the bottom of the Stage. An exit pill that names the same Room as a door is that door's twin: it goes to the same place. Hovering a door shows CLICK TO ENTER · <Room>. Clicking walks the Penguin there; the screen fades (250 ms) and the Penguin arrives at the matching door. Tab and Enter reach and use doors (#170).
 
 **Locked door**
 A door to a Room not built yet: no way in. It looks like any other door; only its grey hover pill (<Room> · UNDER CONSTRUCTION) says so. Clicking it, or Enter on it, shows UNDER CONSTRUCTION and the Penguin doesn't walk. The Stairwell's floor 0 LOBBY door is one until the Lobby is built (#170).
@@ -56,7 +62,7 @@ The in-game map screen, opened from the HUD. Clicking a Room on the Map takes th
 The heads-up display drawn over every Room: the Room title, the Token balance, the chat field, and buttons for the Penguin Creator, the Map, the Igloo and the menu. The Emote, Snowball mode and Quest buttons appear only when their stretch work lands. It is part of the DOM overlay layer on the Stage, not the game canvas, and clicks on it never move the Penguin.
 
 **Elevator screen**
-The full-Stage overlay shown whenever a Room change crosses floors, reached through a door or the Map like any other Room change. A ride lasts 1.2s for each floor crossed (5 to R 1.2s, L to 5 6s, L to R 7.2s); the screen hides at the later of the ride's end and the destination Room being ready (at most 10s). Town Center, Dev Pit and The Melt are floor 5; the Roof Deck is one floor up, R; the Igloo has no floor at all, so it never shows the Elevator. Each Stairwell floor is its own floor, floor 0 on L. Moving between Stairwell floors, or by the stairs between floor 5 and the Roof Deck, never shows it; the Stairwell's Map tile from Town Center shows "WADDLING DOWN TO FLOOR L".
+The full-Stage overlay shown whenever a Room change crosses floors, reached through a door or the Map like any other Room change. A ride lasts 1.2s for each floor crossed (5 to R 1.2s, L to 5 6s, L to R 7.2s); the screen hides at the later of the ride's end and the destination Room being ready (at most 10s). Town Center, Dev Pit and the Kitchen are floor 5; the Roof Deck is one floor up, R; the Igloo has no floor at all, so it never shows the Elevator. Each Stairwell floor is its own floor, floor 0 on L. Moving between Stairwell floors, or by the stairs between floor 5 and the Roof Deck, never shows it; the Stairwell's Map tile from Town Center shows "WADDLING DOWN TO FLOOR L".
 
 **Landing page**
 The screen signed-out visitors see, with the logo and sign-in buttons (PLAY NOW and LOG IN, both Google sign-in). It covers the whole Stage and replaced the earlier login card.
@@ -93,7 +99,10 @@ A JG character controlled by the game (not by a Player), placed in a Room, that 
 A bounded exchange between a Penguin and an NPC — either **Dialogue** (the NPC says something, shown in the NPC dialog panel) or a **Minigame** (see below). Triggered by clicking the NPC, which walks the Penguin to it; the Player never types a command.
 
 **Minigame**
-A short, timed activity launched from an NPC Interaction, such as Bug Squash in Dev Pit or Pancake Flip in The Melt. Each play is a **round**: it has a timer and a score, pays Tokens, saves the Player's **personal best** for that Minigame, and can earn a Badge. Payouts are calculated by the server, never trusted from the client.
+A short, timed activity launched from an NPC Interaction, such as Bug Squash in Dev Pit or Pancake Flip in the Kitchen. Each play is a **round**: it has a timer and a score, pays Tokens, saves the Player's **personal best** for that Minigame, and can earn a Badge. Payouts are calculated by the server, never trusted from the client.
+
+**Guard post**
+A door where Anthony, the Phishing Quiz's guard, stands for one 10-minute window, the same for every Player; using that door starts his Phishing Quiz challenge until the Player answers it correctly. The posts are the in-scene doors of Town Center, the Dev Pit, the Kitchen, the Roof Deck and the Hallway, 16 in all, taken in turn so the next window is always in another Room. At each post he stands on his own tile in front of the door, never on a tile a Penguin walks to or arrives on, and paces beside it (#146, #170). An exit pill is never a post; its door's post shuts it too.
 
 **Leaderboard**
 A per-Minigame ranking of named Players' personal bests, shown by Penguin name; ties go to whoever reached the score first. Shown on the Minigame's done screen, all-time, top 10 plus the Player's own rank when it falls outside that.

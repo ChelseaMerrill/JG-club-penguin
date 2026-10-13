@@ -157,13 +157,16 @@ describe('Stairwell doors (S4-D4)', () => {
     });
   });
 
-  it("leads floor 5's upper flight to the Roof Deck's spawn tile, and exports its sill", () => {
+  it("leads floor 5's upper flight to the Roof Deck's STAIRS pill, and back to its sill (#170)", () => {
     const top = floors[5]!;
     const roof = door(top, 'ROOF DECK');
+    const roofDeck = getRoomDefinition('roof-deck');
+    const stairs = door(roofDeck, 'STAIRS');
     expect(roof).toMatchObject({
       targetRoomId: 'roof-deck',
-      entryTile: getRoomDefinition('roof-deck').spawnTile,
+      entryTile: doorApproachTile(roofDeck.walkable, stairs, roofDeck.grid.origin),
     });
+    expect(stairs).toMatchObject({ targetRoomId: 'stairwell-5', entryTile: STAIRWELL_ROOF_SILL });
     expect(STAIRWELL_ROOF_SILL).toEqual(sillTile(top, roof));
     expect(STAIRWELL_ROOF_SILL).toEqual(doorApproachTile(top.walkable, roof, top.grid.origin));
   });

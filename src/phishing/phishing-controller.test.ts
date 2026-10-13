@@ -6,8 +6,8 @@ import type { RoomGuard } from './guard-placement';
 import { createPhishingController } from './phishing-controller';
 import type { PhishingChoice, PhishingState } from './phishing-client';
 
-/** 1970-01-01 00:00 UTC + 0 s: post 0, Town Center's THE ICEBOX door. */
-const TOWN_CENTER_WINDOW = 0;
+/** 1970-01-01 00:10 UTC: post 1 (#170 DN5), Town Center's KITCHEN door. */
+const TOWN_CENTER_WINDOW = 600_000;
 
 function setup(options: { roomId?: RoomId; startMs?: number } = {}) {
   let nowMs = options.startMs ?? TOWN_CENTER_WINDOW + 60_000;
@@ -73,7 +73,7 @@ describe('createPhishingController', () => {
     expect(ctx.guard()).toEqual({
       roomId: 'town-center',
       npcId: 'anthony',
-      doorLabel: 'THE ICEBOX',
+      doorLabel: 'KITCHEN',
       blocking: true,
     });
     expect(ctx.mapLocked()).toBe(false);
@@ -88,11 +88,11 @@ describe('createPhishingController', () => {
     await ctx.controller.start();
 
     await answer(ctx, 'wrong');
-    expect(ctx.guard()).toMatchObject({ doorLabel: 'THE ICEBOX', blocking: true });
+    expect(ctx.guard()).toMatchObject({ doorLabel: 'KITCHEN', blocking: true });
     expect(ctx.tokens).toHaveBeenLastCalledWith({ balance: 0 });
 
     await answer(ctx, 'correct');
-    expect(ctx.guard()).toMatchObject({ doorLabel: 'THE ICEBOX', blocking: false });
+    expect(ctx.guard()).toMatchObject({ doorLabel: 'KITCHEN', blocking: false });
     expect(ctx.tokens).toHaveBeenLastCalledWith({ balance: 10 });
   });
 
@@ -157,16 +157,16 @@ describe('createPhishingController', () => {
     await ctx.controller.start();
     expect(ctx.guard()).toMatchObject({ roomId: 'town-center' });
 
-    // The window ends 540 s after this start; post 1 is Dev Pit's THE ICEBOX.
-    ctx.setNow(600_000 + 1_000);
+    // The window ends 540 s after this start; post 2 is the Hallway's TEAM ROOM 2.
+    ctx.setNow(2 * 600_000 + 1_000);
     await vi.advanceTimersByTimeAsync(540_500);
     expect(ctx.guard()).toBeNull();
 
-    ctx.enter('dev-pit');
+    ctx.enter('office-hallway');
     await vi.advanceTimersByTimeAsync(0);
     expect(ctx.guard()).toMatchObject({
-      roomId: 'dev-pit',
-      doorLabel: 'THE ICEBOX',
+      roomId: 'office-hallway',
+      doorLabel: 'TEAM ROOM 2',
       blocking: true,
     });
   });
