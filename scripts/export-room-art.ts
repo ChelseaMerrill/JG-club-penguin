@@ -199,6 +199,15 @@ type HideRule =
   // that moves a label harmlessly stops matching, rather than silently
   // hiding the wrong node.
   | { kind: 'text-only'; entries: { text: string; transform: string }[]; comment: string }
+  // Rewrites the exact-matching <text>'s content in place (same `text` +
+  // `transform` matching as `text-only`), keeping its backing shapes and its
+  // own `text-anchor`, so the new glyph stays centred on the same point. Used
+  // for the Stairwell's floor-0 wall numerals, drawn "0" but named "L".
+  | {
+      kind: 'text-replace';
+      entries: { text: string; transform: string; to: string }[];
+      comment: string;
+    }
   // Exact CSS selectors (#51), each of which must match exactly one element
   // (the export fails otherwise). For a character the design draws as loose,
   // unlabelled pieces interleaved with the furniture around it (a figure
@@ -226,9 +235,10 @@ type HideRule =
  * figure, nameplate and `say` bubbles in one animated group, and the local
  * player's "You" Penguin is one plain group with its own bubbles. The exit
  * pills ("↑ FLOOR n", "↓ FLOOR n", the floor-5 and floor-0 "↙" pills), the
- * floor numerals, the landing signs and "STAIRS CHALLENGE · SUBMIT" stay in
- * the art: the pills are the Stairwell's doors (S4-D4), and SUBMIT is kept as
- * decoration only (HD-3), frozen in its visible blink frame like the pills.
+ * floor numerals and the landing signs stay in the art: the pills are the
+ * Stairwell's doors (S4-D4). The decorative "STAIRS CHALLENGE · SUBMIT" sign
+ * is hidden (owner request, 2026-10-12): Dom's NPC covers it and it does
+ * nothing.
  * The design's hint line sits above the Stages, outside every exported one.
  */
 function stairwellRules(floor: (typeof STAIRWELL_FLOORS)[number]): HideRule[] {
@@ -266,7 +276,23 @@ function stairwellRules(floor: (typeof STAIRWELL_FLOORS)[number]): HideRule[] {
           },
         ]
       : [];
+  // Floor 0 is the lobby level, which the game calls "L" (`ROOM_FLOORS`): the
+  // design's two wall numerals say "0", so they are redrawn as "L".
+  const lobbyNumeral: HideRule[] =
+    floor === 0
+      ? [
+          {
+            kind: 'text-replace',
+            entries: [
+              { text: '0', transform: 'matrix(1 -0.5 0 1 580.0 320.0)', to: 'L' },
+              { text: '0', transform: 'matrix(1 0.5 0 1 1060.0 320.0)', to: 'L' },
+            ],
+            comment: 'The lobby level\'s wall numerals: "L", not the design\'s "0".',
+          },
+        ]
+      : [];
   return [
+    ...lobbyNumeral,
     {
       kind: 'animation',
       names: ['domRun', 'jasonPace', 'mingle'],
@@ -284,6 +310,12 @@ function stairwellRules(floor: (typeof STAIRWELL_FLOORS)[number]): HideRule[] {
       texts: ['You'],
       comment:
         "The local player's Penguin: its shadow, figure, nameplate and two bubbles share one plain <g>.",
+    },
+    {
+      kind: 'selector',
+      selectors: ['a[href="https://forms.gle/Z2YRhYWR1DDJRwJS6"]'],
+      comment:
+        'The decorative "STAIRS CHALLENGE · SUBMIT" sign (a link wrapping a blinking pill), left out of every floor (owner request, 2026-10-12).',
     },
     panel,
     ...banner,
@@ -1926,6 +1958,31 @@ function hideLiveElements(rules: HideRule[]): void {
     }
   }
 
+  function replaceText(entries: { text: string; transform: string; to: string }[]): void {
+    const matchCounts = new Map<(typeof entries)[number], number>(entries.map((e) => [e, 0]));
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+    let node: Node | null;
+    while ((node = walker.nextNode())) {
+      const value = node.nodeValue ? node.nodeValue.trim() : '';
+      const el = node.parentElement;
+      if (!el) continue;
+      const match = entries.find(
+        (entry) => entry.text === value && el.getAttribute('transform') === entry.transform,
+      );
+      if (match) {
+        matchCounts.set(match, (matchCounts.get(match) ?? 0) + 1);
+        node.nodeValue = match.to;
+      }
+    }
+    for (const [entry, count] of matchCounts) {
+      if (count === 0) {
+        throw new Error(
+          `text-replace rule matched nothing for "${entry.text}" (transform: ${entry.transform})`,
+        );
+      }
+    }
+  }
+
   // #51: hides the plain <g> wrapping each exact-matching <text>, and fails
   // the export loudly if a label matches nothing or sits outside such a <g>
   // (a design resync that changed the markup), rather than silently leaving
@@ -2023,6 +2080,7 @@ function hideLiveElements(rules: HideRule[]): void {
     else if (rule.kind === 'label-group') hideLabelGroups(rule.texts);
     else if (rule.kind === 'title-group') hideTitleGroups(rule.texts);
     else if (rule.kind === 'text-only') hideTextOnly(rule.entries);
+    else if (rule.kind === 'text-replace') replaceText(rule.entries);
     else if (rule.kind === 'selector') hideSelectors(rule.selectors);
     else hideCluster(rule.anchor, rule.companions);
   }
