@@ -181,13 +181,13 @@ begin
     -----------------------------------------------------------------------
     perform set_config('role', 'postgres', true);
     insert into public.player_badges (player_id, badge_id) values (v_b_id, 'exterminator');
-    insert into public.player_items (player_id, item_id) values (v_b_id, 'rgb-light-strip');
+    insert into public.player_items (player_id, item_id) values (v_b_id, 'desk');
     insert into public.minigame_bests (player_id, minigame_id, best_score)
       values (v_b_id, 'pancake-flip', 5);
     insert into public.minigame_rounds (player_id, minigame_id, score, tokens_awarded)
       values (v_b_id, 'pancake-flip', 5, 0);
     insert into public.igloo_slots (player_id, slot, item_id)
-      values (v_b_id, 1, 'rgb-light-strip');
+      values (v_b_id, 1, 'desk');
 
     perform set_config('role', 'authenticated', true);
     perform set_config(
@@ -237,12 +237,12 @@ begin
 
     -----------------------------------------------------------------------
     -- An igloo_slots insert with player_id = B fails the RLS check with
-    -- 42501, even though the item_id given (rgb-light-strip) is one B does
+    -- 42501, even though the item_id given (desk, a floor item) is one B does
     -- own.
     -----------------------------------------------------------------------
     begin
       insert into public.igloo_slots (player_id, slot, item_id)
-        values (v_b_id, 6, 'rgb-light-strip');
+        values (v_b_id, 6, 'desk');
       v_names := array_append(v_names, 'igloo_slot_wrong_player_blocked_42501');
       v_pass := array_append(v_pass, false);
       v_detail := array_append(v_detail, 'insert succeeded, expected 42501');
