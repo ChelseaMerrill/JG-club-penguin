@@ -144,3 +144,5 @@ Atlas also writes the pull-request link on the ticket.
 - Atlas never marks work as done. A person does that, after they review the pull request.
 - Atlas never removes or rewrites what a ticket asks for.
 <!-- atlas-v3:operators-guide:end -->
+
+<!-- AC 3 probe for #249: no supabase/ change. Throwaway; this PR is closed unmerged. -->
