@@ -30,6 +30,8 @@ jobs:
 
   supabase-proofs:
     runs-on: ubuntu-latest
+    env:
+      SUPABASE_CLI: supabase@2.121.0
     steps:
       - uses: actions/checkout@v4
         with:
@@ -52,11 +54,11 @@ jobs:
           run=true
           if [ -z "$base" ] || [[ "$base" =~ ^0+$ ]]; then
             echo "No usable base SHA; running proofs (fail-safe)."
-          elif ! changed="$(git diff --name-only "$base" "$head" -- supabase/migrations supabase/tests)"; then
+          elif ! changed="$(git diff --name-only "$base" "$head" -- supabase/migrations supabase/tests supabase/config.toml)"; then
             echo "git diff failed; running proofs (fail-safe)."
           elif [ -z "$changed" ]; then
             run=false
-            echo "No changes under supabase/migrations or supabase/tests."
+            echo "No changes under supabase/migrations, supabase/tests or supabase/config.toml."
           else
             echo "Changed paths:"
             echo "$changed"
@@ -69,10 +71,10 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - if: steps.changes.outputs.run == 'true'
-        run: npx supabase@2.121.0 start
+        run: npx "$SUPABASE_CLI" start
       - if: steps.changes.outputs.run == 'true'
-        run: npx supabase@2.121.0 db reset
+        run: npx "$SUPABASE_CLI" db reset
       - if: steps.changes.outputs.run == 'true'
         run: bash supabase/tests/run-proofs.sh
       - if: always() && steps.changes.outputs.run == 'true'
-        run: npx supabase@2.121.0 stop --no-backup
+        run: npx "$SUPABASE_CLI" stop --no-backup

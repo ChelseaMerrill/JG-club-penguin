@@ -1,10 +1,12 @@
+# Supabase proofs
+
 > Production migrations are now applied by the deploy pipeline (see
 > [Database migrations and production deploys](../../README.md#database-migrations-and-production-deploys)),
 > and the PR gate runs every proof through `run-proofs.sh` on local Supabase.
 > The per-migration "Real Supabase" SQL-editor steps below are the historical
 > gate records and remain valid for running a proof by hand.
 
-# #27 saved-progress proofs
+## #27 saved-progress proofs
 
 ## Local (Docker)
 

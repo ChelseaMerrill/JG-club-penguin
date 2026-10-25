@@ -49,7 +49,7 @@ npm run dev            # http://localhost:5173
 | `npm test` | Run Vitest unit tests |
 | `npm run test:e2e` | Run Playwright browser tests (first run: `npx playwright install chromium`) |
 
-CI runs typecheck, lint, format check, unit tests, and build on every pull request. A pull request that changes `supabase/migrations/**` or `supabase/tests/**` also runs the Supabase proof gate (see [Database migrations and production deploys](#database-migrations-and-production-deploys)).
+CI runs typecheck, lint, format check, unit tests, and build on every pull request. A pull request that changes `supabase/migrations/**`, `supabase/tests/**` or `supabase/config.toml` also runs the Supabase proof gate (see [Database migrations and production deploys](#database-migrations-and-production-deploys)).
 
 ## Supabase and Vercel setup
 
@@ -87,6 +87,7 @@ The Supabase CLI applies them, pinned at 2.121.0 and run as `npx supabase@2.121.
 1. `npx supabase@2.121.0 migration new <name>`
 2. Start the file with a header that says what it is for, any deploy-order note, and its proof file (`supabase/tests/<name>_proof.sql`).
 3. Do not add the old "Apply by pasting into the Supabase SQL editor (no CLI)" line. Existing files keep theirs because they are already applied, and a tracked runner never re-applies them.
+4. If another PR's migration merges first with a later timestamp, rename yours to a fresh timestamp before merging (`migration new` again and move the SQL). `supabase db push` refuses a migration older than the newest one already applied, and the PR gate can't see that because it replays from scratch.
 
 ### Prove it locally
 
@@ -103,14 +104,14 @@ npx supabase@2.121.0 stop --no-backup
 
 ### PR gate
 
-The `supabase-proofs` job in `ci.yml` always runs, so it can be a required check. Its steps run only when the PR changes `supabase/migrations/**` or `supabase/tests/**`; otherwise it passes with the steps skipped. When it runs it does `supabase start`, `supabase db reset`, then `bash supabase/tests/run-proofs.sh`. Output goes to `test-results/supabase-proofs/output.txt` (gitignored).
+The `supabase-proofs` job in `ci.yml` always runs, so it can be a required check. Its steps run only when the change touches `supabase/migrations/**`, `supabase/tests/**` or `supabase/config.toml`; otherwise it passes with the steps skipped. It also runs on pushes to `main`. When it runs it does `supabase start`, `supabase db reset`, then `bash supabase/tests/run-proofs.sh`. Output goes to `test-results/supabase-proofs/output.txt` (gitignored).
 
 ### Deploy pipeline
 
-The Deploy workflow (`.github/workflows/deploy.yml`) runs on every push to `main`. Deploys queue (concurrency group `deploy-prod`, no cancel-in-progress). Jobs:
+The Deploy workflow (`.github/workflows/deploy.yml`) runs on every push to `main`, one run at a time (concurrency group `deploy-prod`, no cancel-in-progress). GitHub keeps only one pending run per group, so a newer push replaces an older pending one. That is safe: each run diffs from the head commit of the last fully successful Deploy run, not just from the previous push, so a replaced, failed or rejected run's migrations and functions are picked up by the next one. Jobs:
 
-1. `changes`: finds whether migrations changed and which `supabase/functions/<name>` folders changed.
-2. `migrate`: runs only if a migration changed. Waits for approval on the `production` environment, then `supabase link`, the baseline guard, and `supabase db push`.
+1. `changes`: runs only on `main`. Finds whether migrations changed and which `supabase/functions/<name>` folders changed since the last successful Deploy run. If there is none, or the diff fails, it runs everything (fail-safe).
+2. `migrate`: runs only if a migration changed or `run_migrations` is set. Waits for approval on the `production` environment, then `supabase link`, the baseline guard, and `supabase db push`.
 3. `functions`: deploys only the changed function folders. Also uses the `production` environment (it reads the same secrets), so it needs approval too.
 4. `vercel`: always runs after `migrate` and `functions` succeed or are skipped. `vercel pull --environment=production`, `vercel build --prod`, `vercel deploy --prebuilt --prod` (Vercel CLI 65.1.0).
 
@@ -121,6 +122,8 @@ A failed or rejected `migrate` blocks `functions` and `vercel`. The baseline gua
 **Manual triggers.** Actions → Deploy → Run workflow:
 
 - `run_migrations`: run `migrate` even if no migration changed.
+
+Run it from `main`; a run from any other branch skips every job.
 - `force_functions`: deploy every function, not just the changed ones.
 
 ### One-time setup (repo admin)
@@ -146,7 +149,7 @@ Do this once, before the first deploy. It marks the 19 existing migrations as ap
 
 1. `npx supabase@2.121.0 login` with the shared token, then `npx supabase@2.121.0 link --project-ref <project-ref>`.
 2. `npx supabase@2.121.0 start && npx supabase@2.121.0 db reset`
-3. `npx supabase@2.121.0 db diff --linked`. If production has changes that are not in the files, capture them as a new migration and merge it first.
+3. `npx supabase@2.121.0 db diff --linked`. If production has changes that are not in the files, capture them as a new migration and merge it first. While linked, also confirm production's Postgres major version (`select version();`) matches `[db] major_version` in `supabase/config.toml` (17); align the config if it doesn't.
 4. Mark all 19 applied (the timestamps are the file names in `ls supabase/migrations`):
 
    ```sh

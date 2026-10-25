@@ -5,7 +5,10 @@
 # unless every proof prints rows, includes an `ALL` row, and every row's pass
 # field is exactly `t`.
 #
-# DATABASE_URL defaults to the local Supabase Postgres. Requires psql.
+# Local Supabase only: it inserts a fixture Player into auth.users and
+# public.players, so it refuses any DATABASE_URL host other than 127.0.0.1 or
+# localhost. Never point it at the production project. DATABASE_URL defaults
+# to the local Supabase Postgres. Requires psql.
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -14,11 +17,22 @@ DATABASE_URL="${DATABASE_URL:-postgresql://postgres:postgres@127.0.0.1:54322/pos
 # Glob override exists only so a negative check can point at scratch proofs.
 PROOF_GLOB="${PROOF_GLOB:-$SCRIPT_DIR/*_proof.sql}"
 
+case "$DATABASE_URL" in
+  *@127.0.0.1:* | *@127.0.0.1/* | *@localhost:* | *@localhost/*) ;;
+  *)
+    echo "run-proofs.sh only runs against local Supabase (127.0.0.1 or localhost); refusing DATABASE_URL with another host." >&2
+    exit 1
+    ;;
+esac
+
 if ! command -v psql >/dev/null 2>&1; then
   echo "run-proofs.sh requires 'psql' on PATH; install the PostgreSQL client and retry." >&2
   exit 1
 fi
 
+# Evidence policy: captured output cited as PASS evidence is saved under
+# test-results/ (gitignored, local only). Tee everything (stdout and stderr) to
+# that file as well as the terminal, from here to the end of the script.
 OUTPUT_DIR="$REPO_ROOT/test-results/supabase-proofs"
 mkdir -p "$OUTPUT_DIR"
 exec > >(tee "$OUTPUT_DIR/output.txt") 2>&1
@@ -33,8 +47,11 @@ SQL
 passed=0
 total=0
 failed=0
-# shellcheck disable=SC2206
-files=($(ls -1 $PROOF_GLOB 2>/dev/null | sort))
+# A while-read loop rather than mapfile, so macOS's bash 3.2 can run this too.
+files=()
+while IFS= read -r f; do
+  files+=("$f")
+done < <(compgen -G "$PROOF_GLOB" | sort || true)
 if [ "${#files[@]}" -eq 0 ]; then
   echo "FAIL: no proof files match $PROOF_GLOB" >&2
   exit 1
@@ -43,12 +60,15 @@ fi
 for file in "${files[@]}"; do
   total=$((total + 1))
   name="$(basename "$file")"
-  echo "=== $name"
+  echo "== $name =="
+  errfile="$(mktemp)"
   set +e
-  out="$(psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -A -t -F '|' -f "$file" 2>&1)"
+  out="$(psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -q -A -t -F '|' -f "$file" 2>"$errfile")"
   status=$?
   set -e
   printf '%s\n' "$out"
+  cat "$errfile"
+  rm -f "$errfile"
 
   if [ "$status" -ne 0 ]; then
     echo "FAIL: $name: psql exited $status" >&2
@@ -63,8 +83,8 @@ for file in "${files[@]}"; do
     continue
   fi
 
-  if ! printf '%s\n' "$out" | awk -F'|' '$1 == "ALL" { found = 1 } END { exit !found }'; then
-    echo "FAIL: $name: no row with check_name ALL" >&2
+  if ! printf '%s\n' "$out" | awk -F'|' '$1 == "ALL" && NF >= 3 { found = 1 } END { exit !found }'; then
+    echo "FAIL: $name: no check_name|pass|detail row named ALL" >&2
     failed=$((failed + 1))
     continue
   fi

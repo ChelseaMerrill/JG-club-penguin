@@ -61,7 +61,14 @@ The `feedback-email` Edge Function was also deployed by hand.
 - Merging to `main` brings production up to date, tracked and in order. PRs that
   touch `supabase/migrations/**` or `supabase/tests/**` are proven on real local
   Supabase before they merge.
-- Deploys queue (concurrency group `deploy-prod`, no cancel-in-progress).
+- Deploys run one at a time (concurrency group `deploy-prod`, no
+  cancel-in-progress). GitHub keeps only one pending run per group, so a newer
+  push replaces an older pending run. Each run therefore diffs from the head of
+  the last fully successful Deploy run on `main`, not just the push's `before`,
+  so a replaced, failed or rejected run's migrations and functions are picked
+  up by the next one. The workflow only deploys from `main`, including manual
+  runs. This replaces the ticket's literal `before..sha` diff (recorded as a
+  scope change on #249).
 - Someone with repo admin must configure the environment and secrets, and a
   human must run the baseline once.
 
