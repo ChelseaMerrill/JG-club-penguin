@@ -14,14 +14,16 @@ sets the row's `emailed_at`.
 
 ## One-time setup (human steps)
 
-You need the Supabase CLI (`npx supabase ...` works), logged in and linked to
-the project: `supabase login`, then `supabase link --project-ref <project-ref>`.
+You need the Supabase CLI, pinned as `npx supabase@2.121.0 ...`, logged in and
+linked to the project: `npx supabase@2.121.0 login`, then
+`npx supabase@2.121.0 link --project-ref <project-ref>`.
 
-1. **Apply the migration.** Paste
-   `supabase/migrations/20260928010000_feedback.sql` into the Supabase SQL
-   editor and run it (safe to rerun). Optionally prove it: paste
-   `supabase/tests/feedback_proof.sql`, replace the fixture id as its header
-   says, and check every row (including `ALL`) shows `pass = true`.
+1. **Apply the migration.** The deploy pipeline applies
+   `supabase/migrations/20260928010000_feedback.sql` (or already did); see
+   [Database migrations and production deploys](../../../README.md#database-migrations-and-production-deploys).
+   Optionally prove it by hand: open `supabase/tests/feedback_proof.sql`,
+   replace the fixture id as its header says, then run it in the Supabase SQL
+   editor and check every row (including `ALL`) shows `pass = true`.
 
 2. **Create a Resend API key.** Sign up at <https://resend.com>, then API Keys
    → Create API Key (permission "Sending access" is enough). Copy it once; it
@@ -38,28 +40,32 @@ the project: `supabase login`, then `supabase link --project-ref <project-ref>`.
 4. **Set the function's secrets** (replace every `<...>`; don't commit them):
 
    ```sh
-   supabase secrets set \
+   npx supabase@2.121.0 secrets set \
      RESEND_API_KEY=<resend-api-key> \
      FEEDBACK_TO_EMAIL=<destination-address> \
      FEEDBACK_WEBHOOK_SECRET=<webhook-secret>
    # Only if you verified a domain in step 2:
-   supabase secrets set FEEDBACK_FROM_EMAIL=<sender-address-on-that-domain>
+   npx supabase@2.121.0 secrets set FEEDBACK_FROM_EMAIL=<sender-address-on-that-domain>
    ```
 
    `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are provided to Edge
    Functions automatically.
 
-5. **Deploy the function**:
+5. **Deploy the function.** The Deploy workflow deploys it whenever
+   `supabase/functions/feedback-email/**` changes on `main`, or from Actions →
+   Deploy → Run workflow with `force_functions`. Manual fallback:
 
    ```sh
-   supabase functions deploy feedback-email --no-verify-jwt
+   npx supabase@2.121.0 functions deploy feedback-email --no-verify-jwt
    ```
 
-   `--no-verify-jwt` because the webhook authenticates with the
+   `verify_jwt = false` now lives in `supabase/config.toml`
+   (`[functions.feedback-email]`), so the workflow's deploy matches this
+   command. It is off because the webhook authenticates with the
    `x-webhook-secret` header instead of a Supabase JWT; the function rejects
    any request without the right secret (401) before reading its body. (If you
-   prefer to keep JWT verification on, deploy without the flag and also add an
-   `Authorization: Bearer <service-role-key>` header in step 6.)
+   prefer to keep JWT verification on, set `verify_jwt = true`, redeploy, and
+   also add an `Authorization: Bearer <service-role-key>` header in step 6.)
 
 6. **Create the Database Webhook.** Dashboard → Database → Webhooks → Create a
    new hook:

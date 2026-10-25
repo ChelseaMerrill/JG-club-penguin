@@ -17,3 +17,5 @@ playwright-output/
 test-results/
 # Supabase CLI link/cache state (project ref, CLI version); local only.
 supabase/.temp/
+# Vercel CLI link state (vercel link / vercel pull); local only.
+.vercel/

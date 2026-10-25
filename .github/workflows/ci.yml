@@ -27,3 +27,54 @@ jobs:
       - run: npm run format:check
       - run: npm test
       - run: npm run build
+
+  supabase-proofs:
+    runs-on: ubuntu-latest
+    env:
+      SUPABASE_CLI: supabase@2.121.0
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Decide whether Supabase files changed
+        id: changes
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            base="$PR_BASE_SHA"
+            head="HEAD"
+          else
+            base="$PUSH_BEFORE_SHA"
+            head="$HEAD_SHA"
+          fi
+          run=true
+          if [ -z "$base" ] || [[ "$base" =~ ^0+$ ]]; then
+            echo "No usable base SHA; running proofs (fail-safe)."
+          elif ! changed="$(git diff --name-only "$base" "$head" -- supabase/migrations supabase/tests supabase/config.toml)"; then
+            echo "git diff failed; running proofs (fail-safe)."
+          elif [ -z "$changed" ]; then
+            run=false
+            echo "No changes under supabase/migrations, supabase/tests or supabase/config.toml."
+          else
+            echo "Changed paths:"
+            echo "$changed"
+          fi
+          echo "Run Supabase proofs: $run"
+          echo "run=$run" >> "$GITHUB_OUTPUT"
+      - if: steps.changes.outputs.run == 'true'
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - if: steps.changes.outputs.run == 'true'
+        run: npx "$SUPABASE_CLI" start
+      - if: steps.changes.outputs.run == 'true'
+        run: npx "$SUPABASE_CLI" db reset
+      - if: steps.changes.outputs.run == 'true'
+        run: bash supabase/tests/run-proofs.sh
+      - if: always() && steps.changes.outputs.run == 'true'
+        run: npx "$SUPABASE_CLI" stop --no-backup

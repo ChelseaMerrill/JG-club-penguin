@@ -1,0 +1,221 @@
+# Production deploy, run on every push to main (or manually via workflow_dispatch from main).
+#
+# Gating, in order:
+#   changes   -> runs only on main; works out which migrations / Edge Functions changed
+#                since the last fully successful Deploy run (see "Change base" below).
+#   migrate   -> runs if migrations changed or run_migrations is set; approval-gated by
+#                the `production` environment. A failed or rejected migrate blocks
+#                functions and vercel.
+#   functions -> deploys only the changed Edge Functions (all with force_functions); also
+#                approval-gated by the `production` environment (it reads the same
+#                environment secrets).
+#   vercel    -> builds and deploys the static site; runs only after changes succeeded and
+#                migrate and functions have succeeded or been skipped.
+#
+# Change base: the head commit of the last successful Deploy run on main, not just the
+# push's `before`. GitHub keeps only one pending run per concurrency group, so a newer
+# push cancels an older pending one; and a rejected or failed run deploys nothing. Diffing
+# from the last success means the next run still picks up whatever those runs missed. If
+# no successful run is found, or the diff fails, every step runs (fail-safe).
+#
+# Baseline guard: `migrate` refuses to `db push` unless migration 20260924000000 is
+# recorded on both Local and Remote, i.e. the one-time baseline described in README.md
+# (Database migrations and production deploys) has been done.
+#
+# Vercel's own git deploy for main is disabled in vercel.json; this workflow is the
+# only production deploy path.
+
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      run_migrations:
+        description: Run supabase db push even if no migration changed
+        type: boolean
+        default: false
+      force_functions:
+        description: Deploy every Edge Function
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-prod
+  cancel-in-progress: false
+
+env:
+  SUPABASE_CLI: supabase@2.121.0
+  VERCEL_CLI: vercel@65.1.0
+
+jobs:
+  changes:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      migrations: ${{ steps.detect.outputs.migrations }}
+      functions: ${{ steps.detect.outputs.functions }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Find the last successful Deploy run
+        id: base
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -uo pipefail
+          base="$(gh api "repos/$REPO/actions/workflows/deploy.yml/runs?branch=main&status=success&per_page=1" --jq '.workflow_runs[0].head_sha // empty' 2>/dev/null)" || base=""
+          echo "Last successful Deploy head: ${base:-<none>}"
+          echo "sha=$base" >> "$GITHUB_OUTPUT"
+      - name: Detect changed migrations and functions
+        id: detect
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BASE: ${{ steps.base.outputs.sha }}
+          HEAD_SHA: ${{ github.sha }}
+          INPUT_RUN_MIGRATIONS: ${{ inputs.run_migrations }}
+          INPUT_FORCE_FUNCTIONS: ${{ inputs.force_functions }}
+        run: |
+          set -euo pipefail
+
+          all_functions() {
+            if [ -d supabase/functions ]; then
+              find supabase/functions -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort | jq -R . | jq -sc .
+            else
+              echo '[]'
+            fi
+          }
+
+          if [ -z "$BASE" ] || ! changed="$(git diff --name-only "$BASE" "$HEAD_SHA")"; then
+            echo "No usable base commit; failing safe (migrations=true, all functions)."
+            migrations=true
+            functions="$(all_functions)"
+          else
+            echo "Changed since $BASE:"
+            echo "$changed"
+            if grep -q '^supabase/migrations/' <<<"$changed"; then
+              migrations=true
+            else
+              migrations=false
+            fi
+            names="$(sed -nE 's#^supabase/functions/([^/]+)/.*#\1#p' <<<"$changed" | sort -u)"
+            existing=""
+            for n in $names; do
+              if [ -d "supabase/functions/$n" ]; then
+                existing="$existing$n"$'\n'
+              fi
+            done
+            functions="$(printf '%s' "$existing" | jq -R . | jq -sc 'map(select(length > 0))')"
+          fi
+
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            if [ "$INPUT_RUN_MIGRATIONS" = "true" ]; then
+              migrations=true
+            fi
+            if [ "$INPUT_FORCE_FUNCTIONS" = "true" ]; then
+              functions="$(all_functions)"
+            fi
+          fi
+
+          echo "migrations=$migrations"
+          echo "functions=$functions"
+          echo "migrations=$migrations" >> "$GITHUB_OUTPUT"
+          echo "functions=$functions" >> "$GITHUB_OUTPUT"
+
+  migrate:
+    needs: changes
+    if: needs.changes.result == 'success' && needs.changes.outputs.migrations == 'true'
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Link Supabase project
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+        run: npx "$SUPABASE_CLI" link --project-ref "$SUPABASE_PROJECT_ID"
+      - name: Baseline guard
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          set -euo pipefail
+          list="$(npx "$SUPABASE_CLI" migration list --linked)"
+          echo "$list"
+          if ! grep -qE '20260924000000[[:space:]]*\|[[:space:]]*20260924000000' <<<"$list"; then
+            echo "Baseline missing: run the one-time baseline in README.md (Database migrations and production deploys) before the first deploy"
+            exit 1
+          fi
+      - name: Push migrations
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: npx "$SUPABASE_CLI" db push
+      - name: Migration list after push
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: npx "$SUPABASE_CLI" migration list --linked
+
+  functions:
+    needs: [changes, migrate]
+    if: ${{ !cancelled() && needs.changes.result == 'success' && (needs.migrate.result == 'success' || needs.migrate.result == 'skipped') && needs.changes.outputs.functions != '[]' }}
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Deploy Edge Functions
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+          FUNCTIONS: ${{ needs.changes.outputs.functions }}
+        run: |
+          set -euo pipefail
+          jq -e 'type == "array" and length > 0' <<<"$FUNCTIONS" >/dev/null
+          mapfile -t names < <(jq -r '.[]' <<<"$FUNCTIONS")
+          for name in "${names[@]}"; do
+            echo "Deploying function: $name"
+            npx "$SUPABASE_CLI" functions deploy "$name" --project-ref "$SUPABASE_PROJECT_ID"
+          done
+
+  vercel:
+    needs: [changes, migrate, functions]
+    if: ${{ !cancelled() && needs.changes.result == 'success' && (needs.migrate.result == 'success' || needs.migrate.result == 'skipped') && (needs.functions.result == 'success' || needs.functions.result == 'skipped') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - name: Install Vercel CLI
+        run: npm install -g "$VERCEL_CLI"
+      - name: Pull, build and deploy production
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+        run: |
+          set -euo pipefail
+          vercel pull --yes --environment=production --token="$VERCEL_TOKEN"
+          vercel build --prod --token="$VERCEL_TOKEN"
+          url="$(vercel deploy --prebuilt --prod --token="$VERCEL_TOKEN")"
+          echo "Deployed: $url"
